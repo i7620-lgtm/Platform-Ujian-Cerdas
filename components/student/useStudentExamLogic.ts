@@ -78,7 +78,7 @@ export const useStudentExamLogic = ({
     ? "Diawasi & Terkunci"
     : "Diawasi Sistem";
 
-  const isAnswered = (q: Question, currentAnswers: Record<string, string>) => {
+  const isAnswered = useCallback((q: Question, currentAnswers: Record<string, string>) => {
     const ans = currentAnswers[q.id];
     if (!ans) return false;
     if (q.questionType === "COMPLEX_MULTIPLE_CHOICE") {
@@ -108,7 +108,7 @@ export const useStudentExamLogic = ({
       }
     }
     return ans.trim().length > 0;
-  };
+  }, []);
 
   const handleSubmit = useCallback(
     async (isAuto = false, status: ResultStatus = "completed") => {
@@ -181,7 +181,7 @@ export const useStudentExamLogic = ({
         isSubmittingRef.current = false;
       }
     },
-    [activeExam, onSubmit, userLocation, STORAGE_KEY, student.studentId],
+    [activeExam, onSubmit, userLocation, STORAGE_KEY, student.studentId, isAnswered],
   );
 
   const { timeLeft } = useExamAntiCheat({
@@ -585,7 +585,7 @@ export const useStudentExamLogic = ({
         examRoomChannelRef.current,
       )
       .catch(() => {});
-  }, [activeExam, student.studentId]);
+  }, [activeExam, student.studentId, isAnswered]);
 
   const handleAnswerChange = useCallback(
     (qId: string, val: string) => {
@@ -624,7 +624,7 @@ export const useStudentExamLogic = ({
     ],
   );
 
-  const scrollToQuestion = (id: string) => {
+  const scrollToQuestion = useCallback((id: string) => {
     setIsNavOpen(false);
     try {
       localStorage.setItem(`exam_last_q_${activeExam.code}_${student.studentId}`, id);
@@ -633,9 +633,9 @@ export const useStudentExamLogic = ({
     }
     const el = document.getElementById(id);
     if (el) {
-      el.scrollIntoView({ behavior: "smooth", block: "center" });
+      el.scrollIntoView({ behavior: "smooth", block: "start" });
     }
-  };
+  }, [activeExam.code, student.studentId]);
 
   const formatTime = (s: number) => {
     if (s === Infinity) return "Tanpa Batas Waktu";

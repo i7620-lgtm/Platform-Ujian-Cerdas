@@ -289,7 +289,7 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({
       if (e.touches.length === 1) {
         const currentY = e.touches[0].clientY;
         const scrollTop = window.scrollY || document.documentElement.scrollTop;
-        if (scrollTop <= 0 && currentY > startY) {
+        if (scrollTop <= 0 && currentY > startY + 12) {
           if (e.cancelable) {
             e.preventDefault();
           }
@@ -308,141 +308,132 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({
     };
   }, [isSubmitting]);
 
-  // Auto-scroll to last viewed question or first unanswered question after load
+  // Selalu mulai dari posisi paling atas halaman ujian saat pertama kali dimuat
   useEffect(() => {
-    const timer = setTimeout(() => {
-      try {
-        const lastQId = localStorage.getItem(`exam_last_q_${activeExam.code}_${student.studentId}`);
-        if (lastQId) {
-          const el = document.getElementById(lastQId);
-          if (el) {
-            el.scrollIntoView({ behavior: "smooth", block: "center" });
-            return;
-          }
-        }
-        // Fallback: scroll to first unanswered question if answers already exist
-        const firstUnanswered = activeExam.questions.find(
-          (q) => q.questionType !== "INFO" && !isAnswered(q, answersRef.current)
-        );
-        if (firstUnanswered && answersRef.current && Object.keys(answersRef.current).length > 0) {
-          const el = document.getElementById(firstUnanswered.id);
-          if (el) {
-            el.scrollIntoView({ behavior: "smooth", block: "center" });
-          }
-        }
-      } catch {
-        // ignore
-      }
-    }, 350);
-
-    return () => clearTimeout(timer);
-  }, [activeExam.code, activeExam.questions, answersRef, isAnswered, student.studentId]);
+    window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+  }, []);
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] dark:bg-slate-950 font-sans selection:bg-indigo-100 selection:text-indigo-900 pb-40 transition-colors duration-300">
       {/* Modal Informasi Aturan Ujian */}
       {showConfigIntro && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-fade-in">
-          <div className="bg-white dark:bg-slate-900 w-full max-w-md rounded-[2.5rem] shadow-2xl overflow-hidden border border-white dark:border-slate-800 animate-gentle-slide">
-            <div className="p-8 sm:p-10">
-              <div className="flex justify-center mb-8">
-                <div className="p-4 bg-indigo-50 dark:bg-indigo-900/20 rounded-3xl text-indigo-600 dark:text-indigo-400">
-                  <ShieldCheckIcon className="w-10 h-10" />
-                </div>
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-md animate-fade-in">
+          <div className="bg-white dark:bg-slate-900 w-full max-w-lg sm:max-w-xl md:max-w-2xl max-h-[92dvh] overflow-y-auto custom-scrollbar rounded-[1.75rem] sm:rounded-[2.25rem] shadow-2xl border border-white dark:border-slate-800 animate-gentle-slide p-5 sm:p-6 md:p-7">
+            <div className="flex flex-col items-center text-center mb-4 sm:mb-5">
+              <div className="w-11 h-11 sm:w-12 sm:h-12 bg-indigo-50 dark:bg-indigo-900/30 rounded-2xl flex items-center justify-center text-indigo-600 dark:text-indigo-400 mb-2.5 sm:mb-3 shadow-xs">
+                <ShieldCheckIcon className="w-6 h-6 sm:w-6.5 sm:h-6.5" />
               </div>
 
-              <h2 className="text-2xl font-black text-slate-800 dark:text-white text-center mb-2 tracking-tight">
+              <h2 className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white tracking-tight">
                 Aturan Ujian
               </h2>
-              <p className="text-sm text-slate-500 dark:text-slate-400 text-center mb-8 font-medium">
+              <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 font-medium mt-0.5">
                 Mohon perhatikan konfigurasi ujian berikut:
               </p>
+            </div>
 
-              <div className="space-y-4 mb-10">
-                <div className="flex items-center gap-4 p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-100 dark:border-slate-800">
-                  <ClockIcon className="w-5 h-5 text-indigo-500 shrink-0" />
-                  <div>
-                    <p className="text-xs font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest">
-                      Batas Waktu
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-2.5">
+              {/* Batas Waktu */}
+              <div className="flex items-center gap-3 p-3 bg-slate-50 dark:bg-slate-800/50 rounded-xl sm:rounded-2xl border border-slate-100 dark:border-slate-800">
+                <div className="w-8 h-8 rounded-lg bg-indigo-100/60 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0">
+                  <ClockIcon className="w-4.5 h-4.5" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-[10px] sm:text-[11px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-wider">
+                    Batas Waktu
+                  </p>
+                  <p className="text-xs sm:text-sm font-bold text-slate-700 dark:text-slate-200 truncate">
+                    {activeExam.config.examMode === "PR"
+                      ? "Tanpa Batas"
+                      : activeExam.config.timeLimit > 0
+                        ? `${activeExam.config.timeLimit} Menit`
+                        : "Tanpa Batas"}
+                  </p>
+                </div>
+              </div>
+
+              {/* Target Nilai */}
+              {activeExam.config.kkm && (
+                <div className="flex items-center gap-3 p-3 bg-emerald-50 dark:bg-emerald-900/20 rounded-xl sm:rounded-2xl border border-emerald-100 dark:border-emerald-900/30">
+                  <div className="w-8 h-8 rounded-lg bg-emerald-100/70 dark:bg-emerald-900/40 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
+                    <CheckCircleIcon className="w-4.5 h-4.5" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-[10px] sm:text-[11px] font-black uppercase text-emerald-600 dark:text-emerald-400 tracking-wider">
+                      Target Nilai
                     </p>
-                    <p className="text-sm font-bold text-slate-700 dark:text-slate-200">
-                      {activeExam.config.examMode === "PR"
-                        ? "Tanpa Batas"
-                        : activeExam.config.timeLimit > 0
-                          ? `${activeExam.config.timeLimit} Menit`
-                          : "Tanpa Batas"}
+                    <p className="text-xs sm:text-sm font-bold text-emerald-700 dark:text-emerald-300 truncate">
+                      KKM Minimal {activeExam.config.kkm}
                     </p>
                   </div>
                 </div>
+              )}
 
-                {activeExam.config.kkm && (
-                  <div className="flex items-center gap-4 p-4 bg-emerald-50 dark:bg-emerald-900/20 rounded-2xl border border-emerald-100 dark:border-emerald-900/30">
-                    <CheckCircleIcon className="w-5 h-5 text-emerald-500 shrink-0" />
-                    <div>
-                      <p className="text-xs font-black uppercase text-emerald-400 dark:text-emerald-500 tracking-widest">
-                        Target Nilai
-                      </p>
-                      <p className="text-sm font-bold text-emerald-700 dark:text-emerald-300">
-                        KKM Minimal {activeExam.config.kkm}
-                      </p>
+              {/* Pengawasan Aktif */}
+              {activeExam.config.detectBehavior &&
+                activeExam.config.examMode !== "PR" && (
+                  <div className="flex items-center gap-3 p-3 bg-rose-50 dark:bg-rose-900/20 rounded-xl sm:rounded-2xl border border-rose-100 dark:border-rose-900/30">
+                    <div className="w-8 h-8 rounded-lg bg-rose-100/70 dark:bg-rose-900/40 text-rose-600 dark:text-rose-400 flex items-center justify-center shrink-0">
+                      <LockClosedIcon className="w-4.5 h-4.5" />
                     </div>
-                  </div>
-                )}
-
-                {activeExam.config.detectBehavior &&
-                  activeExam.config.examMode !== "PR" && (
-                    <div className="flex items-center gap-4 p-4 bg-rose-50 dark:bg-rose-900/20 rounded-2xl border border-rose-100 dark:border-rose-900/30">
-                      <LockClosedIcon className="w-5 h-5 text-rose-500 shrink-0" />
-                      <div>
-                        <p className="text-xs font-black uppercase text-rose-400 dark:text-rose-500 tracking-widest">
-                          Pengawasan Aktif
-                        </p>
-                        <p className="text-sm font-bold text-rose-700 dark:text-rose-300">
-                          {activeExam.config.continueWithPermission
-                            ? "Akses Terkunci Otomatis Jika Curang"
-                            : "Aktivitas Tercatat Sistem"}
-                        </p>
-                      </div>
-                    </div>
-                  )}
-
-                {(activeExam.config.shuffleQuestions ||
-                  activeExam.config.shuffleAnswers) && (
-                  <div className="flex items-center gap-4 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-2xl border border-blue-100 dark:border-blue-900/30">
-                    <ArrowsRightLeftIcon className="w-5 h-5 text-blue-500 shrink-0" />
-                    <div>
-                      <p className="text-xs font-black uppercase text-blue-400 dark:text-blue-500 tracking-widest">
-                        Mode Acak
+                    <div className="min-w-0">
+                      <p className="text-[10px] sm:text-[11px] font-black uppercase text-rose-500 dark:text-rose-400 tracking-wider">
+                        Pengawasan Aktif
                       </p>
-                      <p className="text-sm font-bold text-blue-700 dark:text-blue-300">
-                        Soal & Jawaban Diacak
+                      <p className="text-xs sm:text-sm font-bold text-rose-700 dark:text-rose-300 truncate">
+                        {activeExam.config.continueWithPermission
+                          ? "Akses Terkunci Jika Curang"
+                          : "Aktivitas Tercatat Sistem"}
                       </p>
                     </div>
                   </div>
                 )}
 
-                {activeExam.config.trackLocation &&
-                  activeExam.config.examMode !== "PR" && (
-                    <div className="flex items-center gap-4 p-4 bg-emerald-50 dark:bg-emerald-900/20 rounded-2xl border border-emerald-100 dark:border-emerald-900/30">
-                      <MapPinIcon className="w-5 h-5 text-emerald-500 shrink-0" />
-                      <div>
-                        <p className="text-xs font-black uppercase text-emerald-400 dark:text-emerald-500 tracking-widest">
-                          Pelacakan Lokasi
-                        </p>
-                        <p className="text-sm font-bold text-emerald-700 dark:text-emerald-300">
-                          Koordinat GPS Dicatat
-                        </p>
-                      </div>
-                    </div>
-                  )}
-              </div>
+              {/* Mode Acak */}
+              {(activeExam.config.shuffleQuestions ||
+                activeExam.config.shuffleAnswers) && (
+                <div className="flex items-center gap-3 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-xl sm:rounded-2xl border border-blue-100 dark:border-blue-900/30">
+                  <div className="w-8 h-8 rounded-lg bg-blue-100/70 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0">
+                    <ArrowsRightLeftIcon className="w-4.5 h-4.5" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-[10px] sm:text-[11px] font-black uppercase text-blue-500 dark:text-blue-400 tracking-wider">
+                      Mode Acak
+                    </p>
+                    <p className="text-xs sm:text-sm font-bold text-blue-700 dark:text-blue-300 truncate">
+                      Soal & Jawaban Diacak
+                    </p>
+                  </div>
+                </div>
+              )}
 
+              {/* Pelacakan Lokasi */}
+              {activeExam.config.trackLocation &&
+                activeExam.config.examMode !== "PR" && (
+                  <div className="flex items-center gap-3 p-3 bg-teal-50 dark:bg-teal-900/20 rounded-xl sm:rounded-2xl border border-teal-100 dark:border-teal-900/30 sm:col-span-2">
+                    <div className="w-8 h-8 rounded-lg bg-teal-100/70 dark:bg-teal-900/40 text-teal-600 dark:text-teal-400 flex items-center justify-center shrink-0">
+                      <MapPinIcon className="w-4.5 h-4.5" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-[10px] sm:text-[11px] font-black uppercase text-teal-600 dark:text-teal-400 tracking-wider">
+                        Pelacakan Lokasi
+                      </p>
+                      <p className="text-xs sm:text-sm font-bold text-teal-700 dark:text-teal-300 truncate">
+                        Koordinat GPS Dicatat
+                      </p>
+                    </div>
+                  </div>
+                )}
+            </div>
+
+            {/* Garis Pemisah Horizontal & Tombol Mulai Mengerjakan */}
+            <div className="mt-3.5 sm:mt-4 pt-3.5 sm:pt-4 border-t border-slate-100 dark:border-slate-800">
               <button
                 onClick={() => setShowConfigIntro(false)}
-                className="w-full py-4 bg-slate-900 dark:bg-indigo-600 text-white font-bold rounded-2xl shadow-xl hover:shadow-indigo-500/20 transition-all active:scale-[0.98] flex items-center justify-center gap-2 group"
+                className="w-full py-2.5 sm:py-3 px-5 bg-slate-900 hover:bg-indigo-600 dark:bg-indigo-600 dark:hover:bg-indigo-500 text-white font-bold text-xs sm:text-sm rounded-xl sm:rounded-2xl shadow-md hover:shadow-indigo-500/20 transition-all active:scale-[0.99] flex items-center justify-center gap-2 group cursor-pointer"
               >
                 <span>Mulai Mengerjakan</span>
-                <CheckCircleIcon className="w-5 h-5 group-hover:scale-110 transition-transform" />
+                <CheckCircleIcon className="w-4 h-4 sm:w-4.5 sm:h-4.5 shrink-0 group-hover:scale-110 transition-transform" />
               </button>
             </div>
           </div>
@@ -757,7 +748,7 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({
             <div
               key={q.id}
               id={q.id}
-              className={`scroll-mt-32 animate-fade-in transition-all duration-500 ${isMissing ? "ring-2 ring-rose-400 rounded-[1.5rem]" : ""}`}
+              className={`scroll-mt-24 sm:scroll-mt-28 animate-fade-in transition-all duration-500 ${isMissing ? "ring-2 ring-rose-400 rounded-[1.5rem]" : ""}`}
             >
               <div className="bg-white dark:bg-slate-900 rounded-[1.5rem] border border-slate-100 dark:border-slate-800 shadow-sm p-6 sm:p-8">
                 <div className="flex gap-4 sm:gap-5 items-start">
