@@ -3,7 +3,7 @@ import type { RealtimeChannel } from "@supabase/supabase-js";
 import type { Exam, Result, TeacherProfile } from "../../../../types";
 import { supabase } from "../../../../lib/supabase";
 import { storageService } from "../../../../services/storage";
-import { parseList, normalize } from "../../examUtils";
+import { parseList, normalize, calculateExamScore } from "../../examUtils";
 
 interface UseOngoingExamModalProps {
   exam: Exam | null;
@@ -772,75 +772,7 @@ export const useOngoingExamModal = ({
   const calculateScore = useCallback(
     (r: Result) => {
       if (!displayExam) return 0;
-      let correctCount = 0;
-      const scorableQuestions = displayExam.questions.filter(
-        (q) => q.questionType !== "INFO" && q.questionType !== "ESSAY",
-      );
-
-      scorableQuestions.forEach((q) => {
-        const studentAnswer = r.answers[q.id];
-        if (!studentAnswer) return;
-
-        if (
-          q.questionType === "MULTIPLE_CHOICE" ||
-          q.questionType === "FILL_IN_THE_BLANK"
-        ) {
-          if (
-            q.correctAnswer &&
-            normalize(studentAnswer, q.questionType) ===
-              normalize(q.correctAnswer, q.questionType)
-          )
-            correctCount++;
-        } else if (q.questionType === "COMPLEX_MULTIPLE_CHOICE") {
-          const studentSet = new Set(
-            parseList(studentAnswer as string).map((a) =>
-              normalize(a, q.questionType),
-            ),
-          );
-          const correctSet = new Set(
-            parseList(q.correctAnswer).map((a) => normalize(a, q.questionType)),
-          );
-          if (
-            studentSet.size === correctSet.size &&
-            [...studentSet].every((val) => correctSet.has(val))
-          ) {
-            correctCount++;
-          }
-        } else if (q.questionType === "TRUE_FALSE") {
-          try {
-            const ansObj = JSON.parse(studentAnswer);
-            const allCorrect = q.trueFalseRows?.every(
-              (row: { answer: boolean }, idx: number) => {
-                if (ansObj[idx] === undefined) return false;
-                return ansObj[idx] === row.answer;
-              },
-            );
-            if (allCorrect) correctCount++;
-          } catch {
-            /* ignore */
-          }
-        } else if (q.questionType === "MATCHING") {
-          try {
-            const ansObj = JSON.parse(studentAnswer);
-            const allCorrect = q.matchingPairs?.every(
-              (pair: { right: string }, idx: number) => {
-                if (ansObj[idx] === undefined) return false;
-                return (
-                  normalize(ansObj[idx], q.questionType) ===
-                  normalize(pair.right, q.questionType)
-                );
-              },
-            );
-            if (allCorrect) correctCount++;
-          } catch {
-            /* ignore */
-          }
-        }
-      });
-
-      return scorableQuestions.length > 0
-        ? Math.round((correctCount / scorableQuestions.length) * 100)
-        : 0;
+      return calculateExamScore(displayExam, r.answers || {}).score;
     },
     [displayExam],
   );
