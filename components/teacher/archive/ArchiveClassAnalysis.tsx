@@ -4,6 +4,7 @@ import { ChartBarIcon, SparklesIcon } from "../../Icons";
 import { formatDuration, filterEvaluationSection } from "./archiveUtils";
 import { archiveService } from "../../../services/archive";
 import Markdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { ClassPerformanceDistribution } from "./ClassPerformanceDistribution";
 
 interface QuestionTypeStat {
@@ -99,6 +100,38 @@ export const ArchiveClassAnalysis: React.FC<ArchiveClassAnalysisProps> = ({
   } else {
     splitAnalysis = { before: sanitizedAnalysis, after: "", splitFound: false };
   }
+
+  const markdownComponents = useMemo(() => ({
+    table: ({ node, ...props }: any) => (
+      <div className="overflow-x-auto my-6 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm bg-white dark:bg-slate-800">
+        <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-700 text-sm text-left" {...props} />
+      </div>
+    ),
+    thead: ({ node, ...props }: any) => (
+      <thead className="bg-slate-100/80 dark:bg-slate-800/80 text-xs font-bold text-slate-700 dark:text-slate-200 uppercase tracking-wider border-b border-slate-200 dark:border-slate-700" {...props} />
+    ),
+    th: ({ node, ...props }: any) => (
+      <th className="px-4 py-3 font-bold border-r last:border-r-0 border-slate-200 dark:border-slate-700" {...props} />
+    ),
+    td: ({ node, ...props }: any) => (
+      <td className="px-4 py-3 border-b border-slate-100 dark:border-slate-700/60 border-r last:border-r-0 border-slate-100 dark:border-slate-700/60 align-top text-slate-700 dark:text-slate-300 leading-relaxed" {...props} />
+    ),
+    tr: ({ node, ...props }: any) => (
+      <tr className="hover:bg-slate-50/70 dark:hover:bg-slate-700/30 transition-colors odd:bg-slate-50/30 dark:odd:bg-slate-800/40" {...props} />
+    ),
+    h1: ({ node, ...props }: any) => (
+      <h1 className="text-2xl font-black text-slate-900 dark:text-white mt-8 mb-4 pb-3 border-b border-slate-200 dark:border-slate-700 flex items-center gap-2" {...props} />
+    ),
+    h2: ({ node, ...props }: any) => (
+      <h2 className="text-xl font-bold text-slate-800 dark:text-slate-100 mt-8 mb-4 border-l-4 border-indigo-500 pl-3 py-0.5" {...props} />
+    ),
+    h3: ({ node, ...props }: any) => (
+      <h3 className="text-base font-bold text-indigo-700 dark:text-indigo-400 mt-6 mb-2 flex items-center gap-2" {...props} />
+    ),
+    blockquote: ({ node, ...props }: any) => (
+      <blockquote className="border-l-4 border-amber-500 bg-amber-50/70 dark:bg-amber-950/20 text-slate-700 dark:text-slate-300 p-4 rounded-r-xl my-4 text-sm" {...props} />
+    ),
+  }), []);
 
   const renderClassPerformanceChart = () => {
     if (filteredResults.length === 0) return null;
@@ -285,7 +318,7 @@ export const ArchiveClassAnalysis: React.FC<ArchiveClassAnalysisProps> = ({
               <div className="space-y-6">
                 <div className="prose prose-sm dark:prose-invert max-w-none prose-headings:text-slate-800 dark:prose-headings:text-slate-100 prose-a:text-indigo-600 dark:prose-a:text-indigo-400">
                   <div className="markdown-body">
-                    <Markdown>{splitAnalysis.before}</Markdown>
+                    <Markdown remarkPlugins={[remarkGfm]} components={markdownComponents}>{splitAnalysis.before}</Markdown>
                   </div>
                 </div>
 
@@ -304,7 +337,7 @@ export const ArchiveClassAnalysis: React.FC<ArchiveClassAnalysisProps> = ({
                 {splitAnalysis.after && (
                   <div className="prose prose-sm dark:prose-invert max-w-none prose-headings:text-slate-800 dark:prose-headings:text-slate-100 prose-a:text-indigo-600 dark:prose-a:text-indigo-400">
                     <div className="markdown-body">
-                      <Markdown>{splitAnalysis.after}</Markdown>
+                      <Markdown remarkPlugins={[remarkGfm]} components={markdownComponents}>{splitAnalysis.after}</Markdown>
                     </div>
                   </div>
                 )}
@@ -324,7 +357,7 @@ export const ArchiveClassAnalysis: React.FC<ArchiveClassAnalysisProps> = ({
                 </div>
                 <div className="prose prose-sm dark:prose-invert max-w-none prose-headings:text-slate-800 dark:prose-headings:text-slate-100 prose-a:text-indigo-600 dark:prose-a:text-indigo-400">
                   <div className="markdown-body">
-                    <Markdown>{sanitizedAnalysis}</Markdown>
+                    <Markdown remarkPlugins={[remarkGfm]} components={markdownComponents}>{sanitizedAnalysis}</Markdown>
                   </div>
                 </div>
               </div>

@@ -4,6 +4,10 @@ import { examService } from './exam';
 import { resultService } from './result';
 import type { Exam, Result, Question, ExamSummary, TeacherProfile, AccountType, ExamConfig } from '../types';
 import { normalize, parseList } from '../components/teacher/examUtils';
+import { GoogleGenAI } from '@google/genai';
+
+// Pelacak ketersediaan kolom tambahan pada tabel exam_summaries di database produksi (default false agar aman dari error 400)
+let supportsExtendedSummaries: boolean = false;
 
 export class ArchiveService {
 
@@ -39,12 +43,12 @@ export class ArchiveService {
           }
       }
 
-      // PRESERVE MANUAL EDITS: Fetch existing summaries first
+      // PRESERVE MANUAL EDITS: Fetch existing summaries first (gunakan kolom aman)
       let existingList: any[] = [];
       try {
           const result = await supabase
               .from('exam_summaries')
-              .select('region, exam_type, class_level, school_name')
+              .select('school_name')
               .eq('exam_code', exam.code);
           existingList = result.data || [];
       } catch (e) {
@@ -135,12 +139,12 @@ export class ArchiveService {
           }
       }
 
-      // PRESERVE MANUAL EDITS: Fetch existing summaries first
+      // PRESERVE MANUAL EDITS: Fetch existing summaries first (gunakan kolom aman)
       let existingList: any[] = [];
       try {
           const result = await supabase
               .from('exam_summaries')
-              .select('region, exam_type, class_level, school_name')
+              .select('school_name')
               .eq('exam_code', exam.code);
           existingList = result.data || [];
       } catch (e) {
@@ -211,12 +215,51 @@ export class ArchiveService {
       for (const [schoolName, schoolResults] of Object.entries(schoolGroups)) {
           const scores = schoolResults.map(r => Number(r.score));
           const total = scores.length;
+          const kkmThreshold = Number(exam.config.kkm) || 75;
           
           const avg = total > 0 ? scores.reduce((a, b) => a + b, 0) / total : 0;
           const max = total > 0 ? Math.max(...scores) : 0;
           const min = total > 0 ? Math.min(...scores) : 0;
-          const passing = scores.filter(s => s >= 75).length;
+          const passing = scores.filter(s => s >= kkmThreshold).length;
           const passingRate = total > 0 ? (passing / total) * 100 : 0;
+
+          // Segmentasi 4 Jenjang Kompetensi Standar Asesmen Nasional / Kurikulum Merdeka
+          const perluBimbinganStudents = schoolResults.filter(r => Number(r.score) < 55).map(r => r.student.fullName || (r.student as any).name || 'Siswa');
+          const dasarStudents = schoolResults.filter(r => Number(r.score) >= 55 && Number(r.score) < 70).map(r => r.student.fullName || (r.student as any).name || 'Siswa');
+          const cakapStudents = schoolResults.filter(r => Number(r.score) >= 70 && Number(r.score) < 85).map(r => r.student.fullName || (r.student as any).name || 'Siswa');
+          const mahirStudents = schoolResults.filter(r => Number(r.score) >= 85).map(r => r.student.fullName || (r.student as any).name || 'Siswa');
+
+          const tierStats = {
+              kkm: kkmThreshold,
+              perlu_bimbingan: {
+                  tier: "Perlu Bimbingan",
+                  range: "0 - 54",
+                  count: perluBimbinganStudents.length,
+                  percentage: total > 0 ? Math.round((perluBimbinganStudents.length / total) * 100) : 0,
+                  students: perluBimbinganStudents
+              },
+              dasar: {
+                  tier: "Dasar",
+                  range: "55 - 69",
+                  count: dasarStudents.length,
+                  percentage: total > 0 ? Math.round((dasarStudents.length / total) * 100) : 0,
+                  students: dasarStudents
+              },
+              cakap: {
+                  tier: "Cakap",
+                  range: "70 - 84",
+                  count: cakapStudents.length,
+                  percentage: total > 0 ? Math.round((cakapStudents.length / total) * 100) : 0,
+                  students: cakapStudents
+              },
+              mahir: {
+                  tier: "Mahir",
+                  range: "85 - 100",
+                  count: mahirStudents.length,
+                  percentage: total > 0 ? Math.round((mahirStudents.length / total) * 100) : 0,
+                  students: mahirStudents
+              }
+          };
 
           const questionStats: Record<string, unknown>[] = exam.questions
               .filter(q => q.questionType !== 'INFO')
@@ -246,14 +289,20 @@ export class ArchiveService {
                       topWrongCount = answerDist[topWrongAns];
                   }
                   const topWrongRate = total > 0 ? Math.round((topWrongCount / total) * 100) : 0;
+                  const correctRate = total > 0 ? Math.round((correctCount / total) * 100) : 0;
 
                   return {
                       id: q.id,
                       number: idx + 1,
                       type: q.questionType,
-                      correct_rate: total > 0 ? Math.round((correctCount / total) * 100) : 0,
+                      kisiKisi: q.kisiKisi || "",
+                      level: q.level || "",
+                      category: q.category || "",
+                      scoreWeight: q.scoreWeight || 1,
+                      correct_rate: correctRate,
                       top_wrong_answer: topWrongAns,
-                      top_wrong_rate: topWrongRate
+                      top_wrong_rate: topWrongRate,
+                      answer_distribution: answerDist
                   };
               });
 
@@ -275,6 +324,7 @@ export class ArchiveService {
               lowest_score: min,
               passing_rate: parseFloat(passingRate.toFixed(2)),
               question_stats: questionStats,
+              tier_stats: tierStats,
               region: '',
               author_id: exam.authorId 
           });
@@ -347,19 +397,30 @@ export class ArchiveService {
           subject: s.exam_subject,
           exam_type: s.exam_type,
           avg: s.average_score,
+          highest_score: s.highest_score,
+          lowest_score: s.lowest_score,
           participants: s.total_participants,
-          weakness_count: s.question_stats.filter((qs: Record<string, unknown>) => (qs.correct_rate as number) < 50).length,
-          top_difficulty_questions: s.question_stats
-              .filter((qs: Record<string, unknown>) => (qs.correct_rate as number) < 40)
-              .map((qs: Record<string, unknown>) => `Soal nomor ${qs.number || 1}: ${qs.correct_rate}%`)
-              .slice(0, 3)
+          passing_rate: s.passing_rate,
+          tier_distribution: s.tier_stats || null,
+          weakness_count: s.question_stats.filter((qs: Record<string, unknown>) => (qs.correct_rate as number) < 60).length,
+          critical_questions_summary: s.question_stats
+              .filter((qs: Record<string, unknown>) => (qs.correct_rate as number) < 60)
+              .map((qs: Record<string, unknown>) => ({
+                  soal: `soal nomor ${qs.number || 1}`,
+                  kebenaran: `${qs.correct_rate}%`,
+                  pengecoh_terpopuler: qs.top_wrong_answer ? `${qs.top_wrong_answer} (${qs.top_wrong_rate}%)` : 'Tersebar merata',
+                  kisi_kisi: qs.kisiKisi || qs.category || 'Materi Inti'
+              }))
       }));
 
-      // Map examQuestions to a structured list for the AI to understand the exam content and formulate exact remedial/enrichment questions
-      const questionDetails = examQuestions
-          ? examQuestions
+      // Optimasi Payload: Pisahkan butir kritis (< 60% benar) vs butir tuntas agar prompt padat, responsif, dan hemat token
+      const criticalQuestions: any[] = [];
+      const masteredSummary: string[] = [];
+
+      if (examQuestions) {
+          examQuestions
               .filter(q => q.questionType !== 'INFO')
-              .map((q, idx) => {
+              .forEach((q, idx) => {
                   let correctRate: number | undefined;
                   let topWrongAnswer: string | null = null;
                   let topWrongRate: number | undefined;
@@ -374,20 +435,24 @@ export class ArchiveService {
                       }
                   }
 
-                  return {
-                      number: idx + 1,
-                      text: stripBase64(q.questionText || ""),
-                      type: q.questionType,
-                      options: (q.options || []).map(o => stripBase64(o || "")),
-                      correctAnswer: q.correctAnswer || "",
-                      correct_rate: correctRate,
-                      top_wrong_answer: topWrongAnswer,
-                      top_wrong_rate: topWrongRate
-                  };
-              })
-          : [];
+                  const isCritical = typeof correctRate === 'number' && correctRate < 60;
+                  if (isCritical) {
+                      const cleanText = stripBase64(q.questionText || "");
+                      criticalQuestions.push({
+                          nomor: idx + 1,
+                          teks: cleanText.length > 200 ? cleanText.substring(0, 190) + "..." : cleanText,
+                          materi: q.kisiKisi || q.category || "Materi Ujian",
+                          kunci: q.correctAnswer || "-",
+                          tingkat_benar: `${correctRate}%`,
+                          pengecoh_dominan: topWrongAnswer ? `${topWrongAnswer} (${topWrongRate}%)` : "Tersebar"
+                      });
+                  } else {
+                      masteredSummary.push(`No.${idx + 1} (${q.category || q.kisiKisi || 'Materi Inti'})`);
+                  }
+              });
+      }
 
-      const defaultTask = `Buatlah laporan "Analisis Karakteristik dan Ketuntasan Hasil Ujian" yang komprehensif. Jika data input berisi beberapa sekolah yang berbeda, Anda WAJIB menganalisis dan membuat penjabaran performa untuk MASING-MASING sekolah secara terpisah.`;
+      const defaultTask = `Buatlah laporan "Analisis Karakteristik, Diagnostik Butir Soal, dan Matriks Intervensi Berjenjang Hasil Ujian" yang sangat komprehensif, tajam, dan siap dieksekusi langsung oleh guru di kelas. Jika data input berisi beberapa sekolah yang berbeda, Anda WAJIB menganalisis dan membuat penjabaran performa untuk MASING-MASING sekolah secara terpisah.`;
 
       const isTKA = summaries.some(s => {
           const t = (s.exam_type || '').toLowerCase().trim();
@@ -396,17 +461,19 @@ export class ArchiveService {
 
       const rule6 = isTKA
           ? `6. STANDAR EVALUASI NILAI RATA-RATA TKA (WAJIB UNTUK UJIAN TKA): Pada bagian RINGKASAN EKSEKUTIF, Anda WAJIB membuat sub-bagian khusus dengan judul "Evaluasi Nilai Rata-Rata Berdasarkan Standar Nasional". Bandingkan nilai rata-rata siswa secara spesifik dengan rerata skor TKA nasional di Indonesia yang terbaru (sekitar 500-550 poin atau setara dengan 50%-55% ketuntasan pada skala penilaian nasional terbaru) agar analisis ringkasan eksekutif terlihat lebih faktual, realistis, dan berbobot akademis tinggi.
-           - ATURAN KEPADATAN INFORMASI TKA: JANGAN PERNAH menulis penjelasan yang bertele-tele atau tidak penting seperti "Berbeda dengan ujian sekolah biasa yang menargetkan Kriteria Ketuntasan Minimal (KKM) di rentang 70-75, ujian berjenis TKA (Tes Kemampuan Akademik) memiliki karakteristik soal selektif dengan tingkat kesulitan tinggi (HOTS)." jika Anda sudah tahu bahwa yang dibahas adalah ujian TKA. Hindari penjelasan teori HOTS yang tidak bernilai guna praktis bagi guru. Tulis analisis yang langsung, faktual, padat, penting, dan mudah dipahami saja.`
+           - ATURAN KEPADATAN INFORMASI TKA: JANGAN PERNAH menulis penjelasan yang bertele-tele atau tidak penting. Tulis analisis yang langsung, faktual, padat, penting, dan mudah dipahami guru.`
           : `6. STANDAR EVALUASI RINGKASAN (BUKAN UJIAN TKA): Karena ini BUKAN ujian berjenis TKA, DILARANG membuat sub-bagian atau mencantumkan judul "Evaluasi Nilai Rata-Rata Berdasarkan Standar Nasional" dan DILARANG membandingkannya dengan standar nilai nasional TKA. Cukup berikan analisis ringkasan pencapaian dan rata-rata performa kelas secara deskriptif langsung di dalam Ringkasan Eksekutif.`;
 
       const ringkasanEksekutifStructure = isTKA
-          ? `1. RINGKASAN EKSEKUTIF:
-           - Berikan ringkasan performa secara keseluruhan.
+          ? `1. RINGKASAN EKSEKUTIF & DATA MAKRO HASIL BELAJAR:
+           - Tampilkan sintesis data makro: Rerata nilai kelas, nilai tertinggi & terendah, persentase kelulusan terhadap batas KKM, dan jumlah total peserta.
            - Sub-bagian "### Evaluasi Nilai Rata-Rata Berdasarkan Standar Nasional": Berisi evaluasi nilai rata-rata kelas sesuai standar TKA di atas. JANGAN gunakan pengantar panjang lebar, langsung ke poin evaluasinya saja.
-           - Highlight temuan utama (misalnya materi mana yang sudah tuntas secara agregat dan materi mana yang perlu perhatian khusus).`
-          : `1. RINGKASAN EKSEKUTIF:
-           - Berikan ringkasan performa secara keseluruhan dan capaian nilai rata-rata kelas secara deskriptif (DILARANG membuat sub-bagian "Evaluasi Nilai Rata-Rata Berdasarkan Standar Nasional").
-           - Highlight temuan utama (misalnya materi mana yang sudah tuntas secara agregat dan materi mana yang perlu perhatian khusus).`;
+           - Pemetaan Sebaran 4 Jenjang Kompetensi (Perlu Bimbingan 0-54, Dasar 55-69, Cakap 70-84, Mahir 85-100) secara deskriptif dan padat.
+           - Identifikasi kekuatan materi yang sudah tuntas secara agregat vs topik materi kritis yang mengalami anjlok pemahaman.`
+          : `1. RINGKASAN EKSEKUTIF & DATA MAKRO HASIL BELAJAR:
+           - Tampilkan sintesis data makro: Rerata nilai kelas, nilai tertinggi & terendah, persentase kelulusan terhadap batas KKM, dan jumlah total peserta (DILARANG membuat sub-bagian "Evaluasi Nilai Rata-Rata Berdasarkan Standar Nasional").
+           - Pemetaan Sebaran 4 Jenjang Kompetensi (Perlu Bimbingan 0-54, Dasar 55-69, Cakap 70-84, Mahir 85-100) secara deskriptif dan padat.
+           - Identifikasi kekuatan materi yang sudah tuntas secara agregat vs topik materi kritis yang mengalami anjlok pemahaman.`;
 
       let existingAnalysesText = "";
       if (existingAnalyses && Object.keys(existingAnalyses).length > 0) {
@@ -425,131 +492,186 @@ export class ArchiveService {
       }
 
       return `
-        You are a Senior Education Data Consultant specializing in Competency-Based Curriculum Analysis.
+        Anda adalah Konsultan Ahli Data Pendidikan & Diagnostik Pembelajaran Berbasis Kompetensi (Kurikulum Merdeka & Asesmen Nasional).
+        Tugas Anda adalah membedah hasil ujian ini menjadi laporan diagnostik klinis pendidikan yang tajam, sangat detail, mendalam, dan langsung membimbing guru untuk terjun melakukan intervensi kelas secara presisi.
         
-        INPUT DATA (JSON):
+        INPUT DATA MAKRO & SEBARAN JENJANG (JSON):
         ${JSON.stringify(simpleData)}
 
-        EXAM QUESTIONS LIST WITH PERFORMANCE STATS (Use correct_rate, top_wrong_answer, and top_wrong_rate to diagnose understanding levels and check for potential answer key errors):
-        ${JSON.stringify(questionDetails)}
+        DAFTAR BUTIR SOAL KRITIS (< 60% BENAR) (JSON):
+        ${JSON.stringify(criticalQuestions)}
+
+        RINGKASAN BUTIR SOAL TUNTAS KKM:
+        ${masteredSummary.slice(0, 20).join(", ")}${masteredSummary.length > 20 ? ` ...dan ${masteredSummary.length - 20} butir soal lainnya tuntas` : ''}
 
         ${existingAnalysesText}
 
         TASK:
         ${customPrompt || defaultTask}
         
-        OUTPUT FORMAT:
-        - Use standard Markdown (MD).
-        - DO NOT use HTML tags.
+        OUTPUT FORMAT & STYLING RULES:
+        - Gunakan Bahasa Indonesia akademis, profesional, dan instruksional yang jelas dan solutif.
+        - Gunakan format Markdown standar (Heading 1-3, bullet points, dan Tabel Markdown).
+        - DILARANG menggunakan tag HTML mentah (misal: <table>, <div>, <span>).
         - Jika terdapat lebih dari 1 sekolah, buat sub-bagian terpisah (Heading 2) untuk SETIAP sekolah.
         
-        CRITICAL RULES:
-        1. JANGAN PERNAH menyebutkan atau menampilkan ID soal internal mentah seperti "Soal Q1770787225501", "Q1770787225501", atau "id-soal". Anda WAJIB langsung menyebutnya dengan format "soal nomor [nomor]" (misalnya: "soal nomor 1", "soal nomor 2", "soal nomor 3") sesuai dengan urutan 'number' di daftar soal. Hindari penggunaan kata "Soal [nomor]" tanpa kata "nomor".
-        2. JANGAN menggunakan progress bar tekstual atau diagram ASCII (seperti "[||||||||||] 53%") untuk visualisasi performa kelas. Cukup sebutkan persentase angka rata-rata performanya saja dalam bentuk teks, karena visualisasi diagram garis interaktif yang indah sudah disediakan langsung secara dinamis di antarmuka web.
-        3. Rekomendasi Remedial: Anda WAJIB membuat minimal 5 (lima) contoh soal latihan remedial konkret, baru, dan mirip (setara indikator pencapaian kompetensi) dengan soal-soal tersulit di ujian (soal dengan 'correct_rate' rendah). Tuliskan kelima soal tersebut secara lengkap dengan teks soal baru, pilihan jawaban (jika pilihan ganda), dan kunci jawaban yang benar agar guru dapat langsung menggunakannya atau menyalinnya secara utuh.
-        4. Rekomendasi Pengayaan: Anda WAJIB membuat minimal 5 (lima) contoh soal tantangan pengayaan konkret, baru, dan lebih menantang (HOTS - Higher Order Thinking Skills) berdasarkan topik utama ujian ini. Tuliskan kelima soal tersebut secara lengkap dengan teks soal baru, pilihan jawaban (jika pilihan ganda), dan kunci jawaban yang benar agar guru dapat langsung menggunakannya.
-        5. PERSAMAAN MATEMATIKA TANPA LATEX: JANGAN PERNAH menggunakan sintaks matematika LaTeX seperti \\frac, \\div, \\times, $ atau $$ pada teks laporan maupun pada contoh soal remedial/pengayaan. Selalu gunakan penulisan teks biasa atau simbol Unicode standar yang bersih dan mudah dibaca (contoh: '1/5' atau '1 per 5', '240 : 6 + 15 = 55', simbol '÷' or ':' untuk pembagian, '×' atau '*' untuk perkalian, dsb.). Hal ini penting agar seluruh formula matematika tampak rapi dan dapat dibaca dengan mudah tanpa rendering MathJax/KaTeX.
+        ATURAN KRITIS (CRITICAL RULES):
+        1. IDENTIFIKASI SOAL: JANGAN PERNAH menyebutkan atau menampilkan ID soal internal mentah (seperti "Q1770787225501", "id-soal"). Anda WAJIB selalu menyebutnya dengan format "soal nomor [nomor]" (misalnya: "soal nomor 1", "soal nomor 2", "soal nomor 3") sesuai dengan urutan nomor di daftar soal.
+        2. BEBAS PROGRESS BAR ASCII: JANGAN menggunakan diagram garis ASCII tekstual (seperti "[||||||||||] 53%") karena visualisasi diagram interaktif sudah disediakan langsung di web. Cukup sebutkan angka persentase numerik langsung dalam kalimat atau tabel.
+        3. BEDAH MIKRO BUTIR SOAL KRITIS: Lakukan bedah diagnostik mendalam untuk SEMUA butir soal yang memiliki tingkat kebenaran rendah (< 60% benar). Laporkan teks soal, indikator/kisi-kisi materi, persentase benar, opsi salah terpopuler (pengecoh dominan), akar miskonsepsi mengapa siswa salah berpikir, dan cara mengobati kesalahan tersebut sampai tuntas.
+        4. CARA MENGOBATI KESALAHAN SAMPAI TUNTAS (TERAPI PEDAGOGIS): Sebelum memberikan latihan soal remedial, guru WAJIB diberikan petunjuk pedagogis konkret bagaimana mengajarkan ulang konsep tersebut di kelas (misal: penggunaan model visual, analogi konkret, dekonstruksi struktur kalimat soal, atau pembongkaran jebakan opsi).
+        5. MATRIKS INTERVENSI BERJENJANG (TABEL KOMPREHENSIF): Anda WAJIB menyajikan Tabel Markdown 5 Kolom yang memetakan 4 jenjang kompetensi (Perlu Bimbingan 0-54, Dasar 55-69, Cakap 70-84, Mahir 85-100), mencantumkan nama siswa terkait dari data input, akar masalah belajar, tindakan guru, dan indikator target ketuntasan.
+        6. PERSAMAAN MATEMATIKA TANPA LATEX: JANGAN PERNAH menggunakan sintaks matematika LaTeX seperti \\frac, \\div, \\times, $ atau $$ pada teks laporan maupun pada contoh soal remedial/pengayaan. Selalu gunakan penulisan teks biasa atau simbol Unicode standar yang bersih dan mudah dibaca (contoh: '1/5' atau '1 per 5', '240 : 6 + 15 = 55', simbol '÷' atau ':' untuk pembagian, '×' atau '*' untuk perkalian, '²', '³', '√', dsb.).
         ${rule6}
         7. DETEKSI KESALAHAN KUNCI JAWABAN (CRITICAL BIAS ANALYSIS):
-           - Anda WAJIB secara aktif mendeteksi potensi kesalahan kunci jawaban ujian (guru salah input kunci).
-           - Skenario utama deteksi: Jika persentase siswa menjawab benar ('correct_rate') sangat rendah (< 35%) DAN ada satu jawaban salah terpopuler ('top_wrong_answer') yang dipilih oleh mayoritas siswa ('top_wrong_rate' > 45%).
-           - Lakukan analisis terhadap teks soal, pilihan jawaban ('options'), kunci jawaban saat ini ('correctAnswer'), dan opsi terpopuler tersebut.
-           - Jika secara logis/akademis opsi terpopuler tersebut sebenarnya adalah jawaban yang benar, atau jika soal tersebut membingungkan/memiliki beberapa opsi yang sama-sama benar, laporkan ini dengan sangat jelas and berani sebagai "Indikasi Kesalahan Kunci Jawaban" dalam evaluasi butir soal Anda. Jelaskan penalaran logisnya dan berikan saran kunci koreksi agar guru mengetahuinya.
+           - Secara aktif periksa potensi salah kunci: Jika tingkat kebenaran 'correct_rate' sangat rendah (< 35%) DAN ada satu jawaban salah terpopuler ('top_wrong_answer') yang dipilih mayoritas siswa (> 45%).
+           - Jika secara logis/akademis opsi terpopuler tersebut sebenarnya adalah jawaban yang benar, atau jika soal memiliki ambiguitas fatal, laporkan dengan tegas sebagai "Indikasi Kesalahan Kunci Jawaban", jelaskan alasannya, dan berikan saran kunci koreksi.
 
-        STRUCTURE:
+        STRUKTUR LAPORAN ANALISIS AI:
+
+        # Laporan Diagnostik & Analisis Hasil Belajar AI: [Mata Pelajaran]
 
         ${ringkasanEksekutifStructure}
 
-        2. ANALISIS PER SEKOLAH (Wajib dipisah per sekolah jika > 1 sekolah):
-           - Untuk SETIAP sekolah, sebutkan nama sekolahnya, lalu berikan:
-             * Rata-rata nilai dan tingkat ketuntasan.
-             * Analisis topik/materi yang belum dikuasai (lihat dari weakness_count atau top_difficulty_questions, dan rujuk sebagai "soal nomor [nomor]").
-             * Karakteristik kelas atau pola jawaban.
-            
-        3. PERBANDINGAN DAN REKOMENDASI:
-           - Jika ada >1 sekolah, bandingkan secara singkat perbedaan/kesenjangan performa.
-           - Evaluasi Butir Soal & Analisis Validitas: Berikan evaluasi singkat mengenai tingkat kesulitan, pengecoh (distractor) yang terlalu kuat, dan validitas butir soal berdasarkan pola jawaban siswa (gunakan penomoran "soal nomor [nomor]"). Masukkan bagian khusus analisis potensi kesalahan kunci jawaban jika terdeteksi di langkah kritis nomor 7 di atas.
-           - Rekomendasi Remedial & CONTOH SOAL: Berikan rekomendasi konkrit untuk remedial, dilanjutkan dengan minimal 5 contoh soal remedial baru lengkap dengan pilihan jawaban dan kunci jawaban.
-           - Rekomendasi Pengayaan & CONTOH SOAL: Berikan rekomendasi pengayaan untuk siswa nilai tinggi, dilanjutkan dengan minimal 5 contoh soal pengayaan HOTS baru lengkap dengan pilihan jawaban dan kunci jawaban.
+        2. BEDAH MIKRO BUTIR SOAL KRITIS & TERAPI PENUNTASAN KONSEP:
+           Bedah secara tuntas setiap butir soal yang memiliki tingkat kebenaran < 60% (atau soal-soal tersulit di ujian jika semua soal > 60%). Susun dengan format seragam per butir soal:
+           - ### Soal Nomor [X] – [Topik / Kisi-Kisi Materi]
+             * **Karakteristik Butir**: Tingkat Kebenaran ([correct_rate]%), Tingkat Kesulitan, dan Bobot Soal.
+             * **Pola Jawaban & Pengecoh Terkuat**: Kunci benar vs jawaban salah terpopuler (dipilih oleh [top_wrong_rate]% siswa). Cantumkan deteksi kesalahan kunci jawaban jika terindikasi.
+             * **Akar Miskonsepsi Siswa**: Jelaskan secara tajam proses berpikir semu siswa, jebakan kognitif, atau konsep prasyarat apa yang tertukar sehingga siswa memilih jawaban pengecoh tersebut.
+             * **Terapi Pedagogis Guru ("Cara Mengobati Sampai Tuntas")**: Berikan panduan langkah-demi-langkah konkret bagaimana guru mengajarkan ulang konsep ini di kelas secara tuntas (analog, visualisasi konkret, dekonstruksi jebakan, verifikasi konsep dasar) SEBELUM siswa diberikan latihan remedial.
 
-        TONE:
-        - Professional, analytical, yet accessible to teachers and policymakers.
-        - Use Indonesian language (Bahasa Indonesia).
+        3. MATRIKS INTERVENSI BERJENJANG (TABEL KOMPREHENSIF 4 JENJANG):
+           Sajikan tabel komprehensif berikut secara utuh dan lengkap:
+           | Jenjang Kompetensi | Daftar Siswa Terkait | Diagnosis Akar Hambatan Belajar | Aksi Pedagogis Nyata Guru di Kelas | Target Capaian & Verifikasi Ketuntasan |
+           | :--- | :--- | :--- | :--- | :--- |
+           | **Perlu Bimbingan (0 - 54)** | [Cantumkan nama-nama siswa pada tier perlu_bimbingan dari input data] | Kesulitan memahami konsep dasar prasyarat, hambatan literasi pemahaman kalimat soal panjang | Bimbingan klinis 1-on-1 atau kelompok kecil (3-4 siswa), pembedahan konsep dari nol dengan visualisasi/konkret | Memahami 100% konsep dasar inti; verifikasi lewat tanya-jawab konsep lisan dan contoh sederhana |
+           | **Dasar (55 - 69)** | [Cantumkan nama-nama siswa pada tier dasar dari input data] | Memahami konsep dasar terpisah, tetapi bingung pada prosedur bertahap dan mudah terkecoh opsi jebakan | Scaffolding terbimbing bertahap, demonstrasi model pemecahan terstruktur, latihan kelompok kecil | Tuntas KKM secara mandiri; verifikasi lewat lembar kerja bertahap (worked examples) |
+           | **Cakap (70 - 84)** | [Cantumkan nama-nama siswa pada tier cakap dari input data] | Tuntas KKM dan konsep matang, namun kurang cermat pada soal analisis bertingkat atau variasi kontekstual | Penguatan metakognisi (strategi cek ulang, analisis pengecoh), latihan variasi soal cerita multi-langkah | Stabilitas akurasi > 85%; verifikasi lewat soal variasi kontekstual |
+           | **Mahir (85 - 100)** | [Cantumkan nama-nama siswa pada tier mahir dari input data] | Daya tangkap dan nalar sangat kuat, membutuhkan stimulasi intelektual lanjutan agar tidak pasif | Pemberian proyek analitis terbuka, peran sebagai tutor sebaya (peer tutor) yang mendampingi kelompok belajar | Penguasaan transfer konsep tingkat tinggi (HOTS lanjut) dan kepemimpinan belajar |
+
+        4. REKOMENDASI MANAJEMEN KELAS & PEMBELAJARAN TERDIFERENSIASI:
+           - Berikan 3-4 strategi konkret bagi guru untuk mengelola kelas diferensiasi (misal: pembagian jam remedial mandiri vs tutor sebaya, rotasi stasiun belajar).
+
+        5. BANK SOAL REMEDIAL & PENGAYAAN HOTS SIAP PAKAI (TANPA LATEX):
+           - ### Paket Soal Remedial (Minimal 5 Soal Baru)
+             Buat minimal 5 contoh soal latihan remedial konkret, baru, dan setara indikator pencapaian kompetensi dengan butir-butir soal yang dibedah di Bagian 2. Tuliskan kelima soal tersebut secara lengkap dengan teks soal baru, pilihan jawaban (A-E jika pilihan ganda), kunci jawaban, dan pembahasan tuntas.
+           - ### Paket Soal Pengayaan HOTS (Minimal 5 Soal Baru)
+             Buat minimal 5 contoh soal tantangan pengayaan konkret, baru, dan lebih menantang (HOTS) berdasarkan topik utama ujian ini untuk memfasilitasi siswa kelompok Cakap & Mahir. Tuliskan kelima soal tersebut secara lengkap dengan teks soal baru, pilihan jawaban (A-E jika pilihan ganda), kunci jawaban, dan pembahasan analitis.
       `.trim();
   }
 
   // --- GEMINI AI ANALYTICS (GENERATIVE VISUALIZATION) ---
   async generateAIAnalysis(summaries: ExamSummary[], customPrompt?: string, examQuestions?: Question[], existingAnalyses?: Record<string, string>): Promise<string> {
+      const prompt = this.generateAnalysisPrompt(summaries, customPrompt, examQuestions, existingAnalyses);
+      let lastErrorMessage = "";
+
+      // 1. Percobaan Utama: Melalui Serverless API /api/generate-analysis dengan AbortController timeout 55s
       try {
-          const prompt = this.generateAnalysisPrompt(summaries, customPrompt, examQuestions, existingAnalyses);
-          
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => {
+              try { controller.abort(); } catch {}
+          }, 55000);
+
           const res = await fetch("/api/generate-analysis", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ prompt })
+              body: JSON.stringify({ prompt }),
+              signal: controller.signal
           });
+          clearTimeout(timeoutId);
 
-          if (!res.ok) {
-              const text = await res.text().catch(() => "");
-              let serverError = "Gagal menghubungi server analisis AI.";
-              try {
-                  const parsed = JSON.parse(text);
-                  serverError = parsed.error || serverError;
-              } catch {
-                  if (text.includes("API key is missing") || text.includes("api key is missing")) {
-                      serverError = "API Key Gemini belum dikonfigurasi di server.";
-                  } else if (text.length > 0 && text.length < 200) {
-                      serverError = `Error Server (${res.status}): ${text}`;
+          if (res.ok) {
+              const contentType = res.headers.get("Content-Type") || "";
+              if (contentType.includes("application/json")) {
+                  const data = await res.json();
+                  if (data.success && data.text) {
+                      return data.text;
                   }
               }
-              throw new Error(serverError);
+          } else {
+              const errText = await res.text().catch(() => "");
+              lastErrorMessage = `Serverless status ${res.status}: ${errText.slice(0, 150)}`;
+              console.warn(`[Analisis AI Serverless Error]: ${lastErrorMessage}`);
           }
-
-          const contentType = res.headers.get("Content-Type") || "";
-          if (!contentType.includes("application/json")) {
-              throw new Error("Respon server tidak valid (bukan JSON).");
-          }
-
-          const data = await res.json();
-          if (!data.success) {
-              throw new Error(data.error || "Gagal menghasilkan analisis.");
-          }
-
-          return data.text || "Gagal menghasilkan analisis.";
-      } catch (e) {
-          console.error("Gemini Error:", e);
-          
-          const errorMsg = e instanceof Error ? e.message.toLowerCase() : String(e).toLowerCase();
-          
-          let title = "Layanan Sedang Sibuk";
-          let message = "Kuota analisis AI harian/menit tercapai. Mohon tunggu beberapa saat sebelum mencoba lagi.";
-
-          if (errorMsg.includes('429') || errorMsg.includes('quota') || errorMsg.includes('exhausted') || (e && typeof e === 'object' && 'status' in e && e.status === 429)) {
-              if (errorMsg.includes('per minute') && errorMsg.includes('requests')) {
-                  title = "Peringatan Tipe 1: Batas Per Menit";
-                  message = "Batas 15 penggunaan per menit telah tercapai pada akun gratis Gemini Flash. Silakan tunggu 1 menit lalu coba lagi.";
-              } else if (errorMsg.includes('per day')) {
-                  title = "Peringatan Tipe 2: Batas Harian";
-                  message = "Batas penggunaan harian gratis (1500 request/hari) dari Gemini Flash telah habis. Silakan coba kembali besok hari.";
-              } else if (errorMsg.includes('tokens')) {
-                  title = "Peringatan Tipe 3: Batas Token Teks";
-                  message = "Data analisis terlalu panjang dan melebihi batas (Maks 1 juta token/menit). Kurangi data atau tunggu 1 menit sebelum mencoba lagi.";
-              } else {
-                 title = "Batas Kuota Pemakaian Tercapai";
-                 message = "Batas pemakaian wajar (kuota gratis) Gemini AI (per menit/harian) telah habis. Silahkan mencobanya kembali nanti.";
-              }
-
-             return `
-                <div class="p-6 bg-rose-50 dark:bg-rose-900/20 border border-rose-100 dark:border-rose-800 rounded-2xl flex flex-col items-center text-center gap-3">
-                    <div class="w-12 h-12 bg-rose-100 dark:bg-rose-800 text-rose-500 rounded-full flex items-center justify-center text-xl">⏳</div>
-                    <h3 class="text-lg font-bold text-rose-700 dark:text-rose-300">${title}</h3>
-                    <p class="text-sm text-rose-600 dark:text-rose-400">${message}</p>
-                </div>
-             `;
-          }
-
-          return "Maaf, layanan analisis AI sedang mengalami gangguan. Silakan coba lagi nanti.";
+      } catch (fetchErr: any) {
+          lastErrorMessage = fetchErr?.message || String(fetchErr);
+          console.warn("[Analisis AI Serverless Fetch Gagal]:", lastErrorMessage);
       }
+
+      // 2. Failover Sekunder: Eksekusi Langsung di Sisi Klien menggunakan Gemini Model Cascade
+      try {
+          console.log("[Analisis AI] Mengaktifkan client-side direct failover menggunakan model cascade...");
+          const clientResult = await this.generateAIAnalysisOnClient(prompt);
+          if (clientResult) {
+              return clientResult;
+          }
+      } catch (clientErr: any) {
+          console.warn("[Analisis AI Client Failover Error]:", clientErr);
+          lastErrorMessage = clientErr?.message || lastErrorMessage;
+      }
+
+      // 3. User-friendly Fallback Message jika seluruh jalur mengalami kuota penuh atau kendala jaringan
+      const lower = (lastErrorMessage || "").toLowerCase();
+      let title = "Layanan Analisis Sedang Padat";
+      let message = "Antrean atau kuota analisis AI sedang penuh. Sistem otomatis menjadwalkan ulang, silakan klik coba kembali dalam 1 menit.";
+
+      if (lower.includes('429') || lower.includes('quota') || lower.includes('exhausted')) {
+          title = "Batas Kuota Pemakaian Tercapai";
+          message = "Batas kuota pemakaian wajar (kuota gratis) Gemini AI per menit atau harian telah tercapai. Harap tunggu 1-2 menit lalu coba kembali.";
+      } else if (lower.includes('503') || lower.includes('high demand')) {
+          title = "Antrean Model AI Sedang Penuh";
+          message = "Layanan AI sedang melayani lonjakan permintaan tinggi. Silakan coba kembali sesaat lagi.";
+      }
+
+      return `
+<div class="p-6 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-2xl flex flex-col items-center text-center gap-3">
+    <div class="w-12 h-12 bg-amber-100 dark:bg-amber-800 text-amber-600 dark:text-amber-300 rounded-full flex items-center justify-center text-xl">⏳</div>
+    <h3 class="text-lg font-bold text-amber-800 dark:text-amber-200">${title}</h3>
+    <p class="text-sm text-amber-700 dark:text-amber-300 max-w-md">${message}</p>
+</div>`;
+  }
+
+  private async generateAIAnalysisOnClient(prompt: string): Promise<string | null> {
+      const apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY;
+      if (!apiKey) {
+          console.warn("Client Gemini API key tidak tersedia untuk failover.");
+          return null;
+      }
+
+      const ai = new GoogleGenAI({
+          apiKey,
+          httpOptions: {
+              headers: { 'User-Agent': 'aistudio-build' }
+          }
+      });
+
+      const cascadeModels = [
+          'gemini-3.8-flash',
+          'gemini-2.5-flash',
+          'gemini-flash-latest',
+          'gemini-3.1-flash-lite'
+      ];
+
+      for (const model of cascadeModels) {
+          try {
+              console.log(`[Client AI Failover] Meminta analisis dengan model: ${model}...`);
+              const res = await ai.models.generateContent({
+                  model,
+                  contents: prompt,
+                  config: {
+                      temperature: 0.2
+                  }
+              });
+              if (res && res.text) {
+                  console.log(`[Client AI Failover] Berhasil menghasilkan analisis dengan model: ${model}`);
+                  return res.text;
+              }
+          } catch (modelErr: any) {
+              console.warn(`[Client AI Failover] Model ${model} gagal:`, modelErr?.message || modelErr);
+          }
+      }
+      return null;
   }
 
   // --- COLD DATA (CLOUD ARCHIVE) METHODS ---
@@ -653,14 +775,43 @@ export class ArchiveService {
       const summaryMap = new Map<string, any>();
       if (fileExamCodes.length > 0) {
           const uniqueCodes = Array.from(new Set(fileExamCodes));
-          const chunkSize = 100;
+          const chunkSize = 30;
           for (let i = 0; i < uniqueCodes.length; i += chunkSize) {
               const chunk = uniqueCodes.slice(i, i + chunkSize);
               try {
-                  const { data: summaries } = await supabase
-                      .from('exam_summaries')
-                      .select('exam_code, school_name, exam_subject, exam_type, class_level, exam_date, total_participants, author_id')
-                      .in('exam_code', chunk);
+                  let summaries: any[] | null = null;
+                  
+                  // 1. Coba query lengkap dengan kolom tambahan jika belum terdeteksi bermasalah
+                  if (supportsExtendedSummaries !== false) {
+                      const res = await supabase
+                          .from('exam_summaries')
+                          .select('exam_code, school_name, exam_subject, exam_type, class_level, exam_date, total_participants, author_id')
+                          .in('exam_code', chunk);
+
+                      if (res.error) {
+                          const errCode = (res.error as any)?.code;
+                          const errMsg = (res.error as any)?.message || "";
+                          const status = (res.error as any)?.status;
+                          if (errCode === 'PGRST204' || errMsg.includes('column') || status === 400) {
+                              supportsExtendedSummaries = false;
+                          }
+                      } else {
+                          supportsExtendedSummaries = true;
+                          summaries = res.data;
+                      }
+                  }
+
+                  // 2. Fallback aman ke kolom standar jika kolom tambahan belum ada di skema database produksi
+                  if (supportsExtendedSummaries === false || !summaries) {
+                      const resFallback = await supabase
+                          .from('exam_summaries')
+                          .select('exam_code, school_name, exam_subject, exam_date, total_participants')
+                          .in('exam_code', chunk);
+                      
+                      if (!resFallback.error && resFallback.data) {
+                          summaries = resFallback.data;
+                      }
+                  }
                   
                   if (summaries && Array.isArray(summaries)) {
                       summaries.forEach((s) => {
