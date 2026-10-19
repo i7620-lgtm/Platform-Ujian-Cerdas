@@ -52,6 +52,8 @@ export async function generateAIAnalysisOnServer(prompt: string): Promise<string
     const ai = getAI();
     let response: string | null = null;
     let lastError: unknown = null;
+    const startTime = Date.now();
+    const MAX_BUDGET_MS = 45000; // Menjaga waktu eksekusi agar tidak mencapai timeout lambda Vercel
 
     // Cascade berjenjang: Utamakan model aktif tertinggi (gemini-3.8-flash) ke model cadangan
     const uniqueModels = Array.from(new Set(FLASH_MODELS_CASCADE));
@@ -61,54 +63,40 @@ export async function generateAIAnalysisOnServer(prompt: string): Promise<string
     ];
 
     for (const currentModel of sortedModels) {
-        let attempts = 0;
-        const maxAttempts = 2;
-        let success = false;
-
-        while (attempts < maxAttempts && !success) {
-            attempts++;
-            try {
-                console.log(`[Analisis AI] Mencoba menghasilkan analisis dengan model: ${currentModel} (Percobaan ${attempts}/${maxAttempts})`);
-                const res = await ai.models.generateContent({
-                    model: currentModel,
-                    contents: prompt,
-                    config: {
-                        temperature: 0.2,
-                    }
-                });
-
-                if (res && res.text) {
-                    response = res.text;
-                    lastError = null;
-                    success = true;
-                    console.log(`[Analisis AI] Berhasil menghasilkan analisis menggunakan model: ${currentModel}`);
-                    return response;
-                }
-            } catch (error: unknown) {
-                lastError = error;
-                const err = error as Error & { status?: number };
-                const errorMessage = err?.message?.toLowerCase() || "";
-
-                const is503 = err?.status === 503 || errorMessage.includes('503') || errorMessage.includes('high demand');
-                const isQuota = err?.status === 429 || errorMessage.includes('quota') || errorMessage.includes('exhausted') || errorMessage.includes('429');
-
-                if (isQuota) {
-                    markModelExhausted(currentModel);
-                }
-
-                if (is503 && attempts < maxAttempts) {
-                    console.log(`[Analisis AI] Model ${currentModel} antrean tinggi (503). Menunggu jeda singkat...`);
-                    await new Promise(resolve => setTimeout(resolve, 800));
-                    continue;
-                }
-
-                console.log(`[Analisis AI] Model ${currentModel} ${is503 ? '503 antrean tinggi' : isQuota ? '429 batas kuota' : 'beralih'}, beralih ke model berjenjang berikutnya...`);
-                break;
-            }
+        if (Date.now() - startTime > MAX_BUDGET_MS) {
+            console.warn("[Analisis AI] Batas waktu eksekusi 45s tercapai, menyerahkan ke client failover.");
+            break;
         }
 
-        if (success) {
-            break;
+        try {
+            console.log(`[Analisis AI] Mencoba menghasilkan analisis dengan model: ${currentModel}`);
+            const res = await ai.models.generateContent({
+                model: currentModel,
+                contents: prompt,
+                config: {
+                    temperature: 0.2,
+                }
+            });
+
+            if (res && res.text) {
+                response = res.text;
+                lastError = null;
+                console.log(`[Analisis AI] Berhasil menghasilkan analisis menggunakan model: ${currentModel}`);
+                return response;
+            }
+        } catch (error: unknown) {
+            lastError = error;
+            const err = error as Error & { status?: number };
+            const errorMessage = err?.message?.toLowerCase() || "";
+
+            const is503 = err?.status === 503 || errorMessage.includes('503') || errorMessage.includes('high demand');
+            const isQuota = err?.status === 429 || errorMessage.includes('quota') || errorMessage.includes('exhausted') || errorMessage.includes('429');
+
+            if (isQuota) {
+                markModelExhausted(currentModel);
+            }
+
+            console.log(`[Analisis AI] Model ${currentModel} ${is503 ? '503 antrean tinggi' : isQuota ? '429 batas kuota' : 'beralih'}, beralih ke model berjenjang berikutnya...`);
         }
     }
 
