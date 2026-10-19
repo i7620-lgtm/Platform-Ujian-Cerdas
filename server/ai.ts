@@ -1,6 +1,6 @@
 import { GoogleGenAI, Type } from "@google/genai";
-import { generateContextualEducationalSvg } from "./smartSvgFallback.js";
-import { validateEducationalSafety } from "./contentModeration.js";
+import { generateContextualEducationalSvg } from "./smartSvgFallback.ts";
+import { validateEducationalSafety } from "./contentModeration.ts";
 
 let aiInstance: GoogleGenAI | null = null;
 
