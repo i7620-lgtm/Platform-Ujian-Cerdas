@@ -19,6 +19,7 @@ import {
   sanitizeHtml,
   normalize,
   isAnswerMatch,
+  calculateExamScore,
 } from "./teacher/examUtils";
 import { QRCodeCanvas } from "qrcode.react";
 import { ChartRenderer } from "./ChartRenderer";
@@ -170,90 +171,23 @@ export const StudentResultPage: React.FC<StudentResultPageProps> = ({
 
   // REAL-TIME CALCULATION LOGIC
   const calculatedStats = useMemo(() => {
-    const scorableQuestions = exam.questions.filter(
-      (q) => q.questionType !== "INFO",
-    );
-    let totalScore = 0;
-    let maxPossibleScore = 0;
-    let correctCount = 0;
-    let emptyCount = 0;
-
-    scorableQuestions.forEach((q) => {
-      const weight = q.scoreWeight || 1;
-      maxPossibleScore += weight;
-
-      const ans = result.answers[q.id];
-      if (!ans) {
-        emptyCount++;
-        return;
-      }
-      let isCorrect = false;
-
-      // Check if teacher has manually graded this question
-      const manualGradeKey = `_grade_${q.id}`;
-      if (result.answers[manualGradeKey]) {
-        isCorrect = result.answers[manualGradeKey] === "CORRECT";
-      } else if (
-        q.questionType === "MULTIPLE_CHOICE" ||
-        q.questionType === "FILL_IN_THE_BLANK"
-      ) {
-        isCorrect = isAnswerMatch(q.correctAnswer, ans, q.questionType);
-      } else if (q.questionType === "COMPLEX_MULTIPLE_CHOICE") {
-        const sSet = new Set(
-          parseList(String(ans)).map((a) => normalize(a, q.questionType)),
-        );
-        const cSet = new Set(
-          parseList(String(q.correctAnswer || "")).map((a) =>
-            normalize(a, q.questionType),
-          ),
-        );
-        isCorrect =
-          sSet.size === cSet.size && [...sSet].every((x) => cSet.has(x));
-      } else if (q.questionType === "TRUE_FALSE") {
-        try {
-          const ansObj = JSON.parse(ans);
-          isCorrect =
-            q.trueFalseRows?.every((row, idx) => {
-              if (ansObj[idx] === undefined) return false;
-              return ansObj[idx] === row.answer;
-            }) ?? false;
-        } catch {
-          /* ignore */
-        }
-      } else if (q.questionType === "MATCHING") {
-        try {
-          const ansObj = JSON.parse(ans);
-          isCorrect =
-            q.matchingPairs?.every((pair, idx) => {
-              if (ansObj[idx] === undefined) return false;
-              return isAnswerMatch(pair.right, ansObj[idx], q.questionType);
-            }) ?? false;
-        } catch {
-          /* ignore */
-        }
-      }
-
-      if (isCorrect) {
-        correctCount++;
-        totalScore += weight;
-      }
-    });
-
-    const finalScore =
-      maxPossibleScore > 0
-        ? Math.round((totalScore / maxPossibleScore) * 100)
-        : 0;
-
+    const grading = calculateExamScore(exam, result.answers || {});
+    const isOlympiad = !!exam.config?.isOlympiadMode;
     return {
       score: result.score, // Use the score from the database
-      calculatedScore: finalScore, // Keep calculated score for discrepancy check
-      correctAnswers: result.correctAnswers ?? correctCount,
-      totalQuestions: result.totalQuestions ?? scorableQuestions.length,
-      wrongAnswers: scorableQuestions.length - correctCount - emptyCount,
-      hasDiscrepancy: finalScore !== result.score, // Check logic
+      calculatedScore: grading.score, // Keep calculated score for discrepancy check
+      correctAnswers: result.correctAnswers ?? grading.correctAnswers,
+      wrongAnswers: grading.wrongAnswers ?? (grading.totalQuestions - grading.correctAnswers - (grading.unansweredQuestions || 0)),
+      unansweredQuestions: grading.unansweredQuestions ?? 0,
+      totalQuestions: result.totalQuestions ?? grading.totalQuestions,
+      maxScore: grading.maxScore,
+      minScore: grading.minScore,
+      isOlympiadMode: isOlympiad,
+      olympiadScoring: grading.olympiadScoring,
+      hasDiscrepancy: grading.score !== result.score,
     };
   }, [
-    exam.questions,
+    exam,
     result.answers,
     result.score,
     result.correctAnswers,
@@ -336,12 +270,14 @@ export const StudentResultPage: React.FC<StudentResultPageProps> = ({
 
   const showResult = config.showResultToStudent;
 
+  const isOlympiad = !!config.isOlympiadMode;
+
   // REAL-TIME FALLBACK & RPC BUGFIX:
   // If server score is 0 but client calculated > 0, use client score for display (happens on outdated RPCs when submitting MATCHING logic)
   const displayScore =
-    calculatedStats?.calculatedScore > result.score
-      ? calculatedStats.calculatedScore
-      : result.score;
+    typeof result.score === "number" && (isOlympiad ? !isNaN(result.score) : result.score > 0)
+      ? result.score
+      : calculatedStats.calculatedScore;
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#F8FAFC] dark:bg-slate-950 p-6 font-sans relative overflow-hidden transition-colors duration-300">
@@ -368,14 +304,18 @@ export const StudentResultPage: React.FC<StudentResultPageProps> = ({
       >
         <div className="bg-white dark:bg-slate-900 p-5 md:p-8 rounded-[2.5rem] shadow-[0_20px_60px_-15px_rgba(0,0,0,0.05)] dark:shadow-black/30 border border-white dark:border-slate-800 relative overflow-hidden">
           {/* Background decoration */}
-          <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-emerald-400 to-teal-500"></div>
+          <div className={`absolute top-0 left-0 w-full h-2 ${isOlympiad ? 'bg-gradient-to-r from-amber-400 to-orange-500' : 'bg-gradient-to-r from-emerald-400 to-teal-500'}`}></div>
 
           <div className="mb-6">
-            <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-emerald-50 dark:bg-emerald-900/20 text-emerald-500 dark:text-emerald-400 mb-4 shadow-sm ring-4 ring-emerald-50/50 dark:ring-emerald-900/10">
+            <div className={`inline-flex items-center justify-center w-16 h-16 rounded-full mb-4 shadow-sm ${
+              isOlympiad
+                ? 'bg-amber-50 dark:bg-amber-900/20 text-amber-500 dark:text-amber-400 ring-4 ring-amber-50/50 dark:ring-amber-900/10'
+                : 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-500 dark:text-emerald-400 ring-4 ring-emerald-50/50 dark:ring-emerald-900/10'
+            }`}>
               <CheckCircleIcon className="w-8 h-8" />
             </div>
             <h1 className="text-xl font-black text-slate-900 dark:text-white mb-1 tracking-tight">
-              Ujian Selesai
+              {isOlympiad ? "Ujian Olimpiade Selesai" : "Ujian Selesai"}
             </h1>
             <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">
               Jawaban Anda telah berhasil disimpan.
@@ -386,7 +326,11 @@ export const StudentResultPage: React.FC<StudentResultPageProps> = ({
             <div className="space-y-6">
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-stretch">
                 {/* SCORE CARD */}
-                <div className="lg:col-span-3 py-6 relative bg-emerald-50/30 dark:bg-emerald-900/10 rounded-3xl border border-emerald-100/50 dark:border-emerald-800/30 flex flex-col items-center justify-center">
+                <div className={`lg:col-span-3 py-6 relative rounded-3xl border flex flex-col items-center justify-center ${
+                  isOlympiad
+                    ? 'bg-amber-50/30 dark:bg-amber-900/10 border-amber-200/50 dark:border-amber-800/30'
+                    : 'bg-emerald-50/30 dark:bg-emerald-900/10 border-emerald-100/50 dark:border-emerald-800/30'
+                }`}>
                   {isWaitingForServer ? (
                     <div className="flex flex-col items-center justify-center space-y-3">
                       <div className="relative">
@@ -401,12 +345,28 @@ export const StudentResultPage: React.FC<StudentResultPageProps> = ({
                     </div>
                   ) : (
                     <>
-                      <span className="text-5xl font-black text-slate-800 dark:text-slate-100 tracking-tighter block">
-                        {displayScore}
-                      </span>
+                      <div className="flex items-baseline justify-center gap-1">
+                        <span className={`font-black tracking-tighter ${isOlympiad ? "text-4xl sm:text-5xl" : "text-5xl"} text-slate-800 dark:text-slate-100`}>
+                          {displayScore}
+                        </span>
+                        {isOlympiad && calculatedStats.maxScore !== undefined && (
+                          <span className="text-sm sm:text-base font-bold text-slate-400 dark:text-slate-500">
+                            / {calculatedStats.maxScore} pt
+                          </span>
+                        )}
+                      </div>
                       <span className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mt-1 block">
-                        Nilai Akhir
+                        {isOlympiad ? "Skor Olimpiade" : "Nilai Akhir"}
                       </span>
+                      {isOlympiad && (
+                        <div className="mt-2.5 flex items-center justify-center gap-1.5 text-[10px] font-mono font-bold text-slate-500 dark:text-slate-400">
+                          <span className="text-emerald-600 dark:text-emerald-400">B: {calculatedStats.correctAnswers}</span>
+                          <span>·</span>
+                          <span className="text-rose-600 dark:text-rose-400">S: {calculatedStats.wrongAnswers}</span>
+                          <span>·</span>
+                          <span className="text-slate-500">K: {calculatedStats.unansweredQuestions}</span>
+                        </div>
+                      )}
                       {calculatedStats.hasDiscrepancy &&
                         !isWaitingForServer && (
                           <span className="absolute top-3 right-3 flex h-2.5 w-2.5">
