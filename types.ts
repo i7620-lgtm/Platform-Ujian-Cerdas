@@ -182,6 +182,9 @@ export interface ExamConfig {
   manualParticipantCount?: number; // Added for manual override in archives
   collaborators?: Collaborator[]; // Moved here for JSONB persistence
   kkm?: number; // Nilai KKM (Kriteria Ketuntasan Minimal)
+  // Mode Olimpiade (Sistem Skor Penalti / Pengali Kustom)
+  isOlympiadMode?: boolean;
+  olympiadScoring?: OlympiadScoringConfig;
   certificateSettings?: {
     enabled: boolean;
     backgroundUrl: string; 
@@ -190,6 +193,12 @@ export interface ExamConfig {
       score: { x: number; y: number; fontSize: number; color: string; visible: boolean };
     };
   };
+}
+
+export interface OlympiadScoringConfig {
+  correctMultiplier: number; // default: 4
+  wrongMultiplier: number;   // default: -1
+  emptyMultiplier: number;   // default: 0
 }
 
 export interface Exam {
@@ -230,6 +239,11 @@ export interface Result {
     score: number;
     totalQuestions: number;
     correctAnswers: number;
+    wrongAnswers?: number;
+    unansweredQuestions?: number;
+    maxScore?: number;
+    minScore?: number;
+    isOlympiadMode?: boolean;
     completionTime?: number; 
     activityLog?: string[];
     status?: ResultStatus;
