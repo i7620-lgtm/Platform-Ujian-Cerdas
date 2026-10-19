@@ -443,7 +443,7 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                         STATUS
                       </th>
                       <th className="px-6 py-4 text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest text-center">
-                        NILAI
+                        {displayExam?.config?.isOlympiadMode ? "SKOR OLIMPIADE" : "NILAI"}
                       </th>
                       <th className="px-6 py-4 text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest text-center">
                         WAKTU
@@ -600,9 +600,21 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                             </td>
 
                             <td className="px-6 py-4 whitespace-nowrap text-center">
-                              <span className="text-sm font-black text-indigo-600 dark:text-indigo-400 font-mono bg-indigo-50/50 dark:bg-indigo-900/10 px-2 py-1 rounded">
-                                {Math.max(r.score || 0, computedScore || 0)}
-                              </span>
+                              {(() => {
+                                const isOlympiad = !!displayExam?.config?.isOlympiadMode;
+                                const liveScore = typeof r.score === "number" && (isOlympiad ? !isNaN(r.score) : r.score > 0)
+                                  ? r.score
+                                  : computedScore;
+                                return (
+                                  <span className={`text-sm font-black font-mono px-2 py-1 rounded ${
+                                    isOlympiad
+                                      ? (liveScore > 0 ? "text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/40" : liveScore < 0 ? "text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/40" : "text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-slate-800")
+                                      : "text-indigo-600 dark:text-indigo-400 bg-indigo-50/50 dark:bg-indigo-900/10"
+                                  }`}>
+                                    {liveScore}{isOlympiad ? " pt" : ""}
+                                  </span>
+                                );
+                              })()}
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-center">
                               {r.status === "completed" ? (
