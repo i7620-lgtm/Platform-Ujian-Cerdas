@@ -653,15 +653,17 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({
             })}
           </div>
 
-          {/* Informasi Pengawasan & Batas Jam Sesi Bersebelahan di Laci Soal */}
-          {(isMonitoring || isSessionGracePeriodActive) && (
+          {/* Informasi Pengawasan, Batas Jam Sesi & Mode Olimpiade di Laci Soal */}
+          {(isMonitoring || isSessionGracePeriodActive || activeExam.config?.isOlympiadMode) && (
             <div className="mt-6 pt-4 border-t border-slate-100 dark:border-slate-800 animate-fade-in">
               <div
                 className={`grid grid-cols-1 ${
-                  isMonitoring && isSessionGracePeriodActive
-                    ? "md:grid-cols-2"
-                    : "max-w-md mx-auto"
-                } gap-3.5 max-w-4xl mx-auto`}
+                  (Number(!!isMonitoring) + Number(!!isSessionGracePeriodActive) + Number(!!activeExam.config?.isOlympiadMode)) >= 3
+                    ? "md:grid-cols-2 lg:grid-cols-3 max-w-5xl"
+                    : (Number(!!isMonitoring) + Number(!!isSessionGracePeriodActive) + Number(!!activeExam.config?.isOlympiadMode)) === 2
+                      ? "md:grid-cols-2 max-w-4xl"
+                      : "max-w-md"
+                } gap-3.5 mx-auto`}
               >
                 {/* Kolom 1: Peringatan Pengawasan Sistem */}
                 {isMonitoring && (
@@ -685,7 +687,31 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({
                   </div>
                 )}
 
-                {/* Kolom 2: Informasi Batas Jam Sesi & Toleransi Waktu */}
+                {/* Kolom 2: Mode Olimpiade Aktif */}
+                {activeExam.config?.isOlympiadMode && (
+                  <div className="p-4 rounded-2xl bg-amber-50/70 dark:bg-amber-950/30 border border-amber-200/80 dark:border-amber-900/50 flex flex-col items-center text-center justify-between shadow-xs">
+                    <div className="flex flex-col items-center w-full">
+                      <div className="bg-amber-100/90 dark:bg-amber-900/50 px-3.5 py-1.5 rounded-full border border-amber-200/70 dark:border-amber-800 flex items-center gap-2 mb-2 text-amber-800 dark:text-amber-200">
+                        <span className="w-2 h-2 rounded-full bg-amber-500"></span>
+                        <span className="text-xs font-black uppercase tracking-wider">
+                          Mode Olimpiade Aktif
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1.5 text-xs font-mono font-bold text-amber-900 dark:text-amber-200 mb-2 bg-white/70 dark:bg-slate-800/70 px-3 py-1 rounded-lg border border-amber-200/50 dark:border-amber-800/40">
+                        <span className="text-emerald-700 dark:text-emerald-400">Benar +{activeExam.config.olympiadScoring?.correctMultiplier ?? 4}</span>
+                        <span>·</span>
+                        <span className="text-rose-700 dark:text-rose-400">Salah {activeExam.config.olympiadScoring?.wrongMultiplier ?? -1}</span>
+                        <span>·</span>
+                        <span className="text-slate-600 dark:text-slate-400">Kosong {activeExam.config.olympiadScoring?.emptyMultiplier ?? 0}</span>
+                      </div>
+                      <p className="text-xs text-amber-950/80 dark:text-amber-200/80 font-medium leading-relaxed">
+                        Jawaban salah mengurangi nilai akhir. Mengosongkan jawaban yang diragukan terhindar dari penalti poin.
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Kolom 3: Informasi Batas Jam Sesi & Toleransi Waktu */}
                 {isSessionGracePeriodActive && (
                   <div className="p-4 rounded-2xl bg-amber-50/80 dark:bg-amber-950/30 border border-amber-200/80 dark:border-amber-900/50 flex flex-col items-center text-center justify-between shadow-xs">
                     <div className="flex flex-col items-center w-full">
