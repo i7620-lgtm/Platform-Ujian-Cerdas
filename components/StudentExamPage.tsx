@@ -735,6 +735,28 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({
           </div>
         )}
 
+        {/* Banner Mode Olimpiade (Sistem Skor Penalti) */}
+        {activeExam.config?.isOlympiadMode && (
+          <div className="p-4 sm:p-5 rounded-2xl bg-amber-50/90 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/60 shadow-xs flex items-start gap-3.5">
+            <div className="w-8 h-8 rounded-xl bg-amber-500 text-white flex items-center justify-center shrink-0 shadow-xs font-black text-xs">
+              OSN
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h3 className="text-sm font-bold text-amber-950 dark:text-amber-100">
+                  Ujian Berjalan dalam Mode Olimpiade
+                </h3>
+                <span className="text-[11px] font-mono font-bold text-amber-800 dark:text-amber-300 bg-white dark:bg-slate-800 px-2 py-0.5 rounded border border-amber-200 dark:border-amber-700/60">
+                  Benar +{activeExam.config.olympiadScoring?.correctMultiplier ?? 4} · Salah {activeExam.config.olympiadScoring?.wrongMultiplier ?? -1} · Kosong {activeExam.config.olympiadScoring?.emptyMultiplier ?? 0}
+                </span>
+              </div>
+              <p className="text-xs text-amber-800/90 dark:text-amber-300/80 mt-1 leading-relaxed">
+                Ujian ini menerapkan sistem penalti poin. Jawaban yang salah akan mengurangi nilai akhir. Jika ragu, Anda dapat mengosongkan jawaban agar terhindar dari penalti.
+              </p>
+            </div>
+          </div>
+        )}
+
         {activeExam.questions.map((q, idx) => {
           const num =
             activeExam.questions
@@ -894,14 +916,18 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({
             <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 font-medium leading-relaxed max-w-lg mb-5">
               {answeredCount === totalQuestions
                 ? "Hebat! Anda telah menjawab seluruh soal ujian. Silakan periksa kembali jawaban Anda jika masih memiliki sisa waktu, atau kumpulkan ujian sekarang."
-                : `Anda telah menjawab ${answeredCount} dari total ${totalQuestions} soal (${progress}%). Masih ada ${totalQuestions - answeredCount} soal yang belum dijawab.`}
+                : activeExam.config?.isOlympiadMode
+                  ? `Anda menjawab ${answeredCount} dari ${totalQuestions} soal (${progress}%). Terdapat ${totalQuestions - answeredCount} soal yang dikosongkan. Dalam Mode Olimpiade, membiarkan soal kosong tidak akan mengurangi poin Anda.`
+                  : `Anda telah menjawab ${answeredCount} dari total ${totalQuestions} soal (${progress}%). Masih ada ${totalQuestions - answeredCount} soal yang belum dijawab.`}
             </p>
 
-            {/* Nomor Soal yang Belum Terjawab (Dapat diklik langsung untuk menuju soal) */}
+            {/* Nomor Soal yang Belum Terjawab / Dikosongkan (Dapat diklik langsung untuk menuju soal) */}
             {answeredCount < totalQuestions && (
               <div className="w-full mb-6 p-4 rounded-2xl bg-amber-50/70 dark:bg-amber-950/30 border border-amber-200/80 dark:border-amber-900/50 text-left">
                 <span className="text-xs font-bold text-amber-900 dark:text-amber-200 block mb-2.5">
-                  Nomor soal yang belum dijawab (ketuk untuk memeriksa):
+                  {activeExam.config?.isOlympiadMode
+                    ? "Nomor soal yang dikosongkan (tanpa penalti, ketuk jika ingin mengisi):"
+                    : "Nomor soal yang belum dijawab (ketuk untuk memeriksa):"}
                 </span>
                 <div className="flex flex-wrap gap-2">
                   {activeExam.questions
