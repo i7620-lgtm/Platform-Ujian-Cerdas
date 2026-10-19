@@ -599,7 +599,7 @@ const App: React.FC = () => {
         student: currentStudent,
         examCode: currentExam.code,
         answers: finalAnswers,
-        score: (grading as {score?: number})?.score || 0,
+        score: typeof (grading as {score?: number})?.score === 'number' ? (grading as {score: number}).score : 0,
         totalQuestions: (grading as {totalQuestions?: number})?.totalQuestions || currentExam.questions.length,
         correctAnswers: (grading as {correctAnswers?: number})?.correctAnswers || 0,
         status, 
