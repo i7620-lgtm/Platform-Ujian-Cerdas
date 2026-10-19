@@ -920,7 +920,7 @@ export const ExamConfigSettings: React.FC<ExamConfigSettingsProps> = ({
                       Poin Jawaban Salah
                     </label>
                     <div className="flex items-center gap-1.5">
-                      <span className="text-sm font-black text-rose-600 dark:text-rose-400">±</span>
+                      <span className="text-sm font-black text-rose-600 dark:text-rose-400">−</span>
                       <input
                         type="number"
                         value={config.olympiadScoring?.wrongMultiplier ?? -1}
