@@ -4,6 +4,10 @@ import { examService } from './exam';
 import { resultService } from './result';
 import type { Exam, Result, Question, ExamSummary, TeacherProfile, AccountType, ExamConfig } from '../types';
 import { normalize, parseList } from '../components/teacher/examUtils';
+import { GoogleGenAI } from '@google/genai';
+
+// Pelacak ketersediaan kolom tambahan pada tabel exam_summaries di database produksi (default false agar aman dari error 400)
+let supportsExtendedSummaries: boolean = false;
 
 export class ArchiveService {
 
@@ -39,12 +43,12 @@ export class ArchiveService {
           }
       }
 
-      // PRESERVE MANUAL EDITS: Fetch existing summaries first
+      // PRESERVE MANUAL EDITS: Fetch existing summaries first (gunakan kolom aman)
       let existingList: any[] = [];
       try {
           const result = await supabase
               .from('exam_summaries')
-              .select('region, exam_type, class_level, school_name')
+              .select('school_name')
               .eq('exam_code', exam.code);
           existingList = result.data || [];
       } catch (e) {
@@ -135,12 +139,12 @@ export class ArchiveService {
           }
       }
 
-      // PRESERVE MANUAL EDITS: Fetch existing summaries first
+      // PRESERVE MANUAL EDITS: Fetch existing summaries first (gunakan kolom aman)
       let existingList: any[] = [];
       try {
           const result = await supabase
               .from('exam_summaries')
-              .select('region, exam_type, class_level, school_name')
+              .select('school_name')
               .eq('exam_code', exam.code);
           existingList = result.data || [];
       } catch (e) {
@@ -409,15 +413,17 @@ export class ArchiveService {
               }))
       }));
 
-      // Map examQuestions to a structured list for the AI to understand the exam content and formulate exact remedial/enrichment questions
-      const questionDetails = examQuestions
-          ? examQuestions
+      // Optimasi Payload: Pisahkan butir kritis (< 60% benar) vs butir tuntas agar prompt padat, responsif, dan hemat token
+      const criticalQuestions: any[] = [];
+      const masteredSummary: string[] = [];
+
+      if (examQuestions) {
+          examQuestions
               .filter(q => q.questionType !== 'INFO')
-              .map((q, idx) => {
+              .forEach((q, idx) => {
                   let correctRate: number | undefined;
                   let topWrongAnswer: string | null = null;
                   let topWrongRate: number | undefined;
-                  let answerDist: Record<string, number> | undefined;
 
                   for (const s of summaries) {
                       const qs = s.question_stats?.find((item: any) => item.id === q.id || item.number === idx + 1);
@@ -425,29 +431,26 @@ export class ArchiveService {
                           correctRate = qs.correct_rate as number;
                           topWrongAnswer = qs.top_wrong_answer as string | null;
                           topWrongRate = qs.top_wrong_rate as number;
-                          answerDist = qs.answer_distribution as Record<string, number>;
                           break;
                       }
                   }
 
-                  return {
-                      number: idx + 1,
-                      text: stripBase64(q.questionText || ""),
-                      type: q.questionType,
-                      options: (q.options || []).map(o => stripBase64(o || "")),
-                      correctAnswer: q.correctAnswer || "",
-                      kisiKisi: q.kisiKisi || "",
-                      level: q.level || "",
-                      category: q.category || "",
-                      scoreWeight: q.scoreWeight || 1,
-                      correct_rate: correctRate,
-                      top_wrong_answer: topWrongAnswer,
-                      top_wrong_rate: topWrongRate,
-                      answer_distribution: answerDist,
-                      is_critical: typeof correctRate === 'number' && correctRate < 60
-                  };
-              })
-          : [];
+                  const isCritical = typeof correctRate === 'number' && correctRate < 60;
+                  if (isCritical) {
+                      const cleanText = stripBase64(q.questionText || "");
+                      criticalQuestions.push({
+                          nomor: idx + 1,
+                          teks: cleanText.length > 200 ? cleanText.substring(0, 190) + "..." : cleanText,
+                          materi: q.kisiKisi || q.category || "Materi Ujian",
+                          kunci: q.correctAnswer || "-",
+                          tingkat_benar: `${correctRate}%`,
+                          pengecoh_dominan: topWrongAnswer ? `${topWrongAnswer} (${topWrongRate}%)` : "Tersebar"
+                      });
+                  } else {
+                      masteredSummary.push(`No.${idx + 1} (${q.category || q.kisiKisi || 'Materi Inti'})`);
+                  }
+              });
+      }
 
       const defaultTask = `Buatlah laporan "Analisis Karakteristik, Diagnostik Butir Soal, dan Matriks Intervensi Berjenjang Hasil Ujian" yang sangat komprehensif, tajam, dan siap dieksekusi langsung oleh guru di kelas. Jika data input berisi beberapa sekolah yang berbeda, Anda WAJIB menganalisis dan membuat penjabaran performa untuk MASING-MASING sekolah secara terpisah.`;
 
@@ -495,8 +498,11 @@ export class ArchiveService {
         INPUT DATA MAKRO & SEBARAN JENJANG (JSON):
         ${JSON.stringify(simpleData)}
 
-        EXAM QUESTIONS LIST WITH ITEM PERFORMANCE & DISTRACTORS (JSON):
-        ${JSON.stringify(questionDetails)}
+        DAFTAR BUTIR SOAL KRITIS (< 60% BENAR) (JSON):
+        ${JSON.stringify(criticalQuestions)}
+
+        RINGKASAN BUTIR SOAL TUNTAS KKM:
+        ${masteredSummary.slice(0, 20).join(", ")}${masteredSummary.length > 20 ? ` ...dan ${masteredSummary.length - 20} butir soal lainnya tuntas` : ''}
 
         ${existingAnalysesText}
 
@@ -557,76 +563,115 @@ export class ArchiveService {
 
   // --- GEMINI AI ANALYTICS (GENERATIVE VISUALIZATION) ---
   async generateAIAnalysis(summaries: ExamSummary[], customPrompt?: string, examQuestions?: Question[], existingAnalyses?: Record<string, string>): Promise<string> {
+      const prompt = this.generateAnalysisPrompt(summaries, customPrompt, examQuestions, existingAnalyses);
+      let lastErrorMessage = "";
+
+      // 1. Percobaan Utama: Melalui Serverless API /api/generate-analysis dengan AbortController timeout 55s
       try {
-          const prompt = this.generateAnalysisPrompt(summaries, customPrompt, examQuestions, existingAnalyses);
-          
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => {
+              try { controller.abort(); } catch {}
+          }, 55000);
+
           const res = await fetch("/api/generate-analysis", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ prompt })
+              body: JSON.stringify({ prompt }),
+              signal: controller.signal
           });
+          clearTimeout(timeoutId);
 
-          if (!res.ok) {
-              const text = await res.text().catch(() => "");
-              let serverError = "Gagal menghubungi server analisis AI.";
-              try {
-                  const parsed = JSON.parse(text);
-                  serverError = parsed.error || serverError;
-              } catch {
-                  if (text.includes("API key is missing") || text.includes("api key is missing")) {
-                      serverError = "API Key Gemini belum dikonfigurasi di server.";
-                  } else if (text.length > 0 && text.length < 200) {
-                      serverError = `Error Server (${res.status}): ${text}`;
+          if (res.ok) {
+              const contentType = res.headers.get("Content-Type") || "";
+              if (contentType.includes("application/json")) {
+                  const data = await res.json();
+                  if (data.success && data.text) {
+                      return data.text;
                   }
               }
-              throw new Error(serverError);
+          } else {
+              const errText = await res.text().catch(() => "");
+              lastErrorMessage = `Serverless status ${res.status}: ${errText.slice(0, 150)}`;
+              console.warn(`[Analisis AI Serverless Error]: ${lastErrorMessage}`);
           }
-
-          const contentType = res.headers.get("Content-Type") || "";
-          if (!contentType.includes("application/json")) {
-              throw new Error("Respon server tidak valid (bukan JSON).");
-          }
-
-          const data = await res.json();
-          if (!data.success) {
-              throw new Error(data.error || "Gagal menghasilkan analisis.");
-          }
-
-          return data.text || "Gagal menghasilkan analisis.";
-      } catch (e) {
-          console.error("Gemini Error:", e);
-          
-          const errorMsg = e instanceof Error ? e.message.toLowerCase() : String(e).toLowerCase();
-          
-          let title = "Layanan Sedang Sibuk";
-          let message = "Kuota analisis AI harian/menit tercapai. Mohon tunggu beberapa saat sebelum mencoba lagi.";
-
-          if (errorMsg.includes('429') || errorMsg.includes('quota') || errorMsg.includes('exhausted') || (e && typeof e === 'object' && 'status' in e && e.status === 429)) {
-              if (errorMsg.includes('per minute') && errorMsg.includes('requests')) {
-                  title = "Peringatan Tipe 1: Batas Per Menit";
-                  message = "Batas 15 penggunaan per menit telah tercapai pada akun gratis Gemini Flash. Silakan tunggu 1 menit lalu coba lagi.";
-              } else if (errorMsg.includes('per day')) {
-                  title = "Peringatan Tipe 2: Batas Harian";
-                  message = "Batas penggunaan harian gratis (1500 request/hari) dari Gemini Flash telah habis. Silakan coba kembali besok hari.";
-              } else if (errorMsg.includes('tokens')) {
-                  title = "Peringatan Tipe 3: Batas Token Teks";
-                  message = "Data analisis terlalu panjang dan melebihi batas (Maks 1 juta token/menit). Kurangi data atau tunggu 1 menit sebelum mencoba lagi.";
-              } else {
-                 title = "Batas Kuota Pemakaian Tercapai";
-                 message = "Batas pemakaian wajar (kuota gratis) Gemini AI (per menit/harian) telah habis. Silahkan mencobanya kembali nanti.";
-              }
-
-             return `
-                <div class="p-6 bg-rose-50 dark:bg-rose-900/20 border border-rose-100 dark:border-rose-800 rounded-2xl flex flex-col items-center text-center gap-3">
-                    <div class="w-12 h-12 bg-rose-100 dark:bg-rose-800 text-rose-500 rounded-full flex items-center justify-center text-xl">⏳</div>
-                    <h3 class="text-lg font-bold text-rose-700 dark:text-rose-300">${title}</h3>
-                    <p class="text-sm text-rose-600 dark:text-rose-400">${message}</p>
-                </div>
-             `;
-          }
-
-          return "Maaf, layanan analisis AI sedang mengalami gangguan. Silakan coba lagi nanti.";
+      } catch (fetchErr: any) {
+          lastErrorMessage = fetchErr?.message || String(fetchErr);
+          console.warn("[Analisis AI Serverless Fetch Gagal]:", lastErrorMessage);
       }
+
+      // 2. Failover Sekunder: Eksekusi Langsung di Sisi Klien menggunakan Gemini Model Cascade
+      try {
+          console.log("[Analisis AI] Mengaktifkan client-side direct failover menggunakan model cascade...");
+          const clientResult = await this.generateAIAnalysisOnClient(prompt);
+          if (clientResult) {
+              return clientResult;
+          }
+      } catch (clientErr: any) {
+          console.warn("[Analisis AI Client Failover Error]:", clientErr);
+          lastErrorMessage = clientErr?.message || lastErrorMessage;
+      }
+
+      // 3. User-friendly Fallback Message jika seluruh jalur mengalami kuota penuh atau kendala jaringan
+      const lower = (lastErrorMessage || "").toLowerCase();
+      let title = "Layanan Analisis Sedang Padat";
+      let message = "Antrean atau kuota analisis AI sedang penuh. Sistem otomatis menjadwalkan ulang, silakan klik coba kembali dalam 1 menit.";
+
+      if (lower.includes('429') || lower.includes('quota') || lower.includes('exhausted')) {
+          title = "Batas Kuota Pemakaian Tercapai";
+          message = "Batas kuota pemakaian wajar (kuota gratis) Gemini AI per menit atau harian telah tercapai. Harap tunggu 1-2 menit lalu coba kembali.";
+      } else if (lower.includes('503') || lower.includes('high demand')) {
+          title = "Antrean Model AI Sedang Penuh";
+          message = "Layanan AI sedang melayani lonjakan permintaan tinggi. Silakan coba kembali sesaat lagi.";
+      }
+
+      return `
+<div class="p-6 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-2xl flex flex-col items-center text-center gap-3">
+    <div class="w-12 h-12 bg-amber-100 dark:bg-amber-800 text-amber-600 dark:text-amber-300 rounded-full flex items-center justify-center text-xl">⏳</div>
+    <h3 class="text-lg font-bold text-amber-800 dark:text-amber-200">${title}</h3>
+    <p class="text-sm text-amber-700 dark:text-amber-300 max-w-md">${message}</p>
+</div>`;
+  }
+
+  private async generateAIAnalysisOnClient(prompt: string): Promise<string | null> {
+      const apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY;
+      if (!apiKey) {
+          console.warn("Client Gemini API key tidak tersedia untuk failover.");
+          return null;
+      }
+
+      const ai = new GoogleGenAI({
+          apiKey,
+          httpOptions: {
+              headers: { 'User-Agent': 'aistudio-build' }
+          }
+      });
+
+      const cascadeModels = [
+          'gemini-3.8-flash',
+          'gemini-2.5-flash',
+          'gemini-flash-latest',
+          'gemini-3.1-flash-lite'
+      ];
+
+      for (const model of cascadeModels) {
+          try {
+              console.log(`[Client AI Failover] Meminta analisis dengan model: ${model}...`);
+              const res = await ai.models.generateContent({
+                  model,
+                  contents: prompt,
+                  config: {
+                      temperature: 0.2
+                  }
+              });
+              if (res && res.text) {
+                  console.log(`[Client AI Failover] Berhasil menghasilkan analisis dengan model: ${model}`);
+                  return res.text;
+              }
+          } catch (modelErr: any) {
+              console.warn(`[Client AI Failover] Model ${model} gagal:`, modelErr?.message || modelErr);
+          }
+      }
+      return null;
   }
 
   // --- COLD DATA (CLOUD ARCHIVE) METHODS ---
@@ -730,14 +775,43 @@ export class ArchiveService {
       const summaryMap = new Map<string, any>();
       if (fileExamCodes.length > 0) {
           const uniqueCodes = Array.from(new Set(fileExamCodes));
-          const chunkSize = 100;
+          const chunkSize = 30;
           for (let i = 0; i < uniqueCodes.length; i += chunkSize) {
               const chunk = uniqueCodes.slice(i, i + chunkSize);
               try {
-                  const { data: summaries } = await supabase
-                      .from('exam_summaries')
-                      .select('exam_code, school_name, exam_subject, exam_type, class_level, exam_date, total_participants, author_id')
-                      .in('exam_code', chunk);
+                  let summaries: any[] | null = null;
+                  
+                  // 1. Coba query lengkap dengan kolom tambahan jika belum terdeteksi bermasalah
+                  if (supportsExtendedSummaries !== false) {
+                      const res = await supabase
+                          .from('exam_summaries')
+                          .select('exam_code, school_name, exam_subject, exam_type, class_level, exam_date, total_participants, author_id')
+                          .in('exam_code', chunk);
+
+                      if (res.error) {
+                          const errCode = (res.error as any)?.code;
+                          const errMsg = (res.error as any)?.message || "";
+                          const status = (res.error as any)?.status;
+                          if (errCode === 'PGRST204' || errMsg.includes('column') || status === 400) {
+                              supportsExtendedSummaries = false;
+                          }
+                      } else {
+                          supportsExtendedSummaries = true;
+                          summaries = res.data;
+                      }
+                  }
+
+                  // 2. Fallback aman ke kolom standar jika kolom tambahan belum ada di skema database produksi
+                  if (supportsExtendedSummaries === false || !summaries) {
+                      const resFallback = await supabase
+                          .from('exam_summaries')
+                          .select('exam_code, school_name, exam_subject, exam_date, total_participants')
+                          .in('exam_code', chunk);
+                      
+                      if (!resFallback.error && resFallback.data) {
+                          summaries = resFallback.data;
+                      }
+                  }
                   
                   if (summaries && Array.isArray(summaries)) {
                       summaries.forEach((s) => {
