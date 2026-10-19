@@ -788,9 +788,9 @@ export const analyzeStudentPerformance = (
       ? Math.round((totalCorrectScored / totalQuestionsScored) * 100)
       : 0;
 
-  // Use result.score if valid (> 0), otherwise fallback to calculatedScore
+  // Use result.score if valid number (including 0 or negative in Olympiad mode)
   const score =
-    typeof result.score === "number" && result.score > 0
+    typeof result.score === "number" && (exam.config?.isOlympiadMode ? !isNaN(result.score) : result.score > 0)
       ? result.score
       : calculatedScore;
 
@@ -1628,36 +1628,82 @@ export const generateExamCode = () => {
 
 /**
  * Calculates the exam score based on student answers and exam configuration.
- * Handles weighted scoring and manual grades.
+ * Handles standard scoring, weighted scoring, Olympiad mode penalty multipliers, and manual grades.
  */
 export const calculateExamScore = (
   exam: Exam,
   answers: Record<string, string>,
 ) => {
   let correctCount = 0;
+  let wrongCount = 0;
+  let unansweredCount = 0;
   let totalScore = 0;
   let maxPossibleScore = 0;
+  let minPossibleScore = 0;
+
   const scorableQuestions = exam.questions.filter(
     (q) => q.questionType !== "INFO",
   );
 
+  const isOlympiad = !!exam.config?.isOlympiadMode;
+  const correctMult = Number(exam.config?.olympiadScoring?.correctMultiplier ?? 4);
+  const wrongMult = Number(exam.config?.olympiadScoring?.wrongMultiplier ?? -1);
+  const emptyMult = Number(exam.config?.olympiadScoring?.emptyMultiplier ?? 0);
+
+  const isAnswerEmpty = (ans: string | undefined | null, q: Question): boolean => {
+    if (ans === undefined || ans === null) return true;
+    const str = String(ans).trim();
+    if (str === "") return true;
+
+    if (q.questionType === "COMPLEX_MULTIPLE_CHOICE") {
+      return parseList(str).length === 0;
+    }
+    if (q.questionType === "TRUE_FALSE" || q.questionType === "MATCHING") {
+      try {
+        const obj = JSON.parse(str);
+        if (!obj || typeof obj !== "object") return true;
+        return Object.keys(obj).length === 0;
+      } catch {
+        return true;
+      }
+    }
+    return false;
+  };
+
   scorableQuestions.forEach((q: Question) => {
     const weight = q.scoreWeight || 1;
-    maxPossibleScore += weight;
-
     const studentAnswer = answers[q.id];
+    const empty = isAnswerEmpty(studentAnswer, q);
+
+    if (isOlympiad) {
+      maxPossibleScore += (correctMult * weight);
+      minPossibleScore += (wrongMult * weight);
+    } else {
+      maxPossibleScore += weight;
+    }
 
     // Check if teacher has manually graded this question
     const manualGradeKey = `_grade_${q.id}`;
     if (answers[manualGradeKey]) {
       if (answers[manualGradeKey] === "CORRECT") {
         correctCount++;
-        totalScore += weight;
+        totalScore += isOlympiad ? (correctMult * weight) : weight;
+      } else {
+        wrongCount++;
+        if (isOlympiad) {
+          totalScore += (wrongMult * weight);
+        }
       }
       return;
     }
 
-    if (!studentAnswer) return;
+    if (empty) {
+      unansweredCount++;
+      if (isOlympiad) {
+        totalScore += (emptyMult * weight);
+      }
+      return;
+    }
 
     let isCorrect = false;
     if (
@@ -1667,8 +1713,9 @@ export const calculateExamScore = (
       if (
         q.correctAnswer &&
         isAnswerMatch(q.correctAnswer, studentAnswer, q.questionType)
-      )
+      ) {
         isCorrect = true;
+      }
     } else if (q.questionType === "COMPLEX_MULTIPLE_CHOICE") {
       const studentSet = new Set(
         parseList(studentAnswer).map((a) => normalize(a, q.questionType)),
@@ -1712,18 +1759,29 @@ export const calculateExamScore = (
 
     if (isCorrect) {
       correctCount++;
-      totalScore += weight;
+      totalScore += isOlympiad ? (correctMult * weight) : weight;
+    } else {
+      wrongCount++;
+      if (isOlympiad) {
+        totalScore += (wrongMult * weight);
+      }
     }
   });
 
-  const score =
-    maxPossibleScore > 0
-      ? Math.round((totalScore / maxPossibleScore) * 100)
-      : 0;
+  const finalScore = isOlympiad
+    ? totalScore
+    : (maxPossibleScore > 0 ? Math.round((totalScore / maxPossibleScore) * 100) : 0);
+
   return {
-    score,
+    score: finalScore,
     correctAnswers: correctCount,
+    wrongAnswers: wrongCount,
+    unansweredQuestions: unansweredCount,
     totalQuestions: scorableQuestions.length,
+    maxScore: isOlympiad ? maxPossibleScore : 100,
+    minScore: isOlympiad ? minPossibleScore : 0,
+    isOlympiadMode: isOlympiad,
+    olympiadScoring: isOlympiad ? { correctMultiplier: correctMult, wrongMultiplier: wrongMult, emptyMultiplier: emptyMult } : undefined,
   };
 };
 
