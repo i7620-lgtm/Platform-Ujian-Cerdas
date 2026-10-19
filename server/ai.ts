@@ -31,35 +31,112 @@ export const FLASH_MODELS_CASCADE = [
     'gemini-3.1-flash-lite'
 ];
 
+// In-memory tracker for models with exhausted daily quotas to minimize latency
+const exhaustedModelsMap = new Map<string, number>();
+
+function markModelExhausted(model: string, durationMs: number = 10 * 60 * 1000) {
+    exhaustedModelsMap.set(model, Date.now() + durationMs);
+}
+
+function isModelTemporarilyExhausted(model: string): boolean {
+    const expire = exhaustedModelsMap.get(model);
+    if (!expire) return false;
+    if (Date.now() > expire) {
+        exhaustedModelsMap.delete(model);
+        return false;
+    }
+    return true;
+}
+
 export async function generateAIAnalysisOnServer(prompt: string): Promise<string> {
-    const modelsToTry = [...FLASH_MODELS_CASCADE];
-    
-    for (const model of modelsToTry) {
+    const ai = getAI();
+    let response: string | null = null;
+    let lastError: unknown = null;
+
+    // Cascade berjenjang: Utamakan model aktif tertinggi (gemini-3.8-flash) ke model cadangan
+    const uniqueModels = Array.from(new Set(FLASH_MODELS_CASCADE));
+    const sortedModels = [
+        ...uniqueModels.filter(m => !isModelTemporarilyExhausted(m)),
+        ...uniqueModels.filter(m => isModelTemporarilyExhausted(m))
+    ];
+
+    for (const currentModel of sortedModels) {
         let attempts = 0;
         const maxAttempts = 2;
-        
-        while (attempts < maxAttempts) {
+        let success = false;
+
+        while (attempts < maxAttempts && !success) {
             attempts++;
             try {
-                const ai = getAI();
-                const response = await ai.models.generateContent({
-                    model: model, 
-                    contents: prompt
+                console.log(`[Analisis AI] Mencoba menghasilkan analisis dengan model: ${currentModel} (Percobaan ${attempts}/${maxAttempts})`);
+                const res = await ai.models.generateContent({
+                    model: currentModel,
+                    contents: prompt,
+                    config: {
+                        temperature: 0.2,
+                    }
                 });
-                return response.text || "Gagal menghasilkan analisis.";
-            } catch (e: any) {
-                const is503 = e?.status === 503 || e?.message?.includes('503') || e?.message?.includes('high demand');
-                const isQuota = e?.status === 429 || e?.message?.includes('quota') || e?.message?.includes('429');
+
+                if (res && res.text) {
+                    response = res.text;
+                    lastError = null;
+                    success = true;
+                    console.log(`[Analisis AI] Berhasil menghasilkan analisis menggunakan model: ${currentModel}`);
+                    return response;
+                }
+            } catch (error: unknown) {
+                lastError = error;
+                const err = error as Error & { status?: number };
+                const errorMessage = err?.message?.toLowerCase() || "";
+
+                const is503 = err?.status === 503 || errorMessage.includes('503') || errorMessage.includes('high demand');
+                const isQuota = err?.status === 429 || errorMessage.includes('quota') || errorMessage.includes('exhausted') || errorMessage.includes('429');
+
+                if (isQuota) {
+                    markModelExhausted(currentModel);
+                }
+
                 if (is503 && attempts < maxAttempts) {
-                    await new Promise(resolve => setTimeout(resolve, 600));
+                    console.log(`[Analisis AI] Model ${currentModel} antrean tinggi (503). Menunggu jeda singkat...`);
+                    await new Promise(resolve => setTimeout(resolve, 800));
                     continue;
                 }
-                console.log(`[Analisis AI] Model ${model} ${is503 ? '503 antrean tinggi' : isQuota ? '429 kuota' : 'beralih'}, beralih ke model berikutnya...`);
-                break; 
+
+                console.log(`[Analisis AI] Model ${currentModel} ${is503 ? '503 antrean tinggi' : isQuota ? '429 batas kuota' : 'beralih'}, beralih ke model berjenjang berikutnya...`);
+                break;
             }
         }
+
+        if (success) {
+            break;
+        }
     }
-    throw new Error("Layanan AI Gemini sedang mengalami antrean tinggi. Harap tunggu beberapa saat lalu coba kembali.");
+
+    if (lastError && !response) {
+        const err = lastError as Error & { status?: number };
+        const errorMessage = err?.message?.toLowerCase() || "";
+        console.warn("[Analisis AI] Seluruh model AI dalam kaskade sedang mengalami beban/kuota penuh. Error:", errorMessage.slice(0, 80));
+
+        if (err?.status === 429 || errorMessage.includes('quota') || errorMessage.includes('exhausted') || errorMessage.includes('429')) {
+            if (errorMessage.includes('per minute') && errorMessage.includes('requests')) {
+                throw new Error("Batas permintaan per menit pada Gemini telah tercapai. Harap tunggu 1 menit lalu coba kembali.");
+            }
+            if (errorMessage.includes('per day')) {
+                throw new Error("Batas kuota harian Gemini telah tercapai untuk seluruh model. Silakan coba kembali besok atau gunakan API key lain.");
+            }
+            throw new Error("Kuota penggunaan Gemini sedang penuh pada seluruh model. Harap tunggu beberapa menit lalu coba kembali.");
+        }
+        if (err?.status === 503 || errorMessage.includes('503') || errorMessage.includes('high demand')) {
+            throw new Error("Seluruh layanan AI Gemini sedang mengalami antrean tinggi (503). Harap tunggu beberapa saat lalu coba kembali.");
+        }
+        throw new Error(`API Error: ${err?.message || "Terjadi kesalahan server saat menghasilkan analisis."}`);
+    }
+
+    if (!response) {
+        throw new Error("Gagal mendapatkan respons analisis AI setelah mencoba seluruh model berjenjang.");
+    }
+
+    return response;
 }
 
 export async function generateSvgOnServer(prompt: string, style?: string): Promise<string> {
@@ -211,23 +288,6 @@ function cleanAndValidateSvg(rawText: string): string {
 
     // Perbaiki simbol '&' mentah menjadi entitas XML &amp; (mencegah parsing error pada browser)
     return resultSvg.replace(/&(?!(amp|lt|gt|quot|apos|#\d+|#x[0-9a-fA-F]+);)/g, "&amp;");
-}
-
-// In-memory tracker for models with exhausted daily quotas to minimize latency
-const exhaustedModelsMap = new Map<string, number>();
-
-function markModelExhausted(model: string, durationMs: number = 10 * 60 * 1000) {
-    exhaustedModelsMap.set(model, Date.now() + durationMs);
-}
-
-function isModelTemporarilyExhausted(model: string): boolean {
-    const expire = exhaustedModelsMap.get(model);
-    if (!expire) return false;
-    if (Date.now() > expire) {
-        exhaustedModelsMap.delete(model);
-        return false;
-    }
-    return true;
 }
 
 export async function generateQuestionsOnServer(prompt: string, systemInstruction: string, modelsToTry: string[], properties: any): Promise<any> {
