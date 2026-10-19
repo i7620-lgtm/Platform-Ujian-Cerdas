@@ -89,7 +89,7 @@ export const FinishedStudentsTab: React.FC<FinishedStudentsTabProps> = ({
                 Kelas
               </th>
               <th className="px-6 py-4 text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest text-center">
-                Nilai
+                {displayExam?.config?.isOlympiadMode ? "Skor Olimpiade" : "Nilai"}
               </th>
               <th className="px-6 py-4 text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest text-center">
                 B/S/K
@@ -147,9 +147,13 @@ export const FinishedStudentsTab: React.FC<FinishedStudentsTabProps> = ({
                     </td>
                     <td className="px-6 py-4 text-center">
                       <span
-                        className={`text-sm font-black px-2 py-1 rounded ${score >= 75 ? "text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30" : score >= 50 ? "text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-900/30" : "text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-900/30"}`}
+                        className={`text-sm font-black px-2 py-1 rounded ${
+                          displayExam?.config?.isOlympiadMode
+                            ? (score > 0 ? "text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-900/30" : score < 0 ? "text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-900/30" : "text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-slate-700")
+                            : (score >= 75 ? "text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30" : score >= 50 ? "text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-900/30" : "text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-900/30")
+                        }`}
                       >
-                        {score}
+                        {score}{displayExam?.config?.isOlympiadMode ? " pt" : ""}
                       </span>
                     </td>
                     <td className="px-6 py-4 text-center text-xs font-bold text-slate-600 dark:text-slate-400">
