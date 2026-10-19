@@ -770,6 +770,238 @@ export const ExamConfigSettings: React.FC<ExamConfigSettingsProps> = ({
           </div>
         </div>
 
+        {/* PENGATURAN MODE OLIMPIADE & SISTEM PENALTI */}
+        <div className="md:col-span-2 space-y-4 pt-6 mt-2 border-t border-gray-100 dark:border-slate-700">
+          <div className="flex items-center justify-between">
+            <h4 className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">
+              Sistem Penilaian & Mode Olimpiade
+            </h4>
+            {config.isOlympiadMode && (
+              <span className="text-[11px] font-semibold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 px-2.5 py-0.5 rounded-full border border-amber-200 dark:border-amber-800">
+                Mode Olimpiade Aktif
+              </span>
+            )}
+          </div>
+          
+          <div className={`p-5 rounded-2xl border transition-all ${config.isOlympiadMode ? 'border-amber-300 dark:border-amber-700 bg-gradient-to-br from-amber-50/60 to-orange-50/30 dark:from-amber-950/20 dark:to-slate-900 shadow-sm' : 'border-gray-200 dark:border-slate-700 bg-slate-50/80 dark:bg-slate-900/50'}`}>
+            <label className="flex items-start cursor-pointer group">
+              <input
+                type="checkbox"
+                name="isOlympiadMode"
+                checked={config.isOlympiadMode || false}
+                onChange={(e) => {
+                  const isChecked = e.target.checked;
+                  if (typeof store.handleConfigChangeManual === 'function') {
+                    store.handleConfigChangeManual((prev: ExamConfig) => ({
+                      ...prev,
+                      isOlympiadMode: isChecked,
+                      olympiadScoring: prev.olympiadScoring || {
+                        correctMultiplier: 4,
+                        wrongMultiplier: -1,
+                        emptyMultiplier: 0,
+                      }
+                    }));
+                  }
+                }}
+                className="mt-0.5 h-5 w-5 rounded text-amber-600 focus:ring-amber-500 border-gray-300"
+              />
+              <div className="ml-3.5">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-bold text-gray-900 dark:text-slate-100 group-hover:text-amber-600 dark:group-hover:text-amber-400 transition-colors">
+                    Mode Olimpiade (Sistem Skor Penalti)
+                  </span>
+                  <span className="text-[10px] font-extrabold uppercase px-1.5 py-0.5 rounded bg-amber-500 text-white tracking-wider">
+                    OSN / KSM
+                  </span>
+                </div>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
+                  Terapkan penilaian berbasis poin pengali kustom untuk jawaban benar, salah (penalti minus), dan tidak dijawab. Skor akhir siswa dihitung sebagai skor poin mentah dan dapat bernilai negatif.
+                </p>
+              </div>
+            </label>
+
+            {config.isOlympiadMode && (
+              <div className="mt-5 pt-4 border-t border-amber-200/70 dark:border-amber-900/40 space-y-4">
+                {/* Preset Cepat */}
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-xs font-semibold text-slate-600 dark:text-slate-400">Preset Rekomendasi:</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (typeof store.handleConfigChangeManual === 'function') {
+                        store.handleConfigChangeManual((prev: ExamConfig) => ({
+                          ...prev,
+                          isOlympiadMode: true,
+                          olympiadScoring: { correctMultiplier: 4, wrongMultiplier: -1, emptyMultiplier: 0 }
+                        }));
+                      }
+                    }}
+                    className={`px-2.5 py-1 text-xs font-medium rounded-lg border transition-all ${
+                      (config.olympiadScoring?.correctMultiplier === 4 && config.olympiadScoring?.wrongMultiplier === -1 && config.olympiadScoring?.emptyMultiplier === 0)
+                        ? 'bg-amber-500 text-white border-amber-600 shadow-xs'
+                        : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-amber-400'
+                    }`}
+                  >
+                    Standar OSN (+4 / -1 / 0)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (typeof store.handleConfigChangeManual === 'function') {
+                        store.handleConfigChangeManual((prev: ExamConfig) => ({
+                          ...prev,
+                          isOlympiadMode: true,
+                          olympiadScoring: { correctMultiplier: 3, wrongMultiplier: -2, emptyMultiplier: -1 }
+                        }));
+                      }
+                    }}
+                    className={`px-2.5 py-1 text-xs font-medium rounded-lg border transition-all ${
+                      (config.olympiadScoring?.correctMultiplier === 3 && config.olympiadScoring?.wrongMultiplier === -2 && config.olympiadScoring?.emptyMultiplier === -1)
+                        ? 'bg-amber-500 text-white border-amber-600 shadow-xs'
+                        : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-amber-400'
+                    }`}
+                  >
+                    Kompetisi Ketat (+3 / -2 / -1)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (typeof store.handleConfigChangeManual === 'function') {
+                        store.handleConfigChangeManual((prev: ExamConfig) => ({
+                          ...prev,
+                          isOlympiadMode: true,
+                          olympiadScoring: { correctMultiplier: 2, wrongMultiplier: 0, emptyMultiplier: 0 }
+                        }));
+                      }
+                    }}
+                    className={`px-2.5 py-1 text-xs font-medium rounded-lg border transition-all ${
+                      (config.olympiadScoring?.correctMultiplier === 2 && config.olympiadScoring?.wrongMultiplier === 0 && config.olympiadScoring?.emptyMultiplier === 0)
+                        ? 'bg-amber-500 text-white border-amber-600 shadow-xs'
+                        : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-amber-400'
+                    }`}
+                  >
+                    Tanpa Minus (+2 / 0 / 0)
+                  </button>
+                </div>
+
+                {/* 3 Input Kolom Multiplier */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="p-3 bg-white dark:bg-slate-800 rounded-xl border border-emerald-200 dark:border-emerald-900/50 shadow-xs">
+                    <label className="block text-xs font-bold text-emerald-700 dark:text-emerald-400 mb-1">
+                      Poin Jawaban Benar
+                    </label>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-sm font-black text-emerald-600 dark:text-emerald-400">+</span>
+                      <input
+                        type="number"
+                        value={config.olympiadScoring?.correctMultiplier ?? 4}
+                        onChange={(e) => {
+                          const val = Number(e.target.value);
+                          if (typeof store.handleConfigChangeManual === 'function') {
+                            store.handleConfigChangeManual((prev: ExamConfig) => ({
+                              ...prev,
+                              olympiadScoring: {
+                                correctMultiplier: val,
+                                wrongMultiplier: prev.olympiadScoring?.wrongMultiplier ?? -1,
+                                emptyMultiplier: prev.olympiadScoring?.emptyMultiplier ?? 0,
+                              }
+                            }));
+                          }
+                        }}
+                        className="w-full px-2.5 py-1.5 bg-slate-50 dark:bg-slate-900 border border-emerald-300 dark:border-emerald-700 rounded-lg text-sm font-bold text-emerald-700 dark:text-emerald-300 tabular-nums focus:ring-2 focus:ring-emerald-500"
+                        placeholder="Contoh: 4"
+                      />
+                    </div>
+                    <span className="text-[10px] text-slate-500 dark:text-slate-400 block mt-1">Dikalikan bobot soal</span>
+                  </div>
+
+                  <div className="p-3 bg-white dark:bg-slate-800 rounded-xl border border-rose-200 dark:border-rose-900/50 shadow-xs">
+                    <label className="block text-xs font-bold text-rose-700 dark:text-rose-400 mb-1">
+                      Poin Jawaban Salah
+                    </label>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-sm font-black text-rose-600 dark:text-rose-400">−</span>
+                      <input
+                        type="number"
+                        value={config.olympiadScoring?.wrongMultiplier ?? -1}
+                        onChange={(e) => {
+                          const val = Number(e.target.value);
+                          if (typeof store.handleConfigChangeManual === 'function') {
+                            store.handleConfigChangeManual((prev: ExamConfig) => ({
+                              ...prev,
+                              olympiadScoring: {
+                                correctMultiplier: prev.olympiadScoring?.correctMultiplier ?? 4,
+                                wrongMultiplier: val,
+                                emptyMultiplier: prev.olympiadScoring?.emptyMultiplier ?? 0,
+                              }
+                            }));
+                          }
+                        }}
+                        className="w-full px-2.5 py-1.5 bg-slate-50 dark:bg-slate-900 border border-rose-300 dark:border-rose-700 rounded-lg text-sm font-bold text-rose-700 dark:text-rose-300 tabular-nums focus:ring-2 focus:ring-rose-500"
+                        placeholder="Contoh: -1"
+                      />
+                    </div>
+                    <span className="text-[10px] text-slate-500 dark:text-slate-400 block mt-1">Gunakan minus (-) untuk penalti</span>
+                  </div>
+
+                  <div className="p-3 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-xs">
+                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                      Poin Tidak Dijawab (Kosong)
+                    </label>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-sm font-black text-slate-500">○</span>
+                      <input
+                        type="number"
+                        value={config.olympiadScoring?.emptyMultiplier ?? 0}
+                        onChange={(e) => {
+                          const val = Number(e.target.value);
+                          if (typeof store.handleConfigChangeManual === 'function') {
+                            store.handleConfigChangeManual((prev: ExamConfig) => ({
+                              ...prev,
+                              olympiadScoring: {
+                                correctMultiplier: prev.olympiadScoring?.correctMultiplier ?? 4,
+                                wrongMultiplier: prev.olympiadScoring?.wrongMultiplier ?? -1,
+                                emptyMultiplier: val,
+                              }
+                            }));
+                          }
+                        }}
+                        className="w-full px-2.5 py-1.5 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg text-sm font-bold text-slate-700 dark:text-slate-300 tabular-nums focus:ring-2 focus:ring-primary"
+                        placeholder="Contoh: 0"
+                      />
+                    </div>
+                    <span className="text-[10px] text-slate-500 dark:text-slate-400 block mt-1">Biasanya 0 (tanpa penalti)</span>
+                  </div>
+                </div>
+
+                {/* Simulasi Rentang Skor */}
+                {(() => {
+                  const qCount = store?.questions ? store.questions.filter((q: any) => q.questionType !== 'INFO').length : 0;
+                  const countToUse = qCount > 0 ? qCount : 10;
+                  const cMul = config.olympiadScoring?.correctMultiplier ?? 4;
+                  const wMul = config.olympiadScoring?.wrongMultiplier ?? -1;
+                  const maxPt = countToUse * cMul;
+                  const minPt = countToUse * wMul;
+                  return (
+                    <div className="p-3.5 bg-amber-500/10 dark:bg-amber-950/30 rounded-xl border border-amber-300/60 dark:border-amber-800/50 text-xs text-amber-900 dark:text-amber-200">
+                      <div className="font-bold flex items-center justify-between mb-1.5">
+                        <span>Simulasi Rentang Skor ({countToUse} butir soal):</span>
+                        <span className="font-mono bg-white dark:bg-slate-800 px-2 py-0.5 rounded border border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-300">
+                          {minPt} s.d. {maxPt} Poin
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] text-slate-600 dark:text-slate-400">
+                        <div>• Skor Maksimal: <strong className="text-emerald-700 dark:text-emerald-400 font-mono">+{maxPt} Poin</strong> (Semua Benar)</div>
+                        <div>• Skor Minimal: <strong className="text-rose-700 dark:text-rose-400 font-mono">{minPt} Poin</strong> (Semua Salah)</div>
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+            )}
+          </div>
+        </div>
+
         <div className="md:col-span-2 space-y-4 pt-6 mt-2 border-t border-gray-100 dark:border-slate-700">
           <h4 className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">
             Pengaturan Hasil & Monitor

@@ -116,6 +116,12 @@ export const OngoingExamCard: React.FC<OngoingExamCardProps> = ({
             colorClass="bg-amber-50 text-amber-700 border-amber-200"
           />
         )}
+        {exam.config.isOlympiadMode && (
+          <MetaBadge
+            text={`Olimpiade (+${exam.config.olympiadScoring?.correctMultiplier ?? 4} / ${exam.config.olympiadScoring?.wrongMultiplier ?? -1} / ${exam.config.olympiadScoring?.emptyMultiplier ?? 0})`}
+            colorClass="bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800"
+          />
+        )}
         {exam.config.targetClasses && exam.config.targetClasses.length > 0 && (
           <MetaBadge
             text={exam.config.targetClasses.join(", ")}

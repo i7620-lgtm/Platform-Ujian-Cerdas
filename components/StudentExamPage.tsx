@@ -16,6 +16,7 @@ import {
   ListBulletIcon,
   ExclamationTriangleIcon,
   LightBulbIcon,
+  SparklesIcon,
 } from "./Icons";
 import { storageService } from "../services/storage";
 import { useStudentExamLogic } from "./student/useStudentExamLogic";
@@ -424,6 +425,46 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({
                     </div>
                   </div>
                 )}
+
+              {/* Sistem Penilaian Mode Olimpiade */}
+              {activeExam.config.isOlympiadMode && (
+                <div className="flex flex-col p-3 sm:p-3.5 bg-amber-50/80 dark:bg-amber-950/30 rounded-xl sm:rounded-2xl border border-amber-200/80 dark:border-amber-900/40 sm:col-span-2">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <div className="w-7 h-7 rounded-lg bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-300 flex items-center justify-center shrink-0">
+                        <SparklesIcon className="w-4 h-4" />
+                      </div>
+                      <span className="text-[10px] sm:text-[11px] font-black uppercase text-amber-800 dark:text-amber-300 tracking-wider">
+                        Sistem Penilaian
+                      </span>
+                    </div>
+                    <span className="text-[9px] sm:text-[10px] font-extrabold uppercase px-2 py-0.5 rounded bg-amber-500 text-white tracking-wider">
+                      Mode Olimpiade
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-2 text-center">
+                    <div className="p-2 rounded-xl bg-white/90 dark:bg-slate-800/90 border border-emerald-200/60 dark:border-emerald-900/40 shadow-2xs">
+                      <span className="block text-[10px] font-bold text-slate-500 dark:text-slate-400">Benar</span>
+                      <span className="text-xs sm:text-sm font-black font-mono text-emerald-600 dark:text-emerald-400">
+                        +{activeExam.config.olympiadScoring?.correctMultiplier ?? 4}
+                      </span>
+                    </div>
+                    <div className="p-2 rounded-xl bg-white/90 dark:bg-slate-800/90 border border-rose-200/60 dark:border-rose-900/40 shadow-2xs">
+                      <span className="block text-[10px] font-bold text-slate-500 dark:text-slate-400">Salah</span>
+                      <span className="text-xs sm:text-sm font-black font-mono text-rose-600 dark:text-rose-400">
+                        {activeExam.config.olympiadScoring?.wrongMultiplier ?? -1}
+                      </span>
+                    </div>
+                    <div className="p-2 rounded-xl bg-white/90 dark:bg-slate-800/90 border border-slate-200/60 dark:border-slate-700 shadow-2xs">
+                      <span className="block text-[10px] font-bold text-slate-500 dark:text-slate-400">Kosong</span>
+                      <span className="text-xs sm:text-sm font-black font-mono text-slate-600 dark:text-slate-300">
+                        {activeExam.config.olympiadScoring?.emptyMultiplier ?? 0}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Garis Pemisah Horizontal & Tombol Mulai Mengerjakan */}
@@ -612,15 +653,17 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({
             })}
           </div>
 
-          {/* Informasi Pengawasan & Batas Jam Sesi Bersebelahan di Laci Soal */}
-          {(isMonitoring || isSessionGracePeriodActive) && (
+          {/* Informasi Pengawasan, Batas Jam Sesi & Mode Olimpiade di Laci Soal */}
+          {(isMonitoring || isSessionGracePeriodActive || activeExam.config?.isOlympiadMode) && (
             <div className="mt-6 pt-4 border-t border-slate-100 dark:border-slate-800 animate-fade-in">
               <div
                 className={`grid grid-cols-1 ${
-                  isMonitoring && isSessionGracePeriodActive
-                    ? "md:grid-cols-2"
-                    : "max-w-md mx-auto"
-                } gap-3.5 max-w-4xl mx-auto`}
+                  (Number(!!isMonitoring) + Number(!!isSessionGracePeriodActive) + Number(!!activeExam.config?.isOlympiadMode)) >= 3
+                    ? "md:grid-cols-2 lg:grid-cols-3 max-w-5xl"
+                    : (Number(!!isMonitoring) + Number(!!isSessionGracePeriodActive) + Number(!!activeExam.config?.isOlympiadMode)) === 2
+                      ? "md:grid-cols-2 max-w-4xl"
+                      : "max-w-md"
+                } gap-3.5 mx-auto`}
               >
                 {/* Kolom 1: Peringatan Pengawasan Sistem */}
                 {isMonitoring && (
@@ -644,7 +687,31 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({
                   </div>
                 )}
 
-                {/* Kolom 2: Informasi Batas Jam Sesi & Toleransi Waktu */}
+                {/* Kolom 2: Mode Olimpiade Aktif */}
+                {activeExam.config?.isOlympiadMode && (
+                  <div className="p-4 rounded-2xl bg-amber-50/70 dark:bg-amber-950/30 border border-amber-200/80 dark:border-amber-900/50 flex flex-col items-center text-center justify-between shadow-xs">
+                    <div className="flex flex-col items-center w-full">
+                      <div className="bg-amber-100/90 dark:bg-amber-900/50 px-3.5 py-1.5 rounded-full border border-amber-200/70 dark:border-amber-800 flex items-center gap-2 mb-2 text-amber-800 dark:text-amber-200">
+                        <span className="w-2 h-2 rounded-full bg-amber-500"></span>
+                        <span className="text-xs font-black uppercase tracking-wider">
+                          Mode Olimpiade Aktif
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1.5 text-xs font-mono font-bold text-amber-900 dark:text-amber-200 mb-2 bg-white/70 dark:bg-slate-800/70 px-3 py-1 rounded-lg border border-amber-200/50 dark:border-amber-800/40">
+                        <span className="text-emerald-700 dark:text-emerald-400">Benar +{activeExam.config.olympiadScoring?.correctMultiplier ?? 4}</span>
+                        <span>·</span>
+                        <span className="text-rose-700 dark:text-rose-400">Salah {activeExam.config.olympiadScoring?.wrongMultiplier ?? -1}</span>
+                        <span>·</span>
+                        <span className="text-slate-600 dark:text-slate-400">Kosong {activeExam.config.olympiadScoring?.emptyMultiplier ?? 0}</span>
+                      </div>
+                      <p className="text-xs text-amber-950/80 dark:text-amber-200/80 font-medium leading-relaxed">
+                        Jawaban salah mengurangi nilai akhir. Mengosongkan jawaban yang diragukan terhindar dari penalti poin.
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Kolom 3: Informasi Batas Jam Sesi & Toleransi Waktu */}
                 {isSessionGracePeriodActive && (
                   <div className="p-4 rounded-2xl bg-amber-50/80 dark:bg-amber-950/30 border border-amber-200/80 dark:border-amber-900/50 flex flex-col items-center text-center justify-between shadow-xs">
                     <div className="flex flex-col items-center w-full">
@@ -732,6 +799,28 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({
               <span>Lanjut Mengerjakan</span>
               <CheckIcon className="w-3.5 h-3.5 text-amber-950 dark:text-amber-100" />
             </button>
+          </div>
+        )}
+
+        {/* Banner Mode Olimpiade (Sistem Skor Penalti) */}
+        {activeExam.config?.isOlympiadMode && (
+          <div className="p-4 sm:p-5 rounded-2xl bg-amber-50/90 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/60 shadow-xs flex items-start gap-3.5">
+            <div className="w-8 h-8 rounded-xl bg-amber-500 text-white flex items-center justify-center shrink-0 shadow-xs font-black text-xs">
+              OSN
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h3 className="text-sm font-bold text-amber-950 dark:text-amber-100">
+                  Ujian Berjalan dalam Mode Olimpiade
+                </h3>
+                <span className="text-[11px] font-mono font-bold text-amber-800 dark:text-amber-300 bg-white dark:bg-slate-800 px-2 py-0.5 rounded border border-amber-200 dark:border-amber-700/60">
+                  Benar +{activeExam.config.olympiadScoring?.correctMultiplier ?? 4} · Salah {activeExam.config.olympiadScoring?.wrongMultiplier ?? -1} · Kosong {activeExam.config.olympiadScoring?.emptyMultiplier ?? 0}
+                </span>
+              </div>
+              <p className="text-xs text-amber-800/90 dark:text-amber-300/80 mt-1 leading-relaxed">
+                Ujian ini menerapkan sistem penalti poin. Jawaban yang salah akan mengurangi nilai akhir. Jika ragu, Anda dapat mengosongkan jawaban agar terhindar dari penalti.
+              </p>
+            </div>
           </div>
         )}
 
@@ -894,14 +983,18 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({
             <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 font-medium leading-relaxed max-w-lg mb-5">
               {answeredCount === totalQuestions
                 ? "Hebat! Anda telah menjawab seluruh soal ujian. Silakan periksa kembali jawaban Anda jika masih memiliki sisa waktu, atau kumpulkan ujian sekarang."
-                : `Anda telah menjawab ${answeredCount} dari total ${totalQuestions} soal (${progress}%). Masih ada ${totalQuestions - answeredCount} soal yang belum dijawab.`}
+                : activeExam.config?.isOlympiadMode
+                  ? `Anda menjawab ${answeredCount} dari ${totalQuestions} soal (${progress}%). Terdapat ${totalQuestions - answeredCount} soal yang dikosongkan. Dalam Mode Olimpiade, membiarkan soal kosong tidak akan mengurangi poin Anda.`
+                  : `Anda telah menjawab ${answeredCount} dari total ${totalQuestions} soal (${progress}%). Masih ada ${totalQuestions - answeredCount} soal yang belum dijawab.`}
             </p>
 
-            {/* Nomor Soal yang Belum Terjawab (Dapat diklik langsung untuk menuju soal) */}
+            {/* Nomor Soal yang Belum Terjawab / Dikosongkan (Dapat diklik langsung untuk menuju soal) */}
             {answeredCount < totalQuestions && (
               <div className="w-full mb-6 p-4 rounded-2xl bg-amber-50/70 dark:bg-amber-950/30 border border-amber-200/80 dark:border-amber-900/50 text-left">
                 <span className="text-xs font-bold text-amber-900 dark:text-amber-200 block mb-2.5">
-                  Nomor soal yang belum dijawab (ketuk untuk memeriksa):
+                  {activeExam.config?.isOlympiadMode
+                    ? "Nomor soal yang dikosongkan (tanpa penalti, ketuk jika ingin mengisi):"
+                    : "Nomor soal yang belum dijawab (ketuk untuk memeriksa):"}
                 </span>
                 <div className="flex flex-wrap gap-2">
                   {activeExam.questions

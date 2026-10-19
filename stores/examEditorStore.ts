@@ -116,6 +116,12 @@ export const DEFAULT_EXAM_CONFIG: ExamConfig = {
     dailyEndTime: '16:00',
     examType: 'Lainnya',
     description: '',
+    isOlympiadMode: false,
+    olympiadScoring: {
+        correctMultiplier: 4,
+        wrongMultiplier: -1,
+        emptyMultiplier: 0,
+    },
 };
 
 export const useExamEditorStore = create<ExamEditorState>()(

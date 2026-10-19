@@ -15,6 +15,12 @@ export const downloadArchiveExcel = (exam: Exam, results: Result[]) => {
     ["Subject / Mata Pelajaran", exam.config.subject],
     ["Kode Ujian", exam.code],
     [
+      "Sistem Penilaian",
+      exam.config.isOlympiadMode
+        ? `Mode Olimpiade (Benar: +${exam.config.olympiadScoring?.correctMultiplier ?? 4}, Salah: ${exam.config.olympiadScoring?.wrongMultiplier ?? -1}, Kosong: ${exam.config.olympiadScoring?.emptyMultiplier ?? 0})`
+        : "Standar (Persentase 0-100)",
+    ],
+    [
       "Waktu Pengerjaan (Menit)",
       exam.config.examMode === "PR"
         ? "Tanpa Batas"
@@ -46,7 +52,7 @@ export const downloadArchiveExcel = (exam: Exam, results: Result[]) => {
     "NISN/ID",
     "Kelas",
     "Instansi/Sekolah",
-    "Nilai Akhir",
+    exam.config.isOlympiadMode ? "Skor Olimpiade" : "Nilai Akhir",
     "Benar",
     "Salah",
     "Kosong",
