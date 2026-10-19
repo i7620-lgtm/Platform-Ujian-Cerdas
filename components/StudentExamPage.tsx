@@ -16,6 +16,7 @@ import {
   ListBulletIcon,
   ExclamationTriangleIcon,
   LightBulbIcon,
+  SparklesIcon,
 } from "./Icons";
 import { storageService } from "../services/storage";
 import { useStudentExamLogic } from "./student/useStudentExamLogic";
@@ -424,6 +425,46 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({
                     </div>
                   </div>
                 )}
+
+              {/* Sistem Penilaian Mode Olimpiade */}
+              {activeExam.config.isOlympiadMode && (
+                <div className="flex flex-col p-3 sm:p-3.5 bg-amber-50/80 dark:bg-amber-950/30 rounded-xl sm:rounded-2xl border border-amber-200/80 dark:border-amber-900/40 sm:col-span-2">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <div className="w-7 h-7 rounded-lg bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-300 flex items-center justify-center shrink-0">
+                        <SparklesIcon className="w-4 h-4" />
+                      </div>
+                      <span className="text-[10px] sm:text-[11px] font-black uppercase text-amber-800 dark:text-amber-300 tracking-wider">
+                        Sistem Penilaian
+                      </span>
+                    </div>
+                    <span className="text-[9px] sm:text-[10px] font-extrabold uppercase px-2 py-0.5 rounded bg-amber-500 text-white tracking-wider">
+                      Mode Olimpiade
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-2 text-center">
+                    <div className="p-2 rounded-xl bg-white/90 dark:bg-slate-800/90 border border-emerald-200/60 dark:border-emerald-900/40 shadow-2xs">
+                      <span className="block text-[10px] font-bold text-slate-500 dark:text-slate-400">Benar</span>
+                      <span className="text-xs sm:text-sm font-black font-mono text-emerald-600 dark:text-emerald-400">
+                        +{activeExam.config.olympiadScoring?.correctMultiplier ?? 4}
+                      </span>
+                    </div>
+                    <div className="p-2 rounded-xl bg-white/90 dark:bg-slate-800/90 border border-rose-200/60 dark:border-rose-900/40 shadow-2xs">
+                      <span className="block text-[10px] font-bold text-slate-500 dark:text-slate-400">Salah</span>
+                      <span className="text-xs sm:text-sm font-black font-mono text-rose-600 dark:text-rose-400">
+                        {activeExam.config.olympiadScoring?.wrongMultiplier ?? -1}
+                      </span>
+                    </div>
+                    <div className="p-2 rounded-xl bg-white/90 dark:bg-slate-800/90 border border-slate-200/60 dark:border-slate-700 shadow-2xs">
+                      <span className="block text-[10px] font-bold text-slate-500 dark:text-slate-400">Kosong</span>
+                      <span className="text-xs sm:text-sm font-black font-mono text-slate-600 dark:text-slate-300">
+                        {activeExam.config.olympiadScoring?.emptyMultiplier ?? 0}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Garis Pemisah Horizontal & Tombol Mulai Mengerjakan */}
