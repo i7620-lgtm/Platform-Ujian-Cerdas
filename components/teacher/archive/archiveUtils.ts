@@ -1,5 +1,5 @@
 import type { Exam, Result, Question } from "../../../types";
-import { isAnswerMatch, parseList, compressImage } from "../examUtils";
+import { isAnswerMatch, parseList, compressImage, calculateExamScore } from "../examUtils";
 import { storageService } from "../../../services/storage";
 
 export type ArchiveData = {
@@ -80,36 +80,16 @@ export const checkAnswerStatus = (
 };
 
 export const getCalculatedStats = (r: Result, exam: Exam) => {
-  let correct = 0;
-  let empty = 0;
-  let totalScore = 0;
-  let maxPossibleScore = 0;
-  const scorableQuestions = exam.questions.filter(
-    (q) => q.questionType !== "INFO",
-  );
-
-  scorableQuestions.forEach((q) => {
-    const weight = q.scoreWeight || 1;
-    maxPossibleScore += weight;
-
-    const status = checkAnswerStatus(q, r.answers);
-    if (status === "CORRECT") {
-      correct++;
-      totalScore += weight;
-    } else if (status === "EMPTY") {
-      empty++;
-    }
-  });
-
-  const total = scorableQuestions.length;
-  const wrong = total - correct - empty;
-  const score =
-    maxPossibleScore > 0
-      ? Math.round((totalScore / maxPossibleScore) * 100)
-      : 0;
+  const grading = calculateExamScore(exam, r.answers || {});
   const duration = r.completionTime || 0;
 
-  return { correct, wrong, empty, score, duration };
+  return {
+    correct: grading.correctAnswers,
+    wrong: grading.wrongAnswers ?? (grading.totalQuestions - grading.correctAnswers - (grading.unansweredQuestions || 0)),
+    empty: grading.unansweredQuestions ?? 0,
+    score: grading.score,
+    duration,
+  };
 };
 
 export const formatDuration = (seconds: number | undefined | null): string => {
