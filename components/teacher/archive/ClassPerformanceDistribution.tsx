@@ -186,24 +186,12 @@ export const ClassPerformanceDistribution: React.FC<ClassPerformanceDistribution
   className,
 }) => {
   const [viewMode, setViewMode] = useState<ViewChartMode>("BOTH");
-  const [isChartReady, setIsChartReady] = useState(false);
   const [hoveredOutlier, setHoveredOutlier] = useState<{
     name: string;
     score: number;
     type: "LOW" | "HIGH";
     class?: string;
   } | null>(null);
-
-  React.useEffect(() => {
-    let timer: any = null;
-    const anim = requestAnimationFrame(() => {
-      timer = setTimeout(() => setIsChartReady(true), 50);
-    });
-    return () => {
-      cancelAnimationFrame(anim);
-      if (timer) clearTimeout(timer);
-    };
-  }, []);
 
   // Filter valid results with numerical scores
   const validResults = useMemo(() => {
@@ -586,65 +574,59 @@ export const ClassPerformanceDistribution: React.FC<ClassPerformanceDistribution
             </div>
           </div>
 
-          <div className="h-[320px] min-h-[320px] w-full pt-4 relative">
-            {isChartReady ? (
-              <ResponsiveContainer width="100%" height="100%" minWidth={100} minHeight={260}>
-                <BarChart
-                  data={histogramData}
-                  margin={{ top: 25, right: 25, left: -10, bottom: 20 }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} className="stroke-slate-200 dark:stroke-slate-700" />
-                  <XAxis
-                    dataKey="range"
-                    tick={{ fill: "#64748b", fontSize: 11 }}
-                    label={{
-                      value: "Rentang Nilai Ujian",
-                      position: "insideBottom",
-                      offset: -12,
-                      fill: "#64748b",
-                      fontSize: 11,
-                    }}
-                  />
-                  <YAxis
-                    allowDecimals={false}
-                    tick={{ fill: "#64748b", fontSize: 11 }}
-                    label={{
-                      value: "Jumlah Siswa",
-                      angle: -90,
-                      position: "insideLeft",
-                      offset: 15,
-                      fill: "#64748b",
-                      fontSize: 11,
-                    }}
-                  />
-                  <Tooltip
-                    wrapperStyle={{ pointerEvents: "auto" }}
-                    content={({ active, payload }) => {
-                      if (active && payload && payload.length) {
-                        const data = payload[0].payload;
-                        return <HistogramTooltipContent data={data} />;
-                      }
-                      return null;
-                    }}
-                  />
-                  <Bar dataKey="count" radius={[6, 6, 0, 0]}>
-                    {histogramData.map((entry, index) => {
-                      let fillColor = "#10b981"; // Emerald for passed
-                      if (entry.status === "BELOW") {
-                        fillColor = "#f43f5e"; // Rose for below KKM
-                      } else if (entry.status === "MIXED") {
-                        fillColor = "#6366f1"; // Indigo for mixed/KKM border
-                      }
-                      return <Cell key={`cell-${index}`} fill={fillColor} />;
-                    })}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            ) : (
-              <div className="h-full w-full flex items-center justify-center text-xs text-slate-400">
-                Memuat diagram sebaran...
-              </div>
-            )}
+          <div className="h-[320px] w-full pt-4 min-w-0 min-h-[320px]">
+            <ResponsiveContainer width="100%" height={280} minWidth={100} minHeight={250} debounce={50}>
+              <BarChart
+                data={histogramData}
+                margin={{ top: 25, right: 25, left: -10, bottom: 20 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" vertical={false} className="stroke-slate-200 dark:stroke-slate-700" />
+                <XAxis
+                  dataKey="range"
+                  tick={{ fill: "#64748b", fontSize: 11 }}
+                  label={{
+                    value: "Rentang Nilai Ujian",
+                    position: "insideBottom",
+                    offset: -12,
+                    fill: "#64748b",
+                    fontSize: 11,
+                  }}
+                />
+                <YAxis
+                  allowDecimals={false}
+                  tick={{ fill: "#64748b", fontSize: 11 }}
+                  label={{
+                    value: "Jumlah Siswa",
+                    angle: -90,
+                    position: "insideLeft",
+                    offset: 15,
+                    fill: "#64748b",
+                    fontSize: 11,
+                  }}
+                />
+                <Tooltip
+                  wrapperStyle={{ pointerEvents: "auto" }}
+                  content={({ active, payload }) => {
+                    if (active && payload && payload.length) {
+                      const data = payload[0].payload;
+                      return <HistogramTooltipContent data={data} />;
+                    }
+                    return null;
+                  }}
+                />
+                <Bar dataKey="count" radius={[6, 6, 0, 0]}>
+                  {histogramData.map((entry, index) => {
+                    let fillColor = "#10b981"; // Emerald for passed
+                    if (entry.status === "BELOW") {
+                      fillColor = "#f43f5e"; // Rose for below KKM
+                    } else if (entry.status === "MIXED") {
+                      fillColor = "#6366f1"; // Indigo for mixed/KKM border
+                    }
+                    return <Cell key={`cell-${index}`} fill={fillColor} />;
+                  })}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
           </div>
         </div>
       )}
