@@ -441,6 +441,7 @@ export class ArchiveService {
                   let correctRate: number | undefined;
                   let topWrongAnswer: string | null = null;
                   let topWrongRate: number | undefined;
+                  let answerDist: Record<string, number> | undefined;
 
                   for (const s of summaries) {
                       const qs = s.question_stats?.find((item: any) => item.id === q.id || item.number === idx + 1);
@@ -448,6 +449,7 @@ export class ArchiveService {
                           correctRate = qs.correct_rate as number;
                           topWrongAnswer = qs.top_wrong_answer as string | null;
                           topWrongRate = qs.top_wrong_rate as number;
+                          answerDist = qs.answer_distribution as Record<string, number>;
                           break;
                       }
                   }
