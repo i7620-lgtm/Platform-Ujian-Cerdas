@@ -17,6 +17,12 @@ app.get(["/api/health", "/health", "/"], (req, res) => {
   res.json({ status: "ok", service: "Platform Ujian Cerdas API", timestamp: Date.now() });
 });
 
+// Transparent AI Key config endpoint for browser fallback
+app.get(["/api/ai-config", "/ai-config"], (req, res) => {
+  const key = process.env.GEMINI_API_KEY || process.env.API_KEY || "";
+  res.json({ hasKey: Boolean(key), key });
+});
+
 // AI Questions Generation
 app.post(["/api/generate-questions", "/generate-questions"], async (req, res) => {
   try {
@@ -38,6 +44,21 @@ app.post(["/api/generate-analysis", "/generate-analysis"], async (req, res) => {
   } catch (error: any) {
     console.warn("API warning generating analysis:", error.message);
     res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Safe Fallback Server Proxy Endpoint for Browser Clients
+app.post(["/api/ai-proxy", "/ai-proxy"], async (req, res) => {
+  try {
+    const { prompt } = req.body;
+    if (!prompt || typeof prompt !== "string") {
+      return res.status(400).json({ success: false, error: "Prompt is required" });
+    }
+    const responseText = await generateAIAnalysisOnServer(prompt);
+    res.json({ success: true, text: responseText, source: "server-ai-proxy" });
+  } catch (error: any) {
+    console.warn("AI Proxy warning:", error?.message || error);
+    res.status(500).json({ success: false, error: error?.message || "AI Proxy failure" });
   }
 });
 
