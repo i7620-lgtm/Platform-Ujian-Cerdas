@@ -5,6 +5,7 @@ import { generateGeometrySVG, extractNum, parseGeometryLabels } from "../compone
 import { generateEducationalSvg, svgToDataUrl } from "./svgGeneratorService";
 import { generateContextualEducationalSvg } from "./smartSvgTemplates";
 import { repairQuestionCharts, normalizeChartPlaceholdersInHtml } from "./chartRepairService";
+import { generateSingleQuestionClientSide } from "./clientQuestionGenerator";
 
 export class PartialGenerationError extends Error {
   public partialQuestions: Question[];
@@ -105,6 +106,8 @@ export async function generateQuestions(
     const selectedDifficulties: string[] = (config.difficulties && config.difficulties.length > 0)
         ? config.difficulties
         : [config.difficulty || "Level 3 - Penalaran"];
+
+    const totalCount = Math.max(1, Math.min(10, config.count || 1));
 
     const isTKA = config.subject.toUpperCase().includes('TKA') || 
                   config.blueprint.toUpperCase().includes('TKA') || 
@@ -765,71 +768,106 @@ export async function generateQuestions(
       imageSearchKeyword?: string;
     }[] = [];
 
-    // Eksekusi pemanggilan AI dengan auto-failover ke model cadangan jika model utama gagal/timeout
-    const primaryModels = ["gemini-3.8-flash"];
-    const backupModels = ["gemini-flash-latest", "gemini-3.1-flash-lite"];
+    // Eksekusi pemanggilan AI murni (Zero Fake Questions):
+    // Jalur 1: Eksekusi Mandiri di Browser Pengguna (jika API key tersedia di browser)
+    // Jalur 2: Serverless Proxy (/api/generate-questions) menggunakan variabel lingkungan Vercel
+    // Jika AI gagal/kuota habis: laporkan keadaan sebenarnya secara jujur tanpa menampilkan soal template palsu.
 
-    const executeAiCall = async (models: string[], timeoutMs: number): Promise<any[]> => {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => {
+    const currentAssignedType = selectedTypes[startIndex % selectedTypes.length] || "Pilihan Ganda";
+    const currentAssignedDiff = selectedDifficulties[startIndex % selectedDifficulties.length] || "Level 3 - Penalaran";
+
+    // --- JALUR 1: Eksekusi Mandiri di Browser Pengguna (Direct Client-Side) ---
+    if (batchCount === 1) {
+      try {
+        const clientQ = await generateSingleQuestionClientSide(
+          config,
+          currentAssignedType,
+          currentAssignedDiff,
+          startIndex + 1,
+          totalCount
+        );
+        if (clientQ && (clientQ.questionText || clientQ.question)) {
+          questions = [clientQ];
+        }
+      } catch (clientErr: any) {
+        console.warn("[Client-Side Question Generator] Beralih ke serverless endpoint Vercel:", clientErr?.message || clientErr);
+      }
+    }
+
+    // --- JALUR 2: Serverless Endpoint Vercel (/api/generate-questions) ---
+    let lastServerError: any = null;
+    if (questions.length === 0) {
+      const primaryModels = ["gemini-3.8-flash", "gemini-3.5-flash-lite"];
+      const backupModels = ["gemini-2.5-flash", "gemini-flash-latest"];
+
+      const executeAiCall = async (models: string[], timeoutMs: number): Promise<any[]> => {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => {
+          try {
+            controller.abort(new Error("Batas waktu koneksi AI terlampaui (Timeout)."));
+          } catch (_) {}
+        }, timeoutMs);
+
         try {
-          controller.abort(new Error("Batas waktu koneksi AI terlampaui (Timeout)."));
-        } catch (_) {}
-      }, timeoutMs);
+          const res = await fetch("/api/generate-questions", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "Accept": "application/json" },
+            body: JSON.stringify({ prompt: batchPrompt, systemInstruction, modelsToTry: models, properties }),
+            signal: controller.signal,
+          });
+          clearTimeout(timeoutId);
+
+          const contentType = res.headers.get("content-type") || "";
+          if (!contentType.includes("application/json")) {
+            const rawHtml = await res.text();
+            console.error("[Vercel Serverless] Non-JSON response:", rawHtml.slice(0, 150));
+            throw new Error("Layanan serverless Vercel mengembalikan status non-JSON. Pastikan variabel GEMINI_API_KEY telah diatur pada Environment Variables di dashboard Vercel.");
+          }
+          const data = await res.json();
+          if (!data.success) {
+            throw new Error(data.error || "Gagal menghasilkan butir soal dari AI.");
+          }
+          const parsed = JSON.parse(data.text || "[]");
+          if (!Array.isArray(parsed) || parsed.length === 0) {
+            throw new Error("Format butir soal dari AI kosong atau tidak sesuai.");
+          }
+          return parsed;
+        } catch (err) {
+          clearTimeout(timeoutId);
+          throw err;
+        }
+      };
 
       try {
-        const res = await fetch("/api/generate-questions", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ prompt: batchPrompt, systemInstruction, modelsToTry: models, properties }),
-          signal: controller.signal,
-        });
-        clearTimeout(timeoutId);
-
-        const contentType = res.headers.get("content-type") || "";
-        if (!contentType.includes("application/json")) {
-          const rawHtml = await res.text();
-          console.error("Non-JSON response from server:", rawHtml.slice(0, 300));
-          throw new Error("Server mengembalikan respons non-JSON.");
+        questions = await executeAiCall(primaryModels, 16000);
+      } catch (primaryErr: any) {
+        lastServerError = primaryErr;
+        console.warn(`[Auto-Failover] Model server utama (${primaryErr?.message || primaryErr}), mencoba model cadangan...`);
+        try {
+          questions = await executeAiCall(backupModels, 14000);
+        } catch (backupErr: any) {
+          lastServerError = backupErr;
+          console.error(`[AI Generation Error] Seluruh model server gagal:`, backupErr?.message || backupErr);
         }
-        const data = await res.json();
-        if (!data.success) {
-          throw new Error(data.error || "Gagal menghasilkan soal dari AI.");
-        }
-        const parsed = JSON.parse(data.text || "[]");
-        if (!Array.isArray(parsed) || parsed.length === 0) {
-          throw new Error("Format butir soal dari AI kosong atau tidak sesuai.");
-        }
-        return parsed;
-      } catch (err) {
-        clearTimeout(timeoutId);
-        throw err;
       }
-    };
+    }
 
-    try {
-      // Percobaan 1: Menggunakan model utama (gemini-3.8-flash)
-      questions = await executeAiCall(primaryModels, 40000);
-    } catch (primaryErr: any) {
-      console.warn(`[Auto-Failover] Model utama mengalami kendala (${primaryErr?.message}). Otomatis mencoba model cadangan...`);
-      try {
-        // Percobaan 2: Auto-Retry Otomatis dengan Model Cadangan (gemini-flash-latest / gemini-3.1-flash-lite)
-        questions = await executeAiCall(backupModels, 35000);
-      } catch (backupErr: any) {
-        const isAbort =
-          backupErr?.name === "AbortError" ||
-          primaryErr?.name === "AbortError" ||
-          backupErr?.message?.toLowerCase().includes("timeout") ||
-          primaryErr?.message?.toLowerCase().includes("timeout") ||
-          backupErr?.message?.toLowerCase().includes("aborted");
+    // Jika AI tidak berhasil menghasilkan soal, sampaikan kondisi sebenarnya secara jujur tanpa membuat soal palsu
+    if (questions.length === 0) {
+      const rawErrMsg = (lastServerError?.message || "").toLowerCase();
+      let cleanMessage = lastServerError?.message || "Layanan AI tidak dapat diakses saat ini. Silakan periksa koneksi dan coba beberapa saat lagi.";
 
-        const cleanReason = isAbort
-          ? "Koneksi AI mengalami batas waktu (timeout). Antrean server sedang padat."
-          : (backupErr?.message || primaryErr?.message || "Layanan AI tidak dapat diakses saat ini.");
-
-        console.error(`[AI Generation Gagal] Batch offset ${startIndex} gagal setelah failover model cadangan:`, cleanReason);
-        throw new Error(cleanReason);
+      if (rawErrMsg.includes("quota") || rawErrMsg.includes("429") || rawErrMsg.includes("exhausted") || rawErrMsg.includes("rate limit")) {
+        cleanMessage = "QUOTA_EXCEEDED";
+      } else if (rawErrMsg.includes("503") || rawErrMsg.includes("high demand") || rawErrMsg.includes("overloaded")) {
+        cleanMessage = "Layanan model AI Google saat ini sedang mengalami lonjakan beban antrean tinggi (503 High Demand). Silakan tunggu 1-2 menit lalu coba kembali.";
+      } else if (rawErrMsg.includes("timeout") || rawErrMsg.includes("batas waktu") || rawErrMsg.includes("aborted")) {
+        cleanMessage = "Batas waktu koneksi server terlampaui saat memproses butir soal. Jaringan sedang padat, silakan coba kembali.";
+      } else if (rawErrMsg.includes("api key") || rawErrMsg.includes("kunci api") || rawErrMsg.includes("environment")) {
+        cleanMessage = "Kunci API Gemini (GEMINI_API_KEY) belum terpasang atau tidak terbaca pada konfigurasi Environment Variables di dashboard Vercel.";
       }
+
+      throw new Error(cleanMessage);
     }
 
     // Helper: Cek apakah baris pernyataan Benar/Salah berupa placeholder/dummy
@@ -1630,21 +1668,21 @@ export async function generateQuestions(
     return batchQuestions;
   }
 
-  // Execution: Capped to max 10 questions, split into batches of max 5 questions each
+  // Eksekusi: Generasi 1-by-1 secara streaming realtime dengan progress langsung
   try {
-    const totalCount = Math.max(1, Math.min(10, config.count || 1));
-    const CHUNK_SIZE = 5;
+    const CHUNK_SIZE = 1;
     const results: Question[][] = [];
 
-    onProgress?.(0, totalCount, "Menghubungi AI dan menyiapkan butir soal...");
+    onProgress?.(0, totalCount, "Menghubungi mesin AI dan menyiapkan butir soal...");
 
     for (let offset = 0; offset < totalCount; offset += CHUNK_SIZE) {
       const batchCount = Math.min(CHUNK_SIZE, totalCount - offset);
       const currentCompleted = results.flat().length;
+      const currentType = selectedTypes[offset % selectedTypes.length] || "Pilihan Ganda";
       onProgress?.(
         currentCompleted,
         totalCount,
-        `Sedang merumuskan butir soal ke-${offset + 1} s.d. ${offset + batchCount}...`
+        `Sedang merumuskan butir soal ke-${offset + 1} dari ${totalCount} (${currentType}) secara streaming...`
       );
       try {
         const batchResults = await generateSingleBatch(offset, batchCount);
@@ -1655,18 +1693,20 @@ export async function generateQuestions(
           totalCount,
           `Berhasil menyelesaikan ${updatedCompleted} dari ${totalCount} soal...`
         );
+        // Mikro-jeda agar browser merender progress secara mulus tanpa lag
+        await new Promise((resolve) => setTimeout(resolve, 40));
       } catch (err: any) {
-        console.warn(`[Batch Error] Batch pada offset ${offset} gagal:`, err?.message);
+        console.warn(`[Batch Error] Pembuatan pada butir ${offset + 1} mengalami kendala:`, err?.message);
         const savedSoFar = results.flat();
         if (savedSoFar.length > 0) {
-          // Ada sebagian soal yang berhasil dibuat: selamatkan hasil tersebut!
+          // Ada sebagian butir soal ASLI AI yang sudah berhasil dibuat: selamatkan hasil asli tersebut!
           throw new PartialGenerationError(
-            `Sebagian soal (${savedSoFar.length} dari ${totalCount} butir) berhasil dibuat, namun sisa butir berikutnya mengalami kendala koneksi: ${err?.message || "Koneksi terputus"}.`,
+            `Sebagian butir soal asli (${savedSoFar.length} dari ${totalCount} butir) berhasil dirumuskan oleh AI. Namun butir berikutnya terhenti karena: ${err?.message || "Koneksi terputus"}.`,
             savedSoFar
           );
         } else {
-          // Tidak ada soal yang berhasil dibuat: lemparkan error asli yang transparan
-          throw new Error(err?.message || "Koneksi AI mengalami batas waktu (timeout). Silakan periksa koneksi dan coba lagi.");
+          // Belum ada soal yang berhasil dibuat: lemparkan error asli yang transparan dan jujur tanpa membuat soal palsu
+          throw new Error(err?.message || "Layanan AI tidak dapat diakses saat ini. Silakan periksa konfigurasi dan coba lagi.");
         }
       }
     }

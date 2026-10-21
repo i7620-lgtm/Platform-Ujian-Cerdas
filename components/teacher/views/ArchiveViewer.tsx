@@ -68,11 +68,28 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({
 }) => {
   const archiveViewerInstance = useArchiveViewer({ teacherProfile });
   const {
-    isGeneratingAI, aiAnalysisResult,   sortedResults,
-    uniqueSchools, uniqueClasses, filteredResults, questionAnalysisData,
-    questionStats, categoryStats, levelStats, questionTypeStats,
-    classAnalysisData, isNoAuthor, totalStudentsDisplay, realStudentCount,
-    averageScore, highestScore, lowestScore, averageCompletionTime, handleGenerateAI, handleDeleteAIAnalysis
+    isGeneratingAI,
+    aiProgressStatus,
+    aiAnalysisResult,
+    sortedResults,
+    uniqueSchools,
+    uniqueClasses,
+    filteredResults,
+    questionAnalysisData,
+    questionStats,
+    categoryStats,
+    levelStats,
+    questionTypeStats,
+    classAnalysisData,
+    isNoAuthor,
+    totalStudentsDisplay,
+    realStudentCount,
+    averageScore,
+    highestScore,
+    lowestScore,
+    averageCompletionTime,
+    handleGenerateAI,
+    handleDeleteAIAnalysis,
   } = useArchiveViewerLogic({ archiveViewer: archiveViewerInstance, teacherProfile });
   const {
     activeTab, setActiveTab, selectedSchool, setSelectedSchool, selectedClass,
@@ -244,6 +261,7 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({
         setActiveTab={setActiveTab}
         totalStudents={totalStudentsDisplay}
         isGeneratingAI={isGeneratingAI}
+        aiProgressMessage={aiProgressStatus?.message}
         onGenerateAI={handleGenerateAI}
         hasAiAnalysis={!!aiAnalysisResult}
       />
@@ -371,6 +389,8 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({
             aiAnalysisResult={aiAnalysisResult}
             onDeleteAIAnalysis={handleDeleteAIAnalysis}
             viewMode="CLASS_ONLY"
+            isGeneratingAI={isGeneratingAI}
+            aiProgressStatus={aiProgressStatus}
           />
         )}
 
@@ -385,6 +405,8 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({
             aiAnalysisResult={aiAnalysisResult}
             onDeleteAIAnalysis={handleDeleteAIAnalysis}
             viewMode="AI_ONLY"
+            isGeneratingAI={isGeneratingAI}
+            aiProgressStatus={aiProgressStatus}
           />
         )}
       </div>

@@ -15,6 +15,7 @@ interface UseArchiveViewerLogicProps {
 export const useArchiveViewerLogic = ({ archiveViewer, teacherProfile }: UseArchiveViewerLogicProps) => {
   const [isGeneratingAI, setIsGeneratingAI] = React.useState(false);
   const [aiAnalysisResult, setAiAnalysisResult] = React.useState<string | null>(null);
+  const [aiProgressStatus, setAiProgressStatus] = React.useState<{ message: string; step: number; total: number } | null>(null);
 
   const {
     archiveData,
@@ -384,6 +385,7 @@ export const useArchiveViewerLogic = ({ archiveViewer, teacherProfile }: UseArch
     
     setIsGeneratingAI(true);
     setAiAnalysisResult(null);
+    setAiProgressStatus({ message: "Menyiapkan data statistik ujian...", step: 1, total: 4 });
     try {
       const summaries = archiveService.calculateExamStatistics(archiveData!.exam, filteredResults) as any[];
       
@@ -391,7 +393,15 @@ export const useArchiveViewerLogic = ({ archiveViewer, teacherProfile }: UseArch
       // Incremental approach: if overall analysis is requested, send existing per-class analyses
       const existing = key === "OVERALL" ? archiveData!.ai_analyses : undefined;
       
-      const analysis = await archiveService.generateAIAnalysis(summaries, undefined, archiveData!.exam.questions, existing);
+      const analysis = await archiveService.generateAIAnalysis(
+        summaries,
+        undefined,
+        archiveData!.exam.questions,
+        existing,
+        (msg, step, total) => {
+          setAiProgressStatus({ message: msg, step, total });
+        }
+      );
       
       const updatedAnalyses = {
         ...(archiveData!.ai_analyses || {}),
@@ -449,6 +459,7 @@ export const useArchiveViewerLogic = ({ archiveViewer, teacherProfile }: UseArch
       setAiAnalysisResult("Gagal menghasilkan analisis AI: " + (error.message || "Terjadi kesalahan."));
     } finally {
       setIsGeneratingAI(false);
+      setAiProgressStatus(null);
     }
   };
 
@@ -509,5 +520,29 @@ export const useArchiveViewerLogic = ({ archiveViewer, teacherProfile }: UseArch
     }
   };
 
-  return { isGeneratingAI, aiAnalysisResult, archiveViewer, sortedResults, uniqueSchools, uniqueClasses, filteredResults, questionAnalysisData, questionStats, categoryStats, levelStats, questionTypeStats, classAnalysisData, isNoAuthor, totalStudentsDisplay, realStudentCount, averageScore, highestScore, lowestScore, averageCompletionTime, handleGenerateAI, handleDeleteAIAnalysis };
+  return {
+    isGeneratingAI,
+    aiProgressStatus,
+    aiAnalysisResult,
+    archiveViewer,
+    sortedResults,
+    uniqueSchools,
+    uniqueClasses,
+    filteredResults,
+    questionAnalysisData,
+    questionStats,
+    categoryStats,
+    levelStats,
+    questionTypeStats,
+    classAnalysisData,
+    isNoAuthor,
+    totalStudentsDisplay,
+    realStudentCount,
+    averageScore,
+    highestScore,
+    lowestScore,
+    averageCompletionTime,
+    handleGenerateAI,
+    handleDeleteAIAnalysis,
+  };
 };

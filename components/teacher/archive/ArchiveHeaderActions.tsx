@@ -29,6 +29,7 @@ interface ArchiveHeaderActionsProps {
   setActiveTab: (tab: ArchiveTab) => void;
   totalStudents: number;
   isGeneratingAI?: boolean;
+  aiProgressMessage?: string;
   onGenerateAI?: () => void;
   hasAiAnalysis?: boolean;
 }
@@ -52,6 +53,7 @@ export const ArchiveHeaderActions: React.FC<ArchiveHeaderActionsProps> = ({
   setActiveTab,
   totalStudents,
   isGeneratingAI,
+  aiProgressMessage,
   onGenerateAI,
   hasAiAnalysis,
 }) => {
@@ -201,12 +203,12 @@ export const ArchiveHeaderActions: React.FC<ArchiveHeaderActionsProps> = ({
           <button
             onClick={onGenerateAI}
             disabled={isGeneratingAI}
-            className="flex-shrink-0 px-4 py-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white text-sm font-bold rounded-lg shadow-md transition-all flex items-center gap-2 disabled:opacity-70"
+            className="flex-shrink-0 px-4 py-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white text-sm font-bold rounded-lg shadow-md transition-all flex items-center gap-2 disabled:opacity-85 cursor-pointer disabled:cursor-wait"
           >
             {isGeneratingAI ? (
               <>
-                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                Menganalisis...
+                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin flex-shrink-0"></div>
+                <span className="truncate max-w-[220px]">{aiProgressMessage || "Menganalisis..."}</span>
               </>
             ) : (
               <>
@@ -217,6 +219,26 @@ export const ArchiveHeaderActions: React.FC<ArchiveHeaderActionsProps> = ({
           </button>
         )}
       </div>
+
+      {isGeneratingAI && (
+        <div className="mt-4 p-3.5 bg-gradient-to-r from-indigo-50/80 via-purple-50/80 to-amber-50/80 dark:from-slate-700/60 dark:via-slate-700/60 dark:to-slate-700/60 border border-indigo-100 dark:border-indigo-900/40 rounded-xl flex items-center justify-between gap-4 animate-fade-in shadow-xs">
+          <div className="flex items-center gap-3">
+            <div className="w-5 h-5 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin flex-shrink-0" />
+            <div>
+              <p className="text-xs font-bold text-slate-800 dark:text-slate-100">
+                {aiProgressMessage || "Memproses analisis hasil belajar..."}
+              </p>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                Pemrosesan hybrid non-blocking di latar belakang tanpa membebani perangkat
+              </p>
+            </div>
+          </div>
+          <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/70 dark:bg-slate-800/70 border border-indigo-100 dark:border-indigo-900/50 text-[11px] font-bold text-indigo-600 dark:text-indigo-400">
+            <SparklesIcon className="w-3.5 h-3.5 animate-pulse" />
+            <span>AI Hybrid</span>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

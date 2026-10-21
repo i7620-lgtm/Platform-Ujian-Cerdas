@@ -16,6 +16,11 @@ async function startServer() {
     res.json({ status: "ok", port: PORT, env: process.env.NODE_ENV || "development" });
   });
 
+  app.get("/api/ai-config", (req, res) => {
+    const key = process.env.GEMINI_API_KEY || process.env.API_KEY || "";
+    res.json({ hasKey: Boolean(key), key });
+  });
+
   app.post("/api/generate-svg", async (req, res) => {
     try {
       const { prompt, style } = req.body;
@@ -28,13 +33,14 @@ async function startServer() {
   });
 
   app.post("/api/generate-questions", async (req, res) => {
+    res.setHeader("Content-Type", "application/json");
     try {
       const { prompt, systemInstruction, modelsToTry, properties } = req.body;
       const responseText = await generateQuestionsOnServer(prompt, systemInstruction, modelsToTry, properties);
       res.json({ success: true, text: responseText });
     } catch (error: any) {
-      console.warn("API warning generating questions:", error.message);
-      res.status(500).json({ success: false, error: error.message });
+      console.warn("API warning generating questions:", error?.message || error);
+      res.status(200).json({ success: false, fallback: true, error: error?.message || "Gagal menghasilkan soal dari server" });
     }
   });
 
@@ -46,6 +52,20 @@ async function startServer() {
     } catch (error: any) {
       console.warn("API warning generating analysis:", error.message);
       res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  app.post("/api/ai-proxy", async (req, res) => {
+    try {
+      const { prompt } = req.body;
+      if (!prompt || typeof prompt !== "string") {
+        return res.status(400).json({ success: false, error: "Prompt is required" });
+      }
+      const responseText = await generateAIAnalysisOnServer(prompt);
+      res.json({ success: true, text: responseText, source: "server-ai-proxy" });
+    } catch (error: any) {
+      console.warn("AI Proxy warning:", error?.message || error);
+      res.status(500).json({ success: false, error: error?.message || "AI Proxy failure" });
     }
   });
 

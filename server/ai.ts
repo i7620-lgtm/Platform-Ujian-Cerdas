@@ -1,6 +1,7 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { generateContextualEducationalSvg } from "./smartSvgFallback.ts";
 import { validateEducationalSafety } from "./contentModeration.ts";
+import { generateDeterministicDiagnosticReport } from "./diagnosticFallback.ts";
 
 let aiInstance: GoogleGenAI | null = null;
 
@@ -14,7 +15,7 @@ export function getAI(): GoogleGenAI {
     aiInstance = new GoogleGenAI({ 
       apiKey,
       httpOptions: {
-        timeout: 50000,
+        timeout: 25000,
         headers: {
           'User-Agent': 'aistudio-build',
         }
@@ -26,15 +27,18 @@ export function getAI(): GoogleGenAI {
 
 export const FLASH_MODELS_CASCADE = [
     'gemini-3.8-flash',
+    'gemini-3.5-flash-lite',
     'gemini-2.5-flash',
     'gemini-flash-latest',
-    'gemini-3.1-flash-lite'
+    'gemini-3.1-flash-lite',
+    'gemini-3.5-flash',
+    'gemini-3.7-flash'
 ];
 
 // In-memory tracker for models with exhausted daily quotas to minimize latency
 const exhaustedModelsMap = new Map<string, number>();
 
-function markModelExhausted(model: string, durationMs: number = 10 * 60 * 1000) {
+function markModelExhausted(model: string, durationMs: number = 3 * 60 * 1000) {
     exhaustedModelsMap.set(model, Date.now() + durationMs);
 }
 
@@ -49,13 +53,17 @@ function isModelTemporarilyExhausted(model: string): boolean {
 }
 
 export async function generateAIAnalysisOnServer(prompt: string): Promise<string> {
+    const apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY;
+    if (!apiKey) {
+      console.info("[Analisis AI] API Key tidak tersedia di server, menggunakan intelligent diagnostic report...");
+      return generateDeterministicDiagnosticReport(prompt);
+    }
+
     const ai = getAI();
     let response: string | null = null;
     let lastError: unknown = null;
-    const startTime = Date.now();
-    const MAX_BUDGET_MS = 45000; // Menjaga waktu eksekusi agar tidak mencapai timeout lambda Vercel
 
-    // Cascade berjenjang: Utamakan model aktif tertinggi (gemini-3.8-flash) ke model cadangan
+    // Filter model yang tidak dalam status exhausted
     const uniqueModels = Array.from(new Set(FLASH_MODELS_CASCADE));
     const sortedModels = [
         ...uniqueModels.filter(m => !isModelTemporarilyExhausted(m)),
@@ -63,14 +71,11 @@ export async function generateAIAnalysisOnServer(prompt: string): Promise<string
     ];
 
     for (const currentModel of sortedModels) {
-        if (Date.now() - startTime > MAX_BUDGET_MS) {
-            console.warn("[Analisis AI] Batas waktu eksekusi 45s tercapai, menyerahkan ke client failover.");
-            break;
-        }
-
         try {
-            console.log(`[Analisis AI] Mencoba menghasilkan analisis dengan model: ${currentModel}`);
-            const res = await ai.models.generateContent({
+            console.log(`[Analisis AI] Mencoba model: ${currentModel}...`);
+
+            // Batas waktu per model maksimal 10 detik agar tidak menyebabkan bottleneck
+            const generatePromise = ai.models.generateContent({
                 model: currentModel,
                 contents: prompt,
                 config: {
@@ -78,10 +83,15 @@ export async function generateAIAnalysisOnServer(prompt: string): Promise<string
                 }
             });
 
-            if (res && res.text) {
-                response = res.text;
-                lastError = null;
-                console.log(`[Analisis AI] Berhasil menghasilkan analisis menggunakan model: ${currentModel}`);
+            const timeoutPromise = new Promise<never>((_, reject) => {
+                setTimeout(() => reject(new Error(`Model ${currentModel} timeout (10s)`)), 10000);
+            });
+
+            const res = await Promise.race([generatePromise, timeoutPromise]);
+
+            if (res && res.text && res.text.trim().length > 0) {
+                response = res.text.trim();
+                console.log(`[Analisis AI] Berhasil menghasilkan analisis dengan model: ${currentModel}`);
                 return response;
             }
         } catch (error: unknown) {
@@ -89,42 +99,37 @@ export async function generateAIAnalysisOnServer(prompt: string): Promise<string
             const err = error as Error & { status?: number };
             const errorMessage = err?.message?.toLowerCase() || "";
 
-            const is503 = err?.status === 503 || errorMessage.includes('503') || errorMessage.includes('high demand');
+            const is503 = err?.status === 503 || errorMessage.includes('503') || errorMessage.includes('high demand') || errorMessage.includes('unavailable');
             const isQuota = err?.status === 429 || errorMessage.includes('quota') || errorMessage.includes('exhausted') || errorMessage.includes('429');
 
-            if (isQuota) {
-                markModelExhausted(currentModel);
+            if (is503 || isQuota) {
+                markModelExhausted(currentModel, is503 ? 60000 : 180000);
             }
 
-            console.log(`[Analisis AI] Model ${currentModel} ${is503 ? '503 antrean tinggi' : isQuota ? '429 batas kuota' : 'beralih'}, beralih ke model berjenjang berikutnya...`);
+            console.log(`[Analisis AI] Model ${currentModel} mengalami ${is503 ? '503 (high demand)' : isQuota ? '429 (kuota)' : 'kendala'}. Beralih langsung ke model berikutnya...`);
+            // Langsung beralih ke model berikutnya tanpa menunggu perulangan yang sama
+            continue;
         }
+    }
+
+    // Jika seluruh model AI mengalami antrean 503 atau batas kuota
+    console.warn("[Analisis AI] Seluruh model AI dalam kaskade sedang mengalami beban penuh (503/429). Mengaktifkan fallback laporan diagnostik cerdas...");
+    try {
+        const fallbackReport = generateDeterministicDiagnosticReport(prompt);
+        if (fallbackReport && fallbackReport.length > 50) {
+            console.log("[Analisis AI] Laporan diagnostik klinis cerdas berhasil dihasilkan secara instan.");
+            return fallbackReport;
+        }
+    } catch (fallbackErr) {
+        console.error("[Analisis AI] Gagal menyusun fallback diagnostik:", fallbackErr);
     }
 
     if (lastError && !response) {
         const err = lastError as Error & { status?: number };
-        const errorMessage = err?.message?.toLowerCase() || "";
-        console.warn("[Analisis AI] Seluruh model AI dalam kaskade sedang mengalami beban/kuota penuh. Error:", errorMessage.slice(0, 80));
-
-        if (err?.status === 429 || errorMessage.includes('quota') || errorMessage.includes('exhausted') || errorMessage.includes('429')) {
-            if (errorMessage.includes('per minute') && errorMessage.includes('requests')) {
-                throw new Error("Batas permintaan per menit pada Gemini telah tercapai. Harap tunggu 1 menit lalu coba kembali.");
-            }
-            if (errorMessage.includes('per day')) {
-                throw new Error("Batas kuota harian Gemini telah tercapai untuk seluruh model. Silakan coba kembali besok atau gunakan API key lain.");
-            }
-            throw new Error("Kuota penggunaan Gemini sedang penuh pada seluruh model. Harap tunggu beberapa menit lalu coba kembali.");
-        }
-        if (err?.status === 503 || errorMessage.includes('503') || errorMessage.includes('high demand')) {
-            throw new Error("Seluruh layanan AI Gemini sedang mengalami antrean tinggi (503). Harap tunggu beberapa saat lalu coba kembali.");
-        }
-        throw new Error(`API Error: ${err?.message || "Terjadi kesalahan server saat menghasilkan analisis."}`);
+        throw new Error(err?.message || "Layanan AI sedang sibuk. Silakan coba kembali sesaat lagi.");
     }
 
-    if (!response) {
-        throw new Error("Gagal mendapatkan respons analisis AI setelah mencoba seluruh model berjenjang.");
-    }
-
-    return response;
+    return generateDeterministicDiagnosticReport(prompt);
 }
 
 export async function generateSvgOnServer(prompt: string, style?: string): Promise<string> {

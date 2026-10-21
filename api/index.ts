@@ -1,38 +1,41 @@
-import express from "express";
-import cors from "cors";
-import { generateQuestionsOnServer, generateAIAnalysisOnServer } from "../server/ai.js";
+import healthHandler from "./health.ts";
+import aiConfigHandler from "./ai-config.ts";
+import generateQuestionsHandler from "./generate-questions.ts";
+import generateAnalysisHandler from "./generate-analysis.ts";
+import generateSvgHandler from "./generate-svg.ts";
 
-const app = express();
+export const config = {
+  maxDuration: 60,
+};
 
-app.use(cors());
-app.use(express.json({ limit: "50mb" }));
-app.use(express.urlencoded({ limit: "50mb", extended: true }));
+export default async function handler(req: any, res: any) {
+  // Normalize pathname from req.url or Vercel proxy headers
+  const rawUrl = (req.headers && (req.headers["x-invoke-path"] || req.headers["x-matched-path"])) || req.url || "/";
+  const url = new URL(rawUrl, "http://localhost");
+  const pathname = url.pathname.replace(/\/+$/, "") || "/";
 
-// API Routes
-app.get("/api/health", (req, res) => {
-  res.json({ status: "ok" });
-});
-
-app.post("/api/generate-questions", async (req, res) => {
-  try {
-    const { prompt, systemInstruction, modelsToTry, properties } = req.body;
-    const responseText = await generateQuestionsOnServer(prompt, systemInstruction, modelsToTry, properties);
-    res.json({ success: true, text: responseText });
-  } catch (error: any) {
-    console.warn("API warning generating questions:", error.message);
-    res.status(500).json({ success: false, error: error.message });
+  if (pathname === "/api/health" || pathname === "/health" || pathname === "/api" || pathname === "") {
+    return healthHandler(req, res);
   }
-});
 
-app.post("/api/generate-analysis", async (req, res) => {
-  try {
-    const { prompt } = req.body;
-    const responseText = await generateAIAnalysisOnServer(prompt);
-    res.json({ success: true, text: responseText });
-  } catch (error: any) {
-    console.warn("API warning generating analysis:", error.message);
-    res.status(500).json({ success: false, error: error.message });
+  if (pathname === "/api/ai-config" || pathname === "/ai-config") {
+    return aiConfigHandler(req, res);
   }
-});
 
-export default app;
+  if (pathname === "/api/generate-questions" || pathname === "/generate-questions") {
+    return generateQuestionsHandler(req, res);
+  }
+
+  if (pathname === "/api/generate-analysis" || pathname === "/generate-analysis" || pathname === "/api/ai-proxy" || pathname === "/ai-proxy") {
+    return generateAnalysisHandler(req, res);
+  }
+
+  if (pathname === "/api/generate-svg" || pathname === "/generate-svg") {
+    return generateSvgHandler(req, res);
+  }
+
+  return res.status(404).json({
+    success: false,
+    error: `Endpoint not found: ${pathname}`
+  });
+}
