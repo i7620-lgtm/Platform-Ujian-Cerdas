@@ -36,6 +36,8 @@ interface ArchiveClassAnalysisProps {
   aiAnalysisResult?: string | null;
   onDeleteAIAnalysis?: () => void;
   viewMode?: "CLASS_ONLY" | "AI_ONLY" | "BOTH";
+  isGeneratingAI?: boolean;
+  aiProgressStatus?: { message: string; step: number; total: number } | null;
 }
 
 export const ArchiveClassAnalysis: React.FC<ArchiveClassAnalysisProps> = ({
@@ -48,6 +50,8 @@ export const ArchiveClassAnalysis: React.FC<ArchiveClassAnalysisProps> = ({
   aiAnalysisResult,
   onDeleteAIAnalysis,
   viewMode = "BOTH",
+  isGeneratingAI,
+  aiProgressStatus,
 }) => {
   const filteredResults = useMemo(() => {
     if (!results) return [];
@@ -363,6 +367,47 @@ export const ArchiveClassAnalysis: React.FC<ArchiveClassAnalysisProps> = ({
               </div>
             )}
           </div>
+        </div>
+      )}
+
+      {/* AI Analysis Loading State */}
+      {(viewMode === "BOTH" || viewMode === "AI_ONLY") && !aiAnalysisResult && isGeneratingAI && (
+        <div className="p-8 bg-white dark:bg-slate-800 rounded-2xl border border-indigo-100 dark:border-indigo-900/40 shadow-sm flex flex-col items-center justify-center text-center space-y-4 my-6 animate-fade-in">
+          <div className="w-14 h-14 bg-indigo-50 dark:bg-indigo-950/60 rounded-2xl flex items-center justify-center border border-indigo-100 dark:border-indigo-800">
+            <div className="w-7 h-7 border-3 border-indigo-600 dark:border-indigo-400 border-t-transparent rounded-full animate-spin" />
+          </div>
+          <div>
+            <h3 className="text-base font-bold text-slate-800 dark:text-slate-100">
+              {aiProgressStatus?.message || "Memproses Analisis AI..."}
+            </h3>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-md mx-auto">
+              Sistem sedang menganalisis sebaran hasil belajar, mendiagnosis akar miskonsepsi siswa, dan menyusun matriks diferensiasi secara non-blocking.
+            </p>
+          </div>
+          <div className="w-full max-w-xs bg-slate-100 dark:bg-slate-700 h-2 rounded-full overflow-hidden mt-2">
+            <div
+              className="bg-gradient-to-r from-indigo-500 to-amber-500 h-full transition-all duration-500 rounded-full"
+              style={{ width: `${Math.max(15, ((aiProgressStatus?.step || 1) / (aiProgressStatus?.total || 4)) * 100)}%` }}
+            />
+          </div>
+          <span className="text-[11px] font-semibold text-indigo-600 dark:text-indigo-400">
+            Langkah {aiProgressStatus?.step || 1} dari {aiProgressStatus?.total || 4}
+          </span>
+        </div>
+      )}
+
+      {/* AI Analysis Empty State */}
+      {viewMode === "AI_ONLY" && !aiAnalysisResult && !isGeneratingAI && (
+        <div className="p-10 bg-white dark:bg-slate-800 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm flex flex-col items-center justify-center text-center space-y-3 my-6 animate-fade-in">
+          <div className="w-12 h-12 bg-amber-50 dark:bg-amber-950/50 rounded-full flex items-center justify-center text-amber-500 text-xl">
+            ✨
+          </div>
+          <h3 className="text-base font-bold text-slate-800 dark:text-slate-100">
+            Belum Ada Analisis AI
+          </h3>
+          <p className="text-xs text-slate-500 dark:text-slate-400 max-w-md">
+            Gunakan tombol "Buat Analisis AI" pada menu di atas untuk menghasilkan laporan diagnostik mendalam, matriks 4 jenjang, dan bank soal remedial secara otomatis.
+          </p>
         </div>
       )}
     </div>
