@@ -33,13 +33,14 @@ async function startServer() {
   });
 
   app.post("/api/generate-questions", async (req, res) => {
+    res.setHeader("Content-Type", "application/json");
     try {
       const { prompt, systemInstruction, modelsToTry, properties } = req.body;
       const responseText = await generateQuestionsOnServer(prompt, systemInstruction, modelsToTry, properties);
       res.json({ success: true, text: responseText });
     } catch (error: any) {
-      console.warn("API warning generating questions:", error.message);
-      res.status(500).json({ success: false, error: error.message });
+      console.warn("API warning generating questions:", error?.message || error);
+      res.status(200).json({ success: false, fallback: true, error: error?.message || "Gagal menghasilkan soal dari server" });
     }
   });
 
