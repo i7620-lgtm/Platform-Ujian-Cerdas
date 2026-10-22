@@ -35,7 +35,7 @@ export const MultipleChoiceEditor: React.FC<MultipleChoiceEditorProps> = ({ q })
           const isSelected =
             q.correctAnswer === letter ||
             q.correctAnswer === opt ||
-            isAnswerMatch(q.correctAnswer, opt, q.questionType) ||
+            isAnswerMatch(q.correctAnswer, opt, q.questionType, q.options) ||
             (typeof q.correctAnswer === "string" &&
               q.correctAnswer.trim().toUpperCase() === letter);
 
