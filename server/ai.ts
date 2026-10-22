@@ -318,7 +318,7 @@ export async function generateQuestionsOnServer(prompt: string, systemInstructio
                 console.log(`Mencoba membuat soal menggunakan model: ${currentModel} (Percobaan ${attempts}/${maxAttempts})`);
                 const configObj: any = {
                   systemInstruction: systemInstruction,
-                  temperature: 0.2,
+                  temperature: 0.7,
                   responseMimeType: "application/json"
                 };
 
@@ -334,6 +334,8 @@ export async function generateQuestionsOnServer(prompt: string, systemInstructio
                   level: { type: Type.STRING },
                   category: { type: Type.STRING },
                   explanation: { type: Type.STRING },
+                  hint: { type: Type.STRING },
+                  solutionSteps: { type: Type.STRING },
                   visualStimulusType: { type: Type.STRING },
                   svgPrompt: { type: Type.STRING },
                   svgStyle: { type: Type.STRING },
