@@ -1,6 +1,6 @@
 import { useEffect, useRef, useCallback, useState } from "react";
 import type { Question, QuizConfig } from "../../types";
-import { parsePdfAndAutoCrop, convertPdfToImages } from "./examUtils";
+import { parsePdfAndAutoCrop, convertPdfToImages, extractSmartCategory } from "./examUtils";
 import { generateQuestions, PartialGenerationError } from "../../services/geminiService";
 
 interface UseCreationViewParams {
@@ -106,7 +106,8 @@ export const useCreationView = ({
     setIsLoading(true);
     setError("");
     const targetCount = Math.max(1, Math.min(10, aiConfig.count || 5));
-    const effectiveAiConfig = { ...aiConfig, count: targetCount };
+    const extractedCat = extractSmartCategory(aiConfig.category, aiConfig.subject);
+    const effectiveAiConfig = { ...aiConfig, count: targetCount, category: extractedCat };
 
     if (inputMethod === "ai") {
       setGenerationProgress({

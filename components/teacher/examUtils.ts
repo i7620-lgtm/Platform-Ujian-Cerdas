@@ -95,7 +95,7 @@ export const analyzeQuestionTypePerformance = (
       q.questionType === "MULTIPLE_CHOICE" ||
       q.questionType === "FILL_IN_THE_BLANK"
     ) {
-      return normAns === normKey;
+      return isAnswerMatch(q.correctAnswer, ans, q.questionType, q.options);
     } else if (q.questionType === "COMPLEX_MULTIPLE_CHOICE") {
       const sSet = new Set(
         parseList(String(ans)).map((a) => normalize(a, q.questionType)),
@@ -258,13 +258,52 @@ export const analyzeClassPerformance = (
 };
 
 // --- HELPER: Parse List (Supports JSON Array or Legacy CSV) ---
-export const stripPrefix = (str: string) =>
-  str.replace(/^[A-E1-5][.)]\s*/i, "").trim();
+export const stripPrefix = (str: string) => {
+  if (!str) return "";
+  let s = str.trim();
+  // Strip HTML wrappers around option letter prefixes like <p>A. 1 : 2</p> or <strong>A.</strong>
+  s = s.replace(/^(?:<p[^>]*>|<div[^>]*>)?(?:\s*<strong[^>]*>|\s*<b[^>]*>)?\s*[A-E1-5][.)]\s*(?:<\/strong>|<\/b>)?\s*/i, "").trim();
+  return s.replace(/^[A-E1-5][.)]\s*/i, "").trim();
+};
+
+export const extractSmartCategory = (category?: string, subject?: string): string => {
+  const cat = (category || "").trim();
+  if (cat && cat.toLowerCase() !== "materi pokok" && cat.toLowerCase() !== "umum") {
+    return cat;
+  }
+
+  const subj = (subject || "").trim();
+  if (!subj) return "Materi Pilihan";
+
+  // Check for separator like " - ", " : ", " / "
+  const separators = [" - ", " – ", " — ", " : ", " / "];
+  for (const sep of separators) {
+    if (subj.includes(sep)) {
+      const parts = subj.split(sep).map((p) => p.trim()).filter(Boolean);
+      if (parts.length > 1) {
+        const lastPart = parts[parts.length - 1];
+        if (lastPart.length >= 2) return lastPart;
+      }
+    }
+  }
+
+  // Check for parenthesis: e.g. "Matematika SD (Rasio)"
+  const parenMatch = subj.match(/\(([^)]+)\)/);
+  if (parenMatch && parenMatch[1].trim().length >= 2) {
+    const inside = parenMatch[1].trim();
+    if (!/ulangan|harian|ujian|pts|pas|tka|anbk|asesmen/i.test(inside)) {
+      return inside;
+    }
+  }
+
+  return subj;
+};
 
 export const isAnswerMatch = (
   ans: string | undefined | null,
   opt: string | undefined | null,
   type: QuestionType,
+  optionsContext?: string[],
 ): boolean => {
   if (!ans || !opt) return false;
 
@@ -283,6 +322,52 @@ export const isAnswerMatch = (
 
   // If both are non-empty and match after stripping prefix
   if (strippedAns === strippedOpt && strippedAns.length > 0) return true;
+
+  // Normalisasi karakter matematika dan spasi (e.g., "$1 : 2$" vs "1 : 2" vs "$1:2$")
+  const cleanMath = (s: string) =>
+    s
+      .replace(/^\$|\$$/g, "")
+      .replace(/<[^>]*>/g, "")
+      .replace(/\s+/g, "")
+      .trim()
+      .toLowerCase();
+  const mathAns = cleanMath(strippedAns);
+  const mathOpt = cleanMath(strippedOpt);
+  if (mathAns === mathOpt && mathAns.length > 0) {
+    return true;
+  }
+
+  // Handle letter index matching using optionsContext (A/B/C/D/E or 0-4 <-> actual option content)
+  if (optionsContext && optionsContext.length > 0) {
+    const trimmedAns = String(ans).replace(/<[^>]*>/g, "").trim();
+    const trimmedOpt = String(opt).replace(/<[^>]*>/g, "").trim();
+
+    // If ans is single letter A-E or index 0-4
+    let ansIdx = -1;
+    if (/^[A-E]$/i.test(trimmedAns)) {
+      ansIdx = trimmedAns.toUpperCase().charCodeAt(0) - 65;
+    } else if (/^[0-4]$/.test(trimmedAns)) {
+      ansIdx = parseInt(trimmedAns, 10);
+    }
+
+    if (ansIdx >= 0 && ansIdx < optionsContext.length) {
+      const canonicalOpt = optionsContext[ansIdx];
+      if (isAnswerMatch(canonicalOpt, opt, type)) return true;
+    }
+
+    // If opt is single letter A-E or index 0-4
+    let optIdx = -1;
+    if (/^[A-E]$/i.test(trimmedOpt)) {
+      optIdx = trimmedOpt.toUpperCase().charCodeAt(0) - 65;
+    } else if (/^[0-4]$/.test(trimmedOpt)) {
+      optIdx = parseInt(trimmedOpt, 10);
+    }
+
+    if (optIdx >= 0 && optIdx < optionsContext.length) {
+      const canonicalOpt = optionsContext[optIdx];
+      if (isAnswerMatch(ans, canonicalOpt, type)) return true;
+    }
+  }
 
   // Special case for image-only answers: if both contain the same image src
   if (normAns.includes("<img") && normOpt.includes("<img")) {
@@ -604,7 +689,7 @@ export const calculateAggregateStats = (exam: Exam, results: Result[]) => {
       q.questionType === "MULTIPLE_CHOICE" ||
       q.questionType === "FILL_IN_THE_BLANK"
     ) {
-      return normAns === normKey;
+      return isAnswerMatch(q.correctAnswer, ans, q.questionType, q.options);
     } else if (q.questionType === "COMPLEX_MULTIPLE_CHOICE") {
       const sSet = new Set(
         parseList(String(ans)).map((a) => normalize(a, q.questionType)),
@@ -1712,7 +1797,7 @@ export const calculateExamScore = (
     ) {
       if (
         q.correctAnswer &&
-        isAnswerMatch(q.correctAnswer, studentAnswer, q.questionType)
+        isAnswerMatch(q.correctAnswer, studentAnswer, q.questionType, q.options)
       ) {
         isCorrect = true;
       }

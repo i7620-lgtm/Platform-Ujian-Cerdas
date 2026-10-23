@@ -109,6 +109,7 @@ export interface Question {
 
   // Petunjuk Pengerjaan & Langkah Pengerjaan
   hint?: string;          // Petunjuk pengerjaan (clue non-jawaban, scaffolding konsep/rumus)
+  explanation?: string;   // Pembahasan / penjelasan konseptual
   solutionSteps?: string; // Langkah pengerjaan (penjabaran cara menjawab dari awal sampai ketemu jawaban)
 }
 

@@ -1,6 +1,6 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { Question, QuizConfig, QuestionType, ChartData } from "../types";
-import { markdownToHtml, htmlToMarkdown, normalize, parseList, isAnswerMatch } from "../components/teacher/examUtils";
+import { markdownToHtml, htmlToMarkdown, normalize, parseList, isAnswerMatch, extractSmartCategory, stripPrefix } from "../components/teacher/examUtils";
 import { generateGeometrySVG, extractNum, parseGeometryLabels } from "../components/teacher/geometryUtils";
 import { generateEducationalSvg, svgToDataUrl } from "./svgGeneratorService";
 import { generateContextualEducationalSvg } from "./smartSvgTemplates";
@@ -1093,14 +1093,15 @@ export async function generateQuestions(
       const result: string[] = [];
 
       for (const opt of existingOptions) {
-        if (!isDummyOption(opt) && !result.includes(opt)) {
-          result.push(opt);
+        const cleanOpt = stripPrefix(opt).trim();
+        if (!isDummyOption(cleanOpt) && cleanOpt && !result.some(r => isAnswerMatch(r, cleanOpt, 'MULTIPLE_CHOICE'))) {
+          result.push(cleanOpt);
         }
       }
 
-      const cleanAnswer = correctAnswer.trim();
-      if (cleanAnswer && !result.some(r => normalize(r, 'MULTIPLE_CHOICE') === normalize(cleanAnswer, 'MULTIPLE_CHOICE'))) {
-        result.unshift(cleanAnswer);
+      const cleanAnswer = stripPrefix(correctAnswer).trim();
+      if (cleanAnswer && !result.some(r => isAnswerMatch(r, cleanAnswer, 'MULTIPLE_CHOICE'))) {
+        result.push(cleanAnswer);
       }
 
       if (result.length >= targetCount) {
@@ -1308,28 +1309,29 @@ export async function generateQuestions(
         const expectedType = selectedTypes[globalIndex % selectedTypes.length] || 'Pilihan Ganda';
         const expectedDiff = selectedDifficulties[globalIndex % selectedDifficulties.length] || 'Level 3 - Penalaran (Reasoning / HOTS)';
 
-        const rawType = (q.questionType || '').toLowerCase();
+        const expLower = expectedType.toLowerCase();
         let currentQuestionType: QuestionType = 'MULTIPLE_CHOICE';
 
-        if (rawType.includes('kompleks') || rawType.includes('mcma')) {
+        if (expLower.includes('kompleks') || expLower.includes('mcma')) {
             currentQuestionType = 'COMPLEX_MULTIPLE_CHOICE';
-        } else if (rawType.includes('benar') || rawType.includes('salah') || (q.trueFalseRows && q.trueFalseRows.length > 0)) {
+        } else if (expLower.includes('benar') || expLower.includes('salah')) {
             currentQuestionType = 'TRUE_FALSE';
-        } else if (rawType.includes('jodoh') || rawType.includes('matching') || (q.matchingPairs && q.matchingPairs.length > 0)) {
+        } else if (expLower.includes('jodoh') || expLower.includes('matching')) {
             currentQuestionType = 'MATCHING';
-        } else if (rawType.includes('isian') || rawType.includes('singkat') || rawType.includes('blank')) {
+        } else if (expLower.includes('isian') || expLower.includes('singkat') || expLower.includes('blank')) {
             currentQuestionType = 'FILL_IN_THE_BLANK';
-        } else if (rawType.includes('esai') || rawType.includes('essay') || rawType.includes('uraian')) {
+        } else if (expLower.includes('esai') || expLower.includes('essay') || expLower.includes('uraian')) {
             currentQuestionType = 'ESSAY';
-        } else if (q.options && q.options.length > 0) {
-            currentQuestionType = 'MULTIPLE_CHOICE';
         } else {
-            if (expectedType.toLowerCase().includes('kompleks')) currentQuestionType = 'COMPLEX_MULTIPLE_CHOICE';
-            else if (expectedType.toLowerCase().includes('benar')) currentQuestionType = 'TRUE_FALSE';
-            else if (expectedType.toLowerCase().includes('menjodohkan')) currentQuestionType = 'MATCHING';
-            else if (expectedType.toLowerCase().includes('singkat') || expectedType.toLowerCase().includes('isian')) currentQuestionType = 'FILL_IN_THE_BLANK';
-            else if (expectedType.toLowerCase().includes('esai') || expectedType.toLowerCase().includes('uraian')) currentQuestionType = 'ESSAY';
-            else currentQuestionType = 'MULTIPLE_CHOICE';
+            currentQuestionType = 'MULTIPLE_CHOICE';
+        }
+
+        // Jika bukan Benar/Salah atau Menjodohkan, bersihkan baris turunan agar tidak menimbulkan kerancuan tipe
+        if (currentQuestionType !== 'TRUE_FALSE') {
+            delete (q as any).trueFalseRows;
+        }
+        if (currentQuestionType !== 'MATCHING') {
+            delete (q as any).matchingPairs;
         }
 
         // --- DETEKSI KONTEKS GEOMETRI / STIMULUS ---
@@ -1416,11 +1418,25 @@ export async function generateQuestions(
                                  (config.blueprint || '').toUpperCase().includes('SMA') || 
                                  (config.blueprint || '').toUpperCase().includes('SMK');
             const targetCount = isHighSchool ? 5 : 4;
+            const targetKeyIndex = (globalIndex + 1) % targetCount;
 
             const htmlCorrectAnswer = stripOuterSingleParagraph(formatContent(String(correctAnswer), !!q.correctAnswerChart));
 
-            // Bersihkan opsi dari dummy options ("Pilihan alternatif...", dll)
-            let rawOptions = (options || []).map(opt => stripOuterSingleParagraph(opt).trim()).filter(opt => !isDummyOption(opt));
+            // Bersihkan opsi dari dummy options dan bersihkan awalan A., B., dll
+            let rawOptions = (options || [])
+                .map(opt => stripOuterSingleParagraph(opt).trim())
+                .filter(opt => !isDummyOption(opt))
+                .map(opt => stripPrefix(cleanGeneratedMathUnits(opt)).trim())
+                .filter(Boolean);
+
+            // Hilangkan opsi kembar
+            const uniqueOptions: string[] = [];
+            for (const opt of rawOptions) {
+                if (!uniqueOptions.some(u => isAnswerMatch(u, opt, currentQuestionType))) {
+                    uniqueOptions.push(opt);
+                }
+            }
+            rawOptions = uniqueOptions;
 
             // Jika options kurang dari targetCount atau tidak ada yang cocok dengan kunci jawaban, sintetiskan pengecoh cerdas
             if (rawOptions.length < targetCount || !rawOptions.some(opt => isAnswerMatch(htmlCorrectAnswer, opt, currentQuestionType))) {
@@ -1428,41 +1444,42 @@ export async function generateQuestions(
                     correctAnswer: htmlCorrectAnswer,
                     questionText: workingQuestionText,
                     subject: config.subject || '',
-                    category: config.category || q.category || '',
+                    category: extractSmartCategory(config.category || q.category, config.subject),
                     existingOptions: rawOptions,
                     targetCount: targetCount
                 });
             }
 
-            options = rawOptions;
+            options = rawOptions.slice(0, targetCount).map(opt => stripPrefix(cleanGeneratedMathUnits(opt)).trim());
 
-            const matchingOption = options.find(opt => isAnswerMatch(htmlCorrectAnswer, opt, currentQuestionType));
+            // Tentukan letak jawaban benar yang cocok
+            let matchedIdx = options.findIndex(opt => isAnswerMatch(htmlCorrectAnswer, opt, currentQuestionType));
 
-            if (matchingOption) {
-                correctAnswer = matchingOption;
-            } else {
+            if (matchedIdx === -1) {
                 const letterMatch = String(correctAnswer).trim().toUpperCase().match(/^(?:JAWABAN\s+|OPSI\s+|PILIHAN\s+)?([A-E1-5])[.)]?$/);
                 if (letterMatch) {
                     const char = letterMatch[1];
-                    let matchIndex = -1;
-                    if (char >= 'A' && char <= 'E') matchIndex = char.charCodeAt(0) - 65;
-                    else if (char >= '1' && char <= '5') matchIndex = parseInt(char) - 1;
-
-                    if (matchIndex >= 0 && matchIndex < options.length) {
-                        correctAnswer = options[matchIndex];
-                    } else {
-                        correctAnswer = options[0];
+                    let idx = -1;
+                    if (char >= 'A' && char <= 'E') idx = char.charCodeAt(0) - 65;
+                    else if (char >= '1' && char <= '5') idx = parseInt(char) - 1;
+                    if (idx >= 0 && idx < options.length) {
+                        matchedIdx = idx;
                     }
-                } else {
-                    const fallbackOption = options.find(opt => {
-                        const normOpt = normalize(opt, currentQuestionType);
-                        const normAns = normalize(htmlCorrectAnswer, currentQuestionType);
-                        return (normOpt.length > 2 && normAns.includes(normOpt)) || 
-                               (normAns.length > 2 && normOpt.includes(normAns));
-                    });
-                    correctAnswer = fallbackOption || options[0];
                 }
             }
+
+            if (matchedIdx === -1) {
+                matchedIdx = 0;
+            }
+
+            // Pindahkan kunci jawaban ke targetKeyIndex agar terdistribusi seimbang merata di antara opsi A, B, C, D (dan E)
+            if (matchedIdx !== targetKeyIndex && targetKeyIndex < options.length) {
+                const temp = options[targetKeyIndex];
+                options[targetKeyIndex] = options[matchedIdx];
+                options[matchedIdx] = temp;
+            }
+
+            correctAnswer = options[targetKeyIndex];
         } else if (currentQuestionType === 'COMPLEX_MULTIPLE_CHOICE') {
             const validOptions = (options || []).filter(opt => !isDummyOption(opt));
             if (validOptions.length < 3) {
@@ -1560,12 +1577,14 @@ export async function generateQuestions(
             (specificKisiKisi.includes("Standar TKA") && specificKisiKisi.includes("\n") && specificKisiKisi.length > 150);
 
         if (isGeneralBlueprint) {
-            const topic = config.category?.trim() || q.category?.trim() || config.subject || "materi pokok";
+            const smartCategory = extractSmartCategory(config.category || q.category, config.subject);
+            const topic = smartCategory;
             const kognitif = expectedDiff || q.level?.trim() || "Penalaran";
             specificKisiKisi = `Disajikan stimulus terkait ${topic} (${kognitif}), peserta didik dapat menganalisis dan menyelesaikan masalah dengan tepat.`;
         }
 
-        const formattedHint = q.hint ? formatContent(q.hint) : undefined;
+        const smartCategory = extractSmartCategory(config.category || q.category, config.subject);
+        const formattedHint = q.hint ? formatContent(q.hint) : formatContent(`Pahami konsep inti ${smartCategory} dan gunakan rumus pembimbing yang relevan.`);
         const formattedSolutionSteps = q.solutionSteps ? formatContent(q.solutionSteps) : (q.explanation ? formatContent(q.explanation) : undefined);
 
         const mappedQ: Question = {
@@ -1581,7 +1600,7 @@ export async function generateQuestions(
             scoreWeight: (config.scoreWeight && config.scoreWeight > 0) ? config.scoreWeight : (q.scoreWeight || 1),
             kisiKisi: config.kisiKisi?.trim() || specificKisiKisi,
             level: expectedDiff || q.level?.trim() || "Level 3 - Penalaran (Reasoning / HOTS)",
-            category: config.category?.trim() || q.category?.trim() || config.subject || "Umum",
+            category: smartCategory,
             chartData: q.chartData,
             imagePrompt: q.imagePrompt,
             imageSearchKeyword: (q as any).imageSearchKeyword,
