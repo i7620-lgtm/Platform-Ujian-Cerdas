@@ -25,6 +25,8 @@ import {
 import { ArchiveQuestionAnalysis } from "../archive/ArchiveQuestionAnalysis";
 import { ArchiveClassAnalysis } from "../archive/ArchiveClassAnalysis";
 import { ArchiveHeaderActions } from "../archive/ArchiveHeaderActions";
+import { AiAnalysisTargetModal } from "../archive/AiAnalysisTargetModal";
+import { AiAnalysisProgressModal } from "../archive/AiAnalysisProgressModal";
 import { PrintSoalModal } from "../modals/berlangsung/PrintSoalModal";
 import {
   fixArchiveDataSorting,
@@ -70,7 +72,22 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({
   const {
     isGeneratingAI,
     aiProgressStatus,
+    aiProgressMessage,
     aiAnalysisResult,
+    activeAiSubTab,
+    setActiveAiSubTab,
+    isTargetModalOpen,
+    setIsTargetModalOpen,
+    isProgressModalOpen,
+    setIsProgressModalOpen,
+    analysisTargets,
+    aiQueue,
+    aiCurrentQueueIndex,
+    aiFailedItem,
+    handleOpenAiTargetModal,
+    handleStartBatchAiAnalysis,
+    handleResumeAiAnalysis,
+    handleFinishAiAnalysis,
     sortedResults,
     uniqueSchools,
     uniqueClasses,
@@ -261,9 +278,9 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({
         setActiveTab={setActiveTab}
         totalStudents={totalStudentsDisplay}
         isGeneratingAI={isGeneratingAI}
-        aiProgressMessage={aiProgressStatus?.message}
-        onGenerateAI={handleGenerateAI}
-        hasAiAnalysis={!!aiAnalysisResult}
+        aiProgressMessage={aiProgressMessage || aiProgressStatus?.message}
+        onGenerateAI={handleOpenAiTargetModal}
+        hasAiAnalysis={Boolean(archiveData?.ai_analyses && Object.keys(archiveData.ai_analyses).length > 0) || Boolean(aiAnalysisResult)}
       />
 
       <div className="animate-fade-in print:hidden">
@@ -302,6 +319,7 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({
                     </select>
                   </div>
                 )}
+
                 {uniqueClasses.length > 1 && (
                   <div className="flex items-center gap-2">
                     <span className="text-xs font-bold text-slate-500 uppercase">
@@ -386,8 +404,12 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({
             exam={exam}
             results={filteredResults}
             teacherProfile={teacherProfile}
+            ai_analyses={archiveData?.ai_analyses}
             aiAnalysisResult={aiAnalysisResult}
+            activeAiSubTab={activeAiSubTab}
+            onSelectAiSubTab={setActiveAiSubTab}
             onDeleteAIAnalysis={handleDeleteAIAnalysis}
+            onOpenTargetModal={handleOpenAiTargetModal}
             viewMode="CLASS_ONLY"
             isGeneratingAI={isGeneratingAI}
             aiProgressStatus={aiProgressStatus}
@@ -402,8 +424,12 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({
             exam={exam}
             results={filteredResults}
             teacherProfile={teacherProfile}
+            ai_analyses={archiveData?.ai_analyses}
             aiAnalysisResult={aiAnalysisResult}
+            activeAiSubTab={activeAiSubTab}
+            onSelectAiSubTab={setActiveAiSubTab}
             onDeleteAIAnalysis={handleDeleteAIAnalysis}
+            onOpenTargetModal={handleOpenAiTargetModal}
             viewMode="AI_ONLY"
             isGeneratingAI={isGeneratingAI}
             aiProgressStatus={aiProgressStatus}
@@ -478,6 +504,24 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({
         isOpen={isPrintModalOpen}
         onClose={() => setIsPrintModalOpen(false)}
         exam={exam || null}
+      />
+
+      <AiAnalysisTargetModal
+        isOpen={isTargetModalOpen}
+        onClose={() => setIsTargetModalOpen(false)}
+        targets={analysisTargets}
+        onStart={handleStartBatchAiAnalysis}
+        hasExistingAnalyses={Boolean(archiveData?.ai_analyses && Object.keys(archiveData.ai_analyses).length > 0)}
+      />
+
+      <AiAnalysisProgressModal
+        isOpen={isProgressModalOpen}
+        queue={aiQueue}
+        currentIndex={aiCurrentQueueIndex}
+        currentMessage={aiProgressMessage}
+        failedItem={aiFailedItem}
+        onResume={handleResumeAiAnalysis}
+        onFinish={handleFinishAiAnalysis}
       />
     </div>
   );

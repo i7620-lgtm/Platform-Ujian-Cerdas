@@ -5,6 +5,8 @@ import { calculateAggregateStats, analyzeQuestionTypePerformance } from "../exam
 import { archiveService } from "../../../services/archive";
 import { storageService } from "../../../services/storage";
 import { useArchiveViewer } from "../useArchiveViewer";
+import type { AnalysisTargetItem } from "../archive/AiAnalysisTargetModal";
+import type { QueueItemState } from "../archive/AiAnalysisProgressModal";
 
 interface UseArchiveViewerLogicProps {
   archiveViewer: any;
@@ -16,6 +18,14 @@ export const useArchiveViewerLogic = ({ archiveViewer, teacherProfile }: UseArch
   const [isGeneratingAI, setIsGeneratingAI] = React.useState(false);
   const [aiAnalysisResult, setAiAnalysisResult] = React.useState<string | null>(null);
   const [aiProgressStatus, setAiProgressStatus] = React.useState<{ message: string; step: number; total: number } | null>(null);
+  const [aiProgressMessage, setAiProgressMessage] = React.useState<string>("");
+  const [activeAiSubTab, setActiveAiSubTab] = React.useState<string>("OVERALL");
+  const [isTargetModalOpen, setIsTargetModalOpen] = React.useState(false);
+  const [isProgressModalOpen, setIsProgressModalOpen] = React.useState(false);
+  const [analysisTargets, setAnalysisTargets] = React.useState<AnalysisTargetItem[]>([]);
+  const [aiQueue, setAiQueue] = React.useState<QueueItemState[]>([]);
+  const [aiCurrentQueueIndex, setAiCurrentQueueIndex] = React.useState<number>(0);
+  const [aiFailedItem, setAiFailedItem] = React.useState<QueueItemState | null>(null);
 
   const {
     archiveData,
@@ -367,111 +377,287 @@ export const useArchiveViewerLogic = ({ archiveViewer, teacherProfile }: UseArch
     return `school_${selectedSchool}_class_${selectedClass}`;
   }, [selectedSchool, selectedClass]);
 
+  // Keep activeAiSubTab valid and sync aiAnalysisResult
   React.useEffect(() => {
-    if (!archiveData) {
+    if (!archiveData?.ai_analyses) {
       setAiAnalysisResult(null);
       return;
     }
-    const key = getCurrentAnalysisKey();
-    const saved = archiveData.ai_analyses?.[key] || null;
-    setAiAnalysisResult(saved);
-  }, [archiveData, selectedSchool, selectedClass, getCurrentAnalysisKey]);
+    const availableKeys = Object.keys(archiveData.ai_analyses);
+    if (availableKeys.length === 0) {
+      setAiAnalysisResult(null);
+      return;
+    }
 
-  const handleGenerateAI = async () => {
+    if (!activeAiSubTab || !archiveData.ai_analyses[activeAiSubTab]) {
+      const defaultKey = availableKeys.includes("OVERALL") ? "OVERALL" : availableKeys[0];
+      setActiveAiSubTab(defaultKey);
+      setAiAnalysisResult(archiveData.ai_analyses[defaultKey] || null);
+    } else {
+      setAiAnalysisResult(archiveData.ai_analyses[activeAiSubTab] || null);
+    }
+  }, [archiveData, activeAiSubTab]);
+
+  const saveArchiveToCloudSilently = React.useCallback(async (updatedData: ArchiveData) => {
+    if (sourceType !== "CLOUD" || !currentCloudFilename) return;
+    try {
+      const jsonString = JSON.stringify(updatedData);
+      const newFilename = await storageService.uploadArchive(
+        updatedData.exam.code,
+        jsonString,
+        {
+          school: updatedData.exam.authorSchool,
+          subject: updatedData.exam.config.subject,
+          classLevel: updatedData.exam.config.classLevel,
+          examType: updatedData.exam.config.examType,
+          targetClasses: updatedData.exam.config.targetClasses,
+          date: updatedData.exam.config.date,
+          participantCount: updatedData.results.length,
+          authorId: updatedData.exam.authorId,
+          hasAiAnalysis: Boolean(updatedData.ai_analyses && Object.keys(updatedData.ai_analyses).length > 0),
+        }
+      );
+      if (newFilename !== currentCloudFilename) {
+        try {
+          await storageService.deleteArchive(currentCloudFilename);
+        } catch (delErr) {
+          console.warn("Failed to delete legacy archive on update", delErr);
+        }
+        if (archiveViewer.setCurrentCloudFilename) {
+          archiveViewer.setCurrentCloudFilename(newFilename);
+        }
+        if (archiveViewer.loadCloudList) {
+          archiveViewer.loadCloudList();
+        }
+      }
+    } catch (cloudSaveErr) {
+      console.warn("Failed to silently auto-save AI analysis to cloud:", cloudSaveErr);
+    }
+  }, [sourceType, currentCloudFilename, archiveViewer]);
+
+  const handleOpenAiTargetModal = React.useCallback(() => {
     if (!teacherProfile?.isPremium) {
       alert("Fitur ini khusus untuk akun Premium. Silakan upgrade akun Anda.");
       return;
     }
-    
-    setIsGeneratingAI(true);
-    setAiAnalysisResult(null);
-    setAiProgressStatus({ message: "Menyiapkan data statistik ujian...", step: 1, total: 4 });
-    try {
-      const summaries = archiveService.calculateExamStatistics(archiveData!.exam, filteredResults) as any[];
-      
-      const key = getCurrentAnalysisKey();
-      // Incremental approach: if overall analysis is requested, send existing per-class analyses
-      const existing = key === "OVERALL" ? archiveData!.ai_analyses : undefined;
-      
-      const analysis = await archiveService.generateAIAnalysis(
-        summaries,
-        undefined,
-        archiveData!.exam.questions,
-        existing,
-        (msg, step, total) => {
-          setAiProgressStatus({ message: msg, step, total });
-        }
-      );
-      
-      const updatedAnalyses = {
-        ...(archiveData!.ai_analyses || {}),
-        [key]: analysis
-      };
-
-      const updatedData: ArchiveData = {
-        ...archiveData!,
-        ai_analyses: updatedAnalyses
-      };
-
-      setArchiveData(updatedData);
-      setAiAnalysisResult(analysis);
-      archiveViewer.setActiveTab("AI_ANALYSIS");
-
-      if (sourceType === "CLOUD" && currentCloudFilename) {
-        try {
-          const jsonString = JSON.stringify(updatedData);
-          const newFilename = await storageService.uploadArchive(
-            archiveData!.exam.code,
-            jsonString,
-            {
-              school: archiveData!.exam.authorSchool,
-              subject: archiveData!.exam.config.subject,
-              classLevel: archiveData!.exam.config.classLevel,
-              examType: archiveData!.exam.config.examType,
-              targetClasses: archiveData!.exam.config.targetClasses,
-              date: archiveData!.exam.config.date,
-              participantCount: archiveData!.results.length,
-              authorId: archiveData!.exam.authorId,
-              hasAiAnalysis: updatedAnalyses && Object.keys(updatedAnalyses).length > 0,
-            }
-          );
-          if (newFilename !== currentCloudFilename) {
-            try {
-              await storageService.deleteArchive(currentCloudFilename);
-            } catch (delErr) {
-              console.warn("Failed to delete legacy archive on update", delErr);
-            }
-            if (archiveViewer.setCurrentCloudFilename) {
-              archiveViewer.setCurrentCloudFilename(newFilename);
-            }
-            if (archiveViewer.loadCloudList) {
-              archiveViewer.loadCloudList();
-            }
-          }
-        } catch (cloudSaveErr) {
-          console.warn("Failed to silently auto-save AI analysis to cloud:", cloudSaveErr);
-        }
-      } else if (sourceType === "LOCAL") {
-        // Since we can't write to the local file system automatically, we just update the in-memory state.
-        // The user will need to re-download the archive manually if they want to save it locally.
-      }
-    } catch (error: any) {
-      setAiAnalysisResult("Gagal menghasilkan analisis AI: " + (error.message || "Terjadi kesalahan."));
-    } finally {
-      setIsGeneratingAI(false);
-      setAiProgressStatus(null);
+    if (!archiveData || !archiveData.results || archiveData.results.length === 0) {
+      alert("Tidak ada data hasil siswa pada arsip ini untuk dianalisis.");
+      return;
     }
-  };
 
-  const handleDeleteAIAnalysis = async () => {
+    const classesSet = new Set<string>();
+    archiveData.results.forEach((r) => {
+      const c = String(r.student.class || r.student.className || "").trim();
+      if (c) classesSet.add(c);
+    });
+    const classes = Array.from(classesSet).sort((a, b) =>
+      a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" })
+    );
+
+    const targets: AnalysisTargetItem[] = [];
+
+    // General analysis if multiple classes exist
+    if (classes.length > 1) {
+      targets.push({
+        key: "OVERALL",
+        label: "Analisis Umum (Semua Kelas)",
+        isOverall: true,
+        studentCount: archiveData.results.length,
+      });
+    }
+
+    // Class specific analyses
+    classes.forEach((cls) => {
+      const classResults = archiveData.results.filter(
+        (r) => String(r.student.class || r.student.className || "").trim() === cls
+      );
+      const schoolName = classResults[0]?.student.schoolName || archiveData.exam.authorSchool || "ALL";
+      targets.push({
+        key: `school_${schoolName}_class_${cls}`,
+        label: `Kelas ${cls}`,
+        isOverall: false,
+        className: cls,
+        studentCount: classResults.length,
+      });
+    });
+
+    if (targets.length === 0) {
+      targets.push({
+        key: "OVERALL",
+        label: "Analisis Umum",
+        isOverall: true,
+        studentCount: archiveData.results.length,
+      });
+    } else if (classes.length === 1 && !targets.some(t => t.key === "OVERALL")) {
+      targets.unshift({
+        key: "OVERALL",
+        label: `Analisis Umum (${classes[0]})`,
+        isOverall: true,
+        studentCount: archiveData.results.length,
+      });
+    }
+
+    setAnalysisTargets(targets);
+    setIsTargetModalOpen(true);
+  }, [teacherProfile, archiveData]);
+
+  // Sequential queue processor
+  const processQueue = React.useCallback(async (
+    startIndex: number,
+    queueList: QueueItemState[],
+    initialAnalyses: Record<string, string>,
+    targetsRef: AnalysisTargetItem[]
+  ) => {
     if (!archiveData) return;
-    const key = getCurrentAnalysisKey();
-    if (!archiveData.ai_analyses?.[key]) return;
 
-    if (!confirm("Apakah Anda yakin ingin menghapus analisis AI ini dari arsip?")) return;
+    setIsGeneratingAI(true);
+    setIsProgressModalOpen(true);
+    setAiFailedItem(null);
+
+    const workingAnalyses = { ...initialAnalyses };
+    let currentQueue = [...queueList];
+
+    for (let i = startIndex; i < currentQueue.length; i++) {
+      const currentItem = currentQueue[i];
+
+      // Mark current item as processing
+      currentQueue = currentQueue.map((item, idx) =>
+        idx === i ? { ...item, status: "processing" as const } : item
+      );
+      setAiQueue(currentQueue);
+      setAiCurrentQueueIndex(i);
+      setAiProgressMessage(`Menganalisis ${currentItem.label} (${i + 1}/${currentQueue.length})...`);
+      setAiProgressStatus({
+        message: `Menganalisis ${currentItem.label}...`,
+        step: i + 1,
+        total: currentQueue.length,
+      });
+
+      try {
+        const targetMeta = targetsRef.find((t) => t.key === currentItem.key);
+        const isOverall = currentItem.key === "OVERALL" || targetMeta?.isOverall;
+        const targetClassName = targetMeta?.className;
+
+        let targetResults = archiveData.results;
+        if (!isOverall && targetClassName) {
+          targetResults = archiveData.results.filter(
+            (r) => String(r.student.class || r.student.className || "").trim() === targetClassName
+          );
+        }
+
+        const summaries = archiveService.calculateExamStatistics(
+          archiveData.exam,
+          targetResults
+        ) as any[];
+
+        const analysis = await archiveService.generateAIAnalysis(
+          summaries,
+          isOverall ? undefined : targetClassName,
+          archiveData.exam.questions,
+          workingAnalyses,
+          (msg, step, total) => {
+            setAiProgressMessage(`${currentItem.label}: ${msg} (${step}/${total})`);
+          }
+        );
+
+        workingAnalyses[currentItem.key] = analysis;
+
+        // Mark item as completed
+        currentQueue = currentQueue.map((item, idx) =>
+          idx === i ? { ...item, status: "completed" as const } : item
+        );
+        setAiQueue(currentQueue);
+
+        // Save progress immediately so partial work is never lost
+        const updatedData: ArchiveData = {
+          ...archiveData,
+          ai_analyses: { ...workingAnalyses },
+        };
+        setArchiveData(updatedData);
+        saveArchiveToCloudSilently(updatedData);
+      } catch (err: any) {
+        console.error(`Gagal menganalisis target ${currentItem.label}:`, err);
+        const failedItemState: QueueItemState = {
+          ...currentItem,
+          status: "failed",
+          error: err?.message || "Waktu respons server terlampaui (timeout) atau gangguan koneksi.",
+        };
+
+        currentQueue = currentQueue.map((item, idx) =>
+          idx === i ? failedItemState : item
+        );
+        setAiQueue(currentQueue);
+        setAiFailedItem(failedItemState);
+        setIsGeneratingAI(false);
+        // Pause execution and keep modal open with resume / finish actions
+        return;
+      }
+    }
+
+    // All queued items finished successfully
+    setIsGeneratingAI(false);
+    setIsProgressModalOpen(false);
+    archiveViewer.setActiveTab("AI_ANALYSIS");
+    if (currentQueue[0]?.key) {
+      setActiveAiSubTab(currentQueue[0].key);
+    }
+  }, [archiveData, archiveViewer, saveArchiveToCloudSilently, setArchiveData]);
+
+  const handleStartBatchAiAnalysis = React.useCallback(async (selectedKeys: string[]) => {
+    const selectedTargets = analysisTargets.filter((t) => selectedKeys.includes(t.key));
+    if (selectedTargets.length === 0) return;
+
+    const newQueue: QueueItemState[] = selectedTargets.map((t) => ({
+      key: t.key,
+      label: t.label,
+      status: "pending",
+    }));
+
+    setAiQueue(newQueue);
+    setAiCurrentQueueIndex(0);
+    setAiFailedItem(null);
+    setIsTargetModalOpen(false);
+
+    await processQueue(0, newQueue, archiveData?.ai_analyses || {}, analysisTargets);
+  }, [analysisTargets, archiveData, processQueue]);
+
+  const handleResumeAiAnalysis = React.useCallback(async () => {
+    if (!aiFailedItem) return;
+    setAiFailedItem(null);
+    await processQueue(aiCurrentQueueIndex, aiQueue, archiveData?.ai_analyses || {}, analysisTargets);
+  }, [aiFailedItem, aiCurrentQueueIndex, aiQueue, archiveData, analysisTargets, processQueue]);
+
+  const handleFinishAiAnalysis = React.useCallback(() => {
+    setIsProgressModalOpen(false);
+    setIsGeneratingAI(false);
+    setAiFailedItem(null);
+
+    const completed = aiQueue.filter((q) => q.status === "completed");
+    if (completed.length > 0) {
+      archiveViewer.setActiveTab("AI_ANALYSIS");
+      setActiveAiSubTab(completed[0].key);
+    }
+  }, [aiQueue, archiveViewer]);
+
+  const handleGenerateAI = React.useCallback(() => {
+    handleOpenAiTargetModal();
+  }, [handleOpenAiTargetModal]);
+
+  const handleDeleteAIAnalysis = async (targetKey?: string) => {
+    if (!archiveData || !archiveData.ai_analyses) return;
+    const keyToDelete = targetKey || activeAiSubTab || getCurrentAnalysisKey();
+    if (!archiveData.ai_analyses[keyToDelete]) return;
+
+    let targetLabel = "Analisis Umum";
+    if (keyToDelete !== "OVERALL") {
+      const match = keyToDelete.match(/school_.*_class_(.*)/);
+      targetLabel = match ? `Analisis Kelas ${match[1]}` : `Analisis ${keyToDelete}`;
+    }
+
+    if (!confirm(`Apakah Anda yakin ingin menghapus ${targetLabel} ini dari arsip?`)) return;
 
     const updatedAnalyses = { ...archiveData.ai_analyses };
-    delete updatedAnalyses[key];
+    delete updatedAnalyses[keyToDelete];
 
     const updatedData: ArchiveData = {
       ...archiveData,
@@ -479,51 +665,40 @@ export const useArchiveViewerLogic = ({ archiveViewer, teacherProfile }: UseArch
     };
 
     setArchiveData(updatedData);
-    setAiAnalysisResult(null);
-    if (archiveViewer.activeTab === "AI_ANALYSIS") {
-      archiveViewer.setActiveTab("CLASS_ANALYSIS");
-    }
 
-    if (sourceType === "CLOUD" && currentCloudFilename) {
-      try {
-        const jsonString = JSON.stringify(updatedData);
-        const newFilename = await storageService.uploadArchive(
-          archiveData.exam.code,
-          jsonString,
-          {
-            school: archiveData.exam.authorSchool,
-            subject: archiveData.exam.config.subject,
-            classLevel: archiveData.exam.config.classLevel,
-            examType: archiveData.exam.config.examType,
-            targetClasses: archiveData.exam.config.targetClasses,
-            date: archiveData.exam.config.date,
-            participantCount: archiveData.results.length,
-            authorId: archiveData.exam.authorId,
-          }
-        );
-        if (newFilename !== currentCloudFilename) {
-          try {
-            await storageService.deleteArchive(currentCloudFilename);
-          } catch (delErr) {
-            console.warn("Failed to delete legacy archive on update", delErr);
-          }
-          if (archiveViewer.setCurrentCloudFilename) {
-            archiveViewer.setCurrentCloudFilename(newFilename);
-          }
-          if (archiveViewer.loadCloudList) {
-            archiveViewer.loadCloudList();
-          }
-        }
-      } catch (cloudSaveErr) {
-        console.warn("Failed to silently auto-save archive update on deletion:", cloudSaveErr);
+    const remainingKeys = Object.keys(updatedAnalyses);
+    if (remainingKeys.length > 0) {
+      setActiveAiSubTab(remainingKeys[0]);
+    } else {
+      setActiveAiSubTab("");
+      setAiAnalysisResult(null);
+      if (archiveViewer.activeTab === "AI_ANALYSIS") {
+        archiveViewer.setActiveTab("CLASS_ANALYSIS");
       }
     }
+
+    saveArchiveToCloudSilently(updatedData);
   };
 
   return {
     isGeneratingAI,
     aiProgressStatus,
+    aiProgressMessage,
     aiAnalysisResult,
+    activeAiSubTab,
+    setActiveAiSubTab,
+    isTargetModalOpen,
+    setIsTargetModalOpen,
+    isProgressModalOpen,
+    setIsProgressModalOpen,
+    analysisTargets,
+    aiQueue,
+    aiCurrentQueueIndex,
+    aiFailedItem,
+    handleOpenAiTargetModal,
+    handleStartBatchAiAnalysis,
+    handleResumeAiAnalysis,
+    handleFinishAiAnalysis,
     archiveViewer,
     sortedResults,
     uniqueSchools,
