@@ -146,8 +146,34 @@ export class ResultService {
 
                 let finalScore = rpcData.score;
                 let finalCorrect = rpcData.correct_answers;
+                let finalTotal = resultPayload.totalQuestions || rpcData.total_questions;
 
-                if (resultPayload.score !== undefined && resultPayload.score > finalScore) {
+                // Zero-Trust Server Verification: If completed, verify score using authoritative exam data from database
+                if (resultPayload.status === 'completed' || resultPayload.status === 'force_closed') {
+                    try {
+                        const { data: examData } = await supabase.from('exams').select('*').eq('code', resultPayload.examCode).maybeSingle();
+                        if (examData) {
+                            const fullExam = examData as Exam;
+                            const isOlympiad = !!fullExam.config?.isOlympiadMode;
+                            const authoritativeGrading = calculateExamScore(fullExam, resultPayload.answers || {});
+
+                            // If Olympiad mode or if authoritative calculation corrects RPC discrepancy
+                            if (isOlympiad || authoritativeGrading.score !== finalScore) {
+                                finalScore = authoritativeGrading.score;
+                                finalCorrect = authoritativeGrading.correctAnswers;
+                                finalTotal = authoritativeGrading.totalQuestions;
+
+                                await supabase.from('results').update({
+                                    score: finalScore,
+                                    correct_answers: finalCorrect,
+                                    total_questions: finalTotal
+                                }).eq('id', rpcData.id);
+                            }
+                        }
+                    } catch (verifyErr) {
+                        console.warn("Authoritative exam score verification failed, using RPC result:", verifyErr);
+                    }
+                } else if (resultPayload.score !== undefined && resultPayload.score > finalScore) {
                     finalScore = resultPayload.score;
                     finalCorrect = resultPayload.correctAnswers || finalCorrect;
 
@@ -167,7 +193,7 @@ export class ResultService {
                     },
                     score: finalScore,
                     correctAnswers: finalCorrect,
-                    totalQuestions: resultPayload.totalQuestions || rpcData.total_questions,
+                    totalQuestions: finalTotal,
                     status: rpcData.status,
                     completionTime: validCompletionTime,
                     isSynced: true
@@ -193,23 +219,23 @@ export class ResultService {
         let finalError;
         let newId = student.resultId;
 
-        // Auto-recalculate score securely if completed/force_closed and score is 0
-        let finalScore = resultPayload.score || 0;
+        // Auto-recalculate score securely from database if completed or force_closed (Zero Trust)
+        let finalScore = typeof resultPayload.score === 'number' && !isNaN(resultPayload.score) ? resultPayload.score : 0;
         let finalCorrect = resultPayload.correctAnswers || 0;
         let finalTotal = resultPayload.totalQuestions || 0;
 
-        if (finalScore === 0 && (resultPayload.status === 'completed' || resultPayload.status === 'force_closed')) {
+        if (resultPayload.status === 'completed' || resultPayload.status === 'force_closed') {
             try {
                 const { data: examData } = await supabase.from('exams').select('*').eq('code', resultPayload.examCode).maybeSingle();
                 if (examData) {
                     const exam = examData as Exam;
-                    const { score, correctAnswers, totalQuestions } = calculateExamScore(exam, resultPayload.answers || {});
-                    finalScore = score;
-                    finalCorrect = correctAnswers;
-                    finalTotal = totalQuestions;
+                    const authoritativeGrading = calculateExamScore(exam, resultPayload.answers || {});
+                    finalScore = authoritativeGrading.score;
+                    finalCorrect = authoritativeGrading.correctAnswers;
+                    finalTotal = authoritativeGrading.totalQuestions;
                 }
             } catch (err) {
-                console.error("Failed to recalculate score on submit", err);
+                console.error("Failed to recalculate authoritative score on submit", err);
             }
         }
 

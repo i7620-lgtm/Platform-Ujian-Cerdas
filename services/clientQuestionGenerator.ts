@@ -14,7 +14,7 @@
 import { GoogleGenAI } from "@google/genai";
 import { QuizConfig } from "../types";
 import { cleanGeneratedMathUnits } from "./geminiService";
-import { extractSmartCategory, stripPrefix, isAnswerMatch } from "../components/teacher/examUtils";
+import { extractSmartCategory, stripPrefix, isAnswerMatch, detectEducationalStage, parseList, normalize } from "../components/teacher/examUtils";
 
 let cachedApiKey: string | null = null;
 let keyFetchPromise: Promise<string | null> | null = null;
@@ -97,14 +97,15 @@ export async function generateSingleQuestionClientSide(
   const blueprint = config.blueprint?.trim() || "";
   const weight = config.scoreWeight && config.scoreWeight > 0 ? config.scoreWeight : 1;
 
-  const isHighSchool = (subject || '').toUpperCase().includes('SMA') || 
-                       (subject || '').toUpperCase().includes('SMK') ||
-                       (blueprint || '').toUpperCase().includes('SMA') ||
-                       (blueprint || '').toUpperCase().includes('SMK');
-  const targetOptionCount = isHighSchool ? 5 : 4;
+  // Deteksi jenjang/fase pendidikan pengguna (SD Awal, SD Akhir & SMP, SMA/SMK)
+  const stage = detectEducationalStage(config);
+  const targetOptionCount = stage.targetOptionCount;
+  const trueFalseRowCount = stage.trueFalseRowCount;
+  const matchingPairCount = stage.matchingPairCount;
+  const complexMinCorrect = stage.complexMinCorrect;
+  const complexMaxCorrect = stage.complexMaxCorrect;
 
   // Distribusi letak kunci jawaban seimbang merata:
-  // Butir 1 -> opsi ke-2 (B), Butir 2 -> opsi ke-3 (C), Butir 3 -> opsi ke-4 (D), Butir 4 -> opsi ke-1 (A)
   const targetKeyIndex = (questionNumber) % targetOptionCount;
   const targetKeyLetter = String.fromCharCode(65 + targetKeyIndex);
 
@@ -114,6 +115,7 @@ Buatlah TEPAT 1 BUTIR SOAL yang sangat kreatif, bermutu tinggi, dan kontekstual 
 
 PARAMETER BUTIR SOAL:
 - Nomor Butir: #${questionNumber} dari ${totalQuestions}
+- Jenjang Pendidikan / Fase: ${stage.stageLabel}
 - Mata Pelajaran / Rumpun: "${subject}"
 - Materi Pokok / Topik Riil: "${category}"
 - Bentuk Soal: "${assignedType}"
@@ -130,21 +132,42 @@ PEDOMAN FORMAT RUMUS MATEMATIKA & SAINS (KaTeX / LaTeX):
    - Bentuk akar: "$\\sqrt{144}$" atau "$\\sqrt{x^2 + y^2}$"
 2. PENTING (ESCAPE BACKSLASH): Karena Anda membalas dalam string JSON, selalu gunakan tanda garis miring ganda (double-backslash) untuk perintah LaTeX, contoh: "$\\frac{1}{2}$" bukan "$\frac{1}{2}$".
 
-ATURAN PILIHAN JAWABAN (PILIHAN GANDA):
-1. Buatlah ${targetOptionCount} opsi pilihan yang semuanya unik, bermakna substantif nyata, dan realistis (DILARANG opsi kembar, DILARANG hanya menulis huruf A/B/C/D, dan DILARANG menulis opsi generik seperti "Pilihan alternatif").
-2. DILARANG memberi awalan huruf "A.", "B.", "C.", atau "D." pada teks opsi karena antarmuka sistem telah menyertakan lingkaran huruf secara otomatis.
-3. DISTRIBUSI KUNCI JAWABAN: Untuk butir #${questionNumber} ini, tempatkan jawaban benar pada opsi ke-${targetKeyIndex + 1} (posisi huruf ${targetKeyLetter}).
-4. Field 'correctAnswer' WAJIB diisi teks jawaban benar tersebut secara lengkap dan persis sama dengan opsi ke-${targetKeyIndex + 1} (BUKAN sekadar menulis huruf "${targetKeyLetter}").
+ATURAN STRUKTUR PILIHAN & KUNCI JAWABAN (SESUAI BENTUK SOAL):
+1. Jika "${assignedType}" adalah "Pilihan Ganda":
+   - Buatlah ${targetOptionCount} opsi pilihan yang semuanya unik, bermakna substantif nyata, dan realistis (DILARANG opsi kembar).
+   - DILARANG memberi awalan huruf "A.", "B.", "C.", atau "D." pada teks opsi.
+   - DISTRIBUSI KUNCI JAWABAN: Untuk butir #${questionNumber} ini, tempatkan jawaban benar pada opsi ke-${targetKeyIndex + 1} (posisi huruf ${targetKeyLetter}).
+   - Field 'correctAnswer' WAJIB diisi teks jawaban benar tersebut secara lengkap dan persis sama dengan opsi ke-${targetKeyIndex + 1}.
+
+2. Jika "${assignedType}" adalah "Pilihan Ganda Kompleks":
+   - Jenjang: ${stage.stageLabel}.
+   - 'options': WAJIB berisi TEPAT ${targetOptionCount} opsi pernyataan substantif yang kaya konteks (DILARANG opsi kosong/dummy).
+   - 'correctAnswer': WAJIB memuat minimal ${complexMinCorrect} dan maksimal ${complexMaxCorrect} opsi yang benar (dipisahkan tanda "|||" atau format JSON array string).
+   - PERINGATAN KERAS: DILARANG HANYA 1 JAWABAN BENAR DAN DILARANG SEMUA OPSI BENAR! Jumlah jawaban benar wajib antara ${complexMinCorrect} dan ${complexMaxCorrect}.
+
+3. Jika "${assignedType}" adalah "Benar/Salah":
+   - Jenjang: ${stage.stageLabel}.
+   - 'trueFalseRows': WAJIB berisi array TEPAT ${trueFalseRowCount} baris pernyataan terstruktur:
+     [
+       { "text": "Pernyataan proposisi faktual/rumus 1", "answer": true },
+       ...
+     ]
+   - KESEIMBANGAN NILAI KEBENARAN: Nilai boolean 'answer' WAJIB bervariasi (DILARANG semua true dan DILARANG semua false; wajib memiliki minimal 1 Benar dan minimal 1 Salah).
+   - 'correctAnswer': ringkasan nilai kebenaran, contoh: "Pernyataan 1: Benar, Pernyataan 2: Salah".
+
+4. Jika "${assignedType}" adalah "Menjodohkan":
+   - Jenjang: ${stage.stageLabel}.
+   - 'matchingPairs': WAJIB berisi TEPAT ${matchingPairCount} pasang { "left": "konsep/pernyataan kiri", "right": "pasangan kanan yang cocok" } dengan relasi seimbang 1:1 tanpa ambigu.
+   - 'correctAnswer': daftar pasangan yang benar.
+
+5. Jika "${assignedType}" adalah "Isian Singkat":
+   - Berikan pertanyaan langsung dengan 'correctAnswer' bernilai pasti (angka/kata kunci).
+
+6. Jika "${assignedType}" adalah "Esai":
+   - Berikan rubrik penyelesaian lengkap di 'solutionSteps'.
 
 ATURAN PETUNJUK PENGERJAAN (HINT):
-- Field 'hint' WAJIB DIISI untuk butir ini! Berikan bimbingan konsep inti atau rumus pembimbing yang memandu siswa berpikir TANPA membocorkan kunci/jawaban akhir.
-
-ATURAN BENTUK SOAL LAINNYA:
-- Jika "${assignedType}" adalah "Pilihan Ganda", DILARANG menyertakan baris trueFalseRows atau matchingPairs.
-- Jika "${assignedType}" adalah "Benar/Salah", buat narasi stimulus dan 3 baris pernyataan di 'trueFalseRows' dengan teks bermakna dan nilai kebenaran boolean (true/false).
-- Jika "${assignedType}" adalah "Menjodohkan", buat 3-4 pasangan konsep di 'matchingPairs'.
-- Jika "${assignedType}" adalah "Isian Singkat", berikan pertanyaan langsung dengan 'correctAnswer' bernilai pasti.
-- Jika "${assignedType}" adalah "Esai", berikan rubrik penyelesaian lengkap di 'solutionSteps'.
+- Field 'hint' WAJIB DIISI! Berikan bimbingan konsep inti atau rumus pembimbing yang memandu siswa berpikir TANPA membocorkan kunci/jawaban akhir.
 
 Balas HANYA berupa JSON Array berisi tepat 1 objek dengan struktur:
 [
@@ -200,18 +223,17 @@ Balas HANYA berupa JSON Array berisi tepat 1 objek dengan struktur:
           parsed.hint = `Pahami konsep inti ${category} dan gunakan rumus dasar yang sesuai untuk menelaah stimulus secara runtut.`;
         }
 
-        // Khusus Pilihan Ganda: bersihkan awalan huruf dan posisikan kunci jawaban pada targetKeyIndex
         const rawType = (assignedType || "").toLowerCase();
+
+        // 1. KHUSUS PILIHAN GANDA (MULTIPLE_CHOICE)
         if (rawType.includes("pilihan ganda") && !rawType.includes("kompleks")) {
           parsed.questionType = "MULTIPLE_CHOICE";
           delete parsed.trueFalseRows;
           delete parsed.matchingPairs;
 
           let rawOpts = Array.isArray(parsed.options) ? parsed.options : [];
-          // Bersihkan awalan A., B., C., dll dari setiap opsi
           rawOpts = rawOpts.map((opt: string) => stripPrefix(cleanGeneratedMathUnits(opt || "")).trim()).filter(Boolean);
 
-          // Hapus opsi kembar
           const uniqueOpts: string[] = [];
           for (const opt of rawOpts) {
             if (!uniqueOpts.some(u => isAnswerMatch(u, opt, "MULTIPLE_CHOICE"))) {
@@ -219,7 +241,6 @@ Balas HANYA berupa JSON Array berisi tepat 1 objek dengan struktur:
             }
           }
 
-          // Pastikan jumlah opsi mencukupi
           while (uniqueOpts.length < targetOptionCount) {
             uniqueOpts.push(`Alternatif nilai pembanding ${uniqueOpts.length + 1}`);
           }
@@ -227,10 +248,8 @@ Balas HANYA berupa JSON Array berisi tepat 1 objek dengan struktur:
           let finalAnswer = cleanGeneratedMathUnits(parsed.correctAnswer || "");
           finalAnswer = stripPrefix(finalAnswer).trim();
 
-          // Cari apakah jawaban benar cocok dengan salah satu opsi
           let matchedIdx = uniqueOpts.findIndex(opt => isAnswerMatch(finalAnswer, opt, "MULTIPLE_CHOICE"));
 
-          // Jika jawaban AI berupa huruf A/B/C/D
           if (matchedIdx === -1 && /^[A-E]$/i.test(finalAnswer)) {
             const letterIdx = finalAnswer.toUpperCase().charCodeAt(0) - 65;
             if (letterIdx >= 0 && letterIdx < uniqueOpts.length) {
@@ -244,7 +263,6 @@ Balas HANYA berupa JSON Array berisi tepat 1 objek dengan struktur:
             finalAnswer = uniqueOpts[0];
           }
 
-          // Pindahkan kunci jawaban ke targetKeyIndex agar terdistribusi seimbang merata
           if (matchedIdx !== targetKeyIndex && targetKeyIndex < uniqueOpts.length) {
             const temp = uniqueOpts[targetKeyIndex];
             uniqueOpts[targetKeyIndex] = uniqueOpts[matchedIdx];
@@ -253,6 +271,125 @@ Balas HANYA berupa JSON Array berisi tepat 1 objek dengan struktur:
 
           parsed.options = uniqueOpts.slice(0, targetOptionCount);
           parsed.correctAnswer = parsed.options[targetKeyIndex];
+        }
+
+        // 2. KHUSUS PILIHAN GANDA KOMPLEKS (COMPLEX_MULTIPLE_CHOICE)
+        else if (rawType.includes("kompleks")) {
+          parsed.questionType = "COMPLEX_MULTIPLE_CHOICE";
+          delete parsed.trueFalseRows;
+          delete parsed.matchingPairs;
+
+          let rawOpts = Array.isArray(parsed.options) ? parsed.options : [];
+          rawOpts = rawOpts.map((opt: string) => stripPrefix(cleanGeneratedMathUnits(opt || "")).trim()).filter(Boolean);
+
+          const uniqueOpts: string[] = [];
+          for (const opt of rawOpts) {
+            if (!uniqueOpts.some(u => isAnswerMatch(u, opt, "COMPLEX_MULTIPLE_CHOICE"))) {
+              uniqueOpts.push(opt);
+            }
+          }
+
+          // Pastikan jumlah opsi tepat targetOptionCount
+          while (uniqueOpts.length < targetOptionCount) {
+            uniqueOpts.push(`Pernyataan pendukung tambahan ${uniqueOpts.length + 1} terkait ${category}`);
+          }
+          parsed.options = uniqueOpts.slice(0, targetOptionCount);
+
+          // Parse kunci jawaban kompleks
+          const rawAnswer = parsed.correctAnswer;
+          const parsedAnswers = parseList(typeof rawAnswer === "string" ? rawAnswer : JSON.stringify(rawAnswer), parsed.options);
+          
+          let mappedAnswers: string[] = [];
+          for (const ans of parsedAnswers) {
+            const cleanedAns = stripPrefix(cleanGeneratedMathUnits(ans || "")).trim();
+            const matched = parsed.options.find((opt: string) => isAnswerMatch(cleanedAns, opt, "COMPLEX_MULTIPLE_CHOICE"));
+            if (matched && !mappedAnswers.includes(matched)) {
+              mappedAnswers.push(matched);
+            }
+          }
+
+          // Validasi batas minimal 2 benar dan maksimal targetOptionCount - 1
+          if (mappedAnswers.length < complexMinCorrect) {
+            for (const opt of parsed.options) {
+              if (!mappedAnswers.includes(opt)) {
+                mappedAnswers.push(opt);
+                if (mappedAnswers.length >= complexMinCorrect) break;
+              }
+            }
+          }
+
+          if (mappedAnswers.length > complexMaxCorrect) {
+            mappedAnswers = mappedAnswers.slice(0, complexMaxCorrect);
+          }
+
+          parsed.correctAnswer = JSON.stringify(mappedAnswers);
+        }
+
+        // 3. KHUSUS BENAR / SALAH (TRUE_FALSE)
+        else if (rawType.includes("benar") || rawType.includes("salah") || rawType.includes("true_false")) {
+          parsed.questionType = "TRUE_FALSE";
+          parsed.options = undefined;
+          delete parsed.matchingPairs;
+
+          let rawRows: { text: string; answer: boolean }[] = Array.isArray(parsed.trueFalseRows) ? parsed.trueFalseRows : [];
+
+          // Sesuaikan jumlah baris pernyataan ke trueFalseRowCount
+          while (rawRows.length < trueFalseRowCount) {
+            const idx = rawRows.length + 1;
+            rawRows.push({
+              text: `Pernyataan nomor ${idx} terkait ${category} sesuai dengan prinsip dan formula yang berlaku.`,
+              answer: idx % 2 === 1
+            });
+          }
+          rawRows = rawRows.slice(0, trueFalseRowCount);
+
+          // Bersihkan teks pernyataan dan pastikan tipe boolean
+          const cleanedRows = rawRows.map(r => ({
+            text: cleanGeneratedMathUnits(r.text || ""),
+            answer: typeof r.answer === "string" 
+              ? (r.answer as string).toLowerCase().includes("benar") || (r.answer as string).toLowerCase().includes("true") || (r.answer as string) === "1"
+              : Boolean(r.answer)
+          }));
+
+          // KESEIMBANGAN BOOLEAN: Dilarang semua true atau semua false
+          const allTrue = cleanedRows.every(r => r.answer === true);
+          const allFalse = cleanedRows.every(r => r.answer === false);
+          if (allTrue && cleanedRows.length > 1) {
+            cleanedRows[cleanedRows.length - 1].answer = false;
+          } else if (allFalse && cleanedRows.length > 1) {
+            cleanedRows[0].answer = true;
+          }
+
+          parsed.trueFalseRows = cleanedRows;
+          parsed.correctAnswer = cleanedRows
+            .map((r, i) => `Pernyataan ${i + 1}: ${r.answer ? 'Benar' : 'Salah'}`)
+            .join(", ");
+        }
+
+        // 4. KHUSUS MENJODOHKAN (MATCHING)
+        else if (rawType.includes("jodoh") || rawType.includes("matching")) {
+          parsed.questionType = "MATCHING";
+          parsed.options = undefined;
+          delete parsed.trueFalseRows;
+
+          let rawPairs: { left: string; right: string }[] = Array.isArray(parsed.matchingPairs) ? parsed.matchingPairs : [];
+
+          while (rawPairs.length < matchingPairCount) {
+            const idx = rawPairs.length + 1;
+            rawPairs.push({
+              left: `Konsep Istilah ${idx} (${category})`,
+              right: `Deskripsi Penjelasan ${idx} yang sesuai`
+            });
+          }
+          rawPairs = rawPairs.slice(0, matchingPairCount);
+
+          const cleanedPairs = rawPairs.map(p => ({
+            left: cleanGeneratedMathUnits(p.left || ""),
+            right: cleanGeneratedMathUnits(p.right || "")
+          }));
+
+          parsed.matchingPairs = cleanedPairs;
+          parsed.correctAnswer = cleanedPairs.map(p => `${p.left} -> ${p.right}`).join(", ");
         }
 
         return parsed;

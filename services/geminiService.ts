@@ -1,6 +1,6 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { Question, QuizConfig, QuestionType, ChartData } from "../types";
-import { markdownToHtml, htmlToMarkdown, normalize, parseList, isAnswerMatch, extractSmartCategory, stripPrefix } from "../components/teacher/examUtils";
+import { markdownToHtml, htmlToMarkdown, normalize, parseList, isAnswerMatch, extractSmartCategory, stripPrefix, detectEducationalStage } from "../components/teacher/examUtils";
 import { generateGeometrySVG, extractNum, parseGeometryLabels } from "../components/teacher/geometryUtils";
 import { generateEducationalSvg, svgToDataUrl } from "./svgGeneratorService";
 import { generateContextualEducationalSvg } from "./smartSvgTemplates";
@@ -351,8 +351,8 @@ export async function generateQuestions(
          * 'correctAnswer': WAJIB berisi 1 jawaban benar yang teksnya persis sama dengan salah satu teks di 'options'. Acak letak jawaban benar agar variatif (tidak selalu opsi pertama).
       2. Pilihan Ganda Kompleks (PGK MCMA):
          * 'questionText': Hanya stimulus & instruksi (contoh: "Berdasarkan stimulus di atas, pilihlah semua pernyataan yang benar!"). DILARANG menulis daftar butir (1), (2), (3) di dalam 'questionText'!
-         * 'options': WAJIB berisi 3-5 butir opsi pernyataan LENGKAP dengan nilai/angka dan satuan matematis. DILARANG KERAS membuat opsi gantung yang tidak selesai (contoh SALAH: "Volume tabung tangki tersebut adalah "). Contoh opsi BENAR: "Volume tabung bagian bawah adalah $1.540\\text{ cm}^3$", "Volume kerucut bagian atas adalah $308\\text{ cm}^3$", "Volume total seluruh tangki adalah $1.848\\text{ cm}^3$".
-         * 'correctAnswer': WAJIB berisi semua opsi yang benar, dipisahkan dengan tanda "|||" (contoh: "Opsi 1|||Opsi 3").
+         * 'options': WAJIB berisi opsi pernyataan lengkap substantif (3 opsi untuk SD Awal, 4 opsi untuk SD Akhir/SMP, atau 5 opsi untuk SMA/SMK). DILARANG KERAS membuat opsi gantung yang tidak selesai.
+         * 'correctAnswer': WAJIB berisi minimal 2 dan maksimal (jumlah opsi - 1) opsi yang benar, dipisahkan dengan tanda "|||" (contoh: "Opsi 1|||Opsi 3"). DILARANG HANYA 1 BENAR DAN DILARANG SEMUA OPSI BENAR!
       3. Benar/Salah (PGK Kategori - WAJIB memuat angka dan satuan lengkap pada setiap baris):
          * 'questionText': Hanya narasi stimulus masalah dan pengantar (contoh: "Perhatikan stimulus berikut! Tentukan nilai kebenaran/kesesuaian dari setiap pernyataan berikut.").
          * DILARANG KERAS menuliskan daftar butir "1. ...", "2. ...", "3. ..." di dalam 'questionText'!
@@ -364,19 +364,12 @@ export async function generateQuestions(
            - Penilaian Ketepatan: ["Tepat", "Tidak Tepat"]
            - Analisis Fakta/Opini: ["Fakta", "Opini"]
            - Sains / Matematika Fakta Baku: ["Benar", "Salah"] (Default)
-         * 'trueFalseRows': WAJIB berisi array 3 baris pernyataan matematis/faktual lengkap dan spesifik dengan klaim angka dan satuan utuh.
-           Contoh format yang WAJIB dipatuhi:
-           [
-             { "text": "Volume tabung bagian bawah adalah $1.540\\text{ cm}^3$.", "answer": true },
-             { "text": "Volume kerucut bagian atas adalah $308\\text{ cm}^3$.", "answer": true },
-             { "text": "Volume total seluruh bangun adalah $2.400\\text{ cm}^3$.", "answer": false }
-           ]
-         * DILARANG KERAS hanya menuliskan nama besaran atau kalimat gantung seperti "Volume bangun adalah " atau "Tinggi bangun adalah "! Seluruh pernyataan harus berupa kalimat proposisi utuh yang dapat dinilai Benar/Salah atau Sesuai/Tidak Sesuai.
-         * Setiap pernyataan WAJIB memiliki nilai kebenaran pasti (boolean 'answer': true untuk label pertama, false untuk label kedua).
+         * 'trueFalseRows': WAJIB berisi array baris pernyataan matematis/faktual lengkap (2 baris untuk SD Awal, 3 baris untuk SD Akhir/SMP, atau 4 baris untuk SMA/SMK).
+         * KESEIMBANGAN NILAI KEBENARAN: Nilai boolean 'answer' WAJIB bervariasi (DILARANG semua true dan DILARANG semua false; wajib memiliki minimal 1 Benar dan minimal 1 Salah).
          * 'correctAnswer': WAJIB berisi ringkasan nilai pasti (contoh jika categoryLabels ["Sesuai", "Tidak Sesuai"]: "Pernyataan 1: Sesuai, Pernyataan 2: Sesuai, Pernyataan 3: Tidak Sesuai"; atau jika ["Benar", "Salah"]: "Pernyataan 1: Benar, Pernyataan 2: Benar, Pernyataan 3: Salah").
       4. Menjodohkan:
          * 'questionText': Hanya stimulus dan kalimat instruksi menjodohkan. DILARANG membuat tabel daftar jodoh di dalam 'questionText'!
-         * 'matchingPairs': WAJIB berisi array 3-5 pasangan { "left": "item kiri", "right": "pasangan kanan yang cocok dengan nilai/deskripsi lengkap" }.
+         * 'matchingPairs': WAJIB berisi tepat 3 pasang (SD & SMP) atau 4 pasang (SMA/SMK) pasangan { "left": "item kiri", "right": "pasangan kanan yang cocok dengan nilai/deskripsi lengkap" } dengan relasi seimbang 1:1 tanpa ambigu.
          * 'correctAnswer': WAJIB berisi daftar pasangan yang benar.
       5. Uraian Singkat / Isian:
          * 'correctAnswer': WAJIB berisi jawaban pasti / angka hasil perhitungan yang presisi (contoh: "$1.152\\text{ cm}^3$"). DILARANG KOSONG!
@@ -617,6 +610,13 @@ export async function generateQuestions(
   };
 
   async function generateSingleBatch(startIndex: number, batchCount: number): Promise<Question[]> {
+    const stage = detectEducationalStage(config);
+    const targetOptionCount = stage.targetOptionCount;
+    const trueFalseRowCount = stage.trueFalseRowCount;
+    const matchingPairCount = stage.matchingPairCount;
+    const complexMinCorrect = stage.complexMinCorrect;
+    const complexMaxCorrect = stage.complexMaxCorrect;
+
     const slotDistribution: string[] = [];
     for (let i = 0; i < batchCount; i++) {
       const globalIndex = startIndex + i;
@@ -643,6 +643,7 @@ export async function generateQuestions(
       DILARANG membuat soal tentang topik/materi/konteks acak lain yang tidak diminta!
       
       TARGET PARAMETER WAJIB DARI PENGGUNA:
+      - JENJANG PENDIDIKAN / FASE: ${stage.stageLabel}
       - MATA PELAJARAN / MATERI: "${config.subject}"
       ${userCategoryConstraint ? `- KATEGORI MATERI / SUB-TOPIK (MUTLAK WAJIB): "${userCategoryConstraint}"` : ''}
       - TINGKAT KOGNITIF & BENTUK SOAL: Sesuai TABEL DISTRIBUSI di bawah (WAJIB dipatuhi persis).
@@ -689,29 +690,25 @@ export async function generateQuestions(
       1. Untuk soal berjenis "Pilihan Ganda":
          - 'questionType': "Pilihan Ganda"
          - 'questionText': Hanya stimulus masalah & kalimat tanya. DILARANG memuat A. ..., B. ... di sini!
-         - 'options': WAJIB berisi 4 opsi jawaban lengkap (atau 5 opsi jika SMA) berupa 1 kunci benar + 3-4 pengecoh (distraktor) logis, homogen, dan sepadan dengan materi. DILARANG KOSONG dan DILARANG MENGGUNAKAN TEKS DUMMY/ALTERNATIF!
+         - 'options': WAJIB berisi tepat ${targetOptionCount} opsi jawaban lengkap berupa 1 kunci benar + ${targetOptionCount - 1} pengecoh (distraktor) logis, homogen, dan sepadan dengan materi. DILARANG KOSONG dan DILARANG MENGGUNAKAN TEKS DUMMY/ALTERNATIF!
          - 'correctAnswer': WAJIB berisi 1 jawaban benar yang teksnya persis sama dengan salah satu opsi.
          - PENTING: Acak letak jawaban benar agar variatif (tidak selalu opsi pertama/A).
       2. Untuk soal berjenis "Pilihan Ganda Kompleks":
          - 'questionType': "Pilihan Ganda Kompleks"
          - 'questionText': Hanya stimulus & kalimat instruksi memilih jawaban yang benar.
-         - 'options': WAJIB berisi 3-5 opsi pernyataan. DILARANG KOSONG!
-         - 'correctAnswer': WAJIB berisi semua opsi yang benar, dipisahkan dengan tanda "|||" (contoh: "Opsi 1|||Opsi 3").
+         - 'options': WAJIB berisi TEPAT ${targetOptionCount} opsi pernyataan substantif nyata (${stage.stageLabel}). DILARANG KOSONG, DILARANG OPSI KEMBAR!
+         - 'correctAnswer': WAJIB memuat minimal ${complexMinCorrect} dan maksimal ${complexMaxCorrect} opsi yang benar (${stage.isEarlyElementary ? 'tepat 2 benar' : `antara ${complexMinCorrect} sampai ${complexMaxCorrect} benar`}), dipisahkan tanda "|||" (contoh: "Opsi 1|||Opsi 3").
+         - PERINGATAN MUTLAK: DILARANG HANYA 1 JAWABAN BENAR DAN DILARANG SEMUA OPSI BENAR!
       3. Untuk soal berjenis "Benar/Salah":
          - 'questionType': "Benar/Salah"
          - 'questionText': Hanya stimulus konteks/pengantar. DILARANG menulis daftar pernyataan di questionText!
-         - 'trueFalseRows': WAJIB berisi array 3 baris pernyataan matematis/faktual lengkap dan bermakna:
-           [
-             { "text": "Pernyataan proposisi faktual/rumus spesifik 1", "answer": true/false },
-             { "text": "Pernyataan proposisi faktual/rumus spesifik 2", "answer": true/false },
-             { "text": "Pernyataan proposisi faktual/rumus spesifik 3", "answer": true/false }
-           ]
-           DILARANG KOSONG dan DILARANG MENGGUNAKAN TEKS PLACEHOLDER UMUM!
-         - 'correctAnswer': WAJIB berisi ringkasan nilai kebenaran pasti (contoh: "Pernyataan 1: Benar, Pernyataan 2: Salah, Pernyataan 3: Benar").
+         - 'trueFalseRows': WAJIB berisi array TEPAT ${trueFalseRowCount} baris pernyataan matematis/faktual lengkap dan bermakna (${stage.stageLabel}).
+         - KESEIMBANGAN NILAI KEBENARAN: Nilai boolean 'answer' WAJIB bervariasi (DILARANG semua true dan DILARANG semua false; wajib minimal ada 1 Benar dan minimal ada 1 Salah).
+         - 'correctAnswer': WAJIB berisi ringkasan nilai kebenaran pasti (contoh: "Pernyataan 1: Benar, Pernyataan 2: Salah").
       4. Untuk soal berjenis "Menjodohkan":
          - 'questionType': "Menjodohkan"
          - 'questionText': Hanya stimulus dan kalimat perintah menjodohkan.
-         - 'matchingPairs': WAJIB berisi array 3-5 pasangan { "left": "item/pernyataan kiri", "right": "pasangan kanan yang cocok" }. DILARANG KOSONG!
+         - 'matchingPairs': WAJIB berisi array TEPAT ${matchingPairCount} pasang { "left": "item/pernyataan kiri", "right": "pasangan kanan yang cocok" } dengan relasi seimbang 1:1 (${stage.stageLabel}). DILARANG KOSONG!
          - 'correctAnswer': WAJIB berisi daftar pasangan yang benar.
       5. Untuk soal berjenis "Uraian Singkat":
          - 'questionType': "Uraian Singkat"
@@ -1517,6 +1514,14 @@ export async function generateQuestions(
                 options = validOptions;
             }
 
+            // Sesuaikan jumlah opsi dengan targetOptionCount jenjang (3 SD awal, 4 SD akhir/SMP, 5 SMA)
+            while (options.length < targetOptionCount) {
+                options.push(formatContent(`Pernyataan pendukung nomor ${options.length + 1} terkait ${config.subject}`));
+            }
+            if (options.length > targetOptionCount) {
+                options = options.slice(0, targetOptionCount);
+            }
+
             const splitAnswers = parseList(correctAnswer);
             const mappedAnswers = splitAnswers.map(ans => {
                 const htmlAns = formatContent(ans, !!q.correctAnswerChart);
@@ -1543,8 +1548,19 @@ export async function generateQuestions(
             });
 
             let uniqueAnswers = Array.from(new Set(mappedAnswers)).filter(Boolean);
-            if (uniqueAnswers.length === 0 && options && options.length > 0) {
-                uniqueAnswers = [options[0]];
+
+            // Validasi deterministik: minimal complexMinCorrect (2) dan maksimal complexMaxCorrect (jumlah opsi - 1)
+            if (uniqueAnswers.length < complexMinCorrect) {
+                for (const opt of options) {
+                    if (!uniqueAnswers.includes(opt)) {
+                        uniqueAnswers.push(opt);
+                        if (uniqueAnswers.length >= complexMinCorrect) break;
+                    }
+                }
+            }
+
+            if (uniqueAnswers.length > complexMaxCorrect) {
+                uniqueAnswers = uniqueAnswers.slice(0, complexMaxCorrect);
             }
             correctAnswer = JSON.stringify(uniqueAnswers);
         } else if (currentQuestionType === 'TRUE_FALSE') {
@@ -1618,13 +1634,26 @@ export async function generateQuestions(
             const trueLabel = (mappedQ.categoryLabels && mappedQ.categoryLabels[0]) || 'Benar';
             const falseLabel = (mappedQ.categoryLabels && mappedQ.categoryLabels[1]) || 'Salah';
 
-            const rawRows = (q.trueFalseRows && q.trueFalseRows.length > 0)
-                ? q.trueFalseRows
+            let rawRows = (q.trueFalseRows && q.trueFalseRows.length > 0)
+                ? [...q.trueFalseRows]
                 : [
                     { text: `Hasil perhitungan besaran pada stimulus memenuhi persamaan dan rumus yang berlaku.`, answer: true },
                     { text: `Nilai variabel berbanding terbalik terhadap parameter utama dalam pengujian.`, answer: false },
-                    { text: `Kesimpulan matematis yang diperoleh konsisten dengan data pada stimulus.`, answer: true }
+                    { text: `Kesimpulan matematis yang diperoleh konsisten dengan data pada stimulus.`, answer: true },
+                    { text: `Korelasi antara dua indikator menunjukkan konsistensi dengan teori yang relevan.`, answer: false }
                 ];
+
+            // Sesuaikan jumlah baris ke trueFalseRowCount jenjang
+            while (rawRows.length < trueFalseRowCount) {
+                const idx = rawRows.length + 1;
+                rawRows.push({
+                    text: `Pernyataan nomor ${idx} terkait ${mappedQ.category} sesuai dengan prinsip dan formula yang berlaku.`,
+                    answer: idx % 2 === 1
+                });
+            }
+            if (rawRows.length > trueFalseRowCount) {
+                rawRows = rawRows.slice(0, trueFalseRowCount);
+            }
 
             const boolSeq = parseBooleanSequence(String(q.correctAnswer || ''), rawRows.length);
 
@@ -1656,6 +1685,15 @@ export async function generateQuestions(
                 };
             });
 
+            // KESEIMBANGAN BOOLEAN: Dilarang semua true atau semua false
+            const allTrue = mappedQ.trueFalseRows.every(r => r.answer === true);
+            const allFalse = mappedQ.trueFalseRows.every(r => r.answer === false);
+            if (allTrue && mappedQ.trueFalseRows.length > 1) {
+                mappedQ.trueFalseRows[mappedQ.trueFalseRows.length - 1].answer = false;
+            } else if (allFalse && mappedQ.trueFalseRows.length > 1) {
+                mappedQ.trueFalseRows[0].answer = true;
+            }
+
             // Kunci jawaban pasti untuk Benar/Salah selalu terstruktur ringkas dan pasti
             mappedQ.correctAnswer = mappedQ.trueFalseRows
                 .map((r, i) => `Pernyataan ${i + 1}: ${r.answer ? trueLabel : falseLabel}`)
@@ -1663,22 +1701,27 @@ export async function generateQuestions(
         }
 
         if (currentQuestionType === 'MATCHING') {
-            if (q.matchingPairs && q.matchingPairs.length > 0) {
-                mappedQ.matchingPairs = q.matchingPairs.map((p: { left: string; right: string; leftChart?: ChartData; rightChart?: ChartData }) => ({
-                    left: formatContent(p.left || '', !!p.leftChart),
-                    right: formatContent(p.right || '', !!p.rightChart),
-                    leftChart: p.leftChart,
-                    rightChart: p.rightChart
-                }));
-                mappedQ.correctAnswer = mappedQ.matchingPairs.map(p => `${p.left} -> ${p.right}`).join(', ');
-            } else {
-                mappedQ.matchingPairs = [
-                    { left: markdownToHtml('Konsep/Istilah 1'), right: markdownToHtml('Deskripsi/Pasangan 1') },
-                    { left: markdownToHtml('Konsep/Istilah 2'), right: markdownToHtml('Deskripsi/Pasangan 2') },
-                    { left: markdownToHtml('Konsep/Istilah 3'), right: markdownToHtml('Deskripsi/Pasangan 3') }
-                ];
-                mappedQ.correctAnswer = "Konsep/Istilah 1 -> Deskripsi/Pasangan 1, Konsep/Istilah 2 -> Deskripsi/Pasangan 2, Konsep/Istilah 3 -> Deskripsi/Pasangan 3";
+            let rawPairs = (q.matchingPairs && q.matchingPairs.length > 0) ? [...q.matchingPairs] : [];
+
+            // Sesuaikan kuota pasangan 1:1 ke matchingPairCount (3 untuk SD & SMP, 4 untuk SMA)
+            while (rawPairs.length < matchingPairCount) {
+                const idx = rawPairs.length + 1;
+                rawPairs.push({
+                    left: `Konsep / Istilah ${idx} (${mappedQ.category})`,
+                    right: `Deskripsi Penjelasan ${idx} yang sesuai`
+                });
             }
+            if (rawPairs.length > matchingPairCount) {
+                rawPairs = rawPairs.slice(0, matchingPairCount);
+            }
+
+            mappedQ.matchingPairs = rawPairs.map((p: { left: string; right: string; leftChart?: ChartData; rightChart?: ChartData }) => ({
+                left: formatContent(p.left || '', !!p.leftChart),
+                right: formatContent(p.right || '', !!p.rightChart),
+                leftChart: p.leftChart,
+                rightChart: p.rightChart
+            }));
+            mappedQ.correctAnswer = mappedQ.matchingPairs.map(p => `${p.left} -> ${p.right}`).join(', ');
         }
         
         return mappedQ;
