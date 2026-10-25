@@ -43,6 +43,7 @@ export const FinishedExamModal: React.FC<FinishedExamModalProps> = ({
     levelStats,
     questionTypeStats,
     questionStats,
+    olympiadMedalDistribution,
     setActiveTab,
     setSelectedClass,
     handleUpdateKey,
@@ -125,6 +126,7 @@ export const FinishedExamModal: React.FC<FinishedExamModalProps> = ({
               questionTypeStats={questionTypeStats}
               questionStats={questionStats}
               handleUpdateKey={handleUpdateKey}
+              olympiadMedalDistribution={olympiadMedalDistribution}
             />
           ) : (
             <FinishedStudentsTab
