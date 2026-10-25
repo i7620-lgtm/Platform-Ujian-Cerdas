@@ -1,4 +1,6 @@
 import { Exam, Question, ChartData } from "../../types";
+import { renderMathInHtml } from "../../utils/mathRenderer";
+import { sanitizeHtml } from "./examUtils";
 
 export const normalizeQuestion = (q: any): any => {
   if (!q) {
@@ -333,173 +335,278 @@ export const generateBookHtml = ({
     );
   };
 
+  const shouldRenderTwoColumns = (options?: string[]): boolean => {
+    if (!options || options.length <= 1) return false;
+    return options.every((opt) => {
+      if (!opt) return true;
+      const plain = opt.replace(/<[^>]*>/g, "").trim();
+      return plain.length <= 32;
+    });
+  };
+
+  const isInfoItem = (q: any): boolean => {
+    if (!q) return false;
+    const t = (q.questionType || q.type || "").toString().trim().toUpperCase();
+    return t === "INFO" || t === "KETERANGAN" || t === "INFORMASI";
+  };
+
+  const formatQuestionHtml = (rawHtml: string): string => {
+    if (!rawHtml) return "";
+    const sanitized = sanitizeHtml(rawHtml);
+    return renderMathInHtml(sanitized);
+  };
+
   let questionsHtmlStr = "";
   selectedExams.forEach((exam, examIndex) => {
+    const actualExamQuestionsCount = exam.questions.filter(
+      (item) => !isInfoItem(item),
+    ).length;
     questionsHtmlStr += '<div class="page-container-flow">';
     questionsHtmlStr += `
-            <div class="printable-item exam-header" style="page-break-after: avoid; break-after: avoid;">
-                <div class="border-b-4 border-black pb-3 mb-6 flex justify-between items-end font-sans" style="display: flex; justify-content: space-between; align-items: flex-end; border-bottom: 4px solid black; padding-bottom: 8px; margin-bottom: 16px; margin-top: 16px;">
+            <div class="printable-item exam-header" style="page-break-after: avoid; break-after: avoid; margin-top: 6px; margin-bottom: 14px;">
+                <div style="display: flex; justify-content: space-between; align-items: flex-end; border-bottom: 2px solid #000; padding-bottom: 6px; margin-bottom: 12px;">
                     <div>
-                        <p style="font-size: 10px; font-weight: 900; text-transform: uppercase; color: #64748b; letter-spacing: 0.12em; margin: 0 0 3px 0;">MATA PELAJARAN - MODUL ${examIndex + 1}</p>
-                        <h2 style="margin: 0; font-size: 20px; font-weight: 900; text-transform: uppercase;">${exam.config.subject || "Kisi-Kisi"}</h2>
+                        <p style="font-size: 8.5pt; font-weight: bold; text-transform: uppercase; color: #475569; letter-spacing: 0.1em; margin: 0 0 2px 0;">
+                            MODUL ${examIndex + 1} &bull; ${exam.authorSchool || "UJIAN SEKOLAH / ASESMEN"}
+                        </p>
+                        <h2 style="margin: 0; font-size: 13pt; font-weight: 900; text-transform: uppercase; color: #000;">
+                            ${exam.config?.examType ? `${exam.config.examType} - ` : ""}${exam.config?.subject || "Mata Pelajaran"}
+                        </h2>
                     </div>
-                    <div style="background-color: black; color: white; padding: 4px 10px; font-size: 11px; font-weight: 800; text-transform: uppercase; display: inline-block; line-height: 1.2; box-sizing: border-box; vertical-align: middle; text-align: center;">Materi Soal</div>
+                    <div style="text-align: right; font-size: 8.5pt; color: #334155; line-height: 1.35;">
+                        <div><span style="font-weight: bold;">Kelas:</span> ${exam.config?.classLevel || "-"} &bull; <span style="font-weight: bold;">Waktu:</span> ${exam.config?.timeLimit ? `${exam.config.timeLimit} Menit` : "-"}</div>
+                        <div><span style="font-weight: bold;">Jumlah Soal:</span> ${actualExamQuestionsCount} Butir (${exam.code})</div>
+                    </div>
                 </div>
             </div>
         `;
 
     exam.questions.forEach((q, qIdx) => {
-      const originalIndex = qIdx + 1;
-      let cleanedText = q.questionText || "";
+      const isInfo = isInfoItem(q);
+      const questionNumber =
+        exam.questions
+          .slice(0, qIdx)
+          .filter((item) => !isInfoItem(item)).length + 1;
+
+      let cleanedText = formatQuestionHtml(q.questionText || "");
       cleanedText = injectChart(q.chartData, cleanedText);
 
       const qFontSize =
         fontSize === "small"
-          ? "10.5pt"
+          ? "10pt"
           : fontSize === "large"
-            ? "12.5pt"
-            : "11.5pt";
+            ? "12pt"
+            : "11pt";
       const qLineHeight =
         lineSpacing === "tight"
           ? "1.35"
           : lineSpacing === "relaxed"
-            ? "1.8"
-            : "1.55";
+            ? "1.75"
+            : "1.5";
+      const optFontSize =
+        fontSize === "small"
+          ? "9.5pt"
+          : fontSize === "large"
+            ? "11.5pt"
+            : "10.5pt";
+
+      if (isInfo) {
+        questionsHtmlStr += `
+            <div class="printable-item info-part avoid-break" style="background-color: #eff6ff; border: 1px solid #bfdbfe; border-left: 4px solid #2563eb; border-radius: 6px; padding: 10px 14px; margin-bottom: 14px;">
+                <div class="html-content" style="font-size: ${qFontSize}; line-height: ${qLineHeight}; color: #0f172a; text-align: justify;">
+                    ${cleanedText}
+                </div>
+                ${
+                  q.imageUrl
+                    ? `
+                    <div style="margin-top: 8px; margin-bottom: 8px; max-width: 80%;">
+                        <img src="${q.imageUrl}" style="max-height: 180px; object-fit: contain; display: block; border-radius: 4px; border: 1px solid #cbd5e1;" referrerPolicy="no-referrer" />
+                    </div>
+                `
+                    : ""
+                }
+                ${
+                  q.audioUrl
+                    ? `
+                    <div style="margin-top: 6px; font-size: 8.5pt; color: #475569;">
+                        <strong>[Audio Stimulus]:</strong> ${q.audioUrl}
+                    </div>
+                `
+                    : ""
+                }
+            </div>
+        `;
+        return;
+      }
 
       questionsHtmlStr += `
-                <div class="printable-item question-part" style="page-break-inside: auto; break-inside: auto; margin-bottom: 16px;">
-                    <div class="question-container bg-white text-black">
-                        <div style="display: flex; gap: 12px;">
-                            <div style="font-weight: 955; font-size: 16px; min-width: 24px;">${originalIndex}.</div>
-                            <div style="flex: 1; font-size: ${qFontSize}; line-height: ${qLineHeight}; color: #0f172a;">
-                                <div class="html-content" style="text-align: justify; margin-bottom: 4px;">${cleanedText}</div>
-                                
-                                ${
-                                  q.imageUrl
-                                    ? `
-                                    <div style="margin-top: 10px; margin-bottom: 10px; max-width: 80%; border: 1px solid #cbd5e1; border-radius: 6px; padding: 4px; display: inline-block;">
-                                        <img src="${q.imageUrl}" style="max-height: 180px; object-fit: contain; display: block;" referrerPolicy="no-referrer" />
-                                    </div>
-                                `
-                                    : ""
-                                }
-                            </div>
+            <div class="printable-item question-part avoid-break" style="margin-bottom: 14px;">
+                <div class="question-container bg-white text-black">
+                    <div style="display: flex; gap: 8px; align-items: flex-start;">
+                        <span style="font-weight: bold; font-size: ${qFontSize}; min-width: 22px; text-align: right; flex-shrink: 0; color: #000; margin-top: 1px; line-height: ${qLineHeight}; select-none;">${questionNumber}.</span>
+                        <div style="flex: 1; font-size: ${qFontSize}; line-height: ${qLineHeight}; color: #0f172a;">
+                            <div class="html-content" style="text-align: justify; margin-bottom: 4px;">${cleanedText}</div>
+                            
+                            ${
+                              q.imageUrl
+                                ? `
+                                <div style="margin-top: 8px; margin-bottom: 8px; max-width: 80%;">
+                                    <img src="${q.imageUrl}" style="max-height: 180px; object-fit: contain; display: block; border-radius: 4px; border: 1px solid #cbd5e1;" referrerPolicy="no-referrer" />
+                                </div>
+                            `
+                                : ""
+                            }
+
+                            ${
+                              q.audioUrl
+                                ? `
+                                <div style="margin-top: 6px; font-size: 8.5pt; color: #475569;">
+                                    <strong>[Audio]:</strong> ${q.audioUrl}
+                                </div>
+                            `
+                                : ""
+                            }
                         </div>
                     </div>
                 </div>
-            `;
+      `;
 
       if (
         q.questionType === "MULTIPLE_CHOICE" ||
         q.questionType === "COMPLEX_MULTIPLE_CHOICE"
       ) {
-        const optFontSize =
-          fontSize === "small"
-            ? "10pt"
-            : fontSize === "large"
-              ? "12pt"
-              : "11pt";
         const isComplex = q.questionType === "COMPLEX_MULTIPLE_CHOICE";
-        const borderRadius = isComplex ? "4px" : "9999px";
+        const isTwoCol = shouldRenderTwoColumns(q.options);
+        const containerStyle = isTwoCol
+          ? "display: grid; grid-template-columns: 1fr 1fr; column-gap: 20px; row-gap: 5px; margin-top: 6px; padding-left: 30px; margin-bottom: 12px;"
+          : "display: flex; flex-direction: column; gap: 5px; margin-top: 6px; padding-left: 30px; margin-bottom: 12px;";
+
+        questionsHtmlStr += `<div class="printable-item options-wrapper" style="${containerStyle}">`;
         q.options?.forEach((opt, oIndex) => {
-          let optText = opt || "";
+          let optText = formatQuestionHtml(opt || "");
           if (q.optionCharts && q.optionCharts[oIndex]) {
             optText = injectChart(q.optionCharts[oIndex], optText);
           }
-          const isLastOption = oIndex === (q.options?.length || 0) - 1;
-          const optionStyle = isLastOption
-            ? "margin-bottom: 24px; padding-bottom: 16px;"
-            : "margin-bottom: 8px;";
+          const optionBadge = isComplex
+            ? `<span style="font-weight: bold; border: 1.5px solid #000; border-radius: 3px; min-width: 20px; height: 18px; display: inline-flex; align-items: center; justify-content: center; font-size: 8.5pt; background: #fff; margin-top: 1px; flex-shrink: 0; box-sizing: border-box;">${String.fromCharCode(65 + oIndex)}</span>`
+            : `<span style="font-weight: bold; color: #000; flex-shrink: 0; min-width: 16px;">${String.fromCharCode(65 + oIndex)}.</span>`;
+
           questionsHtmlStr += `
-                        <div class="printable-item option-part" style="page-break-inside: avoid; break-inside: avoid; margin-left: 36px; ${optionStyle} font-size: ${optFontSize};">
-                            <div style="display: flex; gap: 12px; align-items: flex-start;">
-                                <span style="font-weight: 955; border: 1.5px solid #0f172a; border-radius: ${borderRadius}; width: 22px; height: 22px; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 11px; background-color: #f8fafc; color: #0f172a; box-sizing: border-box; padding: 0 0 1px 0; margin-top: 4px; vertical-align: middle;">
-                                    ${String.fromCharCode(65 + oIndex)}
-                                </span>
-                                <div class="html-content" style="padding-top: 2px; flex: 1; word-wrap: break-word; overflow-wrap: break-word;">
-                                    <span style="display: inline-block; max-width: 100%; white-space: normal; line-height: 1.4;">${optText}</span>
-                                    ${
-                                      q.optionImages && q.optionImages[oIndex]
-                                        ? `
-                                        <div style="margin-top: 4px; border: 1px solid #e2e8f0; border-radius: 4px; padding: 2px; display: block; max-width: 120px; background-color: white;">
-                                            <img src="${q.optionImages[oIndex]}" style="max-height: 75px; object-fit: contain;" referrerPolicy="no-referrer" />
-                                        </div>
-                                    `
-                                        : ""
-                                    }
-                                </div>
+                <div class="printable-item option-item avoid-break" style="display: flex; gap: 8px; align-items: flex-start; font-size: ${optFontSize}; line-height: 1.45;">
+                    ${optionBadge}
+                    <div class="html-content" style="flex: 1; word-wrap: break-word; overflow-wrap: break-word; color: #000;">
+                        ${optText}
+                        ${
+                          q.optionImages && q.optionImages[oIndex]
+                            ? `
+                            <div style="margin-top: 4px; border: 1px solid #cbd5e1; border-radius: 4px; padding: 2px; display: inline-block; background-color: white;">
+                                <img src="${q.optionImages[oIndex]}" style="max-height: 75px; object-fit: contain;" referrerPolicy="no-referrer" />
                             </div>
-                        </div>
-                    `;
+                        `
+                            : ""
+                        }
+                    </div>
+                </div>
+          `;
         });
+        questionsHtmlStr += `</div>`;
       } else if (q.questionType === "TRUE_FALSE") {
-        const tfTrueLabel = (q.categoryLabels && q.categoryLabels[0]) || "BENAR";
-        const tfFalseLabel = (q.categoryLabels && q.categoryLabels[1]) || "SALAH";
-        const tfTrueChar = tfTrueLabel.charAt(0).toUpperCase();
-        const tfFalseChar = tfFalseLabel.charAt(0).toUpperCase();
+        const tfTrueLabel =
+          (q.categoryLabels && q.categoryLabels[0]) || "Benar";
+        const tfFalseLabel =
+          (q.categoryLabels && q.categoryLabels[1]) || "Salah";
         questionsHtmlStr += `
-                    <div class="printable-item tf-part" style="margin-top: 8px; margin-left: 36px; margin-bottom: 24px; width: calc(100% - 36px); page-break-inside: auto; break-inside: auto;">
-                        <table style="width: 100%; table-layout: fixed; word-wrap: break-word; border-collapse: collapse; border: 1.5px solid #0f172a; font-size: 10pt;">
-                            <thead>
-                                <tr style="background-color: #f1f5f9;">
-                                    <th style="text-align: left; padding: 6px 10px; font-weight: bold; border-right: 1px solid #0f172a; border-bottom: 1.5px solid #0f172a;">Pernyataan</th>
-                                    <th style="width: 80px; text-align: center; font-weight: bold; border-right: 1px solid #0f172a; border-bottom: 1.5px solid #0f172a; white-space: nowrap;">${tfTrueLabel.toUpperCase()}</th>
-                                    <th style="width: 80px; text-align: center; font-weight: bold; border-bottom: 1.5px solid #0f172a; white-space: nowrap;">${tfFalseLabel.toUpperCase()}</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                `;
+            <div class="printable-item tf-part avoid-break" style="margin-top: 6px; margin-left: 30px; margin-bottom: 14px; width: calc(100% - 30px);">
+                <table style="width: 100%; border-collapse: collapse; border: 1.5px solid #000; font-size: 9.5pt;">
+                    <thead>
+                        <tr style="background-color: #f1f5f9;">
+                            <th style="border: 1px solid #000; padding: 6px 10px; text-align: left; font-weight: bold;">Pernyataan</th>
+                            <th style="border: 1px solid #000; padding: 6px 8px; width: 80px; text-align: center; font-weight: bold;">${tfTrueLabel}</th>
+                            <th style="border: 1px solid #000; padding: 6px 8px; width: 80px; text-align: center; font-weight: bold;">${tfFalseLabel}</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+        `;
         q.trueFalseRows?.forEach((row) => {
-          let rText = row.text || "";
+          let rText = formatQuestionHtml(row.text || "");
           if (row.chartData) {
             rText = injectChart(row.chartData, rText);
           }
           questionsHtmlStr += `
-                        <tr style="border-bottom: 1px solid #cbd5e1;">
-                            <td class="html-content" style="padding: 6px 10px; text-align: left; border-right: 1px solid #cbd5e1; font-weight: 500;">${rText}</td>
-                            <td style="padding: 6px; text-align: center; border-right: 1px solid #cbd5e1;">
-                                <div style="width: 16px; height: 16px; border: 1px solid #94a3b8; border-radius: 3px; margin: 0 auto; display: inline-flex; align-items: center; justify-content: center; font-size: 8px; font-weight: bold; color: #94a3b8; background-color: #f8fafc; box-sizing: border-box; padding: 0 0 1px 0; vertical-align: middle;">${tfTrueChar}</div>
-                            </td>
-                            <td style="padding: 6px; text-align: center;">
-                                <div style="width: 16px; height: 16px; border: 1px solid #94a3b8; border-radius: 3px; margin: 0 auto; display: inline-flex; align-items: center; justify-content: center; font-size: 8px; font-weight: bold; color: #94a3b8; background-color: #f8fafc; box-sizing: border-box; padding: 0 0 1px 0; vertical-align: middle;">${tfFalseChar}</div>
-                            </td>
-                        </tr>
-                    `;
+            <tr style="border-bottom: 1px solid #000;">
+                <td class="html-content" style="border: 1px solid #000; padding: 6px 10px; font-weight: 500;">${rText}</td>
+                <td style="border: 1px solid #000; padding: 6px; text-align: center;">
+                    <div style="width: 15px; height: 15px; border: 1.5px solid #000; border-radius: 50%; margin: 0 auto;"></div>
+                </td>
+                <td style="border: 1px solid #000; padding: 6px; text-align: center;">
+                    <div style="width: 15px; height: 15px; border: 1.5px solid #000; border-radius: 50%; margin: 0 auto;"></div>
+                </td>
+            </tr>
+          `;
         });
         questionsHtmlStr += `
-                            </tbody>
-                        </table>
-                    </div>
-                `;
+                    </tbody>
+                </table>
+            </div>
+        `;
       } else if (q.questionType === "MATCHING") {
-        questionsHtmlStr += `<div class="printable-item match-part" style="margin-left: 36px; margin-top: 10px; margin-bottom: 24px; padding-bottom: 16px; width: calc(100% - 36px); display: flex; flex-direction: column; gap: 8px; page-break-inside: auto; break-inside: auto;">`;
-        q.matchingPairs?.forEach((pair) => {
-          let leftItem = pair.left || "";
+        questionsHtmlStr += `
+            <div class="printable-item match-part avoid-break" style="margin-top: 6px; margin-left: 30px; margin-bottom: 14px; width: calc(100% - 30px);">
+                <table style="width: 100%; border-collapse: collapse; border: 1.5px solid #000; font-size: 9.5pt;">
+                    <thead>
+                        <tr style="background-color: #f1f5f9;">
+                            <th style="border: 1px solid #000; padding: 6px 10px; text-align: left; font-weight: bold; width: 50%;">Pernyataan / Soal</th>
+                            <th style="border: 1px solid #000; padding: 6px 10px; text-align: left; font-weight: bold; width: 50%;">Pasangan Jawaban</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+        `;
+        q.matchingPairs?.forEach((pair, pIdx) => {
+          let leftItem = formatQuestionHtml(pair.left || "");
           if (pair.leftChart) {
             leftItem = injectChart(pair.leftChart, leftItem);
           }
+          let rightItem = formatQuestionHtml(pair.right || "");
+          if (pair.rightChart) {
+            rightItem = injectChart(pair.rightChart, rightItem);
+          }
           questionsHtmlStr += `
-                        <div style="display: flex; align-items: center; gap: 12px; page-break-inside: avoid; break-inside: avoid;">
-                            <div class="html-content" style="flex: 1; padding: 6px 10px; border: 1px solid #cbd5e1; border-radius: 6px; background-color: #f8fafc; font-size: 10.5pt;">${leftItem}</div>
-                            <div style="font-weight: bold; color: #475569;">......</div>
-                            <div style="flex: 1; border-bottom: 1px solid #475569; height: 18px;"></div>
-                        </div>
-                    `;
+            <tr style="border-bottom: 1px solid #000;">
+                <td class="html-content" style="border: 1px solid #000; padding: 6px 10px;">
+                    <span style="font-weight: bold; margin-right: 4px;">(${pIdx + 1})</span>
+                    ${leftItem}
+                </td>
+                <td class="html-content" style="border: 1px solid #000; padding: 6px 10px;">
+                    <span style="font-weight: bold; margin-right: 4px;">(${String.fromCharCode(65 + pIdx)})</span>
+                    ${rightItem}
+                </td>
+            </tr>
+          `;
         });
-        questionsHtmlStr += `</div>`;
-      } else if (
-        q.questionType === "ESSAY" ||
-        q.questionType === "FILL_IN_THE_BLANK"
-      ) {
         questionsHtmlStr += `
-                    <div class="printable-item essay-part" style="margin-left: 36px; margin-top: 10px; border: 1.5px solid #cbd5e1; border-radius: 8px; padding: 10px; background-color: #f8fafc; margin-bottom: 24px; padding-bottom: 16px; width: calc(100% - 36px); page-break-inside: auto; break-inside: auto;">
-                        <p style="font-size: 8.5pt; font-weight: bold; color: #64748b; text-transform: uppercase; letter-spacing: 0.08em; margin: 0 0 6px 0;">Jawaban Uraian:</p>
-                        <div style="border-bottom: 1px dashed #cbd5e1; height: 18px; margin-bottom: 6px;"></div>
-                        <div style="border-bottom: 1px dashed #cbd5e1; height: 18px; margin-bottom: 6px;"></div>
-                        <div style="border-bottom: 1px dashed #cbd5e1; height: 18px;"></div>
-                    </div>
-                `;
+                    </tbody>
+                </table>
+            </div>
+        `;
+      } else if (q.questionType === "FILL_IN_THE_BLANK") {
+        questionsHtmlStr += `
+            <div style="margin-top: 6px; margin-left: 30px; margin-bottom: 12px; font-size: 10pt; font-style: italic; color: #334155;">
+                Jawaban: ..........................................................................................................................................
+            </div>
+        `;
+      } else if (q.questionType === "ESSAY") {
+        questionsHtmlStr += `
+            <div class="printable-item essay-part avoid-break" style="margin-top: 6px; margin-left: 30px; margin-bottom: 14px; border: 1.5px solid #cbd5e1; border-radius: 6px; padding: 10px 14px; background-color: #fafafa; width: calc(100% - 30px);">
+                <p style="font-size: 8.5pt; font-weight: bold; color: #475569; text-transform: uppercase; letter-spacing: 0.08em; margin: 0 0 8px 0;">Lembar Jawaban / Uraian:</p>
+                <div style="border-bottom: 1px dashed #94a3b8; height: 20px; margin-bottom: 8px;"></div>
+                <div style="border-bottom: 1px dashed #94a3b8; height: 20px; margin-bottom: 8px;"></div>
+                <div style="border-bottom: 1px dashed #94a3b8; height: 20px; margin-bottom: 8px;"></div>
+                <div style="border-bottom: 1px dashed #94a3b8; height: 20px;"></div>
+            </div>
+        `;
       }
+
+      questionsHtmlStr += `</div>`;
     });
     questionsHtmlStr += `</div>`;
   });
@@ -630,6 +737,8 @@ export const generateBookHtml = ({
                     background: white !important;
                     margin: 0 !important;
                     padding: 0 !important;
+                    -webkit-print-color-adjust: exact !important;
+                    print-color-adjust: exact !important;
                 }
                 body, .book-canvas, .book-canvas * {
                     visibility: visible !important;
@@ -654,8 +763,9 @@ export const generateBookHtml = ({
                 }
                 .page-container {
                     width: 100% !important;
-                    height: 100% !important;
-                    min-height: 0 !important;
+                    height: calc(297mm - (${computedPadding} * 2)) !important;
+                    min-height: calc(297mm - (${computedPadding} * 2)) !important;
+                    max-height: calc(297mm - (${computedPadding} * 2)) !important;
                     padding: 0 !important;
                     margin: 0 !important;
                     border: none !important;
@@ -665,6 +775,37 @@ export const generateBookHtml = ({
                     justify-content: space-between !important;
                     page-break-after: always !important;
                     break-after: page !important;
+                    page-break-inside: avoid !important;
+                    break-inside: avoid !important;
+                }
+                .page-cover {
+                    width: 100% !important;
+                    height: calc(297mm - (${computedPadding} * 2)) !important;
+                    min-height: calc(297mm - (${computedPadding} * 2)) !important;
+                    max-height: calc(297mm - (${computedPadding} * 2)) !important;
+                    padding: 0 !important;
+                    margin: 0 !important;
+                    box-sizing: border-box !important;
+                    border: none !important;
+                    display: flex !important;
+                    flex-direction: column !important;
+                    page-break-after: always !important;
+                    break-after: page !important;
+                    page-break-inside: avoid !important;
+                    break-inside: avoid !important;
+                    overflow: hidden !important;
+                }
+                .page-frame-box {
+                    border: 6px double #000000 !important;
+                    padding: 8mm !important;
+                    box-sizing: border-box !important;
+                    width: 100% !important;
+                    height: 100% !important;
+                    min-height: 100% !important;
+                    max-height: 100% !important;
+                    display: flex !important;
+                    flex-direction: column !important;
+                    justify-content: space-between !important;
                 }
                 .page-container-flow {
                     width: 100% !important;
@@ -677,17 +818,12 @@ export const generateBookHtml = ({
                     page-break-after: always !important;
                     break-after: page !important;
                 }
-                .page-cover {
-                    border: none !important;
-                    padding: 0 !important;
-                    height: calc(296.5mm - (${computedPadding} * 2)) !important;
-                }
                 .keys-grid {
                     grid-template-columns: repeat(5, 1fr) !important;
                 }
             }
             body {
-                font-family: 'Inter', sans-serif;
+                font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
                 background-color: #f1f5f9;
                 color: #0f172a;
                 margin: 0;
@@ -708,7 +844,7 @@ export const generateBookHtml = ({
                 position: relative;
                 width: 210mm;
                 height: auto;
-                min-height: 296.5mm;
+                min-height: 297mm;
                 padding: ${computedPadding};
                 box-sizing: border-box;
                 background: white;
@@ -718,10 +854,35 @@ export const generateBookHtml = ({
                 page-break-after: always;
                 break-after: page;
             }
+            .page-cover {
+                position: relative;
+                width: 210mm;
+                height: 297mm;
+                min-height: 297mm;
+                max-height: 297mm;
+                padding: ${computedPadding};
+                box-sizing: border-box;
+                background: white;
+                display: flex;
+                flex-direction: column;
+                page-break-after: always;
+                break-after: page;
+                overflow: hidden;
+            }
+            .page-frame-box {
+                border: 6px double #000000;
+                padding: 8mm;
+                box-sizing: border-box;
+                width: 100%;
+                height: 100%;
+                display: flex;
+                flex-direction: column;
+                justify-content: space-between;
+            }
             .page-container-flow {
                 position: relative;
                 width: 210mm;
-                min-height: 296.5mm;
+                min-height: 297mm;
                 padding: ${computedPadding};
                 box-sizing: border-box;
                 background: white;
@@ -767,36 +928,36 @@ export const generateBookHtml = ({
         <div class="book-canvas">
             <!-- Cover Page -->
             <div class="page-container page-cover" style="page-break-after: always; break-after: page;">
-                <div style="border: 12px double #000000; padding: 12mm; flex: 1; height: 100%; min-height: calc(296.5mm - (${computedPadding} * 2)); display: flex; flex-direction: column; justify-content: space-between; box-sizing: border-box; width: 100%;">
-                    <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 4px solid black; padding-bottom: 12px;">
-                        <div style="border: 2px solid black; padding: 6px 14px 6px 14px; font-size: 12px; font-weight: 600; display: inline-block; background-color: white; line-height: 1;">Dokumen Negara</div>
+                <div class="page-frame-box">
+                    <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 3px solid black; padding-bottom: 10px;">
+                        <div style="border: 2px solid black; padding: 5px 12px; font-size: 11px; font-weight: 800; display: inline-block; background-color: white; line-height: 1; text-transform: uppercase;">DOKUMEN NEGARA</div>
                         <div style="text-align: center;">
-                            <p style="font-family: serif; font-weight: bold; font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase; margin: 0 0 2px 0;">Republik Indonesia</p>
-                            <p style="font-size: 11px; font-weight: 900; text-transform: uppercase; margin: 0; color: #1e293b; letter-spacing: 0.05em;">Platform Ujian Cerdas</p>
+                            <p style="font-family: serif; font-weight: bold; font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase; margin: 0 0 2px 0;">REPUBLIK INDONESIA</p>
+                            <p style="font-size: 11px; font-weight: 900; text-transform: uppercase; margin: 0; color: #0f172a; letter-spacing: 0.06em;">PLATFORM UJIAN CERDAS</p>
                         </div>
-                        <div style="border: 2px solid black; padding: 6px 14px 6px 14px; font-size: 12px; font-weight: 600; font-style: italic; display: inline-block; background-color: white; line-height: 1;">Sangat Rahasia</div>
+                        <div style="border: 2px solid black; padding: 5px 12px; font-size: 11px; font-weight: 800; font-style: italic; display: inline-block; background-color: white; line-height: 1; text-transform: uppercase;">SANGAT RAHASIA</div>
                     </div>
 
-                    <div style="display: block; text-align: center; margin: auto 0; padding: 24px 0;">
-                        <div style="display: flex; justify-content: center; margin-bottom: 24px; width: 100%;">
-                            <div style="width: 98px; height: 98px; padding: 12px; border: 4px solid black; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box; background-color: white; margin: 0 auto; vertical-align: middle;">
-                                <div style="box-sizing: border-box; width: 68px; height: 68px; border: 2px dashed black; border-radius: 50%; display: flex; flex-direction: column; align-items: center; justify-content: center; margin: 0 auto;">
-                                    <span style="font-family: serif; font-size: 24px; font-weight: 900; letter-spacing: -0.05em; line-height: 1.1; display: block; margin: 0; padding: 0;">BSR</span>
-                                    <span style="font-size: 7px; font-weight: 955; text-transform: uppercase; letter-spacing: 0.15em; line-height: 1.1; display: block; margin: 2px 0 0 0; padding: 0;">SOAL RESMI</span>
+                    <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; margin: auto 0; padding: 16px 0;">
+                        <div style="display: flex; justify-content: center; margin-bottom: 20px; width: 100%;">
+                            <div style="width: 88px; height: 88px; padding: 10px; border: 3px solid black; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box; background-color: white;">
+                                <div style="box-sizing: border-box; width: 62px; height: 62px; border: 2px dashed black; border-radius: 50%; display: flex; flex-direction: column; align-items: center; justify-content: center;">
+                                    <span style="font-family: serif; font-size: 22px; font-weight: 900; letter-spacing: -0.05em; line-height: 1.1; margin: 0;">BSR</span>
+                                    <span style="font-size: 6.5px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.15em; line-height: 1.1; margin: 2px 0 0 0;">SOAL RESMI</span>
                                 </div>
                             </div>
                         </div>
 
-                        <h1 style="font-family: serif; font-size: 32px; font-weight: 900; text-transform: uppercase; tracking-wider: 0.05em; line-height: 1.25; max-width: 600px; margin: 0 0 12px 0; color: black;">
+                        <h1 style="font-family: serif; font-size: 26px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.03em; line-height: 1.25; max-width: 580px; margin: 0 0 10px 0; color: black; text-align: center;">
                             ${bookTitle}
                         </h1>
-                        <p style="font-size: 14px; font-weight: bold; color: #475569; letter-spacing: 0.12em; text-transform: uppercase; margin: 0 0 28px 0;">
+                        <p style="font-size: 12.5px; font-weight: bold; color: #475569; letter-spacing: 0.1em; text-transform: uppercase; margin: 0 0 20px 0; text-align: center;">
                             ${bookSubtitle}
                         </p>
 
-                        <div style="width: 100%; max-width: 480px; border: 4px double black; padding: 16px; background-color: white; text-align: left; margin: 0 auto;">
-                            <p style="text-align: center; font-weight: 950; text-transform: uppercase; letter-spacing: 0.12em; font-size: 11px; border-bottom: 2px solid black; padding-bottom: 6px; margin: 0 0 12px 0;">IDENTITAS KUMPULAN SOAL</p>
-                            <table style="width: 100%; font-size: 12px; border: none; border-collapse: collapse;">
+                        <div style="width: 100%; max-width: 480px; border: 3px double black; padding: 14px 18px; background-color: white; text-align: left; box-sizing: border-box;">
+                            <p style="text-align: center; font-weight: 900; text-transform: uppercase; letter-spacing: 0.12em; font-size: 10.5px; border-bottom: 2px solid black; padding-bottom: 6px; margin: 0 0 10px 0;">IDENTITAS KUMPULAN SOAL</p>
+                            <table style="width: 100%; font-size: 11.5px; border: none; border-collapse: collapse;">
                                 <tr style="border: none;">
                                     <td style="border: none; padding: 4px 0; width: 130px; text-transform: uppercase; color: #64748b; font-weight: bold;">Jenis Dokumen</td>
                                     <td style="border: none; padding: 4px; width: 10px;">:</td>
@@ -813,51 +974,53 @@ export const generateBookHtml = ({
                                     <td style="border: none; padding: 4px 0; font-weight: bold;">${selectedExams.reduce((acc, exam) => acc + exam.questions.length, 0)} Butir Soal</td>
                                 </tr>
                                 <tr style="border: none; border-top: 1px solid #e2e8f0;">
-                                    <td style="border: none; padding: 4px 0; text-transform: uppercase; color: #64748b; font-weight: bold;">Tahun Terbit</td>
+                                    <td style="border: none; padding: 4px 0; text-transform: uppercase; color: #64748b; font-weight: bold;">Tahun Pelajaran</td>
                                     <td style="border: none; padding: 4px;">:</td>
                                     <td style="border: none; padding: 4px 0; font-weight: bold;">${new Date().getFullYear()} / ${new Date().getFullYear() + 1}</td>
                                 </tr>
                                 <tr style="border: none; border-top: 1px solid #e2e8f0;">
-                                    <td style="border: none; padding: 6px 0; text-transform: uppercase; color: #64748b; font-weight: bold;">Hak Akses</td>
-                                    <td style="border: none; padding: 6px;">:</td>
-                                    <td style="border: none; padding: 6px 0;"><span style="font-weight: 955; font-size: 10px; padding: 4px 10px; border: 1.5px solid black; background-color: #f8fafc; display: inline-block; line-height: 1.2 !important; box-sizing: border-box; vertical-align: middle; text-align: center;">GURU / PENGAWAS</span></td>
+                                    <td style="border: none; padding: 5px 0; text-transform: uppercase; color: #64748b; font-weight: bold;">Hak Akses</td>
+                                    <td style="border: none; padding: 5px;">:</td>
+                                    <td style="border: none; padding: 5px 0;"><span style="font-weight: 800; font-size: 9.5px; padding: 3px 8px; border: 1px solid black; background-color: #f8fafc; display: inline-block;">GURU / PENGAWAS</span></td>
                                 </tr>
                             </table>
                         </div>
                     </div>
 
-                    <div style="border-top: 1px solid #cbd5e1; padding-top: 10px; display: flex; justify-content: space-between; align-items: center; font-size: 9px;">
-                        <p style="font-weight: 900; text-transform: uppercase; letter-spacing: 0.12em; margin: 0; color: #475569;">PLATFORM UJIAN CERDAS INDONESIA</p>
+                    <div style="border-top: 1px solid #000; padding-top: 8px; display: flex; justify-content: space-between; align-items: center; font-size: 8.5pt;">
+                        <p style="font-weight: 900; text-transform: uppercase; letter-spacing: 0.1em; margin: 0; color: #334155;">PLATFORM UJIAN CERDAS INDONESIA</p>
                         <p style="font-weight: 600; margin: 0; color: #64748b;">Dicetak: ${new Date().toLocaleDateString("id-ID", { year: "numeric", month: "long", day: "numeric" })}</p>
                     </div>
                 </div>
-            </div>            <!-- Petunjuk Umum Page -->
+            </div>
+
+            <!-- Petunjuk Umum Page -->
             <div class="page-container page-cover" style="page-break-after: always; break-after: page;">
-                <div style="border: 12px double #000000; padding: 12mm; flex: 1; height: 100%; min-height: calc(296.5mm - (${computedPadding} * 2)); display: flex; flex-direction: column; justify-content: space-between; box-sizing: border-box; width: 100%;">
+                <div class="page-frame-box">
                     <div style="flex: 1; display: flex; flex-direction: column; justify-content: flex-start;">
-                        <div style="border-bottom: 4px solid black; padding-bottom: 12px; margin-bottom: 20px; text-align: center;">
-                            <h2 style="font-family: serif; font-size: 22px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.1em; margin: 0;">PETUNJUK UMUM</h2>
-                            <p style="font-size: 10px; color: #64748b; font-weight: bold; text-transform: uppercase; letter-spacing: 0.08em; margin: 4px 0 0 0;">ASESMEN KOMPETENSI MINIMUM & EVALUASI BELAJAR GURU</p>
+                        <div style="border-bottom: 3px solid black; padding-bottom: 10px; margin-bottom: 16px; text-align: center;">
+                            <h2 style="font-family: serif; font-size: 20px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.08em; margin: 0;">PETUNJUK UMUM</h2>
+                            <p style="font-size: 9.5px; color: #64748b; font-weight: bold; text-transform: uppercase; letter-spacing: 0.08em; margin: 3px 0 0 0;">PEDOMAN PELAKSANAAN UJIAN & EVALUASI BELAJAR</p>
                         </div>
-                        <div style="font-size: 13px; line-height: 1.6; text-align: justify; color: #334155;">
-                            <p style="font-weight: bold; color: #0f172a; margin-bottom: 14px;">Sebelum menguji atau membagikan soal-soal di dalam buku ini, mohon diperhatikan beberapa pedoman penting berikut:</p>
-                            <ol style="padding-left: 20px; display: flex; flex-direction: column; gap: 12px; margin: 0;">
-                                <li><strong>Pembacaan Doa:</strong> Awali pelaksanaan kegiatan mengkaji ataupun pengujian ujian evaluasi dengan berdoa setulus hati demi kesuksesan bersama.</li>
-                                <li><strong>Verifikasi Modul:</strong> Periksa keselarasan semua modul materi (${selectedExams.length} Modul) dalam kumpulan soal ini sebelum didistribusikan secara cetak fisik atau digital.</li>
-                                <li><strong>Soal Pilihan Ganda:</strong> Pilihan ganda tunggal tersaji dengan visual huruf lingkaran tebal (A, B, C, D, E) untuk menjamin kerapihan tata letak halaman saat diprint.</li>
-                                <li><strong>Soal Pilihan Ganda Kompleks:</strong> Pilihan ganda kompleks mengizinkan siswa memilih lebih dari satu jawaban yang benar dengan memberi tanda silang atau checklist pada opsi yang tersedia.</li>
-                                <li><strong>Soal Benar-Salah:</strong> Untuk soal berpola Benar/Salah (True-False), siswa dapat memberi tanda checklist atau lingkaran langsung pada kolom pilihan tabel yang tertera.</li>
-                                <li><strong>Soal Menjodohkan:</strong> Untuk soal menjodohkan, siswa dapat menarik garis lurus dari kotak kiri (premis) ke kotak kanan (respons) yang merupakan pasangan yang sesuai.</li>
-                                <li><strong>Soal Isian Singkat:</strong> Pada soal isian singkat, siswa dapat menuliskan jawaban pendek langsung pada kotak atau titik-titik yang disediakan dengan jelas dan rapi.</li>
-                                <li><strong>Soal Uraian / Esai:</strong> Buku printout ini melampirkan lembar garis putus-putus elegan di bawah soal esai agar memudahkan siswa menjabarkan rincian rumus atau argumen tulisan tangan secara rapi.</li>
-                                <li><strong>Kunci Jawaban:</strong> Lembar Kunci Jawaban Resmi telah dilampirkan pada bagian halaman penutup buku. Pisahkan lembar penutup ini saat mendistribusikan soal kepada peserta didik Anda.</li>
-                                <li><strong>Kisi-Kisi Materi:</strong> Lampiran kisi-kisi lengkap untuk seluruh modul soal dapat Anda temukan pada halaman terakhir dokumen ini untuk keperluan analisis dan rekapitulasi.</li>
+                        <div style="font-size: 11.5px; line-height: 1.55; text-align: justify; color: #1e293b;">
+                            <p style="font-weight: bold; color: #0f172a; margin-bottom: 10px;">Sebelum menguji atau membagikan naskah soal di dalam buku ini, mohon perhatikan pedoman penting berikut:</p>
+                            <ol style="padding-left: 18px; display: flex; flex-direction: column; gap: 8px; margin: 0;">
+                                <li><strong>Pembacaan Doa:</strong> Awali pelaksanaan kegiatan belajar, evaluasi, ataupun pengujian dengan berdoa bersama demi kelancaran dan kesuksesan bersama.</li>
+                                <li><strong>Verifikasi Modul:</strong> Periksa kesesuaian dan kelengkapan butir soal seluruh modul materi (${selectedExams.length} Modul) sebelum didistribusikan kepada peserta didik.</li>
+                                <li><strong>Pilihan Ganda:</strong> Pilihlah satu jawaban yang paling tepat dengan menyilang atau menghitamkan huruf A, B, C, D, atau E. Opsi berkarakter pendek telah disusun rapi dalam 2 kolom untuk efisiensi ruang dan keterbacaan optimal.</li>
+                                <li><strong>Pilihan Ganda Kompleks:</strong> Pilihan ganda kompleks mengizinkan siswa memilih lebih dari satu jawaban yang benar dengan memberi tanda centang/silang pada kotak opsi [A], [B], [C], [D] yang sesuai.</li>
+                                <li><strong>Soal Benar-Salah:</strong> Untuk soal berpola Benar atau Salah, berikan tanda silang atau centang pada lingkaran pilihan tabel pernyataan yang tersedia.</li>
+                                <li><strong>Soal Menjodohkan:</strong> Pasangkan nomor pernyataan di kolom sebelah kiri dengan huruf pilihan jawaban di kolom sebelah kanan yang merupakan pasangan tepat.</li>
+                                <li><strong>Soal Isian Singkat:</strong> Tuliskan jawaban singkat, lugas, dan terarah pada baris titik-titik yang disediakan.</li>
+                                <li><strong>Soal Uraian / Esai:</strong> Gunakan lembar garis pengerjaan di bawah butir soal esai untuk menjabarkan rincian rumus, hitungan, atau argumen tulisan tangan secara rapi.</li>
+                                <li><strong>Kunci Jawaban Resmi:</strong> Kunci jawaban resmi terlampir pada halaman penutup dokumen ini. Pisahkan lembar kunci jawaban sebelum naskah dibagikan kepada peserta ujian.</li>
+                                <li><strong>Kisi-Kisi Materi:</strong> Lampiran kisi-kisi dan level kognitif terlampir di lembar akhir untuk keperluan arsip penilaian dan rekapitulasi guru.</li>
                             </ol>
                         </div>
                     </div>
                     
-                    <div style="margin-top: 32px;">
-                        <div style="border-top: 2px solid #000000; padding-top: 10px; text-align: center; font-size: 11px; font-weight: 900; letter-spacing: 0.12em; text-transform: uppercase; margin-bottom: 24px;">SELAMAT BEKERJA • PRESTASI PENTING JUJUR UTAMA</div>
+                    <div style="margin-top: 16px;">
+                        <div style="border-top: 2px solid #000; padding-top: 8px; text-align: center; font-size: 10px; font-weight: 900; letter-spacing: 0.12em; text-transform: uppercase;">PRESTASI PENTING &bull; JUJUR YANG UTAMA</div>
                     </div>
                 </div>
             </div>
