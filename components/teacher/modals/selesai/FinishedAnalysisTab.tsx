@@ -29,6 +29,14 @@ interface FinishedAnalysisTabProps {
   }>;
   questionStats: Array<{ id: string; correctRate: number }>;
   handleUpdateKey: (qId: string, newKey: string) => Promise<void>;
+  olympiadMedalDistribution?: {
+    gold: { count: number; pct: number };
+    silver: { count: number; pct: number };
+    bronze: { count: number; pct: number };
+    participant: { count: number; pct: number };
+    maxPossibleScore: number;
+    minPossibleScore: number;
+  } | null;
 }
 
 export const FinishedAnalysisTab: React.FC<FinishedAnalysisTabProps> = ({
@@ -45,25 +53,28 @@ export const FinishedAnalysisTab: React.FC<FinishedAnalysisTabProps> = ({
   questionTypeStats,
   questionStats,
   handleUpdateKey,
+  olympiadMedalDistribution,
 }) => {
+  const isOlympiad = !!displayExam.config?.isOlympiadMode;
+
   return (
     <div className="space-y-8 font-sans">
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         <StatWidget
-          label="Rata-rata"
-          value={averageScore}
+          label={isOlympiad ? "Rata-rata Skor" : "Rata-rata"}
+          value={isOlympiad ? `${averageScore} pt` : averageScore}
           color="bg-indigo-50"
           icon={ChartBarIcon}
         />
         <StatWidget
-          label="Tertinggi"
-          value={highestScore}
+          label={isOlympiad ? "Skor Tertinggi" : "Tertinggi"}
+          value={isOlympiad ? `${highestScore} pt` : highestScore}
           color="bg-emerald-50"
           icon={CheckCircleIcon}
         />
         <StatWidget
-          label="Terendah"
-          value={lowestScore}
+          label={isOlympiad ? "Skor Terendah" : "Terendah"}
+          value={isOlympiad ? `${lowestScore} pt` : lowestScore}
           color="bg-rose-50"
           icon={XMarkIcon}
         />
@@ -80,6 +91,132 @@ export const FinishedAnalysisTab: React.FC<FinishedAnalysisTabProps> = ({
           icon={ClockIcon}
         />
       </div>
+
+      {/* OLYMPIAD MEDAL DISTRIBUTION CARD */}
+      {isOlympiad && olympiadMedalDistribution && (
+        <div className="bg-white dark:bg-slate-800 p-6 rounded-3xl border border-amber-200/60 dark:border-amber-900/40 shadow-sm relative overflow-hidden">
+          <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-amber-400 via-orange-400 to-amber-600"></div>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-6">
+            <div>
+              <h3 className="text-sm font-black text-slate-800 dark:text-white uppercase tracking-wider flex items-center gap-2">
+                <span>🏆</span> Distribusi Medali & Capaian Olimpiade
+              </h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                Evaluasi capaian peserta berdasarkan rentang skor olimpiade resmi (Skor Maksimal: {olympiadMedalDistribution.maxPossibleScore} pt).
+              </p>
+            </div>
+            <span className="text-[10px] font-mono font-bold px-2.5 py-1 rounded-full bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800 self-start sm:self-auto">
+              Mode Olimpiade
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {/* GOLD */}
+            <div className="p-4 rounded-2xl bg-amber-50/60 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800/40 flex flex-col justify-between">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-black text-amber-900 dark:text-amber-200 flex items-center gap-1.5">
+                  <span>🥇</span> Medali Emas
+                </span>
+                <span className="text-[10px] font-bold text-amber-700 dark:text-amber-400 font-mono bg-white dark:bg-slate-800 px-2 py-0.5 rounded-full border border-amber-200 dark:border-amber-700">
+                  &ge; 85%
+                </span>
+              </div>
+              <div className="flex items-baseline justify-between mt-1">
+                <span className="text-3xl font-black text-amber-900 dark:text-amber-100">
+                  {olympiadMedalDistribution.gold.count}
+                </span>
+                <span className="text-xs font-bold text-amber-700 dark:text-amber-400">
+                  {olympiadMedalDistribution.gold.pct}% siswa
+                </span>
+              </div>
+              <div className="h-1.5 w-full bg-amber-200 dark:bg-amber-900/60 rounded-full overflow-hidden mt-3">
+                <div
+                  className="h-full bg-amber-500 rounded-full transition-all duration-1000"
+                  style={{ width: `${olympiadMedalDistribution.gold.pct}%` }}
+                ></div>
+              </div>
+            </div>
+
+            {/* SILVER */}
+            <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 flex flex-col justify-between">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-black text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                  <span>🥈</span> Medali Perak
+                </span>
+                <span className="text-[10px] font-bold text-slate-600 dark:text-slate-400 font-mono bg-white dark:bg-slate-900 px-2 py-0.5 rounded-full border border-slate-200 dark:border-slate-700">
+                  70% - 84.9%
+                </span>
+              </div>
+              <div className="flex items-baseline justify-between mt-1">
+                <span className="text-3xl font-black text-slate-800 dark:text-slate-100">
+                  {olympiadMedalDistribution.silver.count}
+                </span>
+                <span className="text-xs font-bold text-slate-600 dark:text-slate-400">
+                  {olympiadMedalDistribution.silver.pct}% siswa
+                </span>
+              </div>
+              <div className="h-1.5 w-full bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden mt-3">
+                <div
+                  className="h-full bg-slate-400 rounded-full transition-all duration-1000"
+                  style={{ width: `${olympiadMedalDistribution.silver.pct}%` }}
+                ></div>
+              </div>
+            </div>
+
+            {/* BRONZE */}
+            <div className="p-4 rounded-2xl bg-orange-50/60 dark:bg-orange-950/20 border border-orange-200 dark:border-orange-800/40 flex flex-col justify-between">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-black text-orange-900 dark:text-orange-200 flex items-center gap-1.5">
+                  <span>🥉</span> Medali Perunggu
+                </span>
+                <span className="text-[10px] font-bold text-orange-700 dark:text-orange-400 font-mono bg-white dark:bg-slate-800 px-2 py-0.5 rounded-full border border-orange-200 dark:border-orange-700">
+                  50% - 69.9%
+                </span>
+              </div>
+              <div className="flex items-baseline justify-between mt-1">
+                <span className="text-3xl font-black text-orange-900 dark:text-orange-100">
+                  {olympiadMedalDistribution.bronze.count}
+                </span>
+                <span className="text-xs font-bold text-orange-700 dark:text-orange-400">
+                  {olympiadMedalDistribution.bronze.pct}% siswa
+                </span>
+              </div>
+              <div className="h-1.5 w-full bg-orange-200 dark:bg-orange-900/60 rounded-full overflow-hidden mt-3">
+                <div
+                  className="h-full bg-orange-500 rounded-full transition-all duration-1000"
+                  style={{ width: `${olympiadMedalDistribution.bronze.pct}%` }}
+                ></div>
+              </div>
+            </div>
+
+            {/* PARTICIPANT */}
+            <div className="p-4 rounded-2xl bg-sky-50/60 dark:bg-sky-950/20 border border-sky-200 dark:border-sky-800/40 flex flex-col justify-between">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-black text-sky-900 dark:text-sky-200 flex items-center gap-1.5">
+                  <span>🎗️</span> Peserta
+                </span>
+                <span className="text-[10px] font-bold text-sky-700 dark:text-sky-400 font-mono bg-white dark:bg-slate-800 px-2 py-0.5 rounded-full border border-sky-200 dark:border-sky-700">
+                  &lt; 50%
+                </span>
+              </div>
+              <div className="flex items-baseline justify-between mt-1">
+                <span className="text-3xl font-black text-sky-900 dark:text-sky-100">
+                  {olympiadMedalDistribution.participant.count}
+                </span>
+                <span className="text-xs font-bold text-sky-700 dark:text-sky-400">
+                  {olympiadMedalDistribution.participant.pct}% siswa
+                </span>
+              </div>
+              <div className="h-1.5 w-full bg-sky-200 dark:bg-sky-900/60 rounded-full overflow-hidden mt-3">
+                <div
+                  className="h-full bg-sky-500 rounded-full transition-all duration-1000"
+                  style={{ width: `${olympiadMedalDistribution.participant.pct}%` }}
+                ></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Category & Level Statistics */}
       {(categoryStats.length > 0 ||

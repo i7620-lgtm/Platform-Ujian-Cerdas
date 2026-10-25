@@ -7,6 +7,8 @@ import {
   analyzeQuestionTypePerformance,
   parseList,
   calculateExamScore,
+  isAnswerMatch,
+  getOlympiadMedalTier,
 } from "../../examUtils";
 
 interface UseFinishedExamModalProps {
@@ -219,28 +221,18 @@ export const useFinishedExamModal = ({
       }
 
       const ans = studentAnswers[q.id];
-      if (!ans) return "EMPTY";
-
-      const studentAns = normalize(String(ans), q.questionType);
-      const correctAns = normalize(
-        String(q.correctAnswer || ""),
-        q.questionType,
-      );
+      if (ans === undefined || ans === null || String(ans).trim() === "") return "EMPTY";
 
       if (
         q.questionType === "MULTIPLE_CHOICE" ||
         q.questionType === "FILL_IN_THE_BLANK"
       ) {
-        return studentAns === correctAns ? "CORRECT" : "WRONG";
+        return isAnswerMatch(q.correctAnswer, ans, q.questionType, q.options) ? "CORRECT" : "WRONG";
       } else if (q.questionType === "COMPLEX_MULTIPLE_CHOICE") {
-        const sSet = new Set(
-          parseList(String(ans)).map((a) => normalize(a, q.questionType)),
-        );
-        const cSet = new Set(
-          parseList(String(q.correctAnswer || "")).map((a) =>
-            normalize(a, q.questionType),
-          ),
-        );
+        const studentList = parseList(String(ans), q.options);
+        const correctList = parseList(String(q.correctAnswer || ""), q.options);
+        const sSet = new Set(studentList.map((a) => normalize(a, q.questionType)));
+        const cSet = new Set(correctList.map((a) => normalize(a, q.questionType)));
         if (sSet.size === cSet.size && [...sSet].every((x) => cSet.has(x)))
           return "CORRECT";
         return "WRONG";
@@ -258,7 +250,7 @@ export const useFinishedExamModal = ({
         try {
           const ansObj = JSON.parse(ans);
           const allCorrect = q.matchingPairs?.every(
-            (pair, idx) => ansObj[idx] === pair.right,
+            (pair, idx) => isAnswerMatch(pair.right, ansObj[idx], q.questionType),
           );
           return allCorrect ? "CORRECT" : "WRONG";
         } catch {
@@ -281,6 +273,12 @@ export const useFinishedExamModal = ({
         empty: grading.unansweredQuestions ?? 0,
         score: grading.score,
         duration,
+        olympiadTier: grading.olympiadTier,
+        maxScore: grading.maxScore,
+        minScore: grading.minScore,
+        correctScore: grading.correctScore,
+        wrongPenalty: grading.wrongPenalty,
+        emptyScore: grading.emptyScore,
       };
     },
     [activeDisplayExam],
@@ -389,26 +387,9 @@ export const useFinishedExamModal = ({
       [`_grade_${qId}`]: isCorrect ? "CORRECT" : "WRONG",
     };
 
-    let correct = 0;
-    let totalScore = 0;
-    let maxPossibleScore = 0;
-    const scorableQuestions = activeDisplayExam.questions.filter(
-      (q) => q.questionType !== "INFO",
-    );
-    scorableQuestions.forEach((q) => {
-      const weight = q.scoreWeight || 1;
-      maxPossibleScore += weight;
-
-      const status = checkAnswerStatus(q, newAnswers);
-      if (status === "CORRECT") {
-        correct++;
-        totalScore += weight;
-      }
-    });
-    const newScore =
-      maxPossibleScore > 0
-        ? Math.round((totalScore / maxPossibleScore) * 100)
-        : 0;
+    const regrading = calculateExamScore(activeDisplayExam, newAnswers);
+    const newScore = regrading.score;
+    const correct = regrading.correctAnswers;
 
     setResults(
       results.map((r) =>
@@ -440,6 +421,28 @@ export const useFinishedExamModal = ({
     }
   };
 
+  const isOlympiad = !!activeDisplayExam?.config?.isOlympiadMode;
+  const olympiadMedalDistribution = useMemo(() => {
+    if (!isOlympiad || results.length === 0) return null;
+    let gold = 0, silver = 0, bronze = 0, participant = 0;
+    const statsList = results.map((r) => getCalculatedStats(r));
+    statsList.forEach((st) => {
+      if (st.olympiadTier?.tier === "GOLD") gold++;
+      else if (st.olympiadTier?.tier === "SILVER") silver++;
+      else if (st.olympiadTier?.tier === "BRONZE") bronze++;
+      else participant++;
+    });
+    const total = results.length;
+    return {
+      gold: { count: gold, pct: Math.round((gold / total) * 100) },
+      silver: { count: silver, pct: Math.round((silver / total) * 100) },
+      bronze: { count: bronze, pct: Math.round((bronze / total) * 100) },
+      participant: { count: participant, pct: Math.round((participant / total) * 100) },
+      maxPossibleScore: statsList[0]?.maxScore || 100,
+      minPossibleScore: statsList[0]?.minScore || 0,
+    };
+  }, [isOlympiad, results, getCalculatedStats]);
+
   return {
     displayExam: activeDisplayExam,
     results,
@@ -459,6 +462,7 @@ export const useFinishedExamModal = ({
     levelStats,
     questionTypeStats,
     questionStats,
+    olympiadMedalDistribution,
     setActiveTab,
     setSelectedClass,
     fetchData,

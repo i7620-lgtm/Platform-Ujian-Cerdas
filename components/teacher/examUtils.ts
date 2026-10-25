@@ -188,6 +188,12 @@ export interface ClassAnalysis {
   passCount: number;
   passRate: number;
   questionTypeStats: QuestionTypeStat[];
+  olympiadMedalCounts?: {
+    gold: number;
+    silver: number;
+    bronze: number;
+    participant: number;
+  };
 }
 
 export const analyzeClassPerformance = (
@@ -204,6 +210,14 @@ export const analyzeClassPerformance = (
     if (!groupMap[key]) groupMap[key] = [];
     groupMap[key].push(r);
   });
+
+  const isOlympiad = !!exam.config?.isOlympiadMode;
+  const correctMult = Number(exam.config?.olympiadScoring?.correctMultiplier ?? 4);
+  const maxScore = isOlympiad
+    ? (exam.questions
+        .filter((q) => q.questionType !== "INFO")
+        .reduce((sum, q) => sum + (q.scoreWeight || 1) * correctMult, 0) || 100)
+    : 100;
 
   return Object.entries(groupMap)
     .map(([key, classResults]) => {
@@ -229,6 +243,19 @@ export const analyzeClassPerformance = (
       const passRate =
         studentCount > 0 ? Math.round((passCount / studentCount) * 100) : 0;
 
+      let olympiadMedalCounts: { gold: number; silver: number; bronze: number; participant: number } | undefined = undefined;
+      if (isOlympiad) {
+        let gold = 0, silver = 0, bronze = 0, participant = 0;
+        scores.forEach((sc) => {
+          const tier = getOlympiadMedalTier(sc, maxScore);
+          if (tier.tier === "GOLD") gold++;
+          else if (tier.tier === "SILVER") silver++;
+          else if (tier.tier === "BRONZE") bronze++;
+          else participant++;
+        });
+        olympiadMedalCounts = { gold, silver, bronze, participant };
+      }
+
       // Analyze question type performance for this class specifically
       const questionTypeStats = analyzeQuestionTypePerformance(
         exam,
@@ -246,6 +273,7 @@ export const analyzeClassPerformance = (
         passCount,
         passRate,
         questionTypeStats,
+        olympiadMedalCounts,
       };
     })
     .sort((a, b) => {
@@ -297,6 +325,74 @@ export const extractSmartCategory = (category?: string, subject?: string): strin
   }
 
   return subj;
+};
+
+export interface EducationalStageSpecs {
+  isEarlyElementary: boolean; // SD awal (Kelas 1-3 / Fase A-B)
+  isHighSchool: boolean;      // SMA / SMK / MA (Kelas 10-12 / Fase E-F)
+  isUpperElemOrMiddle: boolean; // SD akhir & SMP (Kelas 4-9 / Fase C-D)
+  stageLabel: string;
+  targetOptionCount: number;  // SD awal: 3, SD akhir & SMP: 4, SMA: 5
+  trueFalseRowCount: number;  // SD awal: 2, SD akhir & SMP: 3, SMA: 4
+  matchingPairCount: number;  // SD & SMP: 3, SMA: 4
+  complexMinCorrect: number;  // 2
+  complexMaxCorrect: number;  // targetOptionCount - 1
+}
+
+export const detectEducationalStage = (
+  config: { subject?: string; category?: string; blueprint?: string; kisiKisi?: string }
+): EducationalStageSpecs => {
+  const combined = `${config.subject || ''} ${config.category || ''} ${config.blueprint || ''} ${config.kisiKisi || ''}`.toUpperCase();
+
+  // 1. Cek SMA / SMK / MA (Fase E, Fase F, Kelas 10-12, X-XII)
+  const isHigh = /\b(FASE\s*[EF]|KELAS\s*(?:10|11|12|X|XI|XII)|SMA|SMK|MA|ALIYAH)\b/i.test(combined);
+
+  // 2. Cek SD Awal (Fase A, Fase B, Kelas 1-3)
+  const isEarlyElem = !isHigh && (
+    /\b(FASE\s*[AB]|KELAS\s*[1-3]|SD\s*(?:AWAL|1|2|3)|MI\s*(?:AWAL|1|2|3))\b/i.test(combined) ||
+    (/\b(SD|MI)\b/i.test(combined) && /\b(KELAS\s*[1-3]|1|2|3)\b/i.test(combined) && !/\b(4|5|6|SMP|MTS)\b/i.test(combined))
+  );
+
+  if (isEarlyElem) {
+    return {
+      isEarlyElementary: true,
+      isHighSchool: false,
+      isUpperElemOrMiddle: false,
+      stageLabel: "SD Awal (Fase A-B / Kelas 1-3)",
+      targetOptionCount: 3,
+      trueFalseRowCount: 2,
+      matchingPairCount: 3,
+      complexMinCorrect: 2,
+      complexMaxCorrect: 2 // 3 - 1 = 2
+    };
+  }
+
+  if (isHigh) {
+    return {
+      isEarlyElementary: false,
+      isHighSchool: true,
+      isUpperElemOrMiddle: false,
+      stageLabel: "SMA/SMK (Fase E-F / Kelas 10-12)",
+      targetOptionCount: 5,
+      trueFalseRowCount: 4,
+      matchingPairCount: 4,
+      complexMinCorrect: 2,
+      complexMaxCorrect: 4 // 5 - 1 = 4
+    };
+  }
+
+  // Default: SD Akhir & SMP (Fase C-D / Kelas 4-9)
+  return {
+    isEarlyElementary: false,
+    isHighSchool: false,
+    isUpperElemOrMiddle: true,
+    stageLabel: "SD Akhir & SMP (Fase C-D / Kelas 4-9)",
+    targetOptionCount: 4,
+    trueFalseRowCount: 3,
+    matchingPairCount: 3,
+    complexMinCorrect: 2,
+    complexMaxCorrect: 3 // 4 - 1 = 3
+  };
 };
 
 export const isAnswerMatch = (
@@ -795,25 +891,16 @@ export const analyzeStudentPerformance = (
     if (result.answers[manualGradeKey]) {
       isCorrect = result.answers[manualGradeKey] === "CORRECT";
     } else if (studentAns) {
-      const normAns = normalize(String(studentAns), q.questionType);
-      const normKey = normalize(String(q.correctAnswer || ""), q.questionType);
-
       if (
         q.questionType === "MULTIPLE_CHOICE" ||
         q.questionType === "FILL_IN_THE_BLANK"
       ) {
-        isCorrect = normAns === normKey;
+        isCorrect = isAnswerMatch(q.correctAnswer, studentAns, q.questionType, q.options);
       } else if (q.questionType === "COMPLEX_MULTIPLE_CHOICE") {
-        const sSet = new Set(
-          parseList(String(studentAns)).map((a) =>
-            normalize(a, q.questionType),
-          ),
-        );
-        const cSet = new Set(
-          parseList(String(q.correctAnswer || "")).map((a) =>
-            normalize(a, q.questionType),
-          ),
-        );
+        const studentList = parseList(String(studentAns), q.options);
+        const correctList = parseList(String(q.correctAnswer || ""), q.options);
+        const sSet = new Set(studentList.map((a) => normalize(a, q.questionType)));
+        const cSet = new Set(correctList.map((a) => normalize(a, q.questionType)));
         isCorrect =
           sSet.size === cSet.size && [...sSet].every((x) => cSet.has(x));
       } else if (q.questionType === "TRUE_FALSE") {
@@ -829,7 +916,7 @@ export const analyzeStudentPerformance = (
         try {
           const ansObj = JSON.parse(studentAns);
           isCorrect =
-            q.matchingPairs?.every((pair, idx) => ansObj[idx] === pair.right) ??
+            q.matchingPairs?.every((pair, idx) => isAnswerMatch(pair.right, ansObj[idx], q.questionType)) ??
             false;
         } catch {
           /* ignore */
@@ -873,58 +960,82 @@ export const analyzeStudentPerformance = (
       ? Math.round((totalCorrectScored / totalQuestionsScored) * 100)
       : 0;
 
+  const isOlympiad = !!exam.config?.isOlympiadMode;
+
   // Use result.score if valid number (including 0 or negative in Olympiad mode)
   const score =
-    typeof result.score === "number" && (exam.config?.isOlympiadMode ? !isNaN(result.score) : result.score > 0)
+    typeof result.score === "number" && (isOlympiad ? !isNaN(result.score) : result.score > 0)
       ? result.score
       : calculatedScore;
 
-  const rawKkm = exam.config?.kkm;
-  const kkm =
-    rawKkm !== undefined &&
-    rawKkm !== null &&
-    rawKkm !== "" &&
-    !isNaN(Number(rawKkm)) &&
-    Number(rawKkm) > 0
-      ? Number(rawKkm)
-      : null;
-
   let recommendation = "";
 
-  if (kkm !== null) {
-    // Guru secara eksplisit mengatur KKM
-    if (score < kkm) {
-      recommendation = `Perlu Remedial. Nilai belum mencapai KKM (${kkm}). Fokus ulangi materi yang belum tuntas.`;
-    } else if (score >= 95) {
-      recommendation =
-        "Istimewa (Sempurna). Siap untuk materi pengayaan atau tingkat lanjut.";
-    } else if (score >= 80) {
-      recommendation =
-        "Sangat Baik. Pertahankan prestasi dan bantu teman sebagai Tutor Sebaya.";
+  if (isOlympiad) {
+    const correctMult = Number(exam.config?.olympiadScoring?.correctMultiplier ?? 4);
+    const maxScore = exam.questions
+      .filter((q) => q.questionType !== "INFO")
+      .reduce((sum, q) => sum + (q.scoreWeight || 1) * correctMult, 0) || 100;
+    const tier = getOlympiadMedalTier(score, maxScore);
+
+    if (tier.tier === "GOLD") {
+      recommendation = `Prestasi Luar Biasa (Medali Emas 🥇). Tingkat akurasi penalaran olimpiade sangat tinggi (${Math.round((score / maxScore) * 100)}%). Pertahankan performa untuk level kompetisi nasional!`;
+    } else if (tier.tier === "SILVER") {
+      recommendation = `Prestasi Sangat Baik (Medali Perak 🥈). Pemahaman konsep kompetisi sudah matang (${Math.round((score / maxScore) * 100)}%). Tingkatkan ketelitian pada materi kompleks untuk merebut Emas!`;
+    } else if (tier.tier === "BRONZE") {
+      recommendation = `Prestasi Baik (Medali Perunggu 🥉). Konsep dasar olimpiade telah dikuasai dengan baik (${Math.round((score / maxScore) * 100)}%). Perbanyak latihan variasi soal tantangan dan manajemen waktu.`;
     } else {
-      recommendation =
-        weakestCategory && weakestScore < 100
-          ? `Tuntas KKM. Tingkatkan pemahaman pada materi "${weakestCategory}" (${weakestScore}%).`
-          : "Tuntas KKM. Terus pertahankan dan tingkatkan pemahaman materi.";
+      if (score < 0) {
+        recommendation = `Perlu Evaluasi Taktik (Peserta 🎗️). Penalti salah (-1) melebihi akumulasi poin benar. Berhati-hatilah dalam berspekulasi dan prioritaskan soal yang paling Anda yakini.`;
+      } else {
+        recommendation = `Terus Berjuang (Peserta 🎗️). Pemahaman awal telah terbangun. Perdalam latihan soal olimpiade setingkat kompetisi dan kurangi kesalahan tebakan agar tidak terkena penalti nilai.`;
+      }
     }
   } else {
-    // Guru TIDAK mengatur KKM -> Jangan tampilkan kata 'Perlu Remedial'
-    if (score >= 95) {
-      recommendation =
-        "Istimewa (Sempurna). Pemahaman materi sangat baik dan memuaskan.";
-    } else if (score >= 80) {
-      recommendation =
-        "Sangat Baik. Pertahankan prestasimu dan terus giat belajar.";
-    } else if (score >= 60) {
-      recommendation =
-        weakestCategory && weakestScore < 100
-          ? `Cukup Baik. Tingkatkan pemahaman pada materi "${weakestCategory}" (${weakestScore}%).`
-          : "Cukup Baik. Terus tingkatkan pemahaman materi.";
+    const rawKkm = exam.config?.kkm;
+    const kkm =
+      rawKkm !== undefined &&
+      rawKkm !== null &&
+      rawKkm !== "" &&
+      !isNaN(Number(rawKkm)) &&
+      Number(rawKkm) > 0
+        ? Number(rawKkm)
+        : null;
+
+    if (kkm !== null) {
+      // Guru secara eksplisit mengatur KKM
+      if (score < kkm) {
+        recommendation = `Perlu Remedial. Nilai belum mencapai KKM (${kkm}). Fokus ulangi materi yang belum tuntas.`;
+      } else if (score >= 95) {
+        recommendation =
+          "Istimewa (Sempurna). Siap untuk materi pengayaan atau tingkat lanjut.";
+      } else if (score >= 80) {
+        recommendation =
+          "Sangat Baik. Pertahankan prestasi dan bantu teman sebagai Tutor Sebaya.";
+      } else {
+        recommendation =
+          weakestCategory && weakestScore < 100
+            ? `Tuntas KKM. Tingkatkan pemahaman pada materi "${weakestCategory}" (${weakestScore}%).`
+            : "Tuntas KKM. Terus pertahankan dan tingkatkan pemahaman materi.";
+      }
     } else {
-      recommendation =
-        weakestCategory && weakestScore < 100
-          ? `Perlu Peningkatan. Fokus pelajari materi "${weakestCategory}" (${weakestScore}%) secara lebih mendalam.`
-          : "Perlu Peningkatan. Fokus ulangi dan pelajari materi dasar secara berkala.";
+      // Guru TIDAK mengatur KKM -> Jangan tampilkan kata 'Perlu Remedial'
+      if (score >= 95) {
+        recommendation =
+          "Istimewa (Sempurna). Pemahaman materi sangat baik dan memuaskan.";
+      } else if (score >= 80) {
+        recommendation =
+          "Sangat Baik. Pertahankan prestasimu dan terus giat belajar.";
+      } else if (score >= 60) {
+        recommendation =
+          weakestCategory && weakestScore < 100
+            ? `Cukup Baik. Tingkatkan pemahaman pada materi "${weakestCategory}" (${weakestScore}%).`
+            : "Cukup Baik. Terus tingkatkan pemahaman materi.";
+      } else {
+        recommendation =
+          weakestCategory && weakestScore < 100
+            ? `Perlu Peningkatan. Fokus pelajari materi "${weakestCategory}" (${weakestScore}%) secara lebih mendalam.`
+            : "Perlu Peningkatan. Fokus ulangi dan pelajari materi dasar secara berkala.";
+      }
     }
   }
 
@@ -1711,6 +1822,77 @@ export const generateExamCode = () => {
   return Math.random().toString(36).substring(2, 8).toUpperCase();
 };
 
+export interface OlympiadMedalTier {
+  tier: "GOLD" | "SILVER" | "BRONZE" | "PARTICIPANT";
+  label: string;
+  medal: string;
+  minPct: number;
+  maxPct: number;
+  badgeClass: string;
+  bgClass: string;
+  textClass: string;
+  borderClass: string;
+  description: string;
+}
+
+export const getOlympiadMedalTier = (score: number, maxScore: number): OlympiadMedalTier => {
+  const pct = maxScore > 0 ? (score / maxScore) * 100 : 0;
+  if (pct >= 85) {
+    return {
+      tier: "GOLD",
+      label: "Medali Emas",
+      medal: "🥇",
+      minPct: 85,
+      maxPct: 100,
+      badgeClass: "bg-amber-100 text-amber-900 border-amber-300 dark:bg-amber-900/40 dark:text-amber-200 dark:border-amber-700",
+      bgClass: "bg-amber-500",
+      textClass: "text-amber-600 dark:text-amber-400",
+      borderClass: "border-amber-300 dark:border-amber-700",
+      description: "Prestasi Luar Biasa (High Distinction). Tingkat akurasi penalaran olimpiade sangat tinggi dan konsisten.",
+    };
+  }
+  if (pct >= 70) {
+    return {
+      tier: "SILVER",
+      label: "Medali Perak",
+      medal: "🥈",
+      minPct: 70,
+      maxPct: 84.9,
+      badgeClass: "bg-slate-100 text-slate-800 border-slate-300 dark:bg-slate-800 dark:text-slate-200 dark:border-slate-600",
+      bgClass: "bg-slate-400",
+      textClass: "text-slate-600 dark:text-slate-300",
+      borderClass: "border-slate-300 dark:border-slate-600",
+      description: "Prestasi Sangat Baik (Distinction). Penguasaan strategi pemecahan masalah dan logika olimpiade tinggi.",
+    };
+  }
+  if (pct >= 50) {
+    return {
+      tier: "BRONZE",
+      label: "Medali Perunggu",
+      medal: "🥉",
+      minPct: 50,
+      maxPct: 69.9,
+      badgeClass: "bg-orange-100 text-orange-900 border-orange-300 dark:bg-orange-950/40 dark:text-orange-200 dark:border-orange-700",
+      bgClass: "bg-orange-500",
+      textClass: "text-orange-600 dark:text-orange-400",
+      borderClass: "border-orange-300 dark:border-orange-700",
+      description: "Prestasi Baik (Credit / Merit). Konsep dasar kompetisi olimpiade telah dikuasai dengan baik.",
+    };
+  }
+  return {
+    tier: "PARTICIPANT",
+    label: "Peserta",
+    medal: "🎗️",
+    minPct: 0,
+    maxPct: 49.9,
+    badgeClass: "bg-sky-50 text-sky-800 border-sky-200 dark:bg-sky-950/40 dark:text-sky-300 dark:border-sky-800",
+    bgClass: "bg-sky-500",
+    textClass: "text-sky-600 dark:text-sky-400",
+    borderClass: "border-sky-200 dark:border-sky-800",
+    description: "Peserta / Honorable Mention. Perlu penguatan strategi pengerjaan dan meminimalisir penalti jawaban salah.",
+  };
+};
+
 /**
  * Calculates the exam score based on student answers and exam configuration.
  * Handles standard scoring, weighted scoring, Olympiad mode penalty multipliers, and manual grades.
@@ -1741,7 +1923,7 @@ export const calculateExamScore = (
     if (str === "") return true;
 
     if (q.questionType === "COMPLEX_MULTIPLE_CHOICE") {
-      return parseList(str).length === 0;
+      return parseList(str, q.options).length === 0;
     }
     if (q.questionType === "TRUE_FALSE" || q.questionType === "MATCHING") {
       try {
@@ -1803,10 +1985,10 @@ export const calculateExamScore = (
       }
     } else if (q.questionType === "COMPLEX_MULTIPLE_CHOICE") {
       const studentSet = new Set(
-        parseList(studentAnswer).map((a) => normalize(a, q.questionType)),
+        parseList(studentAnswer, q.options).map((a) => normalize(a, q.questionType)),
       );
       const correctSet = new Set(
-        parseList(q.correctAnswer).map((a) => normalize(a, q.questionType)),
+        parseList(q.correctAnswer, q.options).map((a) => normalize(a, q.questionType)),
       );
       if (
         studentSet.size === correctSet.size &&
@@ -1853,6 +2035,10 @@ export const calculateExamScore = (
     }
   });
 
+  const correctScore = isOlympiad ? correctCount * correctMult : correctCount;
+  const wrongPenalty = isOlympiad ? wrongCount * wrongMult : 0;
+  const emptyScore = isOlympiad ? unansweredCount * emptyMult : 0;
+
   const finalScore = isOlympiad
     ? totalScore
     : (maxPossibleScore > 0 ? Math.round((totalScore / maxPossibleScore) * 100) : 0);
@@ -1866,7 +2052,11 @@ export const calculateExamScore = (
     maxScore: isOlympiad ? maxPossibleScore : 100,
     minScore: isOlympiad ? minPossibleScore : 0,
     isOlympiadMode: isOlympiad,
+    correctScore,
+    wrongPenalty,
+    emptyScore,
     olympiadScoring: isOlympiad ? { correctMultiplier: correctMult, wrongMultiplier: wrongMult, emptyMultiplier: emptyMult } : undefined,
+    olympiadTier: isOlympiad ? getOlympiadMedalTier(finalScore, maxPossibleScore) : undefined,
   };
 };
 

@@ -29,6 +29,14 @@ interface FinishedStudentsTabProps {
     empty: number;
     score: number;
     duration: number;
+    olympiadTier?: {
+      tier: "GOLD" | "SILVER" | "BRONZE" | "PARTICIPANT";
+      label: string;
+      medal: string;
+      badgeClass: string;
+    };
+    maxScore?: number;
+    minScore?: number;
   };
   formatDuration: (seconds: number | undefined | null) => string;
   checkAnswerStatus: (
@@ -113,7 +121,8 @@ export const FinishedStudentsTab: React.FC<FinishedStudentsTabProps> = ({
           </thead>
           <tbody className="divide-y divide-slate-50 dark:divide-slate-700/50">
             {filteredResults.map((r) => {
-              const { correct, wrong, empty, score } = getCalculatedStats(r);
+              const stats = getCalculatedStats(r);
+              const { correct, wrong, empty, score } = stats;
               return (
                 <React.Fragment key={r.student.studentId}>
                   <tr
@@ -146,15 +155,41 @@ export const FinishedStudentsTab: React.FC<FinishedStudentsTabProps> = ({
                       {r.student.class}
                     </td>
                     <td className="px-6 py-4 text-center">
-                      <span
-                        className={`text-sm font-black px-2 py-1 rounded ${
-                          displayExam?.config?.isOlympiadMode
-                            ? (score > 0 ? "text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-900/30" : score < 0 ? "text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-900/30" : "text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-slate-700")
-                            : (score >= 75 ? "text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30" : score >= 50 ? "text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-900/30" : "text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-900/30")
-                        }`}
-                      >
-                        {score}{displayExam?.config?.isOlympiadMode ? " pt" : ""}
-                      </span>
+                      {displayExam?.config?.isOlympiadMode ? (
+                        <div className="inline-flex flex-col items-center gap-1">
+                          <span
+                            className={`text-sm font-black px-2 py-0.5 rounded ${
+                              score > 0
+                                ? "text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-900/30"
+                                : score < 0
+                                  ? "text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-900/30"
+                                  : "text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-slate-700"
+                            }`}
+                          >
+                            {score} pt
+                          </span>
+                          {stats.olympiadTier && (
+                            <span
+                              className={`text-[9px] font-bold px-1.5 py-0.5 rounded border inline-flex items-center gap-1 ${stats.olympiadTier.badgeClass}`}
+                            >
+                              <span>{stats.olympiadTier.medal}</span>
+                              <span>{stats.olympiadTier.label}</span>
+                            </span>
+                          )}
+                        </div>
+                      ) : (
+                        <span
+                          className={`text-sm font-black px-2 py-1 rounded ${
+                            score >= 75
+                              ? "text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30"
+                              : score >= 50
+                                ? "text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-900/30"
+                                : "text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-900/30"
+                          }`}
+                        >
+                          {score}
+                        </span>
+                      )}
                     </td>
                     <td className="px-6 py-4 text-center text-xs font-bold text-slate-600 dark:text-slate-400">
                       <span

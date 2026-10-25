@@ -183,8 +183,12 @@ export const StudentResultPage: React.FC<StudentResultPageProps> = ({
       maxScore: grading.maxScore,
       minScore: grading.minScore,
       isOlympiadMode: isOlympiad,
+      correctScore: grading.correctScore,
+      wrongPenalty: grading.wrongPenalty,
+      emptyScore: grading.emptyScore,
       olympiadScoring: grading.olympiadScoring,
-      hasDiscrepancy: grading.score !== result.score,
+      olympiadTier: grading.olympiadTier,
+      hasDiscrepancy: typeof result.score === "number" && grading.score !== result.score,
     };
   }, [
     exam,
@@ -358,15 +362,30 @@ export const StudentResultPage: React.FC<StudentResultPageProps> = ({
                       <span className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mt-1 block">
                         {isOlympiad ? "Skor Olimpiade" : "Nilai Akhir"}
                       </span>
-                      {isOlympiad && (
-                        <div className="mt-2.5 flex items-center justify-center gap-1.5 text-[10px] font-mono font-bold text-slate-500 dark:text-slate-400">
-                          <span className="text-emerald-600 dark:text-emerald-400">B: {calculatedStats.correctAnswers}</span>
-                          <span>·</span>
-                          <span className="text-rose-600 dark:text-rose-400">S: {calculatedStats.wrongAnswers}</span>
-                          <span>·</span>
-                          <span className="text-slate-500">K: {calculatedStats.unansweredQuestions}</span>
+
+                      {/* OLYMPIAD MEDAL BADGE IN SCORE CARD */}
+                      {isOlympiad && calculatedStats.olympiadTier && (
+                        <div className="mt-2.5">
+                          <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black border shadow-sm ${calculatedStats.olympiadTier.badgeClass}`}>
+                            <span>{calculatedStats.olympiadTier.medal}</span>
+                            <span>{calculatedStats.olympiadTier.label}</span>
+                          </span>
                         </div>
                       )}
+
+                      {isOlympiad ? (
+                        <div className="mt-3 flex flex-wrap items-center justify-center gap-1.5 text-[10px] font-mono font-bold">
+                          <span className="text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 rounded border border-emerald-200 dark:border-emerald-800" title="Benar">
+                            B: {calculatedStats.correctAnswers} (+{calculatedStats.correctScore} pt)
+                          </span>
+                          <span className="text-rose-700 dark:text-rose-300 bg-rose-50 dark:bg-rose-950/40 px-2 py-0.5 rounded border border-rose-200 dark:border-rose-800" title="Salah (Penalti)">
+                            S: {calculatedStats.wrongAnswers} ({calculatedStats.wrongPenalty} pt)
+                          </span>
+                          <span className="text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded border border-slate-200 dark:border-slate-700" title="Kosong">
+                            K: {calculatedStats.unansweredQuestions} (0 pt)
+                          </span>
+                        </div>
+                      ) : null}
                       {calculatedStats.hasDiscrepancy &&
                         !isWaitingForServer && (
                           <span className="absolute top-3 right-3 flex h-2.5 w-2.5">
@@ -457,6 +476,10 @@ export const StudentResultPage: React.FC<StudentResultPageProps> = ({
               <AnalysisCards
                 analysisData={analysisData}
                 questionTypeStats={questionTypeStats}
+                isOlympiadMode={isOlympiad}
+                olympiadTier={calculatedStats.olympiadTier}
+                score={displayScore}
+                maxScore={calculatedStats.maxScore}
               />
 
               <div className="flex flex-col md:flex-row items-center justify-end gap-6 border-t border-slate-50 dark:border-slate-800 pt-6">

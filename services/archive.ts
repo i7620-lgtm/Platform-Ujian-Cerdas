@@ -403,7 +403,13 @@ export class ArchiveService {
   }
 
   // --- PROMPT GENERATOR (NO AI CALL) ---
-  generateAnalysisPrompt(summaries: ExamSummary[], customPrompt?: string, examQuestions?: Question[], existingAnalyses?: Record<string, string>): string {
+  generateAnalysisPrompt(
+    summaries: ExamSummary[],
+    customPrompt?: string,
+    examQuestions?: Question[],
+    existingAnalyses?: Record<string, string>,
+    targetClassTitle?: string,
+  ): string {
       const stripBase64 = (str: string): string => {
           if (typeof str !== 'string') return str;
           return str.replace(/data:image\/[a-zA-Z+-]+;base64,[^\s"']+/g, '[Gambar]');
@@ -441,7 +447,6 @@ export class ArchiveService {
                   let correctRate: number | undefined;
                   let topWrongAnswer: string | null = null;
                   let topWrongRate: number | undefined;
-                  let answerDist: Record<string, number> | undefined;
 
                   for (const s of summaries) {
                       const qs = s.question_stats?.find((item: any) => item.id === q.id || item.number === idx + 1);
@@ -449,7 +454,6 @@ export class ArchiveService {
                           correctRate = qs.correct_rate as number;
                           topWrongAnswer = qs.top_wrong_answer as string | null;
                           topWrongRate = qs.top_wrong_rate as number;
-                          answerDist = qs.answer_distribution as Record<string, number>;
                           break;
                       }
                   }
@@ -473,7 +477,11 @@ export class ArchiveService {
               .slice(0, 12)
           : [];
 
-      const defaultTask = `Buatlah laporan "Analisis Karakteristik, Diagnostik Butir Soal, dan Matriks Intervensi Berjenjang Hasil Ujian" yang sangat tajam, padat, esensial, dan siap dieksekusi guru dalam 15-25 detik membaca.`;
+      const scopeDescription = targetClassTitle && targetClassTitle !== "Semua Kelas"
+          ? `KHUSUS untuk ${targetClassTitle}. Seluruh data makro, diagnosis butir soal kritis, matriks 4 jenjang (daftar nama siswa), rekomendasi diferensiasi, dan bank soal remedial/pengayaan HARUS murni bersumber dari data ${targetClassTitle} saja tanpa dicampur dengan kelas lain`
+          : `untuk SELURUH KELAS peserta ujian secara terpadu (Analisis Umum)`;
+
+      const defaultTask = `Buatlah laporan "Analisis Karakteristik, Diagnostik Butir Soal, dan Matriks Intervensi Berjenjang Hasil Ujian" ${scopeDescription} yang sangat tajam, padat, esensial, dan siap dieksekusi guru dalam 15-25 detik membaca.`;
 
       const isTKA = summaries.some(s => {
           const t = (s.exam_type || '').toLowerCase().trim();
@@ -510,10 +518,16 @@ export class ArchiveService {
           }
       }
 
+      const reportTitle = targetClassTitle && targetClassTitle !== "Semua Kelas"
+          ? `# Laporan Diagnostik & Analisis Hasil Belajar AI: [Mata Pelajaran] - ${targetClassTitle}`
+          : `# Laporan Diagnostik & Analisis Hasil Belajar AI: [Mata Pelajaran] (Semua Kelas)`;
+
       return `
         Anda adalah Konsultan Ahli Data Pendidikan & Diagnostik Pembelajaran Berbasis Kompetensi (Kurikulum Merdeka).
         Tugas Anda adalah membedah hasil ujian ini menjadi laporan diagnostik klinis yang tajam, sangat padat, bernas, dan langsung membimbing intervensi kelas guru secara presisi tanpa basa-basi bertele-tele (Target waktu generasi 15-25 detik).
         
+        ${targetClassTitle && targetClassTitle !== "Semua Kelas" ? `PENTING (ISOLASI DATA EKSKLUSIF): Laporan ini hanya untuk ${targetClassTitle}. Dilarang mencampurkan data atau menyebutkan siswa di luar ${targetClassTitle}.` : `PENTING (ANALISIS UMUM): Laporan ini mencakup seluruh kelas gabungan.`}
+
         INPUT DATA MAKRO & SEBARAN JENJANG (JSON):
         ${JSON.stringify(simpleData)}
 
@@ -543,7 +557,7 @@ export class ArchiveService {
 
         STRUKTUR LAPORAN ANALISIS AI:
 
-        # Laporan Diagnostik & Analisis Hasil Belajar AI: [Mata Pelajaran]
+        ${reportTitle}
 
         ${ringkasanEksekutifStructure}
 
@@ -578,9 +592,16 @@ export class ArchiveService {
     customPrompt?: string,
     examQuestions?: Question[],
     existingAnalyses?: Record<string, string>,
-    onProgress?: (message: string, step: number, totalSteps: number) => void
+    onProgress?: (message: string, step: number, totalSteps: number) => void,
+    targetClassTitle?: string,
   ): Promise<string> {
-      const prompt = this.generateAnalysisPrompt(summaries, customPrompt, examQuestions, existingAnalyses);
+      const prompt = this.generateAnalysisPrompt(
+        summaries,
+        customPrompt,
+        examQuestions,
+        existingAnalyses,
+        targetClassTitle,
+      );
       onProgress?.("Menghubungkan ke server proxy analisis cerdas...", 1, 4);
 
       let serverFailed = false;
