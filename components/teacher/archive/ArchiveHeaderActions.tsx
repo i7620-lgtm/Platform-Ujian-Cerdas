@@ -187,7 +187,7 @@ export const ArchiveHeaderActions: React.FC<ArchiveHeaderActionsProps> = ({
                     ? "Analisis Soal"
                     : tab === "CLASS_ANALYSIS"
                       ? "Analisis Kelas"
-                      : "Analisis Lanjutan";
+                      : "Analisis AI";
             return (
               <button
                 key={tab}
@@ -199,7 +199,7 @@ export const ArchiveHeaderActions: React.FC<ArchiveHeaderActionsProps> = ({
             );
           })}
         </div>
-        {activeTab === "CLASS_ANALYSIS" && onGenerateAI && (
+        {(activeTab === "CLASS_ANALYSIS" || activeTab === "AI_ANALYSIS") && onGenerateAI && (
           <button
             onClick={onGenerateAI}
             disabled={isGeneratingAI}
