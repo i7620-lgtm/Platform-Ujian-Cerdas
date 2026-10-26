@@ -19,6 +19,7 @@ interface ExamEditorUIState {
     isExamTypeModalOpen: boolean; 
     insertIndex: number | null;
     isGeneratingId: string | null;
+    questionValidation: Record<string, { category?: boolean; level?: boolean; scoreWeight?: boolean }>;
 
     setClassTagInput: (val: string) => void;
     setTypeSelectionModalOpen: (isOpen: boolean) => void;
@@ -29,6 +30,9 @@ interface ExamEditorUIState {
     setExamTypeModalOpen: (isOpen: boolean) => void;
     setInsertIndex: (index: number | null) => void;
     setIsGeneratingId: (id: string | null) => void;
+    setQuestionValidation: (qId: string, errors: { category?: boolean; level?: boolean; scoreWeight?: boolean }) => void;
+    clearQuestionValidationField: (qId: string, field: 'category' | 'level' | 'scoreWeight') => void;
+    clearQuestionValidation: (qId: string) => void;
     resetUI: () => void;
 }
 
@@ -43,6 +47,7 @@ export const useExamEditorUIStore = create<ExamEditorUIState>()(
         isExamTypeModalOpen: false, 
         insertIndex: null,
         isGeneratingId: null,
+        questionValidation: {},
 
         setClassTagInput: (val) => set((state) => { state.classTagInput = val; }),
         setTypeSelectionModalOpen: (isOpen) => set((state) => { state.isTypeSelectionModalOpen = isOpen; }),
@@ -53,6 +58,17 @@ export const useExamEditorUIStore = create<ExamEditorUIState>()(
         setExamTypeModalOpen: (isOpen) => set((state) => { state.isExamTypeModalOpen = isOpen; }),
         setInsertIndex: (index) => set((state) => { state.insertIndex = index; }),
         setIsGeneratingId: (id) => set((state) => { state.isGeneratingId = id; }),
+        setQuestionValidation: (qId, errors) => set((state) => {
+            state.questionValidation[qId] = errors;
+        }),
+        clearQuestionValidationField: (qId, field) => set((state) => {
+            if (state.questionValidation[qId]) {
+                delete state.questionValidation[qId][field];
+            }
+        }),
+        clearQuestionValidation: (qId) => set((state) => {
+            delete state.questionValidation[qId];
+        }),
         
         resetUI: () => set((state) => {
             state.classTagInput = '';
@@ -64,6 +80,7 @@ export const useExamEditorUIStore = create<ExamEditorUIState>()(
             state.isExamTypeModalOpen = false;
             state.insertIndex = null;
             state.isGeneratingId = null;
+            state.questionValidation = {};
         }),
     }))
 );
