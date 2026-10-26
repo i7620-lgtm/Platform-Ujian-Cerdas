@@ -301,7 +301,7 @@ export const ReviewSection: React.FC<ReviewSectionProps> = ({
                         <div className="flex items-center gap-2 min-w-0">
                           <AcademicCapIcon className="w-4 h-4 text-indigo-500 shrink-0" />
                           <span className="text-xs font-bold text-indigo-800 dark:text-indigo-300 truncate">
-                            Langkah Pengerjaan (Pembahasan Lengkap)
+                            Pembahasan Jawaban & Langkah Penyelesaian
                           </span>
                         </div>
                         <div className="flex items-center gap-1.5 shrink-0 text-indigo-600 dark:text-indigo-400 text-[11px] font-semibold">
