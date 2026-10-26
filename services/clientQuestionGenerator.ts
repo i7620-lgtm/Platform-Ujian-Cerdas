@@ -64,9 +64,9 @@ export async function getTransparentApiKey(): Promise<string | null> {
 
 const CLIENT_CANDIDATE_MODELS = [
   "gemini-3.8-flash",
-  "gemini-3.5-flash-lite",
-  "gemini-2.5-flash",
-  "gemini-flash-latest"
+  "gemini-3.1-flash-lite",
+  "gemini-flash-latest",
+  "gemini-2.5-flash"
 ];
 
 /**
@@ -120,7 +120,7 @@ PARAMETER BUTIR SOAL:
 - Materi Pokok / Topik Riil: "${category}"
 - Bentuk Soal: "${assignedType}"
 - Tingkat Kognitif / Penalaran: "${assignedDiff}"
-${kisiKisi ? `- Indikator Kisi-Kisi Khusus: "${kisiKisi}"` : ''}
+${kisiKisi ? `- Indikator Kisi-Kisi Khusus (WAJIB DIIKUTI SECARA KETAT DAN PRESISI): "${kisiKisi}"` : `- Materi Pokok: Rumuskan stimulus dan indikator kisi-kisi pencapaian kompetensi materi "${category}" secara kontekstual`}
 ${blueprint ? `- Pedoman Kurikulum: "${blueprint}"` : ''}
 
 PEDOMAN FORMAT RUMUS MATEMATIKA & SAINS (KaTeX / LaTeX):
@@ -166,8 +166,9 @@ ATURAN STRUKTUR PILIHAN & KUNCI JAWABAN (SESUAI BENTUK SOAL):
 6. Jika "${assignedType}" adalah "Esai":
    - Berikan rubrik penyelesaian lengkap di 'solutionSteps'.
 
-ATURAN PETUNJUK PENGERJAAN (HINT):
-- Field 'hint' WAJIB DIISI! Berikan bimbingan konsep inti atau rumus pembimbing yang memandu siswa berpikir TANPA membocorkan kunci/jawaban akhir.
+ATURAN PETUNJUK PENGERJAAN & PEMBAHASAN JAWABAN:
+- Field 'hint' WAJIB DIISI! Berikan petunjuk konsep inti, petunjuk arah penalaran, atau rumus pembimbing yang memandu siswa berpikir TANPA membocorkan kunci/jawaban akhir.
+- Field 'solutionSteps' WAJIB DIISI! Berikan pembahasan jawaban lengkap dan tahapan langkah penyelesaian terperinci dari awal hingga akhir pembuktian jawaban benar.
 
 Balas HANYA berupa JSON Array berisi tepat 1 objek dengan struktur:
 [
@@ -177,10 +178,10 @@ Balas HANYA berupa JSON Array berisi tepat 1 objek dengan struktur:
     "questionText": "Narasi stimulus kontekstual dan pertanyaan yang jelas",
     "options": ["Opsi 1 substantif", "Opsi 2 substantif", "Opsi 3 substantif", "Opsi 4 substantif"],
     "correctAnswer": "Isi teks opsi benar yang persis sama dengan salah satu pilihan di atas",
-    "explanation": "Penjelasan detail langkah demi langkah pembuktian jawaban benar",
+    "explanation": "Pembahasan detail langkah demi langkah pembuktian jawaban benar",
     "hint": "Petunjuk konsep inti dan rumus pembimbing tanpa membocorkan jawaban",
-    "solutionSteps": "Tahapan penyelesaian lengkap",
-    "kisiKisi": "${kisiKisi || `Disajikan stimulus kontekstual terkait ${category}, peserta didik dapat menganalisis permasalahan dengan tepat.`}",
+    "solutionSteps": "Pembahasan jawaban dan tahapan penyelesaian lengkap dari awal sampai akhir",
+    "kisiKisi": "${kisiKisi ? kisiKisi.replace(/"/g, '\\"') : `Disajikan stimulus kontekstual terkait ${category}, peserta didik dapat menganalisis permasalahan dengan tepat.`}",
     "level": "${assignedDiff}",
     "category": "${category}",
     "scoreWeight": ${weight}
@@ -221,6 +222,24 @@ Balas HANYA berupa JSON Array berisi tepat 1 objek dengan struktur:
           parsed.hint = cleanGeneratedMathUnits(parsed.hint);
         } else {
           parsed.hint = `Pahami konsep inti ${category} dan gunakan rumus dasar yang sesuai untuk menelaah stimulus secara runtut.`;
+        }
+
+        // Bersihkan pembahasan jawaban (solutionSteps)
+        if (parsed.solutionSteps) {
+          parsed.solutionSteps = cleanGeneratedMathUnits(parsed.solutionSteps);
+        } else if (parsed.explanation) {
+          parsed.solutionSteps = cleanGeneratedMathUnits(parsed.explanation);
+        } else {
+          parsed.solutionSteps = `Pembahasan jawaban lengkap untuk materi ${category}. Telaah stimulus dan terapkan prinsip pembuktian secara terstruktur.`;
+        }
+
+        // Pertahankan kisi-kisi dari input pengguna jika ada, atau gunakan dari AI
+        if (kisiKisi) {
+          parsed.kisiKisi = kisiKisi;
+        } else if (parsed.kisiKisi) {
+          parsed.kisiKisi = cleanGeneratedMathUnits(parsed.kisiKisi);
+        } else {
+          parsed.kisiKisi = `Disajikan stimulus kontekstual terkait ${category}, peserta didik dapat menganalisis permasalahan dengan tepat.`;
         }
 
         const rawType = (assignedType || "").toLowerCase();

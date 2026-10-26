@@ -794,8 +794,8 @@ export async function generateQuestions(
     // --- JALUR 2: Serverless Endpoint Vercel (/api/generate-questions) ---
     let lastServerError: any = null;
     if (questions.length === 0) {
-      const primaryModels = ["gemini-3.8-flash", "gemini-3.5-flash-lite"];
-      const backupModels = ["gemini-2.5-flash", "gemini-flash-latest"];
+      const primaryModels = ["gemini-3.8-flash", "gemini-3.1-flash-lite"];
+      const backupModels = ["gemini-flash-latest", "gemini-2.5-flash"];
 
       const executeAiCall = async (models: string[], timeoutMs: number): Promise<any[]> => {
         const controller = new AbortController();
@@ -822,7 +822,15 @@ export async function generateQuestions(
           }
           const data = await res.json();
           if (!data.success) {
-            throw new Error(data.error || "Gagal menghasilkan butir soal dari AI.");
+            let errorText = "Gagal menghasilkan butir soal dari AI.";
+            if (data.error) {
+              if (typeof data.error === "string") {
+                errorText = data.error;
+              } else if (typeof data.error === "object") {
+                errorText = data.error.message || data.error.error?.message || (typeof data.error.error === "string" ? data.error.error : "") || JSON.stringify(data.error);
+              }
+            }
+            throw new Error(errorText);
           }
           const parsed = JSON.parse(data.text || "[]");
           if (!Array.isArray(parsed) || parsed.length === 0) {
@@ -851,8 +859,17 @@ export async function generateQuestions(
 
     // Jika AI tidak berhasil menghasilkan soal, sampaikan kondisi sebenarnya secara jujur tanpa membuat soal palsu
     if (questions.length === 0) {
-      const rawErrMsg = (lastServerError?.message || "").toLowerCase();
-      let cleanMessage = lastServerError?.message || "Layanan AI tidak dapat diakses saat ini. Silakan periksa koneksi dan coba beberapa saat lagi.";
+      let rawErrMsg = "";
+      if (typeof lastServerError === "string") {
+        rawErrMsg = lastServerError.toLowerCase();
+      } else if (lastServerError && typeof lastServerError === "object") {
+        const extracted = lastServerError.message || lastServerError.error?.message || (typeof lastServerError.error === "string" ? lastServerError.error : "") || "";
+        rawErrMsg = String(extracted || "").toLowerCase();
+      }
+
+      let cleanMessage = (lastServerError && lastServerError.message && lastServerError.message !== "[object Object]")
+        ? lastServerError.message
+        : "Layanan AI tidak dapat diakses saat ini. Silakan periksa koneksi dan coba beberapa saat lagi.";
 
       if (rawErrMsg.includes("quota") || rawErrMsg.includes("429") || rawErrMsg.includes("exhausted") || rawErrMsg.includes("rate limit")) {
         cleanMessage = "QUOTA_EXCEEDED";

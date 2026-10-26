@@ -1068,7 +1068,7 @@ export const ExamConfigSettings: React.FC<ExamConfigSettingsProps> = ({
                 className="h-5 w-5 rounded text-primary focus:ring-primary border-gray-300"
               />
               <span className="ml-3 text-sm font-medium text-gray-700 dark:text-slate-300 group-hover:text-primary transition-colors">
-                Tampilkan Langkah Pengerjaan
+                Tampilkan Pembahasan Jawaban
               </span>
             </label>
             <label className="flex items-center p-3 rounded-xl border border-gray-100 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors cursor-pointer group shadow-sm">
