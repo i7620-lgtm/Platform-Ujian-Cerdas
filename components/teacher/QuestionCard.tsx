@@ -48,6 +48,8 @@ export const QuestionCard = React.memo(
     const setEditingChartTarget = useExamEditorUIStore((s) => s.setEditingChartTarget);
     const setInsertIndex = useExamEditorUIStore((s) => s.setInsertIndex);
     const setTypeSelectionModalOpen = useExamEditorUIStore((s) => s.setTypeSelectionModalOpen);
+    const validation = useExamEditorUIStore((s) => s.questionValidation[q.id]);
+    const clearQuestionValidationField = useExamEditorUIStore((s) => s.clearQuestionValidationField);
 
     const [isHintOpen, setIsHintOpen] = useState(false);
     const [isStepsOpen, setIsStepsOpen] = useState(false);
@@ -236,62 +238,98 @@ export const QuestionCard = React.memo(
                       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
                         <div>
                           <label className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest block mb-1">
-                            Kategori Soal
+                            Kategori Soal <span className="text-red-500 font-black">*</span>
                           </label>
                           <input
                             type="text"
                             value={q.category || ""}
-                            onChange={(e) =>
-                              handleCategoryChange(q.id, e.target.value)
-                            }
-                            className="w-full p-2 bg-slate-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-lg text-xs font-medium focus:ring-1 focus:ring-primary outline-none text-slate-800 dark:text-slate-200 placeholder:text-slate-400"
+                            onChange={(e) => {
+                              handleCategoryChange(q.id, e.target.value);
+                              if (validation?.category) {
+                                clearQuestionValidationField(q.id, "category");
+                              }
+                            }}
+                            className={`w-full p-2 bg-slate-50 dark:bg-slate-900 border rounded-lg text-xs font-medium focus:ring-1 focus:ring-primary outline-none text-slate-800 dark:text-slate-200 placeholder:text-slate-400 transition-all ${
+                              validation?.category
+                                ? "border-red-500 ring-2 ring-red-200 dark:ring-red-900/50 bg-red-50/30"
+                                : "border-gray-200 dark:border-slate-700"
+                            }`}
                             placeholder="Contoh: Aljabar, Teks Prosedur"
                           />
+                          {validation?.category && (
+                            <p className="text-[10px] text-red-600 dark:text-red-400 font-semibold mt-1">
+                              * Wajib diisi sebelum membuat dengan AI
+                            </p>
+                          )}
                         </div>
                         <div>
                           <label className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest block mb-1">
-                            Level Soal
+                            Level Soal <span className="text-red-500 font-black">*</span>
                           </label>
                           <input
                             type="text"
                             value={q.level || ""}
-                            onChange={(e) =>
-                              handleLevelChange(q.id, e.target.value)
-                            }
-                            className="w-full p-2 bg-slate-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-lg text-xs font-medium focus:ring-1 focus:ring-primary outline-none text-slate-800 dark:text-slate-200 placeholder:text-slate-400"
-                            placeholder="Contoh: 1, 2, HOTS, LOTS"
+                            onChange={(e) => {
+                              handleLevelChange(q.id, e.target.value);
+                              if (validation?.level) {
+                                clearQuestionValidationField(q.id, "level");
+                              }
+                            }}
+                            className={`w-full p-2 bg-slate-50 dark:bg-slate-900 border rounded-lg text-xs font-medium focus:ring-1 focus:ring-primary outline-none text-slate-800 dark:text-slate-200 placeholder:text-slate-400 transition-all ${
+                              validation?.level
+                                ? "border-red-500 ring-2 ring-red-200 dark:ring-red-900/50 bg-red-50/30"
+                                : "border-gray-200 dark:border-slate-700"
+                            }`}
+                            placeholder="Contoh: Level 1, Level 2, HOTS"
                           />
+                          {validation?.level && (
+                            <p className="text-[10px] text-red-600 dark:text-red-400 font-semibold mt-1">
+                              * Wajib diisi sebelum membuat dengan AI
+                            </p>
+                          )}
                         </div>
                         <div>
                           <label className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest block mb-1">
-                            Bobot Nilai
+                            Bobot Nilai <span className="text-red-500 font-black">*</span>
                           </label>
                           <input
                             type="number"
                             min="1"
-                            value={q.scoreWeight || 1}
-                            onChange={(e) =>
+                            value={q.scoreWeight ?? 1}
+                            onChange={(e) => {
                               handleScoreWeightChange(
                                 q.id,
                                 parseInt(e.target.value) || 1,
-                              )
-                            }
-                            className="w-full p-2 bg-slate-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-lg text-xs font-medium focus:ring-1 focus:ring-primary outline-none text-slate-800 dark:text-slate-200 placeholder:text-slate-400"
+                              );
+                              if (validation?.scoreWeight) {
+                                clearQuestionValidationField(q.id, "scoreWeight");
+                              }
+                            }}
+                            className={`w-full p-2 bg-slate-50 dark:bg-slate-900 border rounded-lg text-xs font-medium focus:ring-1 focus:ring-primary outline-none text-slate-800 dark:text-slate-200 placeholder:text-slate-400 transition-all ${
+                              validation?.scoreWeight
+                                ? "border-red-500 ring-2 ring-red-200 dark:ring-red-900/50 bg-red-50/30"
+                                : "border-gray-200 dark:border-slate-700"
+                            }`}
                             placeholder="Default: 1"
                           />
+                          {validation?.scoreWeight && (
+                            <p className="text-[10px] text-red-600 dark:text-red-400 font-semibold mt-1">
+                              * Wajib bernilai minimal 1
+                            </p>
+                          )}
                         </div>
                       </div>
 
                       <div className="mb-4">
                         <div className="flex items-center justify-between mb-1">
                           <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest block">
-                            Kisi-Kisi Materi
+                            Kisi-Kisi Materi <span className="normal-case font-normal text-slate-400 dark:text-slate-500">(Opsional)</span>
                           </label>
                         </div>
                         <WysiwygEditor
                           value={q.kisiKisi || ""}
                           onChange={(val) => handleKisiKisiChange(q.id, val)}
-                          placeholder="Tulis kisi-kisi di sini..."
+                          placeholder="Tulis kisi-kisi materi di sini (opsional)..."
                           minHeight="70px"
                         />
                       </div>
@@ -428,7 +466,7 @@ export const QuestionCard = React.memo(
                           )}
                         </div>
 
-                        {/* 2. Langkah Pengerjaan */}
+                        {/* 2. Pembahasan Jawaban */}
                         <div
                           className={`flex flex-col rounded-xl border transition-all duration-200 shadow-2xs overflow-hidden ${
                             hasSteps
@@ -456,7 +494,7 @@ export const QuestionCard = React.memo(
                                     : "text-slate-700 dark:text-slate-300"
                                 }`}
                               >
-                                Langkah Pengerjaan
+                                Pembahasan Jawaban
                               </label>
                             </div>
                             <div className="flex items-center gap-2 shrink-0">
@@ -502,12 +540,12 @@ export const QuestionCard = React.memo(
                           {isStepsOpen && (
                             <div className="p-3 pt-2 border-t border-dashed border-gray-200 dark:border-slate-700/80">
                               <p className="text-[11px] text-slate-500 dark:text-slate-400 mb-2 leading-relaxed">
-                                Cara menjawab dari awal sampai ketemu jawaban (dapat dibuka siswa pada ulasan nilai).
+                                Pembahasan jawaban dan tahapan penyelesaian lengkap dari awal sampai akhir (dapat dibuka siswa pada ulasan nilai).
                               </p>
                               <WysiwygEditor
                                 value={q.solutionSteps || ""}
                                 onChange={(val) => handleSolutionStepsChange(q.id, val)}
-                                placeholder="Tulis cara menjawab dari awal sampai selesai di sini..."
+                                placeholder="Tulis pembahasan jawaban dan langkah penyelesaian lengkap di sini..."
                                 minHeight="75px"
                               />
                             </div>
