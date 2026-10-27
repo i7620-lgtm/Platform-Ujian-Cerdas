@@ -1051,22 +1051,17 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({
         </div>
       </main>
 
-      {/* Floating Drawer Button di Sudut Kanan Bawah (Hanya Angka X / Y Tebal dengan Ikon Daftar Soal Tanpa Persentase) */}
+      {/* Floating Drawer Button di Sudut Kanan Bawah (Hanya Angka X / Y Tebal dan Ikon Naik/Turun) */}
       <div className="fixed bottom-5 right-5 sm:bottom-6 sm:right-6 z-40 pointer-events-auto">
         <button
           type="button"
           onClick={() => setIsNavOpen(!isNavOpen)}
-          className="group flex items-center gap-2.5 px-3.5 py-2.5 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md rounded-2xl shadow-xl hover:shadow-2xl border border-slate-200/90 dark:border-slate-800 ring-1 ring-slate-100 dark:ring-slate-800/60 hover:border-indigo-200 dark:hover:border-indigo-800 transition-all duration-200 active:scale-95 cursor-pointer text-left"
+          className="group flex items-center gap-2 px-3.5 py-2 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md rounded-2xl shadow-xl hover:shadow-2xl border border-slate-200/90 dark:border-slate-800 ring-1 ring-slate-100 dark:ring-slate-800/60 hover:border-indigo-200 dark:hover:border-indigo-800 transition-all duration-200 active:scale-95 cursor-pointer text-left"
           title="Ketuk untuk membuka daftar nomor soal"
-          aria-label="Lihat daftar nomor soal"
+          aria-label="Buka atau tutup daftar nomor soal"
         >
-          {/* Ikon Daftar Soal yang Bersih dan Elegan */}
-          <div className="w-8 h-8 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0 shadow-2xs group-hover:scale-105 group-hover:bg-indigo-600 group-hover:text-white transition-all duration-200">
-            <ListBulletIcon className="w-4 h-4" />
-          </div>
-
           {/* Hanya Angka X / Y Tebal */}
-          <div className="flex items-baseline gap-1 pr-1 font-black leading-tight tabular-nums select-none">
+          <div className="flex items-baseline gap-1 font-black leading-tight tabular-nums select-none pl-0.5">
             <span className="text-sm sm:text-base font-black text-indigo-600 dark:text-indigo-400">
               {answeredCount}
             </span>
@@ -1078,12 +1073,12 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({
             </span>
           </div>
 
-          {/* Ikon Panah Status Laci */}
+          {/* Ikon Panah Status Laci (Naik dan Turun) */}
           <div className="w-5 h-5 rounded-md text-slate-400 dark:text-slate-500 flex items-center justify-center group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
             {isNavOpen ? (
-              <ChevronDownIcon className="w-3.5 h-3.5" />
+              <ChevronDownIcon className="w-4 h-4" />
             ) : (
-              <ChevronUpIcon className="w-3.5 h-3.5" />
+              <ChevronUpIcon className="w-4 h-4" />
             )}
           </div>
         </button>
