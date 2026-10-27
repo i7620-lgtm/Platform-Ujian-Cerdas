@@ -633,6 +633,24 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({
         className={`fixed top-16 left-0 w-full bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl z-50 border-b border-slate-200 dark:border-slate-800 shadow-xl transition-all duration-300 ease-in-out origin-top ${isNavOpen ? "translate-y-0 opacity-100 visible" : "-translate-y-full opacity-0 invisible"}`}
       >
         <div className="w-full max-w-full mx-auto p-4 sm:p-6 max-h-[70vh] overflow-y-auto">
+          {/* Header Ringkasan Daftar Soal (X dari Y Soal tanpa persentase) */}
+          <div className="flex items-center justify-between pb-3 mb-4 border-b border-slate-100 dark:border-slate-800/80 max-w-4xl mx-auto">
+            <div className="flex items-center gap-2">
+              <div className="w-7 h-7 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center">
+                <ListBulletIcon className="w-4 h-4" />
+              </div>
+              <span className="text-xs sm:text-sm font-bold text-slate-800 dark:text-slate-200">
+                Daftar Nomor Soal
+              </span>
+            </div>
+            <div className="flex items-center gap-1.5 px-3 py-1 bg-slate-100/90 dark:bg-slate-800/90 rounded-lg text-xs font-bold text-slate-700 dark:text-slate-300 border border-slate-200/60 dark:border-slate-700/60">
+              <span className="text-indigo-600 dark:text-indigo-400 font-black tabular-nums">{answeredCount}</span>
+              <span className="text-slate-400 dark:text-slate-500 font-normal">dari</span>
+              <span className="font-bold text-slate-900 dark:text-white tabular-nums">{totalQuestions}</span>
+              <span className="text-slate-600 dark:text-slate-400">Soal</span>
+            </div>
+          </div>
+
           <div className="flex flex-wrap gap-2 justify-center">
             {activeExam.questions.map((q, idx) => {
               if (q.questionType === "INFO") return null;
@@ -1033,56 +1051,35 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({
         </div>
       </main>
 
-      {/* Floating Progress Widget di Sudut Kanan Bawah (Ringkas & Bebas Salah Tekan) */}
+      {/* Floating Drawer Button di Sudut Kanan Bawah (Hanya Angka X / Y Tebal dan Ikon Naik/Turun) */}
       <div className="fixed bottom-5 right-5 sm:bottom-6 sm:right-6 z-40 pointer-events-auto">
         <button
           type="button"
           onClick={() => setIsNavOpen(!isNavOpen)}
-          className="group flex items-center gap-2.5 px-3.5 py-2 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md rounded-2xl shadow-xl hover:shadow-2xl border border-slate-200/90 dark:border-slate-800 ring-1 ring-slate-100 dark:ring-slate-800/60 transition-all duration-200 active:scale-95 cursor-pointer text-left"
+          className="group flex items-center gap-2 px-3.5 py-2 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md rounded-2xl shadow-xl hover:shadow-2xl border border-slate-200/90 dark:border-slate-800 ring-1 ring-slate-100 dark:ring-slate-800/60 hover:border-indigo-200 dark:hover:border-indigo-800 transition-all duration-200 active:scale-95 cursor-pointer text-left"
           title="Ketuk untuk membuka daftar nomor soal"
-          aria-label="Lihat nomor soal dan progres"
+          aria-label="Buka atau tutup daftar nomor soal"
         >
-          {/* Mini Circular Progress */}
-          <div className="relative w-7 h-7 flex items-center justify-center shrink-0">
-            <svg className="w-7 h-7 -rotate-90" viewBox="0 0 36 36">
-              <path
-                className="text-slate-100 dark:text-slate-800"
-                strokeWidth="3.5"
-                stroke="currentColor"
-                fill="none"
-                d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-              />
-              <path
-                className="text-indigo-600 dark:text-indigo-400 transition-all duration-500 ease-out"
-                strokeDasharray={`${progress}, 100`}
-                strokeWidth="3.5"
-                strokeLinecap="round"
-                stroke="currentColor"
-                fill="none"
-                d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-              />
-            </svg>
-            <span className="absolute text-[8px] font-black text-slate-700 dark:text-slate-200 font-mono">
-              {progress}%
+          {/* Hanya Angka X / Y Tebal */}
+          <div className="flex items-baseline gap-1 font-black leading-tight tabular-nums select-none pl-0.5">
+            <span className="text-sm sm:text-base font-black text-indigo-600 dark:text-indigo-400">
+              {answeredCount}
+            </span>
+            <span className="text-xs sm:text-sm font-bold text-slate-400 dark:text-slate-500">
+              /
+            </span>
+            <span className="text-xs sm:text-sm font-black text-slate-700 dark:text-slate-200">
+              {totalQuestions}
             </span>
           </div>
 
-          <div className="flex flex-col pr-0.5">
-            <span className="text-[9px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 leading-tight">
-              Progres
-            </span>
-            <div className="flex items-baseline gap-0.5 leading-tight">
-              <span className="text-xs sm:text-sm font-black text-slate-900 dark:text-white tabular-nums">
-                {answeredCount}
-              </span>
-              <span className="text-[10px] sm:text-[11px] font-bold text-slate-400 dark:text-slate-500">
-                /{totalQuestions}
-              </span>
-            </div>
-          </div>
-
-          <div className="w-6 h-6 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 flex items-center justify-center group-hover:bg-indigo-50 dark:group-hover:bg-indigo-950/60 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors ml-0.5">
-            <ListBulletIcon className="w-3.5 h-3.5" />
+          {/* Ikon Panah Status Laci (Naik dan Turun) */}
+          <div className="w-5 h-5 rounded-md text-slate-400 dark:text-slate-500 flex items-center justify-center group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
+            {isNavOpen ? (
+              <ChevronDownIcon className="w-4 h-4" />
+            ) : (
+              <ChevronUpIcon className="w-4 h-4" />
+            )}
           </div>
         </button>
       </div>
