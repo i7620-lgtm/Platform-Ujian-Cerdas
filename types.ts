@@ -211,7 +211,8 @@ export interface Exam {
   config: ExamConfig;
   isSynced?: boolean; 
   createdAt?: string; 
-  status?: 'DRAFT' | 'PUBLISHED'; 
+  status?: 'DRAFT' | 'PUBLISHED';
+  version?: number; 
 }
 
 export interface Collaborator {
