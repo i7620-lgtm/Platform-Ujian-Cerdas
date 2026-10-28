@@ -6,6 +6,7 @@ import type { RealtimeChannel } from "@supabase/supabase-js";
 import { calculateExamScore, sanitizeHtml, parseList } from "../teacher/examUtils";
 import { useExamAntiCheat } from "../../hooks/useExamAntiCheat";
 import { calculateStudentAccess } from "../../utils/scheduleUtils";
+import { measureClientBandwidthBytes, detectClientDevice, countIntegrityViolations } from "../../utils/telemetryUtils";
 
 interface UseStudentExamLogicProps {
   exam: Exam;
@@ -145,6 +146,23 @@ export const useStudentExamLogic = ({
               (Date.now() - startTime) / 1000,
             );
             answersRef.current["_duration"] = durationInSeconds.toString();
+          }
+
+          // Catat telemetri transfer kuota riil, perangkat/OS siswa, dan pelanggaran integritas
+          try {
+            const measuredBytes = measureClientBandwidthBytes();
+            const device = detectClientDevice();
+            const violations = countIntegrityViolations(logRef.current);
+            const submissionHour = new Date().getHours();
+
+            answersRef.current["_bandwidthBytes"] = measuredBytes.toString();
+            answersRef.current["_os"] = device.os;
+            answersRef.current["_device"] = device.deviceType;
+            answersRef.current["_browser"] = device.browser;
+            answersRef.current["_tabSwitches"] = violations.toString();
+            answersRef.current["_submissionHour"] = submissionHour.toString();
+          } catch (telemetryErr) {
+            console.warn("Gagal merekam telemetri:", telemetryErr);
           }
         }
 
