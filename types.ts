@@ -324,6 +324,50 @@ export type TeacherView =
   | "UPCOMING_EXAMS"
   | "FINISHED_EXAMS"
   | "DRAFTS"
+  | "ANALYTICS"
   | "ADMIN_USERS"
   | "ARCHIVE_VIEWER"
   | "BOOK_GENERATOR";
+
+export interface ExamTelemetry {
+  bandwidthBytes?: number;
+  operatingSystem?: string;
+  deviceType?: 'mobile' | 'tablet' | 'desktop';
+  tabSwitchCount?: number;
+  submissionHour?: number;
+}
+
+export interface AnalyticsFilter {
+  dateRange: 'this_month' | 'last_month' | 'last_3_months' | 'this_year' | 'all';
+  startDate?: string;
+  endDate?: string;
+  classLevel?: string;
+  regency?: string;
+  school?: string;
+  teacherId?: string;
+  searchQuery?: string;
+}
+
+export interface UsageStatistics {
+  totalStudents: number;
+  totalExamsConducted: number;
+  totalQuestionsAnswered: number;
+  totalTimeSpentSeconds: number;
+  totalBandwidthBytes: number;
+  avgBandwidthPerStudentKB: number;
+  avgDurationMinutes: number;
+  integrityViolationRate: number; // percentage of students with >=1 tab switch
+  classBreakdown: Array<{ className: string; studentCount: number; questionCount: number }>;
+  monthlyTrends: Array<{
+    monthKey: string; // e.g. 'Jan 2026'
+    rawKey: string;   // e.g. '2026-01'
+    studentCount: number;
+    questionCount: number;
+    bandwidthMB: number;
+    hoursSpent: number;
+  }>;
+  peakHourDistribution: Array<{ hour: number; label: string; count: number }>;
+  osDistribution: Array<{ name: string; count: number; percentage: number }>;
+  deviceDistribution: Array<{ name: string; count: number; percentage: number }>;
+  regionalDistribution: Array<{ regency: string; schoolName: string; studentCount: number; examCount: number }>;
+}
