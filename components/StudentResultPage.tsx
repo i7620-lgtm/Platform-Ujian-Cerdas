@@ -29,6 +29,10 @@ import { CompletedClosedScreen } from "./student/result/CompletedClosedScreen";
 import { AnalysisCards } from "./student/result/AnalysisCards";
 import { ReviewSection } from "./student/result/ReviewSection";
 import { StudentFeedbackModal } from "./student/result/StudentFeedbackModal";
+import { checkAnswerStatus } from "./teacher/archive/archiveUtils";
+import { QuestionResultDetailPopover } from "./QuestionResultDetailPopover";
+import { examService } from "../services/exam";
+import type { Question } from "../types";
 
 interface StudentResultPageProps {
   result: Result;
@@ -50,6 +54,37 @@ export const StudentResultPage: React.FC<StudentResultPageProps> = ({
   const config = exam.config;
   const [expandedReview, setExpandedReview] = useState(false);
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
+  const [enrichedQuestions, setEnrichedQuestions] = useState<Question[]>(exam.questions);
+
+  // Fetch authorized solution package if teacher permitted review
+  useEffect(() => {
+    setEnrichedQuestions(exam.questions);
+    const shouldFetchSolutions = Boolean(
+      config.showCorrectAnswer || config.showHints || config.showSolutionSteps || config.showResultToStudent
+    );
+    if (shouldFetchSolutions && (result.status === "completed" || result.status === "force_closed")) {
+      examService.getExamSolutions(exam.code, result.student.studentId).then((solutionsMap) => {
+        if (solutionsMap) {
+          setEnrichedQuestions((prev) =>
+            prev.map((q) => {
+              const sol = solutionsMap[q.id];
+              if (!sol) return q;
+              return {
+                ...q,
+                correctAnswer: sol.correctAnswer ?? q.correctAnswer,
+                explanation: sol.explanation ?? q.explanation,
+                solutionSteps: sol.solutionSteps ?? q.solutionSteps,
+                matchingPairs: sol.matchingPairs ?? q.matchingPairs,
+                trueFalseRows: sol.trueFalseRows ?? q.trueFalseRows,
+              };
+            })
+          );
+        }
+      });
+    }
+  }, [exam.code, exam.questions, result.student.studentId, result.status, config]);
+
+  const enrichedExam = useMemo(() => ({ ...exam, questions: enrichedQuestions }), [exam, enrichedQuestions]);
 
   // Scroll to top on mount and trigger feedback modal for completed exam
   useEffect(() => {
@@ -482,6 +517,61 @@ export const StudentResultPage: React.FC<StudentResultPageProps> = ({
                 maxScore={calculatedStats.maxScore}
               />
 
+              {/* PALET NOMOR SOAL & DETAIL HASIL SISWA (Hanya ditampilkan jika guru mengizinkan pembahasan/kunci) */}
+              {(config.showCorrectAnswer || config.showHints || config.showSolutionSteps) && (
+                <div className="bg-slate-50/80 dark:bg-slate-800/40 rounded-3xl p-5 border border-slate-100 dark:border-slate-800 text-left">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3 pb-3 border-b border-slate-200/60 dark:border-slate-700/60">
+                    <div>
+                      <h3 className="text-xs font-black text-slate-800 dark:text-white uppercase tracking-wider flex items-center gap-2">
+                        <SparklesIcon className="w-4 h-4 text-indigo-500" />
+                        <span>Rincian Hasil Pengerjaan Soal</span>
+                      </h3>
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                        Arahkan kursor atau ketuk nomor soal untuk melihat pertanyaan, jawaban Anda, kunci yang benar, serta pembahasannya.
+                      </p>
+                    </div>
+                    {/* Legend */}
+                    <div className="flex items-center gap-3 text-[10px] font-bold text-slate-600 dark:text-slate-400 shrink-0">
+                      <span className="flex items-center gap-1">
+                        <span className="w-2.5 h-2.5 rounded-full bg-emerald-400"></span> Benar
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <span className="w-2.5 h-2.5 rounded-full bg-rose-400"></span> Salah
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <span className="w-2.5 h-2.5 rounded-full bg-slate-300 dark:bg-slate-600"></span> Kosong
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap gap-2 pt-1">
+                    {enrichedQuestions
+                      .filter((q) => q.questionType !== "INFO")
+                      .map((q, idx) => {
+                        const status = checkAnswerStatus(q, result.answers || {});
+                        const isManual =
+                          q.questionType === "ESSAY" ||
+                          q.questionType === "FILL_IN_THE_BLANK";
+                        const isGraded = result.answers?.[`_grade_${q.id}`];
+                        return (
+                          <QuestionResultDetailPopover
+                            key={q.id}
+                            question={q}
+                            questionIndex={idx}
+                            answers={result.answers || {}}
+                            status={status}
+                            isManual={isManual}
+                            isGraded={isGraded}
+                            showCorrectAnswer={Boolean(config.showCorrectAnswer)}
+                            showSolutionSteps={Boolean(config.showSolutionSteps || config.showHints)}
+                            size="md"
+                          />
+                        );
+                      })}
+                  </div>
+                </div>
+              )}
+
               <div className="flex flex-col md:flex-row items-center justify-end gap-6 border-t border-slate-50 dark:border-slate-800 pt-6">
                 {config.enableCertificate && (
                   <button
@@ -507,7 +597,7 @@ export const StudentResultPage: React.FC<StudentResultPageProps> = ({
                 )}
               </div>
 
-              {expandedReview && <ReviewSection exam={exam} result={result} />}
+              {expandedReview && <ReviewSection exam={enrichedExam} result={result} />}
             </div>
           ) : (
             <div className="bg-slate-50 dark:bg-slate-800 p-8 rounded-3xl border border-slate-100 dark:border-slate-700">
