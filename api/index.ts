@@ -4,6 +4,8 @@ import generateQuestionsHandler from "./generate-questions.ts";
 import generateAnalysisHandler from "./generate-analysis.ts";
 import generateSvgHandler from "./generate-svg.ts";
 
+import examContentHandler from "./exam-content.ts";
+
 export const config = {
   maxDuration: 60,
 };
@@ -32,6 +34,10 @@ export default async function handler(req: any, res: any) {
 
   if (pathname === "/api/generate-svg" || pathname === "/generate-svg") {
     return generateSvgHandler(req, res);
+  }
+
+  if (pathname.startsWith("/api/exam-content")) {
+    return examContentHandler(req, res);
   }
 
   return res.status(404).json({
