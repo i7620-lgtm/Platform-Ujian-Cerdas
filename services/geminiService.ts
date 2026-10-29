@@ -6,6 +6,7 @@ import { generateEducationalSvg, svgToDataUrl } from "./svgGeneratorService";
 import { generateContextualEducationalSvg } from "./smartSvgTemplates";
 import { repairQuestionCharts, normalizeChartPlaceholdersInHtml } from "./chartRepairService";
 import { generateSingleQuestionClientSide } from "./clientQuestionGenerator";
+import { resolveExpertPersona, buildAIMDirectives, validateAndReflectQuestions } from "./aiPersonaAimEngine";
 
 export class PartialGenerationError extends Error {
   public partialQuestions: Question[];
@@ -114,10 +115,16 @@ export async function generateQuestions(
                   selectedDifficulties.some(d => d.toUpperCase().includes('PENALARAN') || d.toUpperCase().includes('LEVEL 3')) ||
                   selectedTypes.some(t => t.toUpperCase().includes('TKA'));
 
+    const dynamicPersona = resolveExpertPersona(config);
+    const aimDirectives = buildAIMDirectives(config);
+
     const systemInstruction = `
-    Anda adalah Penulis Soal Ahli Asesmen Nasional (Master Item Writer) dan Asisten Pembuat Soal Ujian Profesional yang berpengalaman dalam menyusun soal terstandar nasional, termasuk Kerangka Asesmen Tes Kemampuan Akademik (TKA) sesuai regulasi resmi Badan Standar, Kurikulum, dan Asesmen Pendidikan (BSKAP) Kementerian Pendidikan Dasar dan Menengah RI No. 047/H/AN/2025 (Jenjang SD/MI dan SMP/MTs) serta No. 045/H/AN/2025 (Jenjang SMA/MA/Sederajat dan SMK/MAK).
+    ${dynamicPersona}
     
-    Tugas Anda adalah membuat soal berkualitas tinggi, akurat secara konsep, serta memiliki daya beda yang valid berdasarkan parameter yang diberikan.
+    ${aimDirectives}
+    
+    PRINSIP UTAMA PELAKSANAAN TUGAS:
+    Tugas Anda adalah membuat butir soal berkualitas tinggi, akurat secara konsep 100%, memiliki daya beda valid, bebas kontradiksi, dan mematuhi etika pendidikan nasional.
     
     PRINSIP KEPATUHAN TOPIK MUTLAK (TOPIC FIDELITY & ZERO TOPIC DRIFT):
     - Anda WAJIB mematuhi 100% mata pelajaran, topik materi pokok, sub-topik, dan kisi-kisi yang ditetapkan oleh pengguna pada parameter target.
@@ -1947,8 +1954,9 @@ export async function generateQuestions(
       }
     }
 
-    onProgress?.(finalQuestions.length, totalCount, "Memfinalisasi dan merapikan butir soal...");
-    return repairQuestionCharts(finalQuestions);
+    onProgress?.(finalQuestions.length, totalCount, "Memfinalisasi dan audit mutu butir soal...");
+    const reflectedQuestions = validateAndReflectQuestions(finalQuestions);
+    return repairQuestionCharts(reflectedQuestions);
   } catch (error) {
     if (error instanceof PartialGenerationError) {
       throw error;
