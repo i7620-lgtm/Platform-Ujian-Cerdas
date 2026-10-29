@@ -2,6 +2,7 @@ import { GoogleGenAI, Type } from "@google/genai";
 import { generateContextualEducationalSvg } from "./smartSvgFallback.ts";
 import { validateEducationalSafety } from "./contentModeration.ts";
 import { generateDeterministicDiagnosticReport } from "./diagnosticFallback.ts";
+import { buildAIMAnalysisDirectives } from "../services/aiPersonaAimEngine.ts";
 
 let aiInstance: GoogleGenAI | null = null;
 
@@ -76,6 +77,7 @@ export async function generateAIAnalysisOnServer(prompt: string): Promise<string
                 model: currentModel,
                 contents: prompt,
                 config: {
+                    systemInstruction: buildAIMAnalysisDirectives(),
                     temperature: 0.2,
                 }
             });

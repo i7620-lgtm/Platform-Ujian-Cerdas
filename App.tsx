@@ -16,6 +16,7 @@ import { CollaboratorView } from './components/CollaboratorView';
 import { supabase } from './lib/supabase';
 import { hydrateMathInContainer } from './utils/mathRenderer';
 import { calculateStudentAccess } from './utils/scheduleUtils';
+import { measureClientBandwidthBytes, detectClientDevice, countIntegrityViolations } from './utils/telemetryUtils';
 
 function lazyWithRetry<T extends React.ComponentType<any>>(
   componentImport: () => Promise<{ default: T }>
@@ -585,14 +586,36 @@ const App: React.FC = () => {
 
     if (status === 'completed' || status === 'force_closed') setIsSyncing(true);
     
-    // Add additional safety to ensure duration is populated
+    // Add additional safety to ensure duration and telemetry are populated
     const finalAnswers = { ...answers };
-    if ((status === 'completed' || status === 'force_closed') && finalAnswers['_startTime']) {
-         const startTime = parseInt(finalAnswers['_startTime']);
-         if (!isNaN(startTime)) {
-              const seconds = Math.floor((Date.now() - startTime) / 1000);
-              finalAnswers['_duration'] = Math.max(0, seconds).toString();
-         }
+    if (status === 'completed' || status === 'force_closed') {
+      if (finalAnswers['_startTime']) {
+        const startTime = parseInt(finalAnswers['_startTime']);
+        if (!isNaN(startTime)) {
+          const seconds = Math.floor((Date.now() - startTime) / 1000);
+          finalAnswers['_duration'] = Math.max(0, seconds).toString();
+        }
+      }
+
+      if (!finalAnswers['_bandwidthBytes']) {
+        try {
+          finalAnswers['_bandwidthBytes'] = measureClientBandwidthBytes().toString();
+        } catch { /* ignore */ }
+      }
+      if (!finalAnswers['_os']) {
+        try {
+          const dev = detectClientDevice();
+          finalAnswers['_os'] = dev.os;
+          finalAnswers['_device'] = dev.deviceType;
+          finalAnswers['_browser'] = dev.browser;
+        } catch { /* ignore */ }
+      }
+      if (!finalAnswers['_tabSwitches'] && activityLog) {
+        finalAnswers['_tabSwitches'] = countIntegrityViolations(activityLog).toString();
+      }
+      if (!finalAnswers['_submissionHour']) {
+        finalAnswers['_submissionHour'] = new Date().getHours().toString();
+      }
     }
 
     const res = await storageService.submitExamResult({

@@ -2,6 +2,7 @@ import express from "express";
 import path from "path";
 import cors from "cors";
 import { generateQuestionsOnServer, generateAIAnalysisOnServer, generateSvgOnServer } from "./server/ai.ts";
+import { getStudentQuestionBundle, getAuthorizedExamSolutions } from "./server/examContent.ts";
 
 async function startServer() {
   const app = express();
@@ -66,6 +67,67 @@ async function startServer() {
     } catch (error: any) {
       console.warn("AI Proxy warning:", error?.message || error);
       res.status(500).json({ success: false, error: error?.message || "AI Proxy failure" });
+    }
+  });
+
+  // Edge Cache Exam Content Routes (Two-Phase Bundle)
+  app.get("/api/exam-content/:code/test", async (req, res) => {
+    try {
+      const code = (req.params.code || "").trim().toUpperCase();
+      const versionParam = req.query.v ? parseInt(req.query.v as string, 10) : undefined;
+      const bundle = await getStudentQuestionBundle(code, versionParam);
+      
+      if (!bundle.success) {
+        return res.status(bundle.status || 500).json(bundle);
+      }
+
+      const etag = `"${code}-v${bundle.version}"`;
+      if (req.headers["if-none-match"] === etag) {
+        return res.status(304).end();
+      }
+
+      res.setHeader("Content-Type", "application/json");
+      res.setHeader("ETag", etag);
+      res.setHeader("Cache-Control", "public, max-age=0, s-maxage=86400, stale-while-revalidate=3600");
+      res.setHeader("CDN-Cache-Control", "public, s-maxage=86400");
+      res.setHeader("Vercel-CDN-Cache-Control", "public, s-maxage=86400");
+
+      res.status(200).json(bundle);
+    } catch (error: any) {
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  app.get("/api/exam-content/:code/solutions", async (req, res) => {
+    try {
+      const code = (req.params.code || "").trim().toUpperCase();
+      const studentId = (req.query.studentId as string) || "";
+      const proctorToken = (req.query.token as string) || (req.headers["x-proctor-token"] as string) || "";
+
+      const result = await getAuthorizedExamSolutions(code, studentId, proctorToken);
+      if (!result.success) {
+        return res.status(result.status || 403).json(result);
+      }
+
+      res.setHeader("Content-Type", "application/json");
+      res.setHeader("Cache-Control", "private, no-cache, no-store, must-revalidate");
+      res.status(200).json(result);
+    } catch (error: any) {
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  app.all(["/api/exam-content/:code/warm", "/api/exam-content/warm"], async (req, res) => {
+    try {
+      const code = (((req.params as any).code || req.query.code || req.body?.code) as string || "").trim().toUpperCase();
+      const versionParam = req.query.v ? parseInt(req.query.v as string, 10) : undefined;
+      if (!code) {
+        return res.status(400).json({ success: false, error: "Code required" });
+      }
+      const bundle = await getStudentQuestionBundle(code, versionParam);
+      res.json({ success: true, warmed: true, version: bundle.version });
+    } catch (error: any) {
+      res.status(500).json({ success: false, error: error.message });
     }
   });
 

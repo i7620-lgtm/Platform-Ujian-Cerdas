@@ -23,7 +23,9 @@ import {
   FinishedExamsView,
   DraftsView,
   ArchiveViewer,
+  AnalyticsView,
 } from "./teacher/DashboardViews";
+import { BarChart3 } from "lucide-react";
 import { OngoingExamModal, FinishedExamModal } from "./teacher/DashboardModals";
 import { TutorialPage } from "./TutorialPage";
 import { InvitationModal } from "./teacher/InvitationModal";
@@ -268,6 +270,13 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
               <BookOpenIcon className="w-5 h-5 sm:w-6 sm:h-6" />
               <span className="hidden sm:inline">Arsip</span>
             </button>
+            <button
+              onClick={() => setView("ANALYTICS")}
+              className={`pb-2 px-1 sm:px-2 flex flex-col items-center justify-center gap-1 text-[9px] sm:text-[10px] font-black uppercase tracking-widest transition-all border-b-2 min-w-[40px] sm:min-w-[80px] ${view === "ANALYTICS" ? "border-indigo-600 text-indigo-600 dark:text-indigo-400 dark:border-indigo-400" : "text-slate-400 dark:text-slate-500 border-transparent hover:text-slate-600 dark:hover:text-slate-300"}`}
+            >
+              <BarChart3 className="w-5 h-5 sm:w-6 sm:h-6" />
+              <span className="hidden sm:inline">Statistik</span>
+            </button>
             {accountType === "super_admin" && (
               <>
                 <button
@@ -351,6 +360,14 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
           <ArchiveViewer
             onReuseExam={handleReuseExam}
             teacherProfile={teacherProfile}
+          />
+        )}
+        {view === "ANALYTICS" && (
+          <AnalyticsView
+            exams={exams}
+            results={results}
+            teacherProfile={teacherProfile}
+            onRefreshData={onRefreshResults}
           />
         )}
         {view === "ADMIN_USERS" && accountType === "super_admin" && (

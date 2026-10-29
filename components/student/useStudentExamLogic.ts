@@ -6,6 +6,7 @@ import type { RealtimeChannel } from "@supabase/supabase-js";
 import { calculateExamScore, sanitizeHtml, parseList } from "../teacher/examUtils";
 import { useExamAntiCheat } from "../../hooks/useExamAntiCheat";
 import { calculateStudentAccess } from "../../utils/scheduleUtils";
+import { measureClientBandwidthBytes, detectClientDevice, countIntegrityViolations } from "../../utils/telemetryUtils";
 
 interface UseStudentExamLogicProps {
   exam: Exam;
@@ -145,6 +146,23 @@ export const useStudentExamLogic = ({
               (Date.now() - startTime) / 1000,
             );
             answersRef.current["_duration"] = durationInSeconds.toString();
+          }
+
+          // Catat telemetri transfer kuota riil, perangkat/OS siswa, dan pelanggaran integritas
+          try {
+            const measuredBytes = measureClientBandwidthBytes();
+            const device = detectClientDevice();
+            const violations = countIntegrityViolations(logRef.current);
+            const submissionHour = new Date().getHours();
+
+            answersRef.current["_bandwidthBytes"] = measuredBytes.toString();
+            answersRef.current["_os"] = device.os;
+            answersRef.current["_device"] = device.deviceType;
+            answersRef.current["_browser"] = device.browser;
+            answersRef.current["_tabSwitches"] = violations.toString();
+            answersRef.current["_submissionHour"] = submissionHour.toString();
+          } catch (telemetryErr) {
+            console.warn("Gagal merekam telemetri:", telemetryErr);
           }
         }
 
@@ -296,9 +314,28 @@ export const useStudentExamLogic = ({
           },
           (payload) => {
             const newConfig = payload.new.config;
+            const newVersion = payload.new.version;
             if (newConfig) {
+              setActiveExam((prev) => ({ ...prev, config: newConfig }));
+            }
+            if (typeof newVersion === "number") {
               setActiveExam((prev) => {
-                return { ...prev, config: newConfig };
+                if (!prev.version || newVersion > prev.version) {
+                  // Fetch updated sanitized question bundle from Vercel Edge CDN
+                  fetch(`/api/exam-content/${exam.code}/test?v=${newVersion}`)
+                    .then((res) => res.json())
+                    .then((json) => {
+                      if (json.success && Array.isArray(json.questions)) {
+                        setActiveExam((current) => {
+                          const qMap = new Map(json.questions.map((q: Question) => [q.id, q]));
+                          const updated = current.questions.map((q) => (qMap.get(q.id) as Question) || q);
+                          return { ...current, questions: updated, version: newVersion };
+                        });
+                      }
+                    })
+                    .catch(() => {});
+                }
+                return prev;
               });
             }
           },
@@ -313,10 +350,10 @@ export const useStudentExamLogic = ({
       if (!isPolling) return;
       if (typeof navigator !== "undefined" && navigator.onLine !== false) {
         try {
-          // Select extreme for exams
+          // Select extreme for exams (lightweight: status, config, version)
           const { data } = await supabase
             .from("exams")
-            .select("status, config")
+            .select("status, config, version")
             .eq("code", exam.code)
             .single();
           if (data) {
@@ -332,6 +369,25 @@ export const useStudentExamLogic = ({
                   return { ...prev, config: data.config };
                 }
                 return { ...prev, config: data.config };
+              });
+            }
+            if (typeof data.version === "number") {
+              setActiveExam((prev) => {
+                if (!prev.version || data.version > prev.version) {
+                  fetch(`/api/exam-content/${exam.code}/test?v=${data.version}`)
+                    .then((res) => res.json())
+                    .then((json) => {
+                      if (json.success && Array.isArray(json.questions)) {
+                        setActiveExam((current) => {
+                          const qMap = new Map(json.questions.map((q: Question) => [q.id, q]));
+                          const updated = current.questions.map((q) => (qMap.get(q.id) as Question) || q);
+                          return { ...current, questions: updated, version: data.version };
+                        });
+                      }
+                    })
+                    .catch(() => {});
+                }
+                return prev;
               });
             }
           }

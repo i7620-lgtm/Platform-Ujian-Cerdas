@@ -3,6 +3,7 @@ import { authService } from './auth';
 import type { Exam, Question, TeacherProfile, ExamConfig, ResultStatus } from '../types';
 import { compressImage, calculateExamScore, cleanupQuestionContent, parseList } from '../components/teacher/examUtils';
 import { uploadToCloudinary } from './cloudinary';
+import { offlineService } from './offline';
 
 // Helper: Get file extension safely from data URI
 const getExtFromDataUrl = (dataUrl: string, defaultExt: string = 'png'): string => {
@@ -432,47 +433,197 @@ export class ExamService {
     }
 
     async getExamForStudent(code: string, studentId?: string, isPreview = false): Promise<Exam | null> {
-        let data = null;
+        const cleanCode = (code || '').trim().toUpperCase();
 
-        const { data: simpleData, error: simpleError } = await supabase
-            .from('exams')
-            .select('*')
-            .eq('code', code)
-            .maybeSingle();
+        // 1. FAST PATH: Check Schedule / Pre-login (Zero questions payload, saves 100% egress)
+        if (studentId === 'check_schedule') {
+            const { data: scheduleData, error: scheduleError } = await supabase
+                .from('exams')
+                .select('code, author_id, author_name, school, config, status, created_at, version')
+                .eq('code', cleanCode)
+                .maybeSingle();
 
-        if (simpleError) {
-            console.error("Fetch exam failed:", simpleError);
-        } else {
-            data = simpleData;
+            if (scheduleError || !scheduleData) throw new Error("EXAM_NOT_FOUND");
+            if (scheduleData.status === 'DRAFT' && !isPreview) throw new Error("EXAM_IS_DRAFT");
+
+            return {
+                code: scheduleData.code,
+                authorId: scheduleData.author_id,
+                authorName: (scheduleData.author_name as string) || 'Pengajar',
+                authorSchool: scheduleData.school,
+                config: scheduleData.config,
+                questions: [],
+                status: scheduleData.status,
+                version: scheduleData.version || 1
+            };
         }
 
-        if (!data) {
+        // 2. Fetch lightweight exam metadata from Supabase (excludes heavy questions column!)
+        const { data: metaData, error: metaError } = await supabase
+            .from('exams')
+            .select('code, author_id, author_name, school, config, status, created_at, version')
+            .eq('code', cleanCode)
+            .maybeSingle();
+
+        if (metaError || !metaData) {
+            // Check if student has offline saved exam in IndexedDB
+            const offlineExam = await offlineService.getLocalProgress(`offline_exam_${cleanCode}`) as Exam | null;
+            if (offlineExam) {
+                return this.sanitizeExamForStudent(offlineExam, studentId, false);
+            }
             throw new Error("EXAM_NOT_FOUND");
         }
 
-        if (data.status === 'DRAFT' && !isPreview) throw new Error("EXAM_IS_DRAFT");
-        
+        if (metaData.status === 'DRAFT' && !isPreview) throw new Error("EXAM_IS_DRAFT");
+
+        const examVersion = typeof metaData.version === 'number' ? metaData.version : 1;
+        let loadedQuestions: Question[] = [];
+
+        // 3. Check IndexedDB local cache matching current version
+        const localCacheKey = `edge_bundle_${cleanCode}`;
+        const localCached = await offlineService.getLocalProgress(localCacheKey) as { version: number; questions: Question[] } | null;
+
+        if (localCached && localCached.version === examVersion && Array.isArray(localCached.questions) && localCached.questions.length > 0) {
+            loadedQuestions = localCached.questions;
+        } else {
+            // 4. Download question package from Vercel Edge Network CDN (s-maxage=86400)
+            try {
+                const response = await fetch(`/api/exam-content/${cleanCode}/test?v=${examVersion}`);
+                if (response.ok) {
+                    const json = await response.json();
+                    if (json.success && Array.isArray(json.questions)) {
+                        loadedQuestions = json.questions;
+                        // Save to IndexedDB for offline resilience
+                        await offlineService.saveLocalProgress(localCacheKey, {
+                            version: examVersion,
+                            questions: loadedQuestions,
+                            savedAt: Date.now()
+                        });
+                    }
+                }
+            } catch (edgeErr) {
+                console.warn("Edge CDN fetch error, checking local/DB fallback:", edgeErr);
+            }
+
+            // Fallback: If edge endpoint was unreachable, check local cached questions or query database
+            if (loadedQuestions.length === 0) {
+                if (localCached && Array.isArray(localCached.questions) && localCached.questions.length > 0) {
+                    loadedQuestions = localCached.questions;
+                } else {
+                    const { data: fullData } = await supabase
+                        .from('exams')
+                        .select('questions')
+                        .eq('code', cleanCode)
+                        .maybeSingle();
+                    if (fullData && Array.isArray(fullData.questions)) {
+                        loadedQuestions = fullData.questions.map(q => this.stripAnswersFromQuestion(q));
+                    }
+                }
+            }
+        }
+
         const exam: Exam = {
-            code: data.code, 
-            authorId: data.author_id, 
-            authorName: (data.author_name as string) || 'Pengajar', 
-            authorSchool: data.school,
-            config: data.config, 
-            questions: data.questions, 
-            status: data.status
+            code: metaData.code,
+            authorId: metaData.author_id,
+            authorName: (metaData.author_name as string) || 'Pengajar',
+            authorSchool: metaData.school,
+            config: metaData.config,
+            questions: loadedQuestions,
+            status: metaData.status,
+            version: examVersion
         };
+
+        // Persist complete exam object locally for offline support
+        await offlineService.saveLocalProgress(`offline_exam_${cleanCode}`, exam);
 
         let includeAnswers = false;
         if (studentId === 'monitor') {
             includeAnswers = !!exam.config.enablePublicStream;
-        } else if (studentId && studentId !== 'check_schedule') {
-            const { data: result } = await supabase.from('results').select('status').eq('exam_code', code).eq('student_id', studentId).maybeSingle();
-            if (result && (result.status === 'completed' || result.status === 'force_closed')) {
-                includeAnswers = exam.config.showResultToStudent;
-            }
         }
 
         return this.sanitizeExamForStudent(exam, studentId, includeAnswers);
+    }
+
+    /**
+     * Fetch solutions and explanations with server-side authorization guard
+     */
+    async getExamSolutions(code: string, studentId: string, proctorToken?: string): Promise<Record<string, any> | null> {
+        const cleanCode = (code || '').trim().toUpperCase();
+        try {
+            const url = `/api/exam-content/${cleanCode}/solutions?studentId=${encodeURIComponent(studentId)}&token=${encodeURIComponent(proctorToken || '')}`;
+            const res = await fetch(url);
+            if (!res.ok) {
+                return null;
+            }
+            const json = await res.json();
+            if (json.success && json.solutions) {
+                return json.solutions;
+            }
+            return null;
+        } catch (e) {
+            console.warn("Failed to fetch solutions from edge endpoint:", e);
+            return null;
+        }
+    }
+
+    /**
+     * Subscribe to live exam version updates:
+     * - Primary: Supabase Realtime channel (if enabled)
+     * - Fallback: Staggered lightweight version polling (~3m + random jitter, <50 bytes)
+     */
+    subscribeToExamVersionUpdates(
+        code: string,
+        currentVersion: number,
+        onUpdate: (newVersion: number) => void
+    ): () => void {
+        const cleanCode = (code || '').trim().toUpperCase();
+        let active = true;
+
+        // 1. Supabase Realtime Listener (if supported)
+        const channel = supabase
+            .channel(`exam_live_version_${cleanCode}`)
+            .on(
+                'postgres_changes',
+                {
+                    event: 'UPDATE',
+                    schema: 'public',
+                    table: 'exams',
+                    filter: `code=eq.${cleanCode}`
+                },
+                (payload: any) => {
+                    const newVer = payload.new?.version;
+                    if (typeof newVer === 'number' && newVer > currentVersion) {
+                        onUpdate(newVer);
+                    }
+                }
+            )
+            .subscribe();
+
+        // 2. Normal Mode Fallback: Staggered Periodic Check (every 3 minutes + random jitter)
+        // Only queries { version } from Supabase (<50 bytes payload)
+        const jitterMs = Math.floor(Math.random() * 20000) + 180000;
+        const timerId = setInterval(async () => {
+            if (!active) return;
+            try {
+                const { data } = await supabase
+                    .from('exams')
+                    .select('version')
+                    .eq('code', cleanCode)
+                    .maybeSingle();
+
+                if (data && typeof data.version === 'number' && data.version > currentVersion) {
+                    onUpdate(data.version);
+                }
+            } catch {
+                /* silent fallback */
+            }
+        }, jitterMs);
+
+        return () => {
+            active = false;
+            clearInterval(timerId);
+            channel.unsubscribe();
+        };
     }
 
     async getExamConfig(code: string): Promise<ExamConfig | null> {
@@ -498,7 +649,8 @@ export class ExamService {
         const BUCKET_NAME = 'soal';
         const examCode = exam.code;
 
-        const { data: existing } = await supabase.from('exams').select('code, author_id').eq('code', examCode).maybeSingle();
+        const { data: existing } = await supabase.from('exams').select('code, author_id, version').eq('code', examCode).maybeSingle();
+        const nextVersion = typeof existing?.version === 'number' ? existing.version + 1 : 2;
         
         let finalAuthorId = exam.authorId;
 
@@ -511,7 +663,8 @@ export class ExamService {
                 school: exam.authorSchool,
                 config: exam.config, 
                 questions: [], 
-                status: 'DRAFT'
+                status: 'DRAFT',
+                version: 1
             });
             if (initError) throw initError;
         }
@@ -614,7 +767,8 @@ export class ExamService {
             school: exam.authorSchool,
             config: exam.config, 
             questions: processedQuestions, 
-            status: exam.status || 'PUBLISHED'
+            status: exam.status || 'PUBLISHED',
+            version: nextVersion
         }).eq('code', exam.code).select();
 
         if (error) throw error;
@@ -625,12 +779,16 @@ export class ExamService {
             console.log("Attempting partial update (questions & config only)...");
             const { data: partialData, error: partialError } = await supabase.from('exams').update({
                 config: exam.config,
-                questions: processedQuestions
+                questions: processedQuestions,
+                version: nextVersion
             }).eq('code', exam.code).select();
 
             if (partialData && partialData.length > 0) {
                 console.log("Partial update successful!");
                 await this.syncRegisteredStudents(exam);
+                try {
+                    fetch(`/api/exam-content/${exam.code}/warm?v=${nextVersion}`, { method: 'POST' }).catch(() => {});
+                } catch { /* ignore */ }
                 return;
             }
 
@@ -656,7 +814,8 @@ export class ExamService {
                 author_id: existingExam.author_id,
                 config: exam.config,
                 questions: processedQuestions,
-                status: exam.status || 'PUBLISHED'
+                status: exam.status || 'PUBLISHED',
+                version: nextVersion
             }, { onConflict: 'code' });
 
             if (upsertError) {
@@ -666,6 +825,11 @@ export class ExamService {
         }
 
         await this.syncRegisteredStudents(exam);
+
+        // Prime the Vercel Edge CDN cache in the background
+        try {
+            fetch(`/api/exam-content/${exam.code}/warm?v=${nextVersion}`, { method: 'POST' }).catch(() => {});
+        } catch { /* ignore */ }
     }
 
     private async syncRegisteredStudents(exam: Exam): Promise<void> {

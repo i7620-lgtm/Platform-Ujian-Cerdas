@@ -8,6 +8,7 @@ import {
   CheckCircleIcon,
   ExclamationTriangleIcon,
 } from "../../Icons";
+import { QuestionResultDetailPopover } from "../../QuestionResultDetailPopover";
 
 interface ArchiveDetailUjianViewProps {
   exam: Exam;
@@ -368,7 +369,7 @@ export const ArchiveStudentsRecapView: React.FC<
                                   Kosong
                                 </span>
                               </div>
-                              <div className="flex flex-wrap gap-1 mt-2">
+                              <div className="flex flex-wrap gap-1.5 mt-2">
                                 {exam.questions
                                   .filter((qi) => qi.questionType !== "INFO")
                                   .map((qi, qIdx) => {
@@ -376,25 +377,28 @@ export const ArchiveStudentsRecapView: React.FC<
                                       qi,
                                       r.answers,
                                     );
-                                    let bgClass =
-                                      "bg-slate-200 dark:bg-slate-700 text-slate-900 dark:text-slate-200";
-                                    if (status === "CORRECT")
-                                      bgClass =
-                                        "bg-emerald-300 dark:bg-emerald-600 text-slate-900 dark:text-white";
-                                    else if (status === "WRONG")
-                                      bgClass =
-                                        "bg-rose-300 dark:bg-rose-600 text-slate-900 dark:text-white";
+                                    const isManual =
+                                      qi.questionType === "ESSAY" ||
+                                      qi.questionType === "FILL_IN_THE_BLANK";
+                                    const isGraded = r.answers[`_grade_${qi.id}`];
                                     return (
-                                      <div
+                                      <QuestionResultDetailPopover
                                         key={qi.id}
-                                        title={`Soal ${qIdx + 1}: ${status === "CORRECT" ? "Benar" : status === "EMPTY" ? "Kosong" : "Salah"}`}
-                                        className={`w-6 h-6 flex items-center justify-center rounded text-[10px] font-bold ${bgClass} cursor-help transition-transform hover:scale-110`}
-                                      >
-                                        {qIdx + 1}
-                                      </div>
+                                        question={qi}
+                                        questionIndex={qIdx}
+                                        answers={r.answers}
+                                        status={status}
+                                        isManual={isManual}
+                                        isGraded={isGraded}
+                                        showCorrectAnswer={true}
+                                        showSolutionSteps={true}
+                                      />
                                     );
                                   })}
                               </div>
+                              <p className="text-[10px] text-slate-400 dark:text-slate-500 italic mt-2">
+                                * Arahkan kursor (hover) atau klik nomor soal untuk melihat soal, opsi, kunci jawaban, jawaban siswa, dan pembahasan.
+                              </p>
 
                               {r.activityLog && r.activityLog.length > 0 && (
                                 <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700">

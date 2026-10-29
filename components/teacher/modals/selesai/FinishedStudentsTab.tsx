@@ -7,6 +7,7 @@ import {
   XMarkIcon,
   ExclamationTriangleIcon,
 } from "../../../Icons";
+import { QuestionResultDetailPopover } from "../../../QuestionResultDetailPopover";
 
 interface FinishedStudentsTabProps {
   displayExam: Exam;
@@ -286,7 +287,7 @@ export const FinishedStudentsTab: React.FC<FinishedStudentsTabProps> = ({
                             Kosong
                           </span>
                         </div>
-                        <div className="flex flex-wrap gap-1 mt-2 mb-4">
+                        <div className="flex flex-wrap gap-1.5 mt-2 mb-2">
                           {displayExam.questions
                             .filter((q) => q.questionType !== "INFO")
                             .map((q, idx) => {
@@ -296,31 +297,24 @@ export const FinishedStudentsTab: React.FC<FinishedStudentsTabProps> = ({
                                 q.questionType === "FILL_IN_THE_BLANK";
                               const isGraded = r.answers[`_grade_${q.id}`];
 
-                              let bgClass =
-                                "bg-slate-200 dark:bg-slate-700 text-slate-900 dark:text-slate-200";
-
-                              if (isManual && !isGraded) {
-                                bgClass =
-                                  "bg-yellow-300 dark:bg-yellow-600 text-slate-900 dark:text-white";
-                              } else if (status === "CORRECT") {
-                                bgClass =
-                                  "bg-emerald-300 dark:bg-emerald-600 text-slate-900 dark:text-white";
-                              } else if (status === "WRONG") {
-                                bgClass =
-                                  "bg-rose-300 dark:bg-rose-600 text-slate-900 dark:text-white";
-                              }
-
                               return (
-                                <div
+                                <QuestionResultDetailPopover
                                   key={q.id}
-                                  title={`Soal ${idx + 1}: ${isManual && !isGraded ? "Belum Dinilai" : status === "CORRECT" ? "Benar" : status === "EMPTY" ? "Kosong" : "Salah"}`}
-                                  className={`w-6 h-6 flex items-center justify-center rounded text-[10px] font-bold ${bgClass} cursor-help transition-transform hover:scale-110`}
-                                >
-                                  {idx + 1}
-                                </div>
+                                  question={q}
+                                  questionIndex={idx}
+                                  answers={r.answers}
+                                  status={status}
+                                  isManual={isManual}
+                                  isGraded={isGraded}
+                                  showCorrectAnswer={true}
+                                  showSolutionSteps={true}
+                                />
                               );
                             })}
                         </div>
+                        <p className="text-[10px] text-slate-400 dark:text-slate-500 italic mb-4">
+                          * Arahkan kursor (hover) atau klik nomor soal untuk melihat soal, opsi, kunci jawaban, jawaban siswa, dan pembahasan.
+                        </p>
 
                         {/* MANUAL GRADING UI (ONLY ESSAY & FILL_IN_THE_BLANK) */}
                         {displayExam.questions.some(
