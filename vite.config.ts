@@ -15,7 +15,7 @@ export default defineConfig(({ mode }) => {
         registerType: 'autoUpdate',
         includeAssets: ['favicon.ico', 'robots.txt', 'apple-touch-icon.png'],
         workbox: {
-          maximumFileSizeToCacheInBytes: 6000000,
+          maximumFileSizeToCacheInBytes: 15000000,
           cleanupOutdatedCaches: true,
           skipWaiting: true,
           clientsClaim: true,
@@ -68,7 +68,26 @@ export default defineConfig(({ mode }) => {
       modulePreload: {
         polyfill: false
       },
-      rollupOptions: {},
+      rollupOptions: {
+        output: {
+          manualChunks(id) {
+            if (id.includes('node_modules')) {
+              if (id.includes('katex') || id.includes('marked') || id.includes('react-markdown')) {
+                return 'vendor-math-markdown';
+              }
+              if (id.includes('recharts')) {
+                return 'vendor-charts';
+              }
+              if (id.includes('xlsx') || id.includes('jspdf') || id.includes('html2canvas')) {
+                return 'vendor-export';
+              }
+              if (id.includes('@google/genai')) {
+                return 'vendor-genai';
+              }
+            }
+          }
+        }
+      },
     },
   };
 });
