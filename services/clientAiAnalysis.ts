@@ -9,6 +9,7 @@
  */
 
 import { generateDeterministicDiagnosticReport } from "./diagnosticReportGenerator";
+import { buildAIMAnalysisDirectives } from "./aiPersonaAimEngine";
 
 export interface AIAnalysisProgressCallback {
   (message: string, step: number, totalSteps: number): void;
@@ -21,6 +22,9 @@ export async function generateAIAnalysisClientSide(
   prompt: string,
   onProgress?: AIAnalysisProgressCallback
 ): Promise<string> {
+  const enhancedPrompt = prompt.includes("PERSONA & AIM FRAMEWORK")
+    ? prompt
+    : `${buildAIMAnalysisDirectives()}\n\n${prompt}`;
   // Yield ke antarmuka peramban agar frame rendering 60 FPS tetap lancar
   await new Promise((resolve) => setTimeout(resolve, 50));
 
@@ -47,7 +51,7 @@ export async function generateAIAnalysisClientSide(
         "Content-Type": "application/json",
         "Accept": "application/json"
       },
-      body: JSON.stringify({ prompt }),
+      body: JSON.stringify({ prompt: enhancedPrompt }),
       signal: controller.signal
     });
 
