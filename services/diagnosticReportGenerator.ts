@@ -147,9 +147,14 @@ Soal: Rancang sebuah model matematis/konseptual sederhana untuk memprediksi peru
 *Pembahasan: Mengasah nalar abstrak dan transfer pengetahuan ke situasi baru.*`
   ].join("\n\n");
 
-  return `# Laporan Diagnostik & Analisis Hasil Belajar AI: ${subject}
+  return `# Laporan Diagnostik & Psikometri Pembelajaran (Kerangka Persona-AIM): ${subject}
 
-## 1. RINGKASAN EKSEKUTIF & DATA MAKRO HASIL BELAJAR
+> **Persona Evaluator**: Konsultan Evaluasi Pendidikan & Ahli Psikometri Asesmen Sekolah
+> **Standar Rujukan**: BSKAP Kemendikdasmen RI & Panduan Pembelajaran Berdiferensiasi Kurikulum Merdeka
+
+---
+
+## 1. NEEDS: IDENTIFIKASI KEBUTUHAN KELAS & SEBARAN CAPAIAN KOMPETENSI
 * **Satuan Pendidikan & Rombel**: ${schoolName} (${className})
 * **Total Peserta Asesmen**: ${participants} Siswa
 * **Rata-Rata Nilai Kelas**: **${avgScore}** (Rentang Nilai: ${lowestScore} s.d. ${highestScore})
@@ -159,17 +164,17 @@ Soal: Rancang sebuah model matematis/konseptual sederhana untuk memprediksi peru
   - **Dasar (Nilai 55 - 69)**: **${dasarCount} Siswa** – Konsep dasar mulai terbentuk namun masih bingung pada alur bertahap.
   - **Cakap (Nilai 70 - 84)**: **${cakapCount} Siswa** – Telah tuntas KKM secara mandiri dengan pemahaman stabil.
   - **Mahir (Nilai 85 - 100)**: **${mahirCount} Siswa** – Daya nalar analitis tinggi dan siap menerima proyek pengayaan HOTS.
-* **Sintesis Kekuatan & Kelemahan**: Rombel menunjukkan performa solid pada pemahaman fakta dan prosedur langsung, namun membutuhkan penguatan terstruktur pada butir soal penalaran kontekstual dan analisis multi-tahap.
+* **Sintesis Diagnosa**: Rombel menunjukkan performa solid pada pemahaman fakta dan prosedur langsung, namun membutuhkan penguatan terstruktur pada butir soal penalaran kontekstual dan analisis multi-tahap.
 
 ---
 
-## 2. BEDAH MIKRO BUTIR SOAL KRITIS & TERAPI PENUNTASAN KONSEP
+## 2. TOOLS: DIAGNOSTIK MIKRO BUTIR SOAL KRITIS & ANALISIS DAYA TARIK PENGECOH
 
 ${bedahSoalContent}
 
 ---
 
-## 3. MATRIKS INTERVENSI BERJENJANG (TABEL KOMPREHENSIF 4 JENJANG)
+## 3. CREATIVE: MATRIKS DIFERENSIASI PEMBELAJARAN & AKSI PEDAGOGIS KELAS
 
 | Jenjang Kompetensi | Estimasi Peserta | Diagnosis Akar Hambatan Belajar | Aksi Pedagogis Nyata Guru di Kelas | Target Capaian & Verifikasi Ketuntasan |
 | :--- | :--- | :--- | :--- | :--- |
@@ -180,14 +185,14 @@ ${bedahSoalContent}
 
 ---
 
-## 4. REKOMENDASI MANAJEMEN KELAS & PEMBELAJARAN TERDIFERENSIASI
+## 4. REFLECTIVE: KULTUR BELAJAR BERTUMBUH & PENGUATAN METAKOGNISI
 1. **Penerapan Stasiun Belajar (Station Learning)**: Alokasikan 20 menit pada jam pelajaran berikutnya untuk membagi kelas menjadi 3 zona: Zona Klinis Guru (kelompok Perlu Bimbingan), Zona Latihan Terbimbing (kelompok Dasar), dan Zona Kolaboratif Proyek (kelompok Cakap & Mahir).
 2. **Pemberdayaan Tutor Sebaya (Peer Tutoring)**: Pasangkan siswa kelompok Mahir dengan siswa kelompok Dasar dalam sesi diskusi 10 menit untuk menjelaskan proses berpikir dalam memecahkan soal analitis.
-3. **Umpan Balik Formatif Khusus Butir Soal Kritis**: Awali pertemuan berikutnya dengan membedah 2 soal dengan tingkat kebenaran terendah secara klasikal sebelum melanjutkan ke topik materi baru.
+3. **Umpan Balik Formatif Khusus Butir Soal Kritis**: Awali pertemuan berikutnya dengan membedah 2 soal dengan tingkat kebenaran terendah secara klasikal dengan pendekatan tanpa penghakiman (*growth mindset*) sebelum melanjutkan ke topik materi baru.
 
 ---
 
-## 5. BANK SOAL REMEDIAL & PENGAYAAN HOTS SIAP PAKAI (TANPA LATEX)
+## 5. RESULT: BANK SOAL REMEDIAL & TANTANGAN HOTS SIAP PAKAI
 
 ### Paket Soal Remedial
 ${remedialItems}
