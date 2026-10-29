@@ -1,5 +1,5 @@
-import { supabase } from '../lib/supabase';
-import type { Question } from '../types';
+import { supabase } from '../lib/supabase.ts';
+import type { Question } from '../types.ts';
 
 // In-memory origin cache to shield Supabase from simultaneous origin requests
 interface CachedBundle {
