@@ -15,6 +15,7 @@ import { GoogleGenAI } from "@google/genai";
 import { QuizConfig } from "../types";
 import { cleanGeneratedMathUnits } from "./geminiService";
 import { extractSmartCategory, stripPrefix, isAnswerMatch, detectEducationalStage, parseList, normalize } from "../components/teacher/examUtils";
+import { resolveExpertPersona, buildAIMDirectives, validateAndReflectQuestions } from "./aiPersonaAimEngine";
 
 let cachedApiKey: string | null = null;
 let keyFetchPromise: Promise<string | null> | null = null;
@@ -109,9 +110,16 @@ export async function generateSingleQuestionClientSide(
   const targetKeyIndex = (questionNumber) % targetOptionCount;
   const targetKeyLetter = String.fromCharCode(65 + targetKeyIndex);
 
+  const persona = resolveExpertPersona(config);
+  const aimDirectives = buildAIMDirectives(config);
+
   const prompt = `
-Anda adalah Penulis Soal Ahli Asesmen Nasional Kemendikdasmen RI (BSKAP No. 047/H/AN/2025 & No. 045/H/AN/2025).
-Buatlah TEPAT 1 BUTIR SOAL yang sangat kreatif, bermutu tinggi, dan kontekstual dunia nyata:
+${persona}
+
+${aimDirectives}
+
+TUGAS UTAMA:
+Buatlah TEPAT 1 BUTIR SOAL yang sangat kreatif, bermutu tinggi, dan kontekstual dunia nyata sesuai parameter berikut:
 
 PARAMETER BUTIR SOAL:
 - Nomor Butir: #${questionNumber} dari ${totalQuestions}
@@ -411,7 +419,8 @@ Balas HANYA berupa JSON Array berisi tepat 1 objek dengan struktur:
           parsed.correctAnswer = cleanedPairs.map(p => `${p.left} -> ${p.right}`).join(", ");
         }
 
-        return parsed;
+        const validated = validateAndReflectQuestions([parsed]);
+        return validated[0] || parsed;
       }
     } catch (err: any) {
       console.warn(`[Client AI Question] Model ${model} gagal (${err?.message || err}), mencoba model berikutnya...`);
