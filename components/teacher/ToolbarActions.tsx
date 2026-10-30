@@ -65,6 +65,7 @@ interface ToolbarActionsProps {
   onAksaraClick: () => void;
   onEmojiClick: () => void;
   onLinkClick?: () => void;
+  onVerticalIndentClick?: () => void;
   isInsideTable: boolean;
   onDeleteTable: () => void;
   chartData?: ChartData;
@@ -86,6 +87,7 @@ export const ToolbarActions: React.FC<ToolbarActionsProps> = ({
   onAksaraClick,
   onEmojiClick,
   onLinkClick,
+  onVerticalIndentClick,
   isInsideTable,
   onDeleteTable,
   chartData,
@@ -99,25 +101,29 @@ export const ToolbarActions: React.FC<ToolbarActionsProps> = ({
         <Btn
           runCmd={runCmd}
           cmd="bold"
-          label="B"
+          label="Tebal (Bold)"
+          icon={() => <span className="text-xs font-black font-serif">B</span>}
           active={activeCmds.includes("bold")}
         />
         <Btn
           runCmd={runCmd}
           cmd="italic"
-          label="I"
+          label="Miring (Italic)"
+          icon={() => <span className="text-xs font-bold font-serif italic">I</span>}
           active={activeCmds.includes("italic")}
         />
         <Btn
           runCmd={runCmd}
           cmd="underline"
-          label="U"
+          label="Garis Bawah (Underline)"
+          icon={() => <span className="text-xs font-bold font-serif underline underline-offset-2">U</span>}
           active={activeCmds.includes("underline")}
         />
         <Btn
           runCmd={runCmd}
           cmd="strikethrough"
           icon={StrikethroughIcon}
+          label="Coret (Strikethrough)"
           active={activeCmds.includes("strikethrough")}
         />
         <div className="w-px h-4 bg-gray-200 dark:bg-slate-700 mx-1 shrink-0"></div>
@@ -125,12 +131,14 @@ export const ToolbarActions: React.FC<ToolbarActionsProps> = ({
           runCmd={runCmd}
           cmd="superscript"
           icon={SuperscriptIcon}
+          label="Superscript"
           active={activeCmds.includes("superscript")}
         />
         <Btn
           runCmd={runCmd}
           cmd="subscript"
           icon={SubscriptIcon}
+          label="Subscript"
           active={activeCmds.includes("subscript")}
         />
         <div className="w-px h-4 bg-gray-200 dark:bg-slate-700 mx-1 shrink-0"></div>
@@ -138,7 +146,7 @@ export const ToolbarActions: React.FC<ToolbarActionsProps> = ({
           runCmd={runCmd}
           cmd="removeFormat"
           icon={EraserIcon}
-          label="Clear"
+          label="Clear Format"
         />
       </>
     );
@@ -151,24 +159,28 @@ export const ToolbarActions: React.FC<ToolbarActionsProps> = ({
           runCmd={runCmd}
           cmd="justifyLeft"
           icon={AlignLeftIcon}
+          label="Rata Kiri"
           active={activeCmds.includes("justifyLeft")}
         />
         <Btn
           runCmd={runCmd}
           cmd="justifyCenter"
           icon={AlignCenterIcon}
+          label="Rata Tengah"
           active={activeCmds.includes("justifyCenter")}
         />
         <Btn
           runCmd={runCmd}
           cmd="justifyRight"
           icon={AlignRightIcon}
+          label="Rata Kanan"
           active={activeCmds.includes("justifyRight")}
         />
         <Btn
           runCmd={runCmd}
           cmd="justifyFull"
           icon={AlignJustifyIcon}
+          label="Rata Kiri-Kanan"
           active={activeCmds.includes("justifyFull")}
         />
         <div className="w-px h-4 bg-gray-200 dark:bg-slate-700 mx-1 shrink-0"></div>
@@ -176,12 +188,14 @@ export const ToolbarActions: React.FC<ToolbarActionsProps> = ({
           runCmd={runCmd}
           cmd="insertUnorderedList"
           icon={ListBulletIcon}
+          label="Bullet List"
           active={activeCmds.includes("insertUnorderedList")}
         />
         <Btn
           runCmd={runCmd}
           cmd="insertOrderedList"
-          label="1."
+          label="Numbered List"
+          icon={() => <span className="text-xs font-bold font-mono">1.</span>}
           active={activeCmds.includes("insertOrderedList")}
         />
         <div className="w-px h-4 bg-gray-200 dark:bg-slate-700 mx-1 shrink-0"></div>
@@ -189,13 +203,25 @@ export const ToolbarActions: React.FC<ToolbarActionsProps> = ({
           runCmd={runCmd}
           cmd="indent"
           label="Indent"
-          icon={() => <span className="text-[10px] font-mono">→]</span>}
+          icon={() => <span className="text-[10px] font-mono font-bold">→]</span>}
         />
         <Btn
           runCmd={runCmd}
           cmd="outdent"
           label="Outdent"
-          icon={() => <span className="text-[10px] font-mono">[←</span>}
+          icon={() => <span className="text-[10px] font-mono font-bold">[←</span>}
+        />
+        <div className="w-px h-4 bg-gray-200 dark:bg-slate-700 mx-1 shrink-0"></div>
+        <Btn
+          onClick={onVerticalIndentClick}
+          label="Indent Garis Vertikal (Kutipan/Stimulus)"
+          active={activeCmds.includes("verticalIndent")}
+          icon={() => (
+            <div className="flex items-center gap-0.5 px-0.5">
+              <span className="w-1 h-3.5 bg-indigo-600 dark:bg-indigo-400 rounded-full inline-block mr-0.5"></span>
+              <span className="text-[10px] font-mono font-bold leading-none">|→</span>
+            </div>
+          )}
         />
       </>
     );
