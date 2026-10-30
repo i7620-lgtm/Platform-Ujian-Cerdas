@@ -387,6 +387,38 @@ export class ExamService {
         return { ...exam, questions: finalQuestions };
     }
 
+    getLocalTeacherExams(): Record<string, Exam> {
+        try {
+            if (typeof window === 'undefined') return {};
+            const raw = localStorage.getItem('ujiancerdas_saved_teacher_exams');
+            return raw ? JSON.parse(raw) : {};
+        } catch {
+            return {};
+        }
+    }
+
+    saveLocalTeacherExam(exam: Exam) {
+        try {
+            if (typeof window === 'undefined') return;
+            const current = this.getLocalTeacherExams();
+            current[exam.code] = exam;
+            localStorage.setItem('ujiancerdas_saved_teacher_exams', JSON.stringify(current));
+        } catch (e) {
+            console.warn("Failed to persist exam to local cache:", e);
+        }
+    }
+
+    removeLocalTeacherExam(code: string) {
+        try {
+            if (typeof window === 'undefined') return;
+            const current = this.getLocalTeacherExams();
+            delete current[code];
+            localStorage.setItem('ujiancerdas_saved_teacher_exams', JSON.stringify(current));
+        } catch (e) {
+            console.warn("Failed to delete exam from local cache:", e);
+        }
+    }
+
     async getExams(profile?: TeacherProfile): Promise<Record<string, Exam>> {
         if (profile && (profile.accountType === 'super_admin' || profile.accountType === 'admin_sekolah')) {
             const verified = await authService.getCurrentUser();
@@ -410,11 +442,6 @@ export class ExamService {
 
         const { data, error } = await query.order('created_at', { ascending: false });
 
-        if (error) {
-            console.error("Error fetching exams from Supabase:", error);
-            return {};
-        }
-
         const examMap: Record<string, Exam> = {};
         if (data) {
             data.forEach((row: Record<string, unknown>) => {
@@ -428,7 +455,25 @@ export class ExamService {
                     createdAt: row.created_at as string
                 };
             });
+        } else if (error) {
+            console.error("Error fetching exams from Supabase:", error);
         }
+
+        // Merge local teacher exams cache to guarantee drafts and published exams never disappear
+        const localExams = this.getLocalTeacherExams();
+        Object.values(localExams).forEach((localExam) => {
+            const isMatch = !profile ||
+                profile.accountType === 'super_admin' ||
+                localExam.authorId === profile.id ||
+                (profile.accountType === 'admin_sekolah' && localExam.authorSchool === profile.school);
+
+            if (isMatch) {
+                if (!examMap[localExam.code]) {
+                    examMap[localExam.code] = localExam;
+                }
+            }
+        });
+
         return examMap;
     }
 
@@ -633,6 +678,9 @@ export class ExamService {
     }
 
     async saveExam(exam: Exam): Promise<void> {
+        // Immediate local cache save to prevent data loss or UI disappearance
+        this.saveLocalTeacherExam(exam);
+
         if (exam.config && (exam.config.examMode || '').trim().toUpperCase() === 'PR') {
             exam.config.detectBehavior = false;
             exam.config.continueWithPermission = false;
@@ -999,6 +1047,7 @@ export class ExamService {
     }
 
     async deleteExam(code: string): Promise<void> {
+        this.removeLocalTeacherExam(code);
         await supabase.from('results').delete().eq('exam_code', code);
         await supabase.from('exams').delete().eq('code', code);
         const { data: files } = await supabase.storage.from('soal').list(code);
