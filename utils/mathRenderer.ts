@@ -30,6 +30,9 @@ export const normalizeLatex = (latex: string): string => {
   // Fix Unicode degree symbol
   clean = clean.replace(/°/g, "^{\\circ}");
 
+  // Auto-escape '%' to avoid KaTeX treating it as a LaTeX line comment
+  clean = clean.replace(/(?<!\\)%/g, "\\%");
+
   // Fix common unit formatting issues like \text{ cm}^3 or \text{cm}^3
   clean = clean.replace(/\\text\{\s*cm\s*\}\^([23])/g, "\\text{ cm}^$1");
   clean = clean.replace(/\\text\{\s*m\s*\}\^([23])/g, "\\text{ m}^$1");
