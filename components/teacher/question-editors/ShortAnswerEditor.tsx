@@ -26,10 +26,11 @@ export const ShortAnswerEditor: React.FC<ShortAnswerEditorProps> = ({ q }) => {
             : "Ketik pedoman jawaban essay..."
         }
         minHeight="60px"
-        onChartClick={() =>
+        onChartClick={(chartType) =>
           setEditingChartTarget({
             qId: q.id,
             type: "correctAnswer",
+            preferredType: chartType,
           })
         }
         chartData={q.correctAnswerChart}
