@@ -114,11 +114,12 @@ export const MultipleChoiceEditor: React.FC<MultipleChoiceEditorProps> = ({ q })
                   onChange={(val) => handleOptionTextChange(q.id, optIndex, val)}
                   placeholder={`Pilihan ${letter}`}
                   minHeight="50px"
-                  onChartClick={() =>
+                  onChartClick={(chartType) =>
                     setEditingChartTarget({
                       qId: q.id,
                       type: "option",
                       index: optIndex,
+                      preferredType: chartType,
                     })
                   }
                   chartData={q.optionCharts?.[optIndex]}
