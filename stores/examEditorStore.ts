@@ -13,7 +13,15 @@ const createNewQuestion = (type: QuestionType): Question => {
         case 'COMPLEX_MULTIPLE_CHOICE': return { ...base, options: ['Opsi A', 'Opsi B', 'Opsi C', 'Opsi D'], correctAnswer: '' }; 
         case 'TRUE_FALSE': return { ...base, trueFalseRows: [{ text: 'Pernyataan 1', answer: true }, { text: 'Pernyataan 2', answer: false }], options: undefined, correctAnswer: undefined }; 
         case 'MATCHING': return { ...base, matchingPairs: [{ left: 'Item A', right: 'Pasangan A' }, { left: 'Item B', right: 'Pasangan B' }] }; 
-        case 'FILL_IN_THE_BLANK': return { ...base, correctAnswer: '' }; 
+        case 'QUESTIONNAIRE': return {
+            ...base,
+            scoreWeight: 0,
+            questionnaireFormat: 'scale',
+            scaleMin: 1,
+            scaleMax: 5,
+            scaleLabels: ['Sangat Tidak Setuju', 'Sangat Setuju'],
+            options: ['Sangat Tidak Setuju', 'Tidak Setuju', 'Netral', 'Setuju', 'Sangat Setuju'],
+        };
         case 'ESSAY': 
         default: return { ...base };
     }
@@ -49,6 +57,7 @@ interface ExamEditorState {
     handleHintChange: (id: string, hint: string) => void;
     handleSolutionStepsChange: (id: string, solutionSteps: string) => void;
     handleScoreWeightChange: (id: string, weight: number) => void;
+    handleUpdateQuestion: (qId: string, updates: Partial<Question>) => void;
     handleTypeChange: (qId: string, newType: QuestionType) => void;
     handleOptionTextChange: (qId: string, optIndex: number, text: string) => void;
     handleCorrectAnswerChange: (questionId: string, answer: string) => void;
@@ -357,6 +366,13 @@ export const useExamEditorStore = create<ExamEditorState>()(
             }
         }),
 
+        handleUpdateQuestion: (qId, updates) => set((state) => {
+            const index = state.questions.findIndex(q => q.id === qId);
+            if (index !== -1) {
+                state.questions[index] = { ...state.questions[index], ...updates };
+            }
+        }),
+
         handleTypeChange: (qId, newType) => set((state) => {
             state.questions = state.questions.map((q) => {
                 if (q.id === qId) {
@@ -370,6 +386,16 @@ export const useExamEditorStore = create<ExamEditorState>()(
                     }
                     if (newType === 'MATCHING' && (!updated.matchingPairs || updated.matchingPairs.length === 0)) {
                         updated.matchingPairs = [{ left: 'Item A', right: 'Pasangan A' }, { left: 'Item B', right: 'Pasangan B' }];
+                    }
+                    if (newType === 'QUESTIONNAIRE') {
+                        updated.scoreWeight = 0;
+                        updated.questionnaireFormat = updated.questionnaireFormat || 'scale';
+                        updated.scaleMin = updated.scaleMin ?? 1;
+                        updated.scaleMax = updated.scaleMax ?? 5;
+                        updated.scaleLabels = updated.scaleLabels || ['Sangat Tidak Setuju', 'Sangat Setuju'];
+                        updated.options = updated.options && updated.options.length > 0
+                            ? updated.options
+                            : ['Sangat Tidak Setuju', 'Tidak Setuju', 'Netral', 'Setuju', 'Sangat Setuju'];
                     }
                     return updated;
                 }
