@@ -44,6 +44,7 @@ export const EquationEditorTab: React.FC<EquationEditorTabProps> = ({
       { l: "∞", v: "\\infty ", name: "tak terhingga" },
       { l: "√x", v: "\\sqrt{x} ", name: "akar kuadrat" },
       { l: "·", v: "\\cdot ", name: "titik kali" },
+      { l: "%", v: "\\% ", name: "persen" },
       { l: "…", v: "\\dots ", name: "titik-titik" },
     ],
     "Huruf Yunani": [
