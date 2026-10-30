@@ -18,6 +18,7 @@ import { ComplexMultipleChoiceEditor } from "./question-editors/ComplexMultipleC
 import { TrueFalseEditor } from "./question-editors/TrueFalseEditor";
 import { MatchingEditor } from "./question-editors/MatchingEditor";
 import { ShortAnswerEditor } from "./question-editors/ShortAnswerEditor";
+import { QuestionnaireEditor } from "./question-editors/QuestionnaireEditor";
 
 interface QuestionCardProps {
   q: Question;
@@ -157,6 +158,7 @@ export const QuestionCard = React.memo(
                   <option value="MATCHING">Menjodohkan</option>
                   <option value="ESSAY">Esai / Uraian</option>
                   <option value="FILL_IN_THE_BLANK">Isian Singkat</option>
+                  <option value="QUESTIONNAIRE">Kuisioner / Angket</option>
                   <option value="INFO">Info / Teks</option>
                 </select>
                 <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-400 dark:text-slate-400">
@@ -290,32 +292,43 @@ export const QuestionCard = React.memo(
                         </div>
                         <div>
                           <label className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest block mb-1">
-                            Bobot Nilai <span className="text-red-500 font-black">*</span>
+                            Bobot Nilai {q.questionType !== "QUESTIONNAIRE" && <span className="text-red-500 font-black">*</span>}
                           </label>
-                          <input
-                            type="number"
-                            min="1"
-                            value={q.scoreWeight ?? 1}
-                            onChange={(e) => {
-                              handleScoreWeightChange(
-                                q.id,
-                                parseInt(e.target.value) || 1,
-                              );
-                              if (validation?.scoreWeight) {
-                                clearQuestionValidationField(q.id, "scoreWeight");
-                              }
-                            }}
-                            className={`w-full p-2 bg-slate-50 dark:bg-slate-900 border rounded-lg text-xs font-medium focus:ring-1 focus:ring-primary outline-none text-slate-800 dark:text-slate-200 placeholder:text-slate-400 transition-all ${
-                              validation?.scoreWeight
-                                ? "border-red-500 ring-2 ring-red-200 dark:ring-red-900/50 bg-red-50/30"
-                                : "border-gray-200 dark:border-slate-700"
-                            }`}
-                            placeholder="Default: 1"
-                          />
-                          {validation?.scoreWeight && (
-                            <p className="text-[10px] text-red-600 dark:text-red-400 font-semibold mt-1">
-                              * Wajib bernilai minimal 1
-                            </p>
+                          {q.questionType === "QUESTIONNAIRE" ? (
+                            <div className="w-full p-2 bg-slate-100/90 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-bold text-indigo-700 dark:text-indigo-300 flex items-center justify-between">
+                              <span>0 Poin</span>
+                              <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-900/40 text-emerald-800 dark:text-emerald-300 font-black">
+                                Non-Skor
+                              </span>
+                            </div>
+                          ) : (
+                            <>
+                              <input
+                                type="number"
+                                min="1"
+                                value={q.scoreWeight ?? 1}
+                                onChange={(e) => {
+                                  handleScoreWeightChange(
+                                    q.id,
+                                    parseInt(e.target.value) || 1,
+                                  );
+                                  if (validation?.scoreWeight) {
+                                    clearQuestionValidationField(q.id, "scoreWeight");
+                                  }
+                                }}
+                                className={`w-full p-2 bg-slate-50 dark:bg-slate-900 border rounded-lg text-xs font-medium focus:ring-1 focus:ring-primary outline-none text-slate-800 dark:text-slate-200 placeholder:text-slate-400 transition-all ${
+                                  validation?.scoreWeight
+                                    ? "border-red-500 ring-2 ring-red-200 dark:ring-red-900/50 bg-red-50/30"
+                                    : "border-gray-200 dark:border-slate-700"
+                                }`}
+                                placeholder="Default: 1"
+                              />
+                              {validation?.scoreWeight && (
+                                <p className="text-[10px] text-red-600 dark:text-red-400 font-semibold mt-1">
+                                  * Wajib bernilai minimal 1
+                                </p>
+                              )}
+                            </>
                           )}
                         </div>
                       </div>
@@ -376,8 +389,12 @@ export const QuestionCard = React.memo(
                     <ShortAnswerEditor q={q} />
                   )}
 
+                  {q.questionType === "QUESTIONNAIRE" && (
+                    <QuestionnaireEditor q={q} />
+                  )}
+
                   {/* Petunjuk Pengerjaan & Langkah Pengerjaan (Collapsible - Tertutup Default, Hijau Saat Terisi) */}
-                  {q.questionType !== "INFO" && (
+                  {q.questionType !== "INFO" && q.questionType !== "QUESTIONNAIRE" && (
                     <div className="mt-5 pt-4 border-t border-dashed border-gray-200 dark:border-slate-700">
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 items-start">
                         {/* 1. Petunjuk Pengerjaan */}
