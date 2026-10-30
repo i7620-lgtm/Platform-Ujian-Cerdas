@@ -65,7 +65,7 @@ export const analyzeQuestionTypePerformance = (
 
   // Initialize map with all types present in exam
   exam.questions.forEach((q) => {
-    if (q.questionType === "INFO") return;
+    if (q.questionType === "INFO" || q.questionType === "QUESTIONNAIRE") return;
     if (!typeMap[q.questionType]) {
       typeMap[q.questionType] = {
         totalQuestions: 0,
@@ -133,7 +133,7 @@ export const analyzeQuestionTypePerformance = (
   // Calculate stats
   resultArray.forEach((result) => {
     exam.questions.forEach((q) => {
-      if (q.questionType === "INFO") return;
+      if (q.questionType === "INFO" || q.questionType === "QUESTIONNAIRE") return;
       if (!typeMap[q.questionType]) return; // Should be initialized, but safety check
 
       typeMap[q.questionType].totalAttempt++;
@@ -157,6 +157,8 @@ export const analyzeQuestionTypePerformance = (
         return "Isian Singkat";
       case "ESSAY":
         return "Uraian / Esai";
+      case "QUESTIONNAIRE":
+        return "Kuisioner / Angket";
       default:
         return type;
     }
@@ -871,7 +873,7 @@ export const analyzeStudentPerformance = (
 
   // 1. Calculate Stats per Category
   exam.questions.forEach((q) => {
-    if (q.questionType === "INFO") return;
+    if (q.questionType === "INFO" || q.questionType === "QUESTIONNAIRE") return;
 
     const category =
       q.category && q.category.trim() !== "" ? q.category.trim() : "Umum";
@@ -1909,7 +1911,7 @@ export const calculateExamScore = (
   let minPossibleScore = 0;
 
   const scorableQuestions = exam.questions.filter(
-    (q) => q.questionType !== "INFO",
+    (q) => q.questionType !== "INFO" && q.questionType !== "QUESTIONNAIRE",
   );
 
   const isOlympiad = !!exam.config?.isOlympiadMode;
@@ -3356,6 +3358,25 @@ export const generateQuestionsPDF = async (exam: Exam): Promise<void> => {
                     <strong>Jawaban:</strong>
                     <div class="w-full h-32 border border-slate-300 rounded-lg mt-2"></div>
                 </div>`;
+      } else if (q.questionType === "QUESTIONNAIRE") {
+        if (q.questionnaireFormat === "scale") {
+          htmlContent += `<div class="mt-2 flex items-center justify-between gap-2 max-w-md p-2 border border-slate-200 rounded">
+            <span class="text-xs font-semibold">${q.scaleLabels?.[0] || "1"}</span>
+            <div class="flex gap-2">${Array.from({ length: (q.scaleMax ?? 5) - (q.scaleMin ?? 1) + 1 }, (_, i) => `<span class="w-7 h-7 border border-slate-400 rounded flex items-center justify-center font-bold text-xs">${(q.scaleMin ?? 1) + i}</span>`).join("")}</div>
+            <span class="text-xs font-semibold">${q.scaleLabels?.[1] || (q.scaleMax ?? 5)}</span>
+          </div>`;
+        } else if (q.questionnaireFormat === "choice" && q.options) {
+          q.options.forEach((opt) => {
+            htmlContent += `<div class="option-item flex gap-3">
+              <span class="w-4 h-4 rounded-full border border-black inline-block mt-1"></span>
+              <div class="wysiwyg-content prose prose-sm max-w-none text-black flex-1">${opt}</div>
+            </div>`;
+          });
+        } else if (q.questionnaireFormat === "rating") {
+          htmlContent += `<div class="mt-2 flex gap-2">${[1, 2, 3, 4, 5].map((s) => `<span class="w-7 h-7 border border-amber-400 rounded flex items-center justify-center text-amber-500 font-bold">★ ${s}</span>`).join("")}</div>`;
+        } else {
+          htmlContent += `<div class="mt-3 mb-2"><div class="w-full h-24 border border-slate-300 rounded p-2 text-slate-400 text-xs italic">[ Area Isian Refleksi / Respon Siswa ]</div></div>`;
+        }
       }
       htmlContent += `</div></div>`; // End options-container and question-item
     });
@@ -3373,7 +3394,9 @@ export const generateQuestionsPDF = async (exam: Exam): Promise<void> => {
 
     scorableQuestions.forEach((q, index) => {
       let ansStr = "";
-      if (q.questionType === "COMPLEX_MULTIPLE_CHOICE") {
+      if (q.questionType === "QUESTIONNAIRE") {
+        ansStr = "<em>Angket / Refleksi Non-Skor (Menghimpun respon siswa)</em>";
+      } else if (q.questionType === "COMPLEX_MULTIPLE_CHOICE") {
         ansStr = parseList(q.correctAnswer || "")
           .map((s) => String(s))
           .join(", ");

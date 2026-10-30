@@ -116,6 +116,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
     resetKey,
     generatedCode,
     manualMode,
+    isSavingExam,
     organizerName,
     accountType,
     questions,
@@ -317,6 +318,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                 onReset={resetForm}
                 isPremium={teacherProfile.isPremium || false}
                 teacherSchoolName={teacherProfile.school}
+                isSaving={isSavingExam}
               />
             )}
           </>
@@ -442,6 +444,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                   generatedCode={""}
                   onReset={() => {}}
                   isPremium={teacherProfile.isPremium || false}
+                  isSaving={isSavingExam}
                 />
               </div>
             </div>

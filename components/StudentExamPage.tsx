@@ -34,6 +34,7 @@ import { useExamAntiCheat } from "../hooks/useExamAntiCheat";
 import { MultipleChoiceView } from "./student/question-types/MultipleChoiceView";
 import { TrueFalseView } from "./student/question-types/TrueFalseView";
 import { MatchingView } from "./student/question-types/MatchingView";
+import { QuestionnaireView } from "./student/question-types/QuestionnaireView";
 
 const renderQuestionTextWithChart = (
   html: string,
@@ -936,6 +937,15 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({
                             placeholder="Ketik jawaban singkat..."
                           />
                         </div>
+                      )}
+
+                      {q.questionType === "QUESTIONNAIRE" && (
+                        <QuestionnaireView
+                          question={q}
+                          answers={answers}
+                          onAnswerChange={handleAnswerChange}
+                          optimizeHtml={optimizeHtml}
+                        />
                       )}
                     </div>
 

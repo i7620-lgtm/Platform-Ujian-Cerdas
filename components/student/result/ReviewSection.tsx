@@ -214,11 +214,17 @@ export const ReviewSection: React.FC<ReviewSectionProps> = ({
                 <span className="text-[10px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest">
                   Soal {idx + 1}
                 </span>
-                <span
-                  className={`text-[10px] font-black px-2.5 py-1 rounded-lg uppercase tracking-wide ${isCorrect ? "bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400" : "bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-400"}`}
-                >
-                  {isCorrect ? "Benar" : "Salah"}
-                </span>
+                {q.questionType === "QUESTIONNAIRE" ? (
+                  <span className="text-[10px] font-black px-2.5 py-1 rounded-lg uppercase tracking-wide bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300">
+                    Respon Tercatat
+                  </span>
+                ) : (
+                  <span
+                    className={`text-[10px] font-black px-2.5 py-1 rounded-lg uppercase tracking-wide ${isCorrect ? "bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400" : "bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-400"}`}
+                  >
+                    {isCorrect ? "Benar" : "Salah"}
+                  </span>
+                )}
               </div>
               {renderQuestionTextWithChart(q.questionText, q.chartData)}
 
@@ -228,13 +234,13 @@ export const ReviewSection: React.FC<ReviewSectionProps> = ({
                     Jawaban Kamu:
                   </span>
                   <div
-                    className={`text-right font-black option-content flex-1 min-w-0 [&_p]:inline ${isCorrect ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"}`}
+                    className={`text-right font-black option-content flex-1 min-w-0 [&_p]:inline ${q.questionType === "QUESTIONNAIRE" ? "text-indigo-600 dark:text-indigo-400" : isCorrect ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"}`}
                     dangerouslySetInnerHTML={{
                       __html: sanitizeHtml(displayStudentAns),
                     }}
                   ></div>
                 </div>
-                {exam.config?.showCorrectAnswer && (
+                {exam.config?.showCorrectAnswer && q.questionType !== "QUESTIONNAIRE" && (
                   <div className="flex justify-between items-start border-t border-slate-50 dark:border-slate-800 pt-2 mt-2 gap-2">
                     <span className="text-slate-400 dark:text-slate-500 font-bold shrink-0">
                       Kunci Jawaban:

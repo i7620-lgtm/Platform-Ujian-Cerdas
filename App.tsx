@@ -859,16 +859,40 @@ const App: React.FC = () => {
                     isDarkMode={darkMode}
                     toggleTheme={toggleTheme}
                     addExam={async (e) => { 
-                        const examWithAuthor = { ...e, authorId: teacherProfile.id, authorSchool: teacherProfile.school };
-                        await storageService.saveExam(examWithAuthor); 
-                        refreshExams(); 
+                        const examWithAuthor: Exam = { ...e, authorId: teacherProfile.id, authorSchool: teacherProfile.school };
+                        // Optimistic UI update: immediately add to state so tabs show it with zero delay
+                        setExams((prev) => ({ ...prev, [examWithAuthor.code]: examWithAuthor }));
+                        try {
+                            await storageService.saveExam(examWithAuthor); 
+                        } catch (err) {
+                            console.error("Gagal simpan ujian ke database, data aman di lokal:", err);
+                        }
+                        await refreshExams(); 
                     }}
                     updateExam={async (e) => { 
-                        const examWithAuthor = { ...e, authorId: teacherProfile.id, authorSchool: teacherProfile.school };
-                        await storageService.saveExam(examWithAuthor); 
-                        refreshExams(); 
+                        const examWithAuthor: Exam = { ...e, authorId: teacherProfile.id, authorSchool: teacherProfile.school };
+                        // Optimistic UI update: immediately reflect changes
+                        setExams((prev) => ({ ...prev, [examWithAuthor.code]: examWithAuthor }));
+                        try {
+                            await storageService.saveExam(examWithAuthor); 
+                        } catch (err) {
+                            console.error("Gagal perbarui ujian ke database, data aman di lokal:", err);
+                        }
+                        await refreshExams(); 
                     }}
-                    deleteExam={async (c) => { await storageService.deleteExam(c); refreshExams(); }}
+                    deleteExam={async (c) => { 
+                        setExams((prev) => {
+                            const updated = { ...prev };
+                            delete updated[c];
+                            return updated;
+                        });
+                        try {
+                            await storageService.deleteExam(c); 
+                        } catch (err) {
+                            console.error("Gagal menghapus ujian di server:", err);
+                        }
+                        await refreshExams(); 
+                    }}
                     onLogout={handleLogout}
                     onRefreshExams={refreshExams}
                     onRefreshResults={refreshResults}

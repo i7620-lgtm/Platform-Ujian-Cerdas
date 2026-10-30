@@ -13,6 +13,7 @@ export interface DashboardUIState {
   resetKey: number;
   generatedCode: string;
   manualMode: boolean;
+  isSavingExam: boolean;
 }
 
 export interface DashboardUIActions {
@@ -26,6 +27,7 @@ export interface DashboardUIActions {
   setIsMainGuideModalOpen: (isOpen: boolean) => void;
   setGeneratedCode: (code: string) => void;
   setManualMode: (isManual: boolean) => void;
+  setIsSavingExam: (isSaving: boolean) => void;
   incrementResetKey: () => void;
 }
 
@@ -43,6 +45,7 @@ export const useTeacherDashboardStore = create<TeacherDashboardStore>((set) => (
   resetKey: 0,
   generatedCode: "",
   manualMode: false,
+  isSavingExam: false,
 
   setView: (view) => set({ view }),
   setIsLoadingArchive: (isLoadingArchive) => set({ isLoadingArchive }),
@@ -54,5 +57,6 @@ export const useTeacherDashboardStore = create<TeacherDashboardStore>((set) => (
   setIsMainGuideModalOpen: (isMainGuideModalOpen) => set({ isMainGuideModalOpen }),
   setGeneratedCode: (generatedCode) => set({ generatedCode }),
   setManualMode: (manualMode) => set({ manualMode }),
+  setIsSavingExam: (isSavingExam) => set({ isSavingExam }),
   incrementResetKey: () => set((state) => ({ resetKey: state.resetKey + 1 })),
 }));

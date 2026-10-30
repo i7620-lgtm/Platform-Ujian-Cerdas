@@ -1,5 +1,5 @@
 
-export type QuestionType = 'MULTIPLE_CHOICE' | 'COMPLEX_MULTIPLE_CHOICE' | 'TRUE_FALSE' | 'MATCHING' | 'ESSAY' | 'FILL_IN_THE_BLANK' | 'INFO';
+export type QuestionType = 'MULTIPLE_CHOICE' | 'COMPLEX_MULTIPLE_CHOICE' | 'TRUE_FALSE' | 'MATCHING' | 'ESSAY' | 'FILL_IN_THE_BLANK' | 'INFO' | 'QUESTIONNAIRE';
 
 export interface QuizConfig {
   count: number;
@@ -106,6 +106,13 @@ export interface Question {
   }[];
 
   categoryLabels?: [string, string] | string[]; // Label pilihan untuk soal kategori (misal: ["Benar", "Salah"], ["Sesuai", "Tidak Sesuai"]), default: ["Benar", "Salah"]
+
+  // Kuisioner / Angket (Non-Skor)
+  questionnaireFormat?: 'scale' | 'rating' | 'choice' | 'text';
+  scaleMin?: number;
+  scaleMax?: number;
+  scaleLabels?: [string, string];
+  ratingIcon?: 'star' | 'number';
 
   // Petunjuk Pengerjaan & Langkah Pengerjaan
   hint?: string;          // Petunjuk pengerjaan (clue non-jawaban, scaffolding konsep/rumus)

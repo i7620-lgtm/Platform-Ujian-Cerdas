@@ -51,8 +51,8 @@ const DEFAULT_CONFIG: ExamConfig = {
 
 interface UseTeacherDashboardParams {
   teacherProfile: TeacherProfile;
-  addExam: (newExam: Exam) => void;
-  updateExam: (updatedExam: Exam) => void;
+  addExam: (newExam: Exam) => Promise<void> | void;
+  updateExam: (updatedExam: Exam) => Promise<void> | void;
   deleteExam: (code: string) => Promise<void>;
   exams: Record<string, Exam>;
   results: Result[];
@@ -94,6 +94,8 @@ export const useTeacherDashboard = ({
     setGeneratedCode,
     manualMode,
     setManualMode,
+    isSavingExam,
+    setIsSavingExam,
   } = useTeacherDashboardStore();
 
   const questions = useExamEditorStore((state) => state.questions);
@@ -187,144 +189,187 @@ export const useTeacherDashboard = ({
   };
 
   // 5. Form saving logic (DRAFT / PUBLISHED)
-  const handleSaveExam = (status: "PUBLISHED" | "DRAFT") => {
+  const handleSaveExam = async (status: "PUBLISHED" | "DRAFT") => {
     if (status === "PUBLISHED" && questions.length === 0) {
       alert("Tidak ada soal.");
       return;
     }
 
-    // Sanitize all questions before saving to ensure no theme-specific styles are stored
-    const sanitizedQuestions = questions.map((q) => {
-      let sanitizedCorrectAnswer = q.correctAnswer;
-      if (q.correctAnswer) {
-        if (q.questionType === "COMPLEX_MULTIPLE_CHOICE") {
-          const parsed = parseList(q.correctAnswer, q.options);
-          sanitizedCorrectAnswer = JSON.stringify(
-            (parsed || []).map((opt) => sanitizeHtml(opt)),
-          );
-        } else if (q.questionType === "MULTIPLE_CHOICE") {
-          try {
-            const parsed = JSON.parse(q.correctAnswer);
-            if (Array.isArray(parsed)) {
-              // If it's an array (e.g. changed from COMPLEX), take first element
-              sanitizedCorrectAnswer =
-                parsed.length > 0 ? sanitizeHtml(parsed[0]) : "";
-            } else {
+    if (isSavingExam) return;
+    setIsSavingExam(true);
+
+    try {
+      // Sanitize all questions before saving to ensure no theme-specific styles are stored
+      const sanitizedQuestions = questions.map((q) => {
+        let sanitizedCorrectAnswer = q.correctAnswer;
+        if (q.correctAnswer) {
+          if (q.questionType === "COMPLEX_MULTIPLE_CHOICE") {
+            const parsed = parseList(q.correctAnswer, q.options);
+            sanitizedCorrectAnswer = JSON.stringify(
+              (parsed || []).map((opt) => sanitizeHtml(opt)),
+            );
+          } else if (q.questionType === "MULTIPLE_CHOICE") {
+            try {
+              const parsed = JSON.parse(q.correctAnswer);
+              if (Array.isArray(parsed)) {
+                // If it's an array (e.g. changed from COMPLEX), take first element
+                sanitizedCorrectAnswer =
+                  parsed.length > 0 ? sanitizeHtml(parsed[0]) : "";
+              } else {
+                sanitizedCorrectAnswer = sanitizeHtml(q.correctAnswer);
+              }
+            } catch {
               sanitizedCorrectAnswer = sanitizeHtml(q.correctAnswer);
             }
-          } catch {
+          } else {
             sanitizedCorrectAnswer = sanitizeHtml(q.correctAnswer);
           }
-        } else {
-          sanitizedCorrectAnswer = sanitizeHtml(q.correctAnswer);
+        }
+
+        return {
+          ...q,
+          questionText: sanitizeHtml(q.questionText),
+          options: q.options
+            ? q.options.map((opt) => sanitizeHtml(opt))
+            : undefined,
+          correctAnswer: sanitizedCorrectAnswer,
+          trueFalseRows: q.trueFalseRows
+            ? q.trueFalseRows.map((row) => ({
+                ...row,
+                text: sanitizeHtml(row.text),
+              }))
+            : undefined,
+          matchingPairs: q.matchingPairs
+            ? q.matchingPairs.map((pair) => ({
+                ...pair,
+                left: sanitizeHtml(pair.left),
+                right: sanitizeHtml(pair.right),
+              }))
+            : undefined,
+        };
+      });
+
+      const code = editingExam ? editingExam.code : generateExamCode();
+      const now = new Date();
+      const todayDateStr = now.toLocaleDateString("en-CA");
+      const readableDate = now.toLocaleString("id-ID").replace(/\//g, "-");
+
+      let dateToUse = (config.startDate || config.date || "").split("T")[0];
+      if (!dateToUse) dateToUse = todayDateStr;
+
+      let startTime = config.startTime || "08:00";
+      let endTime = config.endTime || "10:00";
+      const isPR = (config.examMode || "").trim().toUpperCase() === "PR";
+      if (isPR) {
+        endTime = config.endTime || "23:59";
+      }
+
+      let endDateToUse = (config.endDate || dateToUse).split("T")[0];
+      if (!endDateToUse) endDateToUse = dateToUse;
+
+      // AUTOMATIC TIME ADJUSTMENT for PUBLISHED exam:
+      // If publishing for today and the configured endTime has already passed,
+      // adjust startTime to current time and endTime to ensure the exam is ONGOING right now!
+      if (status === "PUBLISHED") {
+        const curLocalEnd = new Date(`${endDateToUse}T${endTime}:59`);
+        if (now > curLocalEnd) {
+          const curHours = String(now.getHours()).padStart(2, "0");
+          const curMinutes = String(now.getMinutes()).padStart(2, "0");
+          startTime = `${curHours}:${curMinutes}`;
+          dateToUse = todayDateStr;
+
+          if (isPR) {
+            endTime = "23:59";
+            endDateToUse = todayDateStr;
+          } else {
+            const limitMinutes =
+              config.timeLimit && config.timeLimit > 0
+                ? config.timeLimit
+                : 120;
+            const autoEndDate = new Date(now.getTime() + limitMinutes * 60000);
+            endDateToUse = autoEndDate.toLocaleDateString("en-CA");
+            const endH = String(autoEndDate.getHours()).padStart(2, "0");
+            const endM = String(autoEndDate.getMinutes()).padStart(2, "0");
+            endTime = `${endH}:${endM}`;
+          }
         }
       }
 
-      return {
-        ...q,
-        questionText: sanitizeHtml(q.questionText),
-        options: q.options
-          ? q.options.map((opt) => sanitizeHtml(opt))
-          : undefined,
-        correctAnswer: sanitizedCorrectAnswer,
-        trueFalseRows: q.trueFalseRows
-          ? q.trueFalseRows.map((row) => ({
-              ...row,
-              text: sanitizeHtml(row.text),
-            }))
-          : undefined,
-        matchingPairs: q.matchingPairs
-          ? q.matchingPairs.map((pair) => ({
-              ...pair,
-              left: sanitizeHtml(pair.left),
-              right: sanitizeHtml(pair.right),
-            }))
-          : undefined,
+      const localDateTime = new Date(`${dateToUse}T${startTime}`);
+      const isoStart = !isNaN(localDateTime.getTime())
+        ? localDateTime.toISOString()
+        : now.toISOString();
+
+      const localEndDateTime = new Date(`${endDateToUse}T${endTime}:59`);
+      const isoEnd = !isNaN(localEndDateTime.getTime())
+        ? localEndDateTime.toISOString()
+        : new Date(now.getTime() + 86400000).toISOString();
+
+      const examData: Exam = {
+        code,
+        authorId: teacherProfile.id,
+        authorSchool: teacherProfile.school,
+        questions: sanitizedQuestions,
+        config: {
+          ...config,
+          date: isoStart,
+          startDate: isoStart,
+          endDate: isoEnd,
+          startTime: isPR ? (startTime || "00:00") : startTime,
+          endTime: endTime,
+        },
+        createdAt: editingExam?.createdAt || String(readableDate),
+        status,
       };
-    });
 
-    const code = editingExam ? editingExam.code : generateExamCode();
-    const now = new Date();
-    const readableDate = now.toLocaleString("id-ID").replace(/\//g, "-");
+      const finalExamData: Exam = {
+        ...examData,
+        config: {
+          ...examData.config,
+          ...(isPR
+            ? {
+                detectBehavior: false,
+                continueWithPermission: false,
+                trackLocation: false,
+              }
+            : {}),
+          isFinished: false, // Reset on save/publish to ensure it's not stuck in finished state
+        },
+      };
 
-    // Convert local time to UTC for storage
-    const dateToUse = (config.startDate || config.date || "").split("T")[0];
-    const localDateTime = new Date(
-      `${dateToUse}T${config.startTime || "00:00"}`,
-    );
-
-    // We store the ISO string which is always UTC
-    const isoStart = !isNaN(localDateTime.getTime())
-      ? localDateTime.toISOString()
-      : new Date().toISOString();
-
-    const isPR = (config.examMode || "").trim().toUpperCase() === "PR";
-    const prEndTime = isPR ? (config.endTime || "23:59") : (config.endTime || "10:00");
-    const endDateToUse = (config.endDate || dateToUse).split("T")[0];
-    const localEndDateTime = new Date(
-      `${endDateToUse}T${prEndTime}:59`,
-    );
-    const isoEnd = !isNaN(localEndDateTime.getTime())
-      ? localEndDateTime.toISOString()
-      : isoStart;
-
-    const examData: Exam = {
-      code,
-      authorId: teacherProfile.id,
-      authorSchool: teacherProfile.school,
-      questions: sanitizedQuestions,
-      config: {
-        ...config,
-        date: isoStart,
-        startDate: isoStart,
-        endDate: isoEnd,
-        startTime: isPR ? (config.startTime || "00:00") : config.startTime,
-        endTime: prEndTime,
-      },
-      createdAt: editingExam?.createdAt || String(readableDate),
-      status,
-    };
-
-    const finalExamData: Exam = {
-      ...examData,
-      config: {
-        ...examData.config,
-        ...(isPR
-          ? {
-              detectBehavior: false,
-              continueWithPermission: false,
-              trackLocation: false,
-            }
-          : {}),
-        isFinished: false, // Reset on save/publish to ensure it's not stuck in finished state
-      },
-    };
-
-    if (editingExam) {
-      updateExam(finalExamData);
-      setIsEditModalOpen(false);
-      setEditingExam(null);
-    } else {
-      addExam(finalExamData);
-      if (status === "PUBLISHED") setGeneratedCode(code);
-    }
-
-    if (status === "DRAFT") {
-      setView("DRAFTS");
-      resetForm();
-    } else {
-      // Check status based on the ISO time
-      const start = new Date(isoStart);
-      const end = new Date(isoEnd);
-
-      if (now >= start && now <= end) {
-        setView("ONGOING");
-      } else if (now < start) {
-        setView("UPCOMING_EXAMS");
+      if (editingExam) {
+        await updateExam(finalExamData);
+        setIsEditModalOpen(false);
+        setEditingExam(null);
       } else {
-        setView("FINISHED_EXAMS");
+        await addExam(finalExamData);
+        if (status === "PUBLISHED") setGeneratedCode(code);
       }
-      resetForm();
+
+      if (status === "DRAFT") {
+        setView("DRAFTS");
+        resetForm();
+      } else {
+        // User preference: "Langsung simpan dan beralih otomatis ke tab ujian berlangsung"
+        const start = new Date(isoStart);
+        const end = new Date(isoEnd);
+
+        if (now >= start && now <= end) {
+          setView("ONGOING");
+        } else if (now < start) {
+          setView("UPCOMING_EXAMS");
+        } else {
+          setView("ONGOING"); // Default to ongoing for newly published exams
+        }
+        resetForm();
+      }
+    } catch (err) {
+      console.error("Gagal menyimpan ujian:", err);
+      alert(
+        "Terjadi kendala saat menyimpan ujian ke server. Data Anda tetap tersimpan di editor, silakan coba lagi.",
+      );
+    } finally {
+      setIsSavingExam(false);
     }
   };
 
@@ -566,6 +611,7 @@ export const useTeacherDashboard = ({
     resetKey,
     generatedCode,
     manualMode,
+    isSavingExam,
     organizerName,
     accountType,
     questions,

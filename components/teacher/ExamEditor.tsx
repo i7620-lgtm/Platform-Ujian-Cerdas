@@ -37,6 +37,7 @@ interface ExamEditorProps {
   onReset: () => void;
   isPremium?: boolean;
   teacherSchoolName?: string;
+  isSaving?: boolean;
 }
 
 const SUBJECTS = [
@@ -106,6 +107,7 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
   onReset,
   isPremium,
   teacherSchoolName,
+  isSaving = false,
 }) => {
   const hookResult = useExamEditor({ isEditing, generatedCode, isPremium });
   const {
@@ -171,6 +173,12 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
         label: "Menjodohkan",
         desc: "Menghubungkan pasangan item kiri dan kanan.",
         icon: ArrowLeftIcon,
+      },
+      {
+        type: "QUESTIONNAIRE",
+        label: "Kuisioner / Angket",
+        desc: "Pengumpulan data, refleksi, & survei opini (non-skor).",
+        icon: SparklesIcon,
       },
     ];
 
@@ -307,24 +315,46 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
         {isEditing ? (
           <div className="flex flex-col sm:flex-row justify-center items-center gap-4 w-full sm:w-auto px-4 sm:px-0">
             <button
+              type="button"
+              disabled={isSaving}
               onClick={onCancel}
-              className="w-full sm:w-auto bg-white dark:bg-slate-800 text-gray-700 dark:text-slate-300 border border-gray-300 dark:border-slate-600 font-bold py-4 px-10 rounded-2xl hover:bg-gray-50 dark:hover:bg-slate-700 transition-all shadow-sm active:scale-95"
+              className="w-full sm:w-auto bg-white dark:bg-slate-800 text-gray-700 dark:text-slate-300 border border-gray-300 dark:border-slate-600 font-bold py-4 px-10 rounded-2xl hover:bg-gray-50 dark:hover:bg-slate-700 transition-all shadow-sm active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Batal
             </button>
             {onSaveDraft && (
               <button
+                type="button"
+                disabled={isSaving}
                 onClick={onSaveDraft}
-                className="w-full sm:w-auto bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-600 font-bold py-4 px-10 rounded-2xl hover:bg-slate-200 dark:hover:bg-slate-600 transition-all shadow-sm flex items-center justify-center gap-2 active:scale-95"
+                className="w-full sm:w-auto bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-600 font-bold py-4 px-10 rounded-2xl hover:bg-slate-200 dark:hover:bg-slate-600 transition-all shadow-sm flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <PencilIcon className="w-5 h-5" /> Perbarui Draf
+                {isSaving ? (
+                  <>
+                    <div className="w-5 h-5 border-2 border-slate-400 border-t-transparent rounded-full animate-spin" />
+                    <span>Menyimpan...</span>
+                  </>
+                ) : (
+                  <>
+                    <PencilIcon className="w-5 h-5" /> Perbarui Draf
+                  </>
+                )}
               </button>
             )}
             <button
+              type="button"
+              disabled={isSaving}
               onClick={onSave}
-              className="w-full sm:w-auto bg-primary dark:bg-indigo-600 text-white font-bold py-4 px-14 rounded-2xl hover:bg-primary-focus dark:hover:bg-indigo-700 transition-all shadow-xl shadow-indigo-100 dark:shadow-indigo-900/30 transform hover:-translate-y-1 active:scale-95"
+              className="w-full sm:w-auto bg-primary dark:bg-indigo-600 text-white font-bold py-4 px-14 rounded-2xl hover:bg-primary-focus dark:hover:bg-indigo-700 transition-all shadow-xl shadow-indigo-100 dark:shadow-indigo-900/30 transform hover:-translate-y-1 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
-              Simpan Perubahan
+              {isSaving ? (
+                <>
+                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  <span>Menyimpan Perubahan...</span>
+                </>
+              ) : (
+                "Simpan Perubahan"
+              )}
             </button>
           </div>
         ) : (
@@ -332,17 +362,39 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
             <div className="flex flex-col sm:flex-row justify-center gap-4 items-center">
               {onSaveDraft && (
                 <button
+                  type="button"
+                  disabled={isSaving}
                   onClick={onSaveDraft}
-                  className="w-full sm:w-auto bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-2 border-slate-100 dark:border-slate-700 font-bold py-4 px-10 rounded-2xl hover:bg-slate-50 dark:hover:bg-slate-700 transition-all flex items-center justify-center gap-2 active:scale-95"
+                  className="w-full sm:w-auto bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-2 border-slate-100 dark:border-slate-700 font-bold py-4 px-10 rounded-2xl hover:bg-slate-50 dark:hover:bg-slate-700 transition-all flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  <PencilIcon className="w-5 h-5" /> Simpan Draf
+                  {isSaving ? (
+                    <>
+                      <div className="w-5 h-5 border-2 border-slate-400 border-t-transparent rounded-full animate-spin" />
+                      <span>Menyimpan Draf...</span>
+                    </>
+                  ) : (
+                    <>
+                      <PencilIcon className="w-5 h-5" /> Simpan Draf
+                    </>
+                  )}
                 </button>
               )}
               <button
+                type="button"
+                disabled={isSaving}
                 onClick={onSave}
-                className="w-full sm:w-auto bg-emerald-600 text-white font-bold py-4 px-14 rounded-2xl hover:bg-emerald-700 transition-all shadow-xl shadow-emerald-100 dark:shadow-emerald-900/30 transform hover:-translate-y-1 flex items-center justify-center gap-3 active:scale-95"
+                className="w-full sm:w-auto bg-emerald-600 text-white font-bold py-4 px-14 rounded-2xl hover:bg-emerald-700 transition-all shadow-xl shadow-emerald-100 dark:shadow-emerald-900/30 transform hover:-translate-y-1 flex items-center justify-center gap-3 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <CheckCircleIcon className="w-6 h-6" /> Publikasikan Sekarang
+                {isSaving ? (
+                  <>
+                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    <span>Mempublikasikan...</span>
+                  </>
+                ) : (
+                  <>
+                    <CheckCircleIcon className="w-6 h-6" /> Publikasikan Sekarang
+                  </>
+                )}
               </button>
             </div>
             {generatedCode && (

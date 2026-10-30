@@ -8,6 +8,195 @@ import {
 import { parseList, normalize, isAnswerMatch } from "../examUtils";
 import { useQuestionAnalysisItemLogic } from "./useQuestionAnalysisItemLogic";
 
+const QuestionnaireAnalysisContent: React.FC<{
+  q: Question;
+  distribution: { counts: Record<string, number>; totalAnswered: number; totalStudents: number };
+  examResults: Result[];
+}> = ({ q, distribution, examResults }) => {
+  const format = q.questionnaireFormat || "scale";
+  const responseRate = distribution.totalStudents > 0
+    ? Math.round((distribution.totalAnswered / distribution.totalStudents) * 100)
+    : 0;
+
+  // Hitung rata-rata skor numerik jika skala atau rating
+  let sumNumeric = 0;
+  let countNumeric = 0;
+  Object.entries(distribution.counts).forEach(([ans, count]) => {
+    const num = parseFloat(ans);
+    if (!isNaN(num)) {
+      sumNumeric += num * count;
+      countNumeric += count;
+    }
+  });
+  const avg = countNumeric > 0 ? (sumNumeric / countNumeric).toFixed(1) : null;
+
+  const scaleMin = q.scaleMin ?? 1;
+  const scaleMax = q.scaleMax ?? 5;
+  const scaleLabels = q.scaleLabels || ["Sangat Tidak Setuju", "Sangat Setuju"];
+  const options = q.options && q.options.length > 0
+    ? q.options
+    : ["Sangat Tidak Setuju", "Tidak Setuju", "Netral", "Setuju", "Sangat Setuju"];
+
+  const textResponses = useMemo(() => {
+    return examResults
+      .map((r) => ({
+        studentName: r.student.fullName,
+        className: r.student.class,
+        text: (r.answers[q.id] || "").trim(),
+      }))
+      .filter((item) => item.text.length > 0);
+  }, [examResults, q.id]);
+
+  return (
+    <div className="space-y-4">
+      {/* Header Metric */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3.5 rounded-xl bg-indigo-50/60 dark:bg-indigo-950/30 border border-indigo-100 dark:border-indigo-900/50">
+        <div>
+          <span className="text-[10px] font-black uppercase text-indigo-700 dark:text-indigo-300 tracking-wider block">
+            Tingkat Partisipasi Respon:
+          </span>
+          <p className="text-sm font-black text-indigo-950 dark:text-indigo-100 mt-0.5">
+            {distribution.totalAnswered} / {distribution.totalStudents} Siswa ({responseRate}%)
+          </p>
+        </div>
+        {avg && (
+          <div>
+            <span className="text-[10px] font-black uppercase text-indigo-700 dark:text-indigo-300 tracking-wider block">
+              Rata-rata Skor Penilaian:
+            </span>
+            <p className="text-sm font-black text-amber-600 dark:text-amber-400 mt-0.5">
+              ★ {avg} <span className="text-xs font-normal text-slate-500">/ {format === "rating" ? "5.0" : `${scaleMax}.0`}</span>
+            </p>
+          </div>
+        )}
+      </div>
+
+      {/* Skala Likert Distribution */}
+      {format === "scale" && (
+        <div className="space-y-2">
+          <div className="flex justify-between items-center text-[11px] font-bold text-slate-500 mb-1">
+            <span>{scaleLabels[0] || `Nilai ${scaleMin}`}</span>
+            <span>{scaleLabels[1] || `Nilai ${scaleMax}`}</span>
+          </div>
+          {Array.from({ length: scaleMax - scaleMin + 1 }, (_, i) => scaleMin + i).map((val) => {
+            const count = distribution.counts[String(val)] || 0;
+            const pct = distribution.totalAnswered > 0 ? Math.round((count / distribution.totalAnswered) * 100) : 0;
+            return (
+              <div key={val} className="relative flex items-center justify-between p-2 rounded-lg text-xs bg-slate-50 dark:bg-slate-700/40">
+                <div className="flex items-center gap-2.5 z-10 w-full">
+                  <span className="w-6 h-6 flex shrink-0 items-center justify-center rounded-lg font-black bg-indigo-600 text-white text-xs">
+                    {val}
+                  </span>
+                  <span className="flex-1 font-semibold text-slate-700 dark:text-slate-300">
+                    Nilai {val}
+                  </span>
+                  <span className="font-bold text-slate-700 dark:text-slate-200 shrink-0">
+                    {count} Siswa ({pct}%)
+                  </span>
+                </div>
+                <div
+                  className="absolute top-0 left-0 h-full rounded-lg bg-indigo-400/20 dark:bg-indigo-500/20"
+                  style={{ width: `${pct}%` }}
+                ></div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Rating Bintang Distribution */}
+      {format === "rating" && (
+        <div className="space-y-2">
+          {[5, 4, 3, 2, 1].map((star) => {
+            const count = distribution.counts[String(star)] || 0;
+            const pct = distribution.totalAnswered > 0 ? Math.round((count / distribution.totalAnswered) * 100) : 0;
+            return (
+              <div key={star} className="relative flex items-center justify-between p-2 rounded-lg text-xs bg-slate-50 dark:bg-slate-700/40">
+                <div className="flex items-center gap-2.5 z-10 w-full">
+                  <span className="w-16 flex shrink-0 items-center font-bold text-amber-500 text-xs">
+                    {"★".repeat(star)}
+                  </span>
+                  <span className="flex-1 font-semibold text-slate-700 dark:text-slate-300">
+                    {star} Bintang
+                  </span>
+                  <span className="font-bold text-slate-700 dark:text-slate-200 shrink-0">
+                    {count} Siswa ({pct}%)
+                  </span>
+                </div>
+                <div
+                  className="absolute top-0 left-0 h-full rounded-lg bg-amber-400/20 dark:bg-amber-500/20"
+                  style={{ width: `${pct}%` }}
+                ></div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Pilihan Opini (Radio) Distribution */}
+      {format === "choice" && (
+        <div className="space-y-2">
+          {options.map((opt, i) => {
+            const count = distribution.counts[opt] || 0;
+            const pct = distribution.totalAnswered > 0 ? Math.round((count / distribution.totalAnswered) * 100) : 0;
+            return (
+              <div key={i} className="relative flex items-center justify-between p-2.5 rounded-lg text-xs bg-slate-50 dark:bg-slate-700/40">
+                <div className="flex items-center gap-2.5 z-10 w-full">
+                  <span className="w-5 h-5 flex shrink-0 items-center justify-center rounded font-bold bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 text-xs">
+                    {String.fromCharCode(65 + i)}
+                  </span>
+                  <div
+                    className="flex-1 min-w-0 font-medium text-slate-800 dark:text-slate-200 [&_p]:inline"
+                    dangerouslySetInnerHTML={{ __html: opt }}
+                  ></div>
+                  <span className="font-bold text-slate-700 dark:text-slate-200 shrink-0 ml-2">
+                    {count} Siswa ({pct}%)
+                  </span>
+                </div>
+                <div
+                  className="absolute top-0 left-0 h-full rounded-lg bg-indigo-400/20 dark:bg-indigo-500/20"
+                  style={{ width: `${pct}%` }}
+                ></div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Respon Teks Terbuka */}
+      {format === "text" && (
+        <div className="space-y-2.5">
+          <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+            Tanggapan & Refleksi Siswa ({textResponses.length} Tanggapan):
+          </p>
+          {textResponses.length > 0 ? (
+            <div className="space-y-2 max-h-60 overflow-y-auto custom-scrollbar">
+              {textResponses.map((item, idx) => (
+                <div
+                  key={idx}
+                  className="p-3 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs shadow-2xs"
+                >
+                  <div className="flex items-center justify-between text-[10px] font-bold text-indigo-600 dark:text-indigo-400 mb-1">
+                    <span>{item.studentName}</span>
+                    {item.className && <span>Kelas {item.className}</span>}
+                  </div>
+                  <p className="text-slate-700 dark:text-slate-200 italic leading-relaxed">
+                    "{item.text}"
+                  </p>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-xs text-slate-400 italic p-3 bg-slate-50 dark:bg-slate-800/50 rounded-xl">
+              Belum ada respon teks yang dihimpun dari siswa.
+            </p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
 export const QuestionAnalysisItem: React.FC<{
   q: Question;
   index: number;
@@ -42,14 +231,20 @@ export const QuestionAnalysisItem: React.FC<{
           <span className="text-xs font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">
             Soal {index + 1}
           </span>
-          <span
-            className={`text-[10px] font-black px-2.5 py-1 rounded-lg uppercase border ${difficultyColor}`}
-          >
-            {stats.correctRate}% Benar • {difficultyLabel}
-          </span>
+          {q.questionType === "QUESTIONNAIRE" ? (
+            <span className="text-[10px] font-black px-2.5 py-1 rounded-lg uppercase border bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-900/30 dark:text-indigo-300 dark:border-indigo-800">
+              Kuisioner • Non-Skor
+            </span>
+          ) : (
+            <span
+              className={`text-[10px] font-black px-2.5 py-1 rounded-lg uppercase border ${difficultyColor}`}
+            >
+              {stats.correctRate}% Benar • {difficultyLabel}
+            </span>
+          )}
         </div>
 
-        {(q.category || q.level || q.scoreWeight) && (
+        {(q.category || q.level || q.scoreWeight !== undefined || q.questionType === "QUESTIONNAIRE") && (
           <div className="flex gap-2 mb-2">
             {q.category && (
               <span className="text-[10px] font-bold bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 px-2 py-0.5 rounded border border-slate-200 dark:border-slate-600">
@@ -61,9 +256,15 @@ export const QuestionAnalysisItem: React.FC<{
                 {q.level}
               </span>
             )}
-            <span className="text-[10px] font-bold bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-300 px-2 py-0.5 rounded border border-purple-100 dark:border-purple-800">
-              Bobot: {q.scoreWeight || 1}
-            </span>
+            {q.questionType === "QUESTIONNAIRE" ? (
+              <span className="text-[10px] font-bold bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 px-2 py-0.5 rounded border border-emerald-200 dark:border-emerald-800">
+                Non-Skor (0 Poin)
+              </span>
+            ) : (
+              <span className="text-[10px] font-bold bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-300 px-2 py-0.5 rounded border border-purple-100 dark:border-purple-800">
+                Bobot: {q.scoreWeight || 1}
+              </span>
+            )}
           </div>
         )}
 
@@ -73,14 +274,31 @@ export const QuestionAnalysisItem: React.FC<{
         ></div>
 
         <div className="w-full bg-slate-100 dark:bg-slate-700 h-1.5 rounded-full overflow-hidden mt-1">
-          <div
-            className={`h-full transition-all duration-1000 ${stats.correctRate >= 80 ? "bg-emerald-500" : stats.correctRate >= 50 ? "bg-orange-500" : "bg-rose-500"}`}
-            style={{ width: `${stats.correctRate}%` }}
-          ></div>
+          {q.questionType === "QUESTIONNAIRE" ? (
+            <div
+              className="h-full transition-all duration-1000 bg-indigo-500"
+              style={{
+                width: `${distribution.totalStudents > 0 ? Math.round((distribution.totalAnswered / distribution.totalStudents) * 100) : 0}%`,
+              }}
+            ></div>
+          ) : (
+            <div
+              className={`h-full transition-all duration-1000 ${stats.correctRate >= 80 ? "bg-emerald-500" : stats.correctRate >= 50 ? "bg-orange-500" : "bg-rose-500"}`}
+              style={{ width: `${stats.correctRate}%` }}
+            ></div>
+          )}
         </div>
 
         {isExpanded && (
           <div className="mt-4 pt-4 border-t border-slate-50 dark:border-slate-700 animate-fade-in">
+            {q.questionType === "QUESTIONNAIRE" ? (
+              <QuestionnaireAnalysisContent
+                q={q}
+                distribution={distribution}
+                examResults={examResults}
+              />
+            ) : (
+              <>
             {/* NEW: Edit Key Section */}
             {onUpdateKey && (
               <div className="mb-4 p-3 bg-indigo-50 dark:bg-indigo-900/20 rounded-lg border border-indigo-100 dark:border-indigo-800">
@@ -590,6 +808,8 @@ export const QuestionAnalysisItem: React.FC<{
                   )}
                 </ul>
               </div>
+            )}
+            </>
             )}
           </div>
         )}
