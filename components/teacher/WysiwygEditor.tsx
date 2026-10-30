@@ -256,13 +256,20 @@ export const AksaraBaliModal: React.FC<{
 export const LinkModal: React.FC<{
   isOpen: boolean;
   onClose: () => void;
-  onInsert: (url: string, text?: string) => void;
+  onInsert: (url: string, text?: string, customHtml?: string) => void;
   selectedText?: string;
 }> = ({ isOpen, onClose, onInsert, selectedText = "" }) => {
   const [url, setUrl] = useState("");
   const [text, setText] = useState(selectedText);
+  const [simulatePreview, setSimulatePreview] = useState(true);
 
   if (!isOpen) return null;
+
+  const getYouTubeId = (rawUrl: string): string | null => {
+    const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
+    const match = rawUrl.match(regExp);
+    return match && match[2].length === 11 ? match[2] : null;
+  };
 
   const handleSubmit = (e?: React.FormEvent) => {
     e?.preventDefault();
@@ -275,6 +282,30 @@ export const LinkModal: React.FC<{
     ) {
       formattedUrl = "https://" + formattedUrl;
     }
+
+    if (simulatePreview) {
+      const videoId = getYouTubeId(formattedUrl);
+      if (videoId) {
+        const cleanTitle = (text.trim() || "Video Pembelajaran").replace(/"/g, "&quot;");
+        const embedHtml = `<div class="video-embed-container my-3 mx-auto max-w-full sm:max-w-xl rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700 shadow-sm bg-slate-900" contenteditable="false"><div class="video-responsive-wrapper relative w-full aspect-video"><iframe src="https://www.youtube-nocookie.com/embed/${videoId}" title="${cleanTitle}" class="w-full h-full border-0 absolute inset-0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe></div><div class="print-video-thumbnail" style="display: none;"><img src="https://img.youtube.com/vi/${videoId}/hqdefault.jpg" alt="Video Screenshot" style="max-width: 100%; height: auto; margin: 0 auto; border-radius: 8px;" /><p style="font-size: 11px; color: #64748b; margin-top: 4px; text-align: center; font-family: monospace;">▶ Video: ${cleanTitle} (${formattedUrl})</p></div><div class="p-2 bg-slate-50 dark:bg-slate-800 text-[11px] text-slate-500 dark:text-slate-400 flex items-center justify-between border-t border-slate-200 dark:border-slate-700"><span>▶ ${cleanTitle}</span><a href="${formattedUrl}" target="_blank" rel="noopener noreferrer" class="text-indigo-600 dark:text-indigo-400 underline font-mono shrink-0 ml-2">Buka YouTube</a></div></div><p><br/></p>`;
+        onInsert(formattedUrl, text.trim() || formattedUrl, embedHtml);
+        onClose();
+        return;
+      }
+
+      let domain = "";
+      try {
+        domain = new URL(formattedUrl).hostname;
+      } catch {
+        domain = formattedUrl;
+      }
+      const cardTitle = (text.trim() || domain).replace(/"/g, "&quot;");
+      const cardHtml = `<div class="link-preview-card my-3 mx-auto max-w-xl rounded-xl border border-indigo-100 dark:border-slate-700 bg-gradient-to-r from-indigo-50/50 via-white to-blue-50/40 dark:from-slate-800 dark:via-slate-800 dark:to-slate-800/80 p-3 shadow-sm hover:shadow transition-all" contenteditable="false"><div class="flex items-start gap-3"><div class="w-9 h-9 rounded-lg bg-indigo-100 dark:bg-indigo-900/50 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0 text-lg font-bold">🌐</div><div class="flex-1 min-w-0"><a href="${formattedUrl}" target="_blank" rel="noopener noreferrer" class="font-bold text-sm text-indigo-600 dark:text-indigo-400 hover:underline block truncate">${cardTitle}</a><p class="text-xs text-slate-500 dark:text-slate-400 truncate mt-0.5 font-mono">${formattedUrl}</p><span class="inline-flex items-center gap-1 text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">🔗 Materi / Referensi Eksternal</span></div></div></div><p><br/></p>`;
+      onInsert(formattedUrl, text.trim() || formattedUrl, cardHtml);
+      onClose();
+      return;
+    }
+
     onInsert(formattedUrl, text.trim() || formattedUrl);
     onClose();
   };
@@ -303,22 +334,40 @@ export const LinkModal: React.FC<{
               type="text"
               value={url}
               onChange={(e) => setUrl(e.target.value)}
-              placeholder="https://contoh.com atau link materi"
+              placeholder="https://contoh.com atau link video YouTube"
               className="w-full p-2.5 rounded-xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-indigo-200 dark:focus:ring-indigo-900 outline-none text-xs"
               autoFocus
             />
           </div>
           <div>
             <label className="text-xs font-bold text-gray-500 dark:text-slate-400 block mb-1">
-              Teks Ditampilkan (Opsional)
+              Teks / Judul Tautan (Opsional)
             </label>
             <input
               type="text"
               value={text}
               onChange={(e) => setText(e.target.value)}
-              placeholder="Judul / Teks yang dapat diklik"
+              placeholder="Judul / Teks deskripsi link"
               className="w-full p-2.5 rounded-xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-indigo-200 dark:focus:ring-indigo-900 outline-none text-xs"
             />
+          </div>
+          <div className="pt-1">
+            <label className="flex items-start gap-2.5 p-2 rounded-xl bg-indigo-50/70 dark:bg-indigo-950/40 border border-indigo-100 dark:border-indigo-900/50 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={simulatePreview}
+                onChange={(e) => setSimulatePreview(e.target.checked)}
+                className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 dark:border-slate-600 mt-0.5"
+              />
+              <div className="flex-1">
+                <span className="text-xs font-bold text-indigo-900 dark:text-indigo-300 block">
+                  Simulasikan Tampilan (Embed / Preview)
+                </span>
+                <span className="text-[10px] text-slate-500 dark:text-slate-400 block leading-tight mt-0.5">
+                  Tampilkan video YouTube responsif atau kartu preview link (cetak/PDF otomatis tampil sebagai tangkapan layar/thumbnail).
+                </span>
+              </div>
+            </label>
           </div>
           <div className="flex gap-2 justify-end pt-2">
             <button
@@ -372,6 +421,7 @@ export const WysiwygEditor: React.FC<{
     runCmd,
     insertTable,
     deleteCurrentTable,
+    toggleVerticalIndentQuote,
     insertMath,
     inlineMathNode,
     inlineMathInitialLatex,
@@ -576,6 +626,7 @@ export const WysiwygEditor: React.FC<{
             onAksaraClick={() => setEditorSubState({ showAksara: true })}
             onEmojiClick={() => setEditorSubState({ showEmoji: true })}
             onLinkClick={openLinkModal}
+            onVerticalIndentClick={toggleVerticalIndentQuote}
             isInsideTable={isInsideTable}
             onDeleteTable={deleteCurrentTable}
             chartData={chartData}

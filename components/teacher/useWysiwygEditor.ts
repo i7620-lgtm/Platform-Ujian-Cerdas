@@ -218,6 +218,7 @@ export const useWysiwygEditor = ({
     const active = cmds.filter((cmd) => document.queryCommandState(cmd));
 
     let inTable = false;
+    let inVerticalIndent = false;
     const selection = window.getSelection();
     if (
       selection &&
@@ -232,10 +233,20 @@ export const useWysiwygEditor = ({
           node.nodeName === "TH"
         ) {
           inTable = true;
-          break;
+        }
+        if (
+          node instanceof HTMLElement &&
+          (node.classList.contains("callout-indent-quote") ||
+            node.tagName === "BLOCKQUOTE")
+        ) {
+          inVerticalIndent = true;
         }
         node = node.parentNode;
       }
+    }
+
+    if (inVerticalIndent) {
+      active.push("verticalIndent");
     }
 
     setEditorSubState({
@@ -558,28 +569,95 @@ export const useWysiwygEditor = ({
     setEditorSubState({ showLink: true, selectedTextForLink: text });
   };
 
-  const insertLink = (url: string, linkText?: string) => {
+  const toggleVerticalIndentQuote = () => {
+    restoreSelection();
+    if (!editorRef.current) return;
+
+    const sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0 || !editorRef.current.contains(sel.anchorNode)) {
+      return;
+    }
+
+    // Check if caret is already inside a callout-indent-quote blockquote
+    let existingBlock: HTMLElement | null = null;
+    let node: Node | null = sel.anchorNode;
+    while (node && node !== editorRef.current) {
+      if (
+        node instanceof HTMLElement &&
+        (node.classList.contains("callout-indent-quote") ||
+          node.tagName === "BLOCKQUOTE")
+      ) {
+        existingBlock = node;
+        break;
+      }
+      node = node.parentNode;
+    }
+
+    if (existingBlock) {
+      // Unwrap blockquote
+      const parent = existingBlock.parentNode;
+      if (parent) {
+        while (existingBlock.firstChild) {
+          parent.insertBefore(existingBlock.firstChild, existingBlock);
+        }
+        parent.removeChild(existingBlock);
+        handleInput();
+        checkActiveFormats();
+      }
+      return;
+    }
+
+    // Wrap selection or insert new blockquote
+    const range = sel.getRangeAt(0);
+    const selectedContent = range.cloneContents();
+    const hasText = (selectedContent.textContent || "").trim().length > 0;
+
+    const block = document.createElement("blockquote");
+    block.className = "callout-indent-quote";
+
+    if (hasText) {
+      block.appendChild(selectedContent);
+      range.deleteContents();
+      range.insertNode(block);
+    } else {
+      block.innerHTML = "<p>Ketik teks kutipan / stimulus dengan garis indent di sini...</p>";
+      range.insertNode(block);
+    }
+
+    range.selectNodeContents(block);
+    sel.removeAllRanges();
+    sel.addRange(range);
+
+    handleInput();
+    checkActiveFormats();
+  };
+
+  const insertLink = (url: string, linkText?: string, customHtml?: string) => {
     restoreSelection();
     if (editorRef.current) {
-      const sel = window.getSelection();
-      const hasSelection =
-        sel &&
-        sel.rangeCount > 0 &&
-        !sel.isCollapsed &&
-        editorRef.current.contains(sel.anchorNode);
-
-      if (hasSelection) {
-        document.execCommand("createLink", false, url);
-        const links = editorRef.current.querySelectorAll(`a[href="${url}"]`);
-        links.forEach((a) => {
-          a.setAttribute("target", "_blank");
-          a.setAttribute("rel", "noopener noreferrer");
-          (a as HTMLElement).classList.add("text-indigo-600", "underline");
-        });
+      if (customHtml) {
+        document.execCommand("insertHTML", false, customHtml);
       } else {
-        const title = linkText || url;
-        const linkHtml = `<a href="${url}" target="_blank" rel="noopener noreferrer" class="text-indigo-600 underline font-medium">${title}</a>&nbsp;`;
-        document.execCommand("insertHTML", false, linkHtml);
+        const sel = window.getSelection();
+        const hasSelection =
+          sel &&
+          sel.rangeCount > 0 &&
+          !sel.isCollapsed &&
+          editorRef.current.contains(sel.anchorNode);
+
+        if (hasSelection) {
+          document.execCommand("createLink", false, url);
+          const links = editorRef.current.querySelectorAll(`a[href="${url}"]`);
+          links.forEach((a) => {
+            a.setAttribute("target", "_blank");
+            a.setAttribute("rel", "noopener noreferrer");
+            (a as HTMLElement).classList.add("text-indigo-600", "underline");
+          });
+        } else {
+          const title = linkText || url;
+          const linkHtml = `<a href="${url}" target="_blank" rel="noopener noreferrer" class="text-indigo-600 underline font-medium">${title}</a>&nbsp;`;
+          document.execCommand("insertHTML", false, linkHtml);
+        }
       }
       saveSelection();
       handleInput();
@@ -599,6 +677,7 @@ export const useWysiwygEditor = ({
     runCmd,
     insertTable,
     deleteCurrentTable,
+    toggleVerticalIndentQuote,
     insertMath,
     inlineMathNode,
     inlineMathInitialLatex,

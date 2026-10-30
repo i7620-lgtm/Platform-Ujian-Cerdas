@@ -93,6 +93,7 @@ const ALL_MATH_ITEMS: MathItem[] = [
   { id: "lt", label: "<", code: " < ", name: "kurang dari", category: "PECAHAN_DASAR" },
   { id: "gt", label: ">", code: " > ", name: "lebih dari", category: "PECAHAN_DASAR" },
   { id: "dots", label: "…", code: "\\dots ", name: "titik-titik elipsis", category: "PECAHAN_DASAR" },
+  { id: "percent", label: "%", code: "\\% ", name: "persen percentage", category: "PECAHAN_DASAR" },
 
   // 2. PANGKAT, AKAR & LOGARITMA
   { id: "power_sq", label: "x²", code: "x^{2}", name: "Pangkat kuadrat x kuadrat", category: "PANGKAT_AKAR", isTemplate: true },

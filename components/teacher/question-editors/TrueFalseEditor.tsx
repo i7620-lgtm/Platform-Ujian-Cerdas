@@ -181,11 +181,12 @@ export const TrueFalseEditor: React.FC<TrueFalseEditorProps> = ({ q }) => {
                 onChange={(val) => handleTrueFalseRowTextChange(q.id, rIndex, val)}
                 placeholder={`Pernyataan ${rIndex + 1}`}
                 minHeight="50px"
-                onChartClick={() =>
+                onChartClick={(chartType) =>
                   setEditingChartTarget({
                     qId: q.id,
                     type: "tf",
                     index: rIndex,
+                    preferredType: chartType,
                   })
                 }
                 chartData={row.chartData}
