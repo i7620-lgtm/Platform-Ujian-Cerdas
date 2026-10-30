@@ -11,6 +11,7 @@ interface ChartConfigModalProps {
   onSave: (data: ChartData) => void;
   onDelete?: () => void;
   initialData?: ChartData;
+  initialType?: "bar" | "line" | "pie" | "venn" | "relation" | "cartesian";
 }
 
 export const ChartConfigModal: React.FC<ChartConfigModalProps> = ({
@@ -19,6 +20,7 @@ export const ChartConfigModal: React.FC<ChartConfigModalProps> = ({
   onSave,
   onDelete,
   initialData,
+  initialType,
 }) => {
   const {
     type,
@@ -40,7 +42,7 @@ export const ChartConfigModal: React.FC<ChartConfigModalProps> = ({
     handleAddDataset,
     handleDeleteDataset,
     handleSave,
-  } = useChartConfigModal({ isOpen, initialData, onClose, onSave });
+  } = useChartConfigModal({ isOpen, initialData, initialType, onClose, onSave });
 
   if (!isOpen) return null;
 
@@ -59,7 +61,7 @@ export const ChartConfigModal: React.FC<ChartConfigModalProps> = ({
       <div className="bg-white dark:bg-slate-900 rounded-2xl w-full max-w-4xl lg:max-w-6xl max-h-[92vh] overflow-hidden shadow-2xl flex flex-col">
         <div className="p-6 border-b dark:border-slate-800 flex justify-between items-center bg-gray-50 dark:bg-slate-800/50">
           <h2 className="text-xl font-bold text-gray-800 dark:text-white flex items-center gap-2">
-            {type === "cartesian" ? "Konfigurasi Diagram Kartesius" : "Konfigurasi Diagram"}
+            {type === "cartesian" ? "📈 Diagram Kartesius" : "📊 Konfigurasi Diagram"}
           </h2>
           <button
             onClick={onClose}
@@ -70,79 +72,87 @@ export const ChartConfigModal: React.FC<ChartConfigModalProps> = ({
         </div>
 
         <div className="p-6 overflow-y-auto flex-1 space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {type === "cartesian" ? (
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">
-                Judul Diagram
+                Judul Diagram Kartesius (Opsional)
               </label>
               <input
                 type="text"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                className="w-full p-2 border dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none dark:bg-slate-800 dark:text-white dark:placeholder-slate-400"
-                placeholder="Contoh: Penjualan Bulanan"
+                className="w-full p-2.5 border dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-teal-500 outline-none dark:bg-slate-800 dark:text-white dark:placeholder-slate-400 text-sm"
+                placeholder="Contoh: Grafik Koordinat Titik dan Garis"
               />
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">
-                Jenis Diagram
-              </label>
-              {type === "cartesian" ? (
-                <div className="w-full p-2 border border-teal-300 dark:border-teal-700 rounded-lg bg-teal-50 dark:bg-teal-900/30 text-teal-800 dark:text-teal-300 font-semibold text-sm flex items-center justify-between">
-                  <span>📈 Diagram Bidang Kartesius</span>
-                  <span className="text-[10px] px-2 py-0.5 bg-teal-200 dark:bg-teal-800 text-teal-900 dark:text-teal-200 rounded font-bold uppercase tracking-wider">
-                    Tombol Khusus Kartesius
-                  </span>
+          ) : (
+            <>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">
+                    Judul Diagram
+                  </label>
+                  <input
+                    type="text"
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    className="w-full p-2 border dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none dark:bg-slate-800 dark:text-white dark:placeholder-slate-400"
+                    placeholder="Contoh: Penjualan Bulanan"
+                  />
                 </div>
-              ) : (
-                <select
-                  value={type}
-                  onChange={(e) => handleTypeChange(e.target.value)}
-                  className="w-full p-2 border dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none dark:bg-slate-800 dark:text-white"
-                >
-                  <option value="bar">Diagram Batang (Bar)</option>
-                  <option value="line">Diagram Garis (Line)</option>
-                  <option value="pie">Diagram Lingkaran (Pie)</option>
-                  <option value="venn">Diagram Venn Himpunan</option>
-                  <option value="relation">Diagram Relasi / Fungsi</option>
-                </select>
-              )}
-            </div>
-          </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">
+                    Jenis Diagram
+                  </label>
+                  <select
+                    value={type}
+                    onChange={(e) => handleTypeChange(e.target.value)}
+                    className="w-full p-2 border dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none dark:bg-slate-800 dark:text-white"
+                  >
+                    <option value="bar">Diagram Batang (Bar)</option>
+                    <option value="line">Diagram Garis (Line)</option>
+                    <option value="pie">Diagram Lingkaran (Pie)</option>
+                    <option value="venn">Diagram Venn Himpunan</option>
+                    <option value="relation">Diagram Relasi / Fungsi</option>
+                  </select>
+                </div>
+              </div>
 
-          <div className="flex flex-col gap-3">
-            <div className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                id="showTooltip"
-                checked={showTooltip}
-                onChange={(e) => setShowTooltip(e.target.checked)}
-                className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
-              />
-              <label
-                htmlFor="showTooltip"
-                className="text-sm font-medium text-gray-700 dark:text-slate-300"
-              >
-                Tampilkan Tooltip (Kotak Info saat disentuh/hover)
-              </label>
-            </div>
+              <div className="flex flex-col gap-3">
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="showTooltip"
+                    checked={showTooltip}
+                    onChange={(e) => setShowTooltip(e.target.checked)}
+                    className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
+                  />
+                  <label
+                    htmlFor="showTooltip"
+                    className="text-sm font-medium text-gray-700 dark:text-slate-300"
+                  >
+                    Tampilkan Tooltip (Kotak Info saat disentuh/hover)
+                  </label>
+                </div>
 
-            <div className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                id="showLegend"
-                checked={showLegend}
-                onChange={(e) => setShowLegend(e.target.checked)}
-                className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
-              />
-              <label
-                htmlFor="showLegend"
-                className="text-sm font-medium text-gray-700 dark:text-slate-300"
-              >
-                Tampilkan Legend / Keterangan Warna
-              </label>
-            </div>
-          </div>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="showLegend"
+                    checked={showLegend}
+                    onChange={(e) => setShowLegend(e.target.checked)}
+                    className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
+                  />
+                  <label
+                    htmlFor="showLegend"
+                    className="text-sm font-medium text-gray-700 dark:text-slate-300"
+                  >
+                    Tampilkan Legend / Keterangan Warna
+                  </label>
+                </div>
+              </div>
+            </>
+          )}
 
           {type === "relation" ? (
             <div className="space-y-4 bg-gray-50 dark:bg-slate-800/30 p-4 rounded-xl border dark:border-slate-700">
@@ -756,9 +766,13 @@ export const ChartConfigModal: React.FC<ChartConfigModalProps> = ({
             </button>
             <button
               onClick={handleSave}
-              className="w-full sm:w-auto px-4 sm:px-6 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors font-medium shadow-lg shadow-blue-200 dark:shadow-blue-900/20"
+              className={`w-full sm:w-auto px-4 sm:px-6 py-2 text-white rounded-xl transition-colors font-medium shadow-lg ${
+                type === "cartesian"
+                  ? "bg-teal-600 hover:bg-teal-700 shadow-teal-200 dark:shadow-teal-900/20"
+                  : "bg-blue-600 hover:bg-blue-700 shadow-blue-200 dark:shadow-blue-900/20"
+              }`}
             >
-              Simpan Diagram
+              {type === "cartesian" ? "Simpan Diagram Kartesius" : "Simpan Diagram"}
             </button>
           </div>
         </div>
