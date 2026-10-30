@@ -58,8 +58,8 @@ export const ChartConfigModal: React.FC<ChartConfigModalProps> = ({
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
       <div className="bg-white dark:bg-slate-900 rounded-2xl w-full max-w-4xl lg:max-w-6xl max-h-[92vh] overflow-hidden shadow-2xl flex flex-col">
         <div className="p-6 border-b dark:border-slate-800 flex justify-between items-center bg-gray-50 dark:bg-slate-800/50">
-          <h2 className="text-xl font-bold text-gray-800 dark:text-white">
-            Konfigurasi Diagram
+          <h2 className="text-xl font-bold text-gray-800 dark:text-white flex items-center gap-2">
+            {type === "cartesian" ? "Konfigurasi Diagram Kartesius" : "Konfigurasi Diagram"}
           </h2>
           <button
             onClick={onClose}
@@ -87,18 +87,26 @@ export const ChartConfigModal: React.FC<ChartConfigModalProps> = ({
               <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">
                 Jenis Diagram
               </label>
-              <select
-                value={type}
-                onChange={(e) => handleTypeChange(e.target.value)}
-                className="w-full p-2 border dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none dark:bg-slate-800 dark:text-white"
-              >
-                <option value="bar">Diagram Batang (Bar)</option>
-                <option value="line">Diagram Garis (Line)</option>
-                <option value="pie">Diagram Lingkaran (Pie)</option>
-                <option value="venn">Diagram Venn Himpunan</option>
-                <option value="relation">Diagram Relasi / Fungsi</option>
-                <option value="cartesian">Diagram Kartesius</option>
-              </select>
+              {type === "cartesian" ? (
+                <div className="w-full p-2 border border-teal-300 dark:border-teal-700 rounded-lg bg-teal-50 dark:bg-teal-900/30 text-teal-800 dark:text-teal-300 font-semibold text-sm flex items-center justify-between">
+                  <span>📈 Diagram Bidang Kartesius</span>
+                  <span className="text-[10px] px-2 py-0.5 bg-teal-200 dark:bg-teal-800 text-teal-900 dark:text-teal-200 rounded font-bold uppercase tracking-wider">
+                    Tombol Khusus Kartesius
+                  </span>
+                </div>
+              ) : (
+                <select
+                  value={type}
+                  onChange={(e) => handleTypeChange(e.target.value)}
+                  className="w-full p-2 border dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none dark:bg-slate-800 dark:text-white"
+                >
+                  <option value="bar">Diagram Batang (Bar)</option>
+                  <option value="line">Diagram Garis (Line)</option>
+                  <option value="pie">Diagram Lingkaran (Pie)</option>
+                  <option value="venn">Diagram Venn Himpunan</option>
+                  <option value="relation">Diagram Relasi / Fungsi</option>
+                </select>
+              )}
             </div>
           </div>
 
