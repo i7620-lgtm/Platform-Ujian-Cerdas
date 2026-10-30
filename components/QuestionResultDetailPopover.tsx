@@ -58,7 +58,21 @@ export const QuestionResultDetailPopover: React.FC<
   let statusBadgeStyle =
     "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border-slate-200 dark:border-slate-700";
 
-  if (isManual && !isGraded) {
+  if (question.questionType === "QUESTIONNAIRE") {
+    if (studentAns && studentAns.trim().length > 0) {
+      badgeColorClass =
+        "bg-indigo-500 dark:bg-indigo-600 text-white font-black hover:bg-indigo-600";
+      statusLabel = "Respon Terkumpul (Non-Skor)";
+      statusBadgeStyle =
+        "bg-indigo-50 text-indigo-800 dark:bg-indigo-950/60 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800";
+    } else {
+      badgeColorClass =
+        "bg-slate-200 dark:bg-slate-700 text-slate-800 dark:text-slate-200 hover:bg-slate-300 dark:hover:bg-slate-600";
+      statusLabel = "Kosong (Tidak Diisi)";
+      statusBadgeStyle =
+        "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border-slate-200 dark:border-slate-700";
+    }
+  } else if (isManual && !isGraded) {
     badgeColorClass =
       "bg-amber-300 dark:bg-amber-500 text-slate-900 font-black hover:bg-amber-400";
     statusLabel = "Belum Dinilai";
@@ -412,6 +426,33 @@ export const QuestionResultDetailPopover: React.FC<
                 />
               </div>
             )}
+          </div>
+        )}
+
+        {/* Tipe Kuisioner / Angket */}
+        {question.questionType === "QUESTIONNAIRE" && (
+          <div className="space-y-2">
+            <div className="p-2.5 rounded-xl bg-indigo-50/70 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800/70">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-700 dark:text-indigo-300 block mb-1">
+                Respon / Pilihan Siswa:
+              </span>
+              <p className="font-bold text-indigo-950 dark:text-indigo-100">
+                {studentAns ? (
+                  question.questionnaireFormat === "rating" ? (
+                    `★ Rating ${studentAns} dari 5 Bintang`
+                  ) : question.questionnaireFormat === "scale" ? (
+                    `Skala Nilai ${studentAns} (${studentAns === String(question.scaleMin ?? 1) ? question.scaleLabels?.[0] || "" : studentAns === String(question.scaleMax ?? 5) ? question.scaleLabels?.[1] || "" : "Pilihan Siswa"})`
+                  ) : (
+                    studentAns
+                  )
+                ) : (
+                  <span className="text-slate-400 italic font-normal">Tidak Mengisi</span>
+                )}
+              </p>
+            </div>
+            <p className="text-[11px] text-slate-500 dark:text-slate-400 italic">
+              * Butir soal kuisioner murni menghimpun data umpan balik dan tidak dihitung ke skor kompetensi siswa.
+            </p>
           </div>
         )}
 
