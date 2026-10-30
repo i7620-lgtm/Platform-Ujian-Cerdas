@@ -13,6 +13,7 @@ export const DEFAULT_CARTESIAN_CONFIG: CartesianConfig = {
 interface UseChartConfigModalProps {
   isOpen: boolean;
   initialData?: ChartData;
+  initialType?: "bar" | "line" | "pie" | "venn" | "relation" | "cartesian";
   onClose: () => void;
   onSave: (data: ChartData) => void;
 }
@@ -20,15 +21,21 @@ interface UseChartConfigModalProps {
 export const useChartConfigModal = ({
   isOpen: _isOpen,
   initialData,
+  initialType,
   onClose,
   onSave,
 }: UseChartConfigModalProps) => {
   const [prevInitialData, setPrevInitialData] = useState<ChartData | undefined>(initialData);
+  const effectiveInitialType = initialData?.type || initialType || "bar";
   const [type, setType] = useState<
     "bar" | "line" | "pie" | "venn" | "relation" | "cartesian"
-  >(initialData?.type || "bar");
-  const [title, setTitle] = useState(initialData?.title || "");
-  const [labels, setLabels] = useState<string[]>(initialData?.labels || ["kategori 1"]);
+  >(effectiveInitialType);
+  const [title, setTitle] = useState(
+    initialData?.title || (effectiveInitialType === "cartesian" ? "Diagram Kartesius" : "")
+  );
+  const [labels, setLabels] = useState<string[]>(
+    initialData?.labels || (effectiveInitialType === "cartesian" ? ["X", "Y"] : ["kategori 1"])
+  );
   const [datasets, setDatasets] = useState<ChartDataset[]>(
     initialData?.datasets?.map((d) => ({
       label: d.label,
@@ -39,7 +46,16 @@ export const useChartConfigModal = ({
       fill: d.fill,
       isFunction: d.isFunction,
       functionStr: d.functionStr,
-    })) || [{ label: "Data 1", data: [0] }],
+    })) || (effectiveInitialType === "cartesian"
+      ? [
+          {
+            label: "Titik Data",
+            data: [],
+            backgroundColor: ["#3b82f6"],
+            showLine: false,
+          },
+        ]
+      : [{ label: "Data 1", data: [0] }])
   );
   const [showTooltip, setShowTooltip] = useState(initialData?.showTooltip !== false);
   const [showLegend, setShowLegend] = useState(initialData?.showLegend !== false);
@@ -48,13 +64,13 @@ export const useChartConfigModal = ({
     ...(initialData?.cartesianConfig || {}),
   }));
 
-  // Synchronize state when initialData changes across opens (React-recommended pattern without cascading effect renders)
+  // Synchronize state when initialData changes across opens
   if (prevInitialData !== initialData) {
     setPrevInitialData(initialData);
     if (initialData) {
-      setType(initialData.type || "bar");
+      setType(initialData.type || initialType || "bar");
       setTitle(initialData.title || "");
-      setLabels(initialData.labels || ["kategori 1"]);
+      setLabels(initialData.labels || (initialData.type === "cartesian" ? ["X", "Y"] : ["kategori 1"]));
       setDatasets(
         initialData.datasets?.map((d) => ({
           label: d.label,
@@ -74,10 +90,22 @@ export const useChartConfigModal = ({
         ...(initialData.cartesianConfig || {}),
       });
     } else {
-      setType("bar");
-      setTitle("");
-      setLabels(["kategori 1"]);
-      setDatasets([{ label: "Data 1", data: [0] }]);
+      const fallbackType = initialType || "bar";
+      setType(fallbackType);
+      setTitle(fallbackType === "cartesian" ? "Diagram Kartesius" : "");
+      setLabels(fallbackType === "cartesian" ? ["X", "Y"] : ["kategori 1"]);
+      setDatasets(
+        fallbackType === "cartesian"
+          ? [
+              {
+                label: "Titik Data",
+                data: [],
+                backgroundColor: ["#3b82f6"],
+                showLine: false,
+              },
+            ]
+          : [{ label: "Data 1", data: [0] }],
+      );
       setShowTooltip(true);
       setShowLegend(true);
       setCartesianConfig(DEFAULT_CARTESIAN_CONFIG);
@@ -85,14 +113,26 @@ export const useChartConfigModal = ({
   }
 
   const resetStore = useCallback(() => {
-    setType("bar");
-    setTitle("");
-    setLabels(["kategori 1"]);
-    setDatasets([{ label: "Data 1", data: [0] }]);
+    const fallbackType = initialType || "bar";
+    setType(fallbackType);
+    setTitle(fallbackType === "cartesian" ? "Diagram Kartesius" : "");
+    setLabels(fallbackType === "cartesian" ? ["X", "Y"] : ["kategori 1"]);
+    setDatasets(
+      fallbackType === "cartesian"
+        ? [
+            {
+              label: "Titik Data",
+              data: [],
+              backgroundColor: ["#3b82f6"],
+              showLine: false,
+            },
+          ]
+        : [{ label: "Data 1", data: [0] }],
+    );
     setShowTooltip(true);
     setShowLegend(true);
     setCartesianConfig(DEFAULT_CARTESIAN_CONFIG);
-  }, []);
+  }, [initialType]);
 
   const handleTypeChange = useCallback(
     (newTypeStr: string) => {
