@@ -44,12 +44,13 @@ export const MatchingEditor: React.FC<MatchingEditorProps> = ({ q }) => {
                 onChange={(val) => handleMatchingPairChange(q.id, pIndex, "left", val)}
                 placeholder={`Kiri ${pIndex + 1}`}
                 minHeight="60px"
-                onChartClick={() =>
+                onChartClick={(chartType) =>
                   setEditingChartTarget({
                     qId: q.id,
                     type: "matching",
                     index: pIndex,
                     subIndex: "left",
+                    preferredType: chartType,
                   })
                 }
                 chartData={pair.leftChart}
@@ -71,12 +72,13 @@ export const MatchingEditor: React.FC<MatchingEditorProps> = ({ q }) => {
                 onChange={(val) => handleMatchingPairChange(q.id, pIndex, "right", val)}
                 placeholder={`Kanan ${pIndex + 1}`}
                 minHeight="60px"
-                onChartClick={() =>
+                onChartClick={(chartType) =>
                   setEditingChartTarget({
                     qId: q.id,
                     type: "matching",
                     index: pIndex,
                     subIndex: "right",
+                    preferredType: chartType,
                   })
                 }
                 chartData={pair.rightChart}
