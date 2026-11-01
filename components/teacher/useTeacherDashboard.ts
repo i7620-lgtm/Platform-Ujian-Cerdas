@@ -558,11 +558,12 @@ export const useTeacherDashboard = ({
 
   const ongoingExams = useMemo(() => {
     return publishedExams.filter((exam) => {
+      const isFinished = Boolean(exam.config?.isFinished);
+      if (isFinished) return false;
       const { start, end } = getExamDates(exam);
       return (
         nowTimestamp >= start.getTime() &&
-        nowTimestamp <= end.getTime() &&
-        !exam.config.isFinished
+        nowTimestamp <= end.getTime()
       );
     });
   }, [publishedExams, nowTimestamp]);
@@ -570,8 +571,10 @@ export const useTeacherDashboard = ({
   const upcomingExams = useMemo(() => {
     return publishedExams
       .filter((exam) => {
+        const isFinished = Boolean(exam.config?.isFinished);
+        if (isFinished) return false;
         const { start } = getExamDates(exam);
-        return start.getTime() > nowTimestamp && !exam.config.isFinished;
+        return start.getTime() > nowTimestamp;
       })
       .sort((a, b) => {
         return (
@@ -583,8 +586,9 @@ export const useTeacherDashboard = ({
   const finishedExams = useMemo(() => {
     return publishedExams
       .filter((exam) => {
+        const isFinished = Boolean(exam.config?.isFinished);
         const { end } = getExamDates(exam);
-        return end.getTime() < nowTimestamp || exam.config.isFinished;
+        return end.getTime() < nowTimestamp || isFinished;
       })
       .sort((a, b) => {
         return getExamDates(b).end.getTime() - getExamDates(a).end.getTime();
