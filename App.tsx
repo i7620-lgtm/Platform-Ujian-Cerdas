@@ -446,24 +446,45 @@ const App: React.FC = () => {
     
     // COLLABORATOR / PROCTOR CHECK
     const collabCode = params.get('collab_code') || params.get('proctor');
-    const collabToken = params.get('collab_token') || params.get('token');
+    const collabToken = params.get('collab_token') || params.get('token') || params.get('proctorToken');
     
     if (collabCode && collabToken) {
         setIsSyncing(true);
-        storageService.getExamByCollaboratorToken(collabCode, collabToken)
+        const cleanCollabCode = collabCode.trim().toUpperCase();
+        storageService.getExamByCollaboratorToken(cleanCollabCode, collabToken)
             .then(data => {
                 if (data) {
-                    setCollaboratorData({ ...data, token: collabToken });
-                    setView('COLLABORATOR_MODE');
+                    if (data.role === 'viewer') {
+                        // Direct supervisor live monitor view
+                        setCurrentExam(data.exam);
+                        setView('LIVE_MONITOR');
+                    } else {
+                        setCollaboratorData({ ...data, token: collabToken });
+                        setView('COLLABORATOR_MODE');
+                    }
                     window.history.replaceState({}, document.title, window.location.pathname);
                 } else {
-                    alert("Link kolaborator tidak valid atau kadaluarsa.");
-                    window.history.replaceState({}, '', '/');
+                    // Try loading exam directly as monitor mode fallback
+                    storageService.getExamForStudent(cleanCollabCode, 'monitor', true)
+                        .then(exam => {
+                            if (exam) {
+                                setCurrentExam(exam);
+                                setView('LIVE_MONITOR');
+                                window.history.replaceState({}, document.title, window.location.pathname);
+                            } else {
+                                alert("Link pengawas/kolaborator tidak valid atau kadaluarsa.");
+                                window.history.replaceState({}, '', '/');
+                            }
+                        })
+                        .catch(() => {
+                            alert("Link pengawas/kolaborator tidak valid atau kadaluarsa.");
+                            window.history.replaceState({}, '', '/');
+                        });
                 }
             })
             .catch(e => {
                 console.error(e);
-                alert("Gagal memuat sesi kolaborator.");
+                alert("Gagal memuat sesi pengawas.");
                 window.history.replaceState({}, '', '/');
             })
             .finally(() => setIsSyncing(false));
@@ -476,7 +497,6 @@ const App: React.FC = () => {
             fullName: 'Mode Pratinjau',
             class: 'PREVIEW',
             absentNumber: '00',
-            // Format ID Konsisten: Nama-Kelas-Absen
             studentId: `Mode Pratinjau-PREVIEW-00-${Date.now()}`
         };
         handleStudentLoginSuccess(previewCode.trim().toUpperCase(), dummyStudent, true);
@@ -527,10 +547,11 @@ const App: React.FC = () => {
     const liveCode = params.get('live');
     if (liveCode) {
         setIsSyncing(true);
+        const cleanLiveCode = liveCode.trim().toUpperCase();
         // Live monitor doesn't need student specific shuffling, pass generic ID or empty
-        storageService.getExamForStudent(liveCode.trim().toUpperCase(), 'monitor', true)
+        storageService.getExamForStudent(cleanLiveCode, 'monitor', true)
             .then(exam => {
-                if (exam && exam.config.enablePublicStream) {
+                if (exam) {
                     setCurrentExam(exam);
                     setView('LIVE_MONITOR');
                 } else {
