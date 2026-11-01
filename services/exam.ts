@@ -514,7 +514,12 @@ export class ExamService {
             // Check if student has offline saved exam in IndexedDB
             const offlineExam = await offlineService.getLocalProgress(`offline_exam_${cleanCode}`) as Exam | null;
             if (offlineExam) {
-                return this.sanitizeExamForStudent(offlineExam, studentId, false);
+                return this.sanitizeExamForStudent(offlineExam, studentId, isPreview);
+            }
+            // Check local teacher exam cache (for drafts or unsynced exams)
+            const localExams = this.getLocalTeacherExams();
+            if (localExams[cleanCode]) {
+                return this.sanitizeExamForStudent(localExams[cleanCode], studentId, isPreview);
             }
             throw new Error("EXAM_NOT_FOUND");
         }
@@ -533,7 +538,7 @@ export class ExamService {
         } else {
             // 4. Download question package from Vercel Edge Network CDN (s-maxage=86400)
             try {
-                const response = await fetch(`/api/exam-content/${cleanCode}/test?v=${examVersion}`);
+                const response = await fetch(`/api/exam-content/${cleanCode}/test?v=${examVersion}&preview=${isPreview}`);
                 if (response.ok) {
                     const json = await response.json();
                     if (json.success && Array.isArray(json.questions)) {
@@ -562,6 +567,12 @@ export class ExamService {
                         .maybeSingle();
                     if (fullData && Array.isArray(fullData.questions)) {
                         loadedQuestions = fullData.questions.map(q => this.stripAnswersFromQuestion(q));
+                    } else {
+                        // Check local teacher cache questions
+                        const localExams = this.getLocalTeacherExams();
+                        if (localExams[cleanCode] && Array.isArray(localExams[cleanCode].questions)) {
+                            loadedQuestions = localExams[cleanCode].questions;
+                        }
                     }
                 }
             }
@@ -1221,16 +1232,38 @@ export class ExamService {
     }
 
     async addCollaborator(examCode: string, label: string, role: 'editor' | 'viewer'): Promise<string> {
-        // Fetch raw to avoid status checks
-        const { data, error } = await supabase
+        const cleanCode = (examCode || '').trim().toUpperCase();
+        let config: ExamConfig | null = null;
+        let localExam: Exam | null = null;
+
+        const { data } = await supabase
             .from('exams')
             .select('config')
-            .eq('code', examCode)
-            .single();
-            
-        if (error || !data) throw new Error("Exam not found");
+            .eq('code', cleanCode)
+            .maybeSingle();
 
-        const config = data.config as ExamConfig;
+        if (data && data.config) {
+            config = data.config as ExamConfig;
+        }
+
+        const localExams = this.getLocalTeacherExams();
+        if (localExams[cleanCode]) {
+            localExam = localExams[cleanCode];
+            if (!config) config = localExam.config;
+        }
+
+        if (!config) {
+            config = {
+                examName: 'Ujian Baru',
+                subject: 'Umum',
+                durationMinutes: 60,
+                shuffleQuestions: false,
+                shuffleAnswers: false,
+                showScore: true,
+                collaborators: []
+            };
+        }
+
         const token = (typeof crypto !== 'undefined' && crypto.randomUUID) 
             ? crypto.randomUUID() 
             : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
@@ -1246,65 +1279,103 @@ export class ExamService {
 
         const currentCollaborators = config.collaborators || [];
         const updatedCollaborators = [...currentCollaborators, newCollaborator];
-        
         const updatedConfig = { ...config, collaborators: updatedCollaborators };
-        
-        const { error: updateError } = await supabase
-            .from('exams')
-            .update({ config: updatedConfig })
-            .eq('code', examCode);
 
-        if (updateError) throw updateError;
+        // Save locally first so UI updates immediately
+        if (localExam) {
+            localExam.config = updatedConfig;
+            this.saveLocalTeacherExam(localExam);
+        }
+
+        // Save to Supabase
+        try {
+            await supabase
+                .from('exams')
+                .update({ config: updatedConfig })
+                .eq('code', cleanCode);
+        } catch (e) {
+            console.warn("Supabase update for addCollaborator failed, relying on local cache:", e);
+        }
+
         return token;
     }
 
     async removeCollaborator(examCode: string, token: string): Promise<void> {
-        const { data, error } = await supabase
+        const cleanCode = (examCode || '').trim().toUpperCase();
+        let config: ExamConfig | null = null;
+        let localExam: Exam | null = null;
+
+        const { data } = await supabase
             .from('exams')
             .select('config')
-            .eq('code', examCode)
-            .single();
-            
-        if (error || !data) throw new Error("Exam not found");
+            .eq('code', cleanCode)
+            .maybeSingle();
 
-        const config = data.config as ExamConfig;
+        if (data && data.config) {
+            config = data.config as ExamConfig;
+        }
+
+        const localExams = this.getLocalTeacherExams();
+        if (localExams[cleanCode]) {
+            localExam = localExams[cleanCode];
+            if (!config) config = localExam.config;
+        }
+
+        if (!config) return;
+
         const currentCollaborators = config.collaborators || [];
         const updatedCollaborators = currentCollaborators.filter(c => c.token !== token);
-        
         const updatedConfig = { ...config, collaborators: updatedCollaborators };
-        
-        const { error: updateError } = await supabase
-            .from('exams')
-            .update({ config: updatedConfig })
-            .eq('code', examCode);
 
-        if (updateError) throw updateError;
+        if (localExam) {
+            localExam.config = updatedConfig;
+            this.saveLocalTeacherExam(localExam);
+        }
+
+        try {
+            await supabase
+                .from('exams')
+                .update({ config: updatedConfig })
+                .eq('code', cleanCode);
+        } catch (e) {
+            console.warn("Supabase update for removeCollaborator failed:", e);
+        }
     }
 
     async getExamByCollaboratorToken(code: string, token: string): Promise<{ exam: Exam, role: 'editor' | 'viewer' } | null> {
-        const { data, error } = await supabase
+        const cleanCode = (code || '').trim().toUpperCase();
+
+        const { data } = await supabase
             .from('exams')
             .select('*')
-            .eq('code', code)
+            .eq('code', cleanCode)
             .maybeSingle();
 
-        if (error || !data) return null;
+        let exam: Exam | null = null;
+        if (data) {
+            exam = {
+                code: data.code,
+                authorId: data.author_id,
+                authorName: 'Pengajar Utama',
+                authorSchool: data.school,
+                config: data.config,
+                questions: data.questions,
+                status: data.status
+            };
+        } else {
+            const localExams = this.getLocalTeacherExams();
+            if (localExams[cleanCode]) {
+                exam = localExams[cleanCode];
+            }
+        }
 
-        const config = data.config as ExamConfig;
-        const collaborators = config.collaborators || [];
+        if (!exam) return null;
+
+        const config = exam.config as ExamConfig;
+        const collaborators = config?.collaborators || [];
         const collaborator = collaborators.find(c => c.token === token);
 
         if (!collaborator) return null;
-
-        const exam: Exam = {
-            code: data.code,
-            authorId: data.author_id,
-            authorName: 'Pengajar Utama',
-            authorSchool: data.school,
-            config: data.config,
-            questions: data.questions,
-            status: data.status
-        };
 
         return { exam, role: collaborator.role };
     }
