@@ -53,8 +53,8 @@ export function stripAnswersFromQuestion(q: Question): Question {
  * Fetch and prepare the sanitized student question package.
  * Answers and solution steps are 100% stripped before return.
  */
-export async function getStudentQuestionBundle(code: string, requestedVersion?: number) {
-  const cacheKey = `${code}:${requestedVersion || 'latest'}`;
+export async function getStudentQuestionBundle(code: string, requestedVersion?: number, isPreview = false) {
+  const cacheKey = `${code}:${requestedVersion || 'latest'}:${isPreview ? 'preview' : 'std'}`;
   const cached = memoryBundleCache.get(cacheKey);
 
   if (cached && Date.now() - cached.timestamp < MEMORY_CACHE_TTL_MS) {
@@ -81,7 +81,7 @@ export async function getStudentQuestionBundle(code: string, requestedVersion?: 
     };
   }
 
-  if (data.status === 'DRAFT') {
+  if (data.status === 'DRAFT' && !isPreview) {
     return {
       success: false,
       status: 403,
