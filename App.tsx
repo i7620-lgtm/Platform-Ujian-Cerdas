@@ -934,6 +934,7 @@ const App: React.FC = () => {
             <OngoingExamModal 
                 exam={currentExam}
                 onClose={resetToHome}
+                onExamFinished={() => resetToHome()}
                 isReadOnly={true}
             />
         )}
