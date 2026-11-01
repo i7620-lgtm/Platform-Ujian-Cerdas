@@ -75,7 +75,8 @@ async function startServer() {
     try {
       const code = (req.params.code || "").trim().toUpperCase();
       const versionParam = req.query.v ? parseInt(req.query.v as string, 10) : undefined;
-      const bundle = await getStudentQuestionBundle(code, versionParam);
+      const isPreview = req.query.preview === "true" || req.query.isPreview === "true";
+      const bundle = await getStudentQuestionBundle(code, versionParam, isPreview);
       
       if (!bundle.success) {
         return res.status(bundle.status || 500).json(bundle);
