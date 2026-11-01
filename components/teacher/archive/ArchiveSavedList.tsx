@@ -157,14 +157,15 @@ export const ArchiveSavedList: React.FC<ArchiveSavedListProps> = ({
           </div>
         ) : (
           filteredArchives.map((file, idx) => (
-            <div key={idx} className="relative group">
-              <button
-                onClick={() => onLoadFromCloud(file.name)}
-                className="w-full text-left p-3 rounded-xl border border-slate-100 dark:border-slate-700 hover:bg-indigo-50 dark:hover:bg-slate-700 hover:border-indigo-100 transition-all group"
-              >
-                <div className="flex items-start justify-between gap-2">
+            <div
+              key={idx}
+              onClick={() => onLoadFromCloud(file.name)}
+              className="w-full text-left p-3 rounded-xl border border-slate-100 dark:border-slate-700 hover:bg-indigo-50/50 dark:hover:bg-slate-700/60 hover:border-indigo-200 dark:hover:border-slate-600 transition-all group cursor-pointer bg-white dark:bg-slate-800"
+            >
+              <div className="flex items-center justify-between gap-2.5">
+                <div className="flex items-center flex-wrap gap-2 min-w-0 flex-1">
                   <p 
-                    className="text-xs font-bold text-slate-700 dark:text-slate-200 truncate group-hover:text-indigo-700 dark:group-hover:text-indigo-300 pr-10"
+                    className="text-[13px] font-bold text-slate-700 dark:text-slate-200 truncate group-hover:text-indigo-700 dark:group-hover:text-indigo-300 leading-tight"
                     title={file.name}
                   >
                     {file.name.includes("_meta_")
@@ -177,129 +178,134 @@ export const ArchiveSavedList: React.FC<ArchiveSavedListProps> = ({
                       String(file.metadata.authorId) === "undefined" ||
                       String(file.metadata.authorId) === "null") && (
                       <span
-                        className="shrink-0 px-2 py-0.5 text-[9px] font-black uppercase tracking-wider bg-rose-50 text-rose-600 dark:bg-rose-900/30 dark:text-rose-400 rounded-md border border-rose-200 dark:border-rose-800"
+                        className="shrink-0 inline-flex items-center px-2 py-0.5 text-[10px] font-black uppercase tracking-wider bg-rose-50 text-rose-600 dark:bg-rose-900/30 dark:text-rose-400 rounded-md border border-rose-200 dark:border-rose-800 leading-none"
                         title="Arsip ini belum memiliki pemilik dan siap diklaim."
                       >
                         Tanpa Pemilik
                       </span>
                     )}
                   {file.metadata && file.metadata.hasAiAnalysis && (
-                      <span
-                        className="shrink-0 px-2 py-0.5 text-[9px] font-black uppercase tracking-wider bg-indigo-50 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400 rounded-md border border-indigo-200 dark:border-indigo-800"
-                        title="Arsip ini memiliki analisis AI."
-                      >
-                        AI
-                      </span>
+                    <span
+                      className="shrink-0 inline-flex items-center px-2 py-0.5 text-[10px] font-black uppercase tracking-wider bg-indigo-50 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400 rounded-md border border-indigo-200 dark:border-indigo-800 leading-none"
+                      title="Arsip ini memiliki analisis AI."
+                    >
+                      AI
+                    </span>
                   )}
                 </div>
 
-                {file.metadata ? (
-                  <div className="mt-2 space-y-1 text-[10px] text-slate-500 dark:text-slate-400 border-t border-slate-100 dark:border-slate-700 pt-2">
-                    {file.metadata.school && file.metadata.school !== "-" && (
-                      <div className="grid grid-cols-3 gap-1">
-                        <span className="font-bold text-slate-400">
-                          Sekolah
-                        </span>
-                        <span 
-                          className="col-span-2 font-medium text-slate-700 dark:text-slate-300 truncate"
-                          title={String(file.metadata.school)}
-                        >
-                          : {file.metadata.school}
-                        </span>
-                      </div>
-                    )}
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onDeleteArchive(file.name, e);
+                  }}
+                  className="shrink-0 p-1.5 bg-slate-50 dark:bg-slate-700/80 text-slate-400 hover:text-red-600 dark:hover:text-red-400 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/30 transition-all shadow-xs border border-slate-200 dark:border-slate-600 cursor-pointer flex items-center justify-center"
+                  title="Hapus Arsip"
+                >
+                  <TrashIcon className="w-4 h-4" />
+                </button>
+              </div>
+
+              {file.metadata ? (
+                <div className="mt-2 space-y-1 text-[10px] text-slate-500 dark:text-slate-400 border-t border-slate-100 dark:border-slate-700 pt-2">
+                  {file.metadata.school && file.metadata.school !== "-" && (
                     <div className="grid grid-cols-3 gap-1">
                       <span className="font-bold text-slate-400">
-                        Mapel/Kelas
+                        Sekolah
                       </span>
                       <span 
                         className="col-span-2 font-medium text-slate-700 dark:text-slate-300 truncate"
-                        title={`${file.metadata.subject || "-"} (${file.metadata.classLevel || "-"})`}
+                        title={String(file.metadata.school)}
                       >
-                        : {file.metadata.subject || "-"} ({file.metadata.classLevel || "-"})
+                        : {file.metadata.school}
                       </span>
                     </div>
-                    <div className="grid grid-cols-3 gap-1">
-                      <span className="font-bold text-slate-400">Evaluasi</span>
-                      <span className="col-span-2 font-medium text-slate-700 dark:text-slate-300 truncate">
-                        : {file.metadata.examType || "-"}
-                      </span>
-                    </div>
-                    {file.metadata.targetClasses &&
-                      (Array.isArray(file.metadata.targetClasses)
-                        ? file.metadata.targetClasses.filter((t) => t && String(t).trim() !== "").length > 0
-                        : String(file.metadata.targetClasses).trim() !== "") && (
-                        <div className="grid grid-cols-3 gap-1">
-                          <span className="font-bold text-slate-400">
-                            Target Kelas
-                          </span>
-                          <span className="col-span-2 font-medium text-slate-700 dark:text-slate-300 truncate">
-                            : {Array.isArray(file.metadata.targetClasses)
-                              ? file.metadata.targetClasses.filter(Boolean).join(", ")
-                              : String(file.metadata.targetClasses)}
-                          </span>
-                        </div>
-                      )}
-                    <div className="grid grid-cols-3 gap-1">
-                      <span className="font-bold text-slate-400">Tanggal</span>
-                      <span className="col-span-2 font-medium text-slate-700 dark:text-slate-300 truncate">
-                        : {formatArchiveDisplayDate(file)}
-                      </span>
-                    </div>
-                    <div className="grid grid-cols-3 gap-1">
-                      <span className="font-bold text-slate-400">
-                        Partisipan
-                      </span>
-                      <span className="col-span-2 font-medium text-slate-700 dark:text-slate-300 truncate">
-                        :{" "}
-                        {file.metadata.participantCount
-                          ? `${file.metadata.participantCount} Siswa`
-                          : "-"}
-                      </span>
-                    </div>
-                    <div className="text-[9px] text-right text-slate-300 mt-1">
-                      {(file.size / 1024).toFixed(1)} KB
-                    </div>
+                  )}
+                  <div className="grid grid-cols-3 gap-1">
+                    <span className="font-bold text-slate-400">
+                      Mapel/Kelas
+                    </span>
+                    <span 
+                      className="col-span-2 font-medium text-slate-700 dark:text-slate-300 truncate"
+                      title={`${file.metadata.subject || "-"} (${file.metadata.classLevel || "-"})`}
+                    >
+                      : {file.metadata.subject || "-"} ({file.metadata.classLevel || "-"})
+                    </span>
                   </div>
-                ) : (
-                  <div className="mt-2 space-y-1 text-[10px] text-slate-500 dark:text-slate-400 border-t border-slate-100 dark:border-slate-700 pt-2">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-300 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase border border-slate-200 dark:border-slate-600">
-                        Arsip Lama
-                      </span>
-                    </div>
-                    <div className="grid grid-cols-3 gap-1">
-                      <span className="font-bold text-slate-400">Tanggal</span>
-                      <span className="col-span-2 font-medium text-slate-700 dark:text-slate-300 truncate">
-                        :{" "}
-                        {file.created_at && !isNaN(Date.parse(String(file.created_at)))
-                          ? new Date(file.created_at).toLocaleDateString("id-ID", {
-                              day: "numeric",
-                              month: "short",
-                              year: "numeric",
-                            })
-                          : "-"}
-                      </span>
-                    </div>
-                    <div className="grid grid-cols-3 gap-1">
-                      <span className="font-bold text-slate-400">Ukuran</span>
-                      <span className="col-span-2 font-medium text-slate-700 dark:text-slate-300 truncate">
-                        : {(file.size / 1024).toFixed(1)} KB
-                      </span>
-                    </div>
-                    <div className="text-[9px] text-slate-400 italic mt-1">
-                      Detail lengkap tidak tersedia di pratinjau.
-                    </div>
+                  <div className="grid grid-cols-3 gap-1">
+                    <span className="font-bold text-slate-400">Evaluasi</span>
+                    <span className="col-span-2 font-medium text-slate-700 dark:text-slate-300 truncate">
+                      : {file.metadata.examType || "-"}
+                    </span>
                   </div>
-                )}
-              </button>
-              <button
-                onClick={(e) => onDeleteArchive(file.name, e)}
-                className="absolute top-2 right-2 p-1.5 bg-white dark:bg-slate-700 text-slate-400 hover:text-red-600 dark:hover:text-red-400 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/30 transition-all shadow-sm border border-slate-200 dark:border-slate-600 z-10"
-                title="Hapus Arsip"
-              >
-                <TrashIcon className="w-4 h-4" />
-              </button>
+                  {file.metadata.targetClasses &&
+                    (Array.isArray(file.metadata.targetClasses)
+                      ? file.metadata.targetClasses.filter((t) => t && String(t).trim() !== "").length > 0
+                      : String(file.metadata.targetClasses).trim() !== "") && (
+                      <div className="grid grid-cols-3 gap-1">
+                        <span className="font-bold text-slate-400">
+                          Target Kelas
+                        </span>
+                        <span className="col-span-2 font-medium text-slate-700 dark:text-slate-300 truncate">
+                          : {Array.isArray(file.metadata.targetClasses)
+                            ? file.metadata.targetClasses.filter(Boolean).join(", ")
+                            : String(file.metadata.targetClasses)}
+                        </span>
+                      </div>
+                    )}
+                  <div className="grid grid-cols-3 gap-1">
+                    <span className="font-bold text-slate-400">Tanggal</span>
+                    <span className="col-span-2 font-medium text-slate-700 dark:text-slate-300 truncate">
+                      : {formatArchiveDisplayDate(file)}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-3 gap-1">
+                    <span className="font-bold text-slate-400">
+                      Partisipan
+                    </span>
+                    <span className="col-span-2 font-medium text-slate-700 dark:text-slate-300 truncate">
+                      :{" "}
+                      {file.metadata.participantCount
+                        ? `${file.metadata.participantCount} Siswa`
+                        : "-"}
+                    </span>
+                  </div>
+                  <div className="text-[9px] text-right text-slate-300 mt-1">
+                    {(file.size / 1024).toFixed(1)} KB
+                  </div>
+                </div>
+              ) : (
+                <div className="mt-2 space-y-1 text-[10px] text-slate-500 dark:text-slate-400 border-t border-slate-100 dark:border-slate-700 pt-2">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-300 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase border border-slate-200 dark:border-slate-600">
+                      Arsip Lama
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-3 gap-1">
+                    <span className="font-bold text-slate-400">Tanggal</span>
+                    <span className="col-span-2 font-medium text-slate-700 dark:text-slate-300 truncate">
+                      :{" "}
+                      {file.created_at && !isNaN(Date.parse(String(file.created_at)))
+                        ? new Date(file.created_at).toLocaleDateString("id-ID", {
+                            day: "numeric",
+                            month: "short",
+                            year: "numeric",
+                          })
+                        : "-"}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-3 gap-1">
+                    <span className="font-bold text-slate-400">Ukuran</span>
+                    <span className="col-span-2 font-medium text-slate-700 dark:text-slate-300 truncate">
+                      : {(file.size / 1024).toFixed(1)} KB
+                    </span>
+                  </div>
+                  <div className="text-[9px] text-slate-400 italic mt-1">
+                    Detail lengkap tidak tersedia di pratinjau.
+                  </div>
+                </div>
+              )}
             </div>
           ))
         )}
