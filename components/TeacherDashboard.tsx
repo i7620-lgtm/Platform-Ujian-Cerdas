@@ -404,6 +404,13 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
             setSelectedOngoingExam(null);
             onRefreshExams();
           }}
+          onExamFinished={(finishedExam) => {
+            updateExam(finishedExam);
+            setSelectedOngoingExam(null);
+            setView("FINISHED_EXAMS");
+            onRefreshExams();
+            onRefreshResults();
+          }}
           isPremium={teacherProfile.isPremium || false}
         />
       )}

@@ -6,6 +6,7 @@ import {
   CheckCircleIcon,
   XMarkIcon,
   ExclamationTriangleIcon,
+  FileExcelIcon,
 } from "../../../Icons";
 import { QuestionResultDetailPopover } from "../../../QuestionResultDetailPopover";
 
@@ -61,32 +62,53 @@ export const FinishedStudentsTab: React.FC<FinishedStudentsTabProps> = ({
   formatDuration,
   checkAnswerStatus,
 }) => {
+  const handleExportExcel = async () => {
+    try {
+      const { downloadArchiveExcel } = await import("../../archive/archiveExcelExporter");
+      downloadArchiveExcel(displayExam, filteredResults);
+    } catch (e) {
+      console.error("Gagal mengekspor Excel", e);
+      alert("Gagal mengunduh file Excel.");
+    }
+  };
+
   return (
     <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm overflow-hidden flex flex-col font-sans">
-      {uniqueClasses.length > 1 && (
-        <div className="p-4 border-b border-slate-100 dark:border-slate-700 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-slate-50/50 dark:bg-slate-700/30">
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-bold text-slate-500 uppercase">
-              Filter Kelas:
-            </span>
-            <select
-              value={selectedClass}
-              onChange={(e) => setSelectedClass(e.target.value)}
-              className="text-xs font-bold p-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
-            >
-              <option value="ALL">Semua Kelas ({results.length})</option>
-              {uniqueClasses.map((c) => (
-                <option key={c} value={c}>
-                  {c} ({results.filter((r) => r.student.class === c).length})
-                </option>
-              ))}
-            </select>
-          </div>
+      <div className="p-4 border-b border-slate-100 dark:border-slate-700 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-slate-50/50 dark:bg-slate-700/30">
+        <div className="flex flex-wrap items-center gap-3">
+          {uniqueClasses.length > 1 && (
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold text-slate-500 uppercase">
+                Filter Kelas:
+              </span>
+              <select
+                value={selectedClass}
+                onChange={(e) => setSelectedClass(e.target.value)}
+                className="text-xs font-bold p-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
+              >
+                <option value="ALL">Semua Kelas ({results.length})</option>
+                {uniqueClasses.map((c) => (
+                  <option key={c} value={c}>
+                    {c} ({results.filter((r) => r.student.class === c).length})
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
           <div className="text-xs font-bold text-slate-400">
             Menampilkan {filteredResults.length} Siswa
           </div>
         </div>
-      )}
+        <button
+          type="button"
+          onClick={handleExportExcel}
+          className="flex items-center gap-2 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-sm transition-all transform active:scale-95 shrink-0 cursor-pointer"
+          title="Unduh data rekap ke format Excel (.xlsx)"
+        >
+          <FileExcelIcon className="w-4 h-4" />
+          <span>Unduh Excel (.xlsx)</span>
+        </button>
+      </div>
       <div className="overflow-x-auto custom-scrollbar">
         <table className="w-full min-w-[800px] text-left">
           <thead className="bg-slate-50/50 dark:bg-slate-700/50">
@@ -273,7 +295,7 @@ export const FinishedStudentsTab: React.FC<FinishedStudentsTabProps> = ({
                         }
                         className="p-6"
                       >
-                        <div className="flex items-center gap-4 mb-3 text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500">
+                        <div className="flex flex-wrap items-center gap-4 mb-3 text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500">
                           <span className="flex items-center gap-1">
                             <div className="w-3 h-3 bg-emerald-300 dark:bg-emerald-600 rounded"></div>{" "}
                             Benar
@@ -286,6 +308,12 @@ export const FinishedStudentsTab: React.FC<FinishedStudentsTabProps> = ({
                             <div className="w-3 h-3 bg-slate-200 dark:bg-slate-700 rounded"></div>{" "}
                             Kosong
                           </span>
+                          {displayExam.questions.some((q) => q.questionType === "QUESTIONNAIRE") && (
+                            <span className="flex items-center gap-1">
+                              <div className="w-3 h-3 bg-indigo-500 dark:bg-indigo-600 rounded"></div>{" "}
+                              Kuisioner (Non-Skor)
+                            </span>
+                          )}
                         </div>
                         <div className="flex flex-wrap gap-1.5 mt-2 mb-2">
                           {displayExam.questions

@@ -9,6 +9,7 @@ interface UseOngoingExamModalProps {
   exam: Exam | null;
   teacherProfile?: TeacherProfile;
   onClose: () => void;
+  onExamFinished?: (finishedExam: Exam) => void;
   isPremium?: boolean;
 }
 
@@ -25,6 +26,7 @@ export const useOngoingExamModal = ({
   exam,
   teacherProfile,
   onClose,
+  onExamFinished,
   isPremium,
 }: UseOngoingExamModalProps) => {
   const [displayExam, setDisplayExam] = useState<Exam | null>(null);
@@ -732,19 +734,49 @@ export const useOngoingExamModal = ({
       isOpen: true,
       message: confirmMsg,
       onConfirm: async () => {
+        setIsRefreshing(true);
+        const now = new Date();
+        const isoNow = now.toISOString();
+        const timeNow = now.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
+
+        const finishedExam: Exam = {
+          ...displayExam,
+          config: {
+            ...displayExam.config,
+            isFinished: true,
+            endDate: isoNow,
+            endTime: timeNow,
+          },
+        };
+
+        // 1. Optimistically mark all in-progress / force-closed results as completed locally
+        setLocalResults((prev) =>
+          prev.map((r) =>
+            r.status === "in_progress" || r.status === "force_closed"
+              ? { ...r, status: "completed" as const }
+              : r,
+          ),
+        );
+
+        // 2. Dismiss confirm dialog immediately
+        setConfirmDialog((prev) => ({ ...prev, isOpen: false }));
+
+        // 3. Stop exam overall in backend & local cache
         try {
-          setIsRefreshing(true);
-          await storageService.stopExamOverall(displayExam.code);
-          setAlertDialog({ isOpen: true, message: "Ujian berhasil dihentikan secara keseluruhan." });
-          onClose();
+          await storageService.stopExamOverall(displayExam.code, finishedExam);
         } catch (e) {
-          console.error(e);
-          setAlertDialog({ isOpen: true, message: "Gagal menghentikan ujian." });
+          console.error("Non-fatal storage error stopping exam:", e);
         } finally {
           setIsRefreshing(false);
-          setConfirmDialog((prev) => ({ ...prev, isOpen: false }));
         }
-      }
+
+        // 4. Notify parent dashboard to update state, close modal, and switch to Selesai tab immediately
+        if (onExamFinished) {
+          onExamFinished(finishedExam);
+        } else {
+          onClose();
+        }
+      },
     });
   };
 

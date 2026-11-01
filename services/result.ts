@@ -3,6 +3,7 @@ import { offlineService } from './offline';
 import { calculateExamScore } from '../components/teacher/examUtils';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import type { Result, ResultStatus, Exam, ExamConfig } from '../types';
+import { examService } from './exam';
 
 export class ResultService {
   private static rpcDisabled = true; // Use direct Supabase persistence to avoid 400 RPC signature errors
@@ -395,43 +396,108 @@ export class ResultService {
   }
 
   async finishAllExams(examCode: string): Promise<void> {
-      const { error } = await supabase
-          .from('results')
-          .update({ status: 'completed' })
-          .eq('exam_code', examCode)
-          .in('status', ['in_progress', 'force_closed']);
-      if (error) throw error;
+      try {
+          const { error } = await supabase
+              .from('results')
+              .update({ status: 'completed' })
+              .eq('exam_code', examCode)
+              .in('status', ['in_progress', 'force_closed']);
+          if (error) {
+              console.warn("finishAllExams update warning:", error);
+          }
+      } catch (err) {
+          console.warn("finishAllExams error caught:", err);
+      }
   }
 
-  async stopExamOverall(examCode: string): Promise<void> {
-      // 1. Finish all student exams in DB
-      await this.finishAllExams(examCode);
+  async stopExamOverall(examCode: string, providedExam?: Exam): Promise<Exam | null> {
+      const cleanCode = (examCode || '').trim().toUpperCase();
+      const now = new Date();
+      const nowIso = now.toISOString();
+      const nowTime = now.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
 
-      // 2. Update exam config to isFinished: true
-      const { data } = await supabase.from('exams').select('config').eq('code', examCode).maybeSingle();
-      if (data && data.config) {
-          const newConfig = { ...data.config, isFinished: true };
-          const { error } = await supabase.from('exams').update({ config: newConfig }).eq('code', examCode);
-          if (error) throw error;
+      // 1. Finish all student exams in Supabase DB (graceful fallback)
+      await this.finishAllExams(cleanCode);
+
+      // 2. Update local teacher exams cache immediately to ensure UI never reverts
+      let updatedExam: Exam | null = null;
+      try {
+          const localTeacherExams = examService.getLocalTeacherExams();
+          const target = providedExam || localTeacherExams[cleanCode];
+          if (target) {
+              const updatedConfig: ExamConfig = {
+                  ...target.config,
+                  isFinished: true,
+                  endDate: nowIso,
+                  endTime: nowTime,
+              };
+              updatedExam = {
+                  ...target,
+                  config: updatedConfig,
+              };
+              examService.saveLocalTeacherExam(updatedExam);
+          }
+      } catch (cacheErr) {
+          console.warn("Local teacher exam cache update error:", cacheErr);
       }
 
-      // 3. Broadcast to all students to force submit immediately
-      if (data?.config?.disableRealtime) return;
-      
-      const channel = supabase.channel(`exam-room-${examCode}`);
-      await channel.subscribe(async (status) => {
-          if (status === 'SUBSCRIBED') {
-              await channel.send({
-                  type: 'broadcast',
-                  event: 'force_submit_exam',
-                  payload: { examCode, timestamp: Date.now() }
-              });
-              // Give it a tiny bit of time to send before unsubscribing
-              setTimeout(() => {
-                  supabase.removeChannel(channel);
-              }, 1000);
+      // 3. Update exam config to isFinished: true and adjusted end date in Supabase DB
+      try {
+          const { data } = await supabase.from('exams').select('*').eq('code', cleanCode).maybeSingle();
+          if (data) {
+              const existingConfig = (data.config || {}) as ExamConfig;
+              const newConfig: ExamConfig = {
+                  ...existingConfig,
+                  isFinished: true,
+                  endDate: nowIso,
+                  endTime: nowTime,
+              };
+              const newVer = typeof data.version === 'number' ? data.version + 1 : 2;
+              
+              await supabase
+                  .from('exams')
+                  .update({ config: newConfig, version: newVer })
+                  .eq('code', cleanCode);
+
+              if (!updatedExam) {
+                  updatedExam = {
+                      code: data.code,
+                      authorId: data.author_id,
+                      authorSchool: data.school,
+                      config: newConfig,
+                      questions: data.questions || [],
+                      status: data.status,
+                      version: newVer
+                  };
+                  examService.saveLocalTeacherExam(updatedExam);
+              }
           }
-      });
+      } catch (dbErr) {
+          console.warn("Supabase update error during stopExamOverall:", dbErr);
+      }
+
+      // 4. Safe Realtime Broadcast to notify all active students to submit immediately
+      try {
+          const channel = supabase.channel(`exam-room-${cleanCode}`);
+          channel.subscribe(async (status) => {
+              if (status === 'SUBSCRIBED') {
+                  try {
+                      await channel.send({
+                          type: 'broadcast',
+                          event: 'force_submit_exam',
+                          payload: { examCode: cleanCode, timestamp: Date.now() }
+                      });
+                  } catch { /* ignore */ }
+                  setTimeout(() => {
+                      try { supabase.removeChannel(channel); } catch { /* ignore */ }
+                  }, 1000);
+              }
+          });
+      } catch (broadcastErr) {
+          console.warn("Broadcast warning:", broadcastErr);
+      }
+
+      return updatedExam;
   }
 
   async extendExamTime(examCode: string, additionalMinutes: number): Promise<void> {

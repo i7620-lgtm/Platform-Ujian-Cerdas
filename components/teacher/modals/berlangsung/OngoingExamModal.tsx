@@ -35,13 +35,14 @@ interface OngoingExamModalProps {
   exam: Exam | null;
   teacherProfile?: TeacherProfile;
   onClose: () => void;
+  onExamFinished?: (finishedExam: Exam) => void;
   isReadOnly?: boolean;
   isProctor?: boolean;
   isPremium?: boolean;
 }
 
 export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
-  const { exam, onClose, teacherProfile, isReadOnly, isProctor: isProctorProp, isPremium } = props;
+  const { exam, onClose, onExamFinished, teacherProfile, isReadOnly, isProctor: isProctorProp, isPremium } = props;
   const isProctor = !!isProctorProp || teacherProfile?.accountType === "collaborator";
   const isOwner = !isReadOnly && !isProctor;
   const canShowActionColumn = isOwner || isProctor;
@@ -100,7 +101,7 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
     sortedResults,
     uniqueClassesInResults,
     uniqueSchoolsInResults,
-  } = useOngoingExamModal({ exam, teacherProfile, onClose, isPremium });
+  } = useOngoingExamModal({ exam, teacherProfile, onClose, onExamFinished, isPremium });
 
   // Auto-scroll student list table in live monitoring (smooth top-to-bottom and bottom-to-top)
   const [autoScrollEnabled, setAutoScrollEnabled] = React.useState(true);

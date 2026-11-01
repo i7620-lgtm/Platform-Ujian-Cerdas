@@ -51,46 +51,62 @@ export const QuestionResultDetailPopover: React.FC<
   const studentAns = answers[question.id] || "";
   const correctAns = question.correctAnswer || "";
 
+  // Hitung poin dan status terpadu
+  const maxPoints = question.points ?? question.scoreWeight ?? 1;
+  let statusText = "Kosong (Tidak Dijawab)";
+  let pointsText = `0/${maxPoints} Poin`;
+  let statusBadgeStyle =
+    "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border-slate-200 dark:border-slate-700";
+
   // Styling badge warna nomor soal
   let badgeColorClass =
     "bg-slate-200 dark:bg-slate-700 text-slate-800 dark:text-slate-200 hover:bg-slate-300 dark:hover:bg-slate-600";
-  let statusLabel = "Kosong (Tidak Dijawab)";
-  let statusBadgeStyle =
-    "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border-slate-200 dark:border-slate-700";
 
   if (question.questionType === "QUESTIONNAIRE") {
     if (studentAns && studentAns.trim().length > 0) {
       badgeColorClass =
         "bg-indigo-500 dark:bg-indigo-600 text-white font-black hover:bg-indigo-600";
-      statusLabel = "Respon Terkumpul (Non-Skor)";
+      statusText = "Respon Tercatat";
+      pointsText = "Non-Skor";
       statusBadgeStyle =
         "bg-indigo-50 text-indigo-800 dark:bg-indigo-950/60 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800";
     } else {
       badgeColorClass =
         "bg-slate-200 dark:bg-slate-700 text-slate-800 dark:text-slate-200 hover:bg-slate-300 dark:hover:bg-slate-600";
-      statusLabel = "Kosong (Tidak Diisi)";
+      statusText = "Kosong (Tidak Diisi)";
+      pointsText = "Non-Skor";
       statusBadgeStyle =
         "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border-slate-200 dark:border-slate-700";
     }
   } else if (isManual && !isGraded) {
     badgeColorClass =
       "bg-amber-300 dark:bg-amber-500 text-slate-900 font-black hover:bg-amber-400";
-    statusLabel = "Belum Dinilai";
+    statusText = "Belum Dinilai";
+    pointsText = `Maks ${maxPoints} Poin`;
     statusBadgeStyle =
       "bg-amber-50 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 border-amber-200 dark:border-amber-800";
   } else if (status === "CORRECT") {
     badgeColorClass =
       "bg-emerald-400 dark:bg-emerald-600 text-white font-black hover:bg-emerald-500";
-    statusLabel = "Jawaban Benar";
+    statusText = "Jawaban Benar";
+    pointsText = `${maxPoints}/${maxPoints} Poin`;
     statusBadgeStyle =
       "bg-emerald-50 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800";
   } else if (status === "WRONG") {
     badgeColorClass =
       "bg-rose-400 dark:bg-rose-600 text-white font-black hover:bg-rose-500";
-    statusLabel = "Jawaban Salah";
+    statusText = "Jawaban Salah";
+    pointsText = `0/${maxPoints} Poin`;
     statusBadgeStyle =
       "bg-rose-50 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300 border-rose-200 dark:border-rose-800";
+  } else {
+    statusText = "Kosong (Tidak Dijawab)";
+    pointsText = `0/${maxPoints} Poin`;
+    statusBadgeStyle =
+      "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border-slate-200 dark:border-slate-700";
   }
+
+  const statusLabel = `${statusText} (${pointsText})`;
 
   // Hitung posisi popover hover agar selalu berada di dalam viewport layar
   const updatePosition = () => {
@@ -142,24 +158,34 @@ export const QuestionResultDetailPopover: React.FC<
   }, []);
 
   // Helper render konten soal
-  const renderDetailContent = () => {
+  const renderDetailContent = (onClose?: () => void) => {
     return (
       <div className="space-y-3.5 text-xs text-slate-700 dark:text-slate-300 leading-relaxed">
-        {/* Header Rincian */}
-        <div className="flex items-center justify-between gap-2 border-b border-slate-100 dark:border-slate-800 pb-2.5">
-          <div className="flex items-center gap-2">
-            <span className="font-black text-sm text-slate-900 dark:text-white">
+        {/* Header Rincian Terpadu & Tombol Tutup Bersanding Aman */}
+        <div className="flex items-start sm:items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-800 pb-3">
+          <div className="flex flex-wrap items-center gap-2 min-w-0 flex-1">
+            <span className="font-black text-sm sm:text-base text-slate-900 dark:text-white shrink-0">
               Soal #{questionIndex + 1}
             </span>
             <span
-              className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${statusBadgeStyle}`}
+              className={`text-[10px] sm:text-xs font-bold px-2.5 py-0.5 sm:py-1 rounded-full border ${statusBadgeStyle} inline-flex items-center gap-1.5`}
             >
-              {statusLabel}
+              <span>{statusText}</span>
+              <span className="opacity-40">·</span>
+              <span className="font-mono font-bold">{pointsText}</span>
             </span>
           </div>
-          <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 font-mono">
-            {question.points ?? 1} Poin
-          </span>
+
+          {onClose && (
+            <button
+              type="button"
+              onClick={onClose}
+              className="w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center rounded-xl text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors shrink-0 -mt-1 -mr-1 cursor-pointer"
+              aria-label="Tutup Detail Soal"
+            >
+              <XMarkIcon className="w-5 h-5" />
+            </button>
+          )}
         </div>
 
         {/* Teks Soal */}
@@ -490,7 +516,7 @@ export const QuestionResultDetailPopover: React.FC<
         className={`${
           size === "md" ? "w-8 h-8 text-xs" : "w-6 h-6 text-[10px]"
         } flex items-center justify-center rounded font-bold cursor-pointer transition-all duration-150 transform hover:scale-110 active:scale-95 shadow-2xs select-none ${badgeColorClass}`}
-        title={`Soal #${questionIndex + 1}: ${statusLabel} (Klik untuk rincian)`}
+        title={`Soal #${questionIndex + 1}: ${statusText} · ${pointsText} (Klik untuk rincian)`}
         aria-label={`Rincian Soal #${questionIndex + 1}`}
       >
         {questionIndex + 1}
@@ -524,29 +550,20 @@ export const QuestionResultDetailPopover: React.FC<
       {isModalOpen &&
         createPortal(
           <div
-            className="fixed inset-0 z-[10000] bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in"
+            className="fixed inset-0 z-[10000] bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 animate-fade-in"
             onClick={() => setIsModalOpen(false)}
           >
             <div
-              className="bg-white dark:bg-slate-900 w-full max-w-lg rounded-3xl shadow-2xl border border-slate-200/80 dark:border-slate-800 p-5 sm:p-6 max-h-[85vh] overflow-y-auto custom-scrollbar animate-scale-up relative"
+              className="bg-white dark:bg-slate-900 w-full max-w-lg rounded-3xl shadow-2xl border border-slate-200/80 dark:border-slate-800 p-5 sm:p-6 max-h-[88vh] overflow-y-auto custom-scrollbar animate-scale-up"
               onClick={(e) => e.stopPropagation()}
             >
-              <button
-                type="button"
-                onClick={() => setIsModalOpen(false)}
-                className="absolute top-4 right-4 p-2 rounded-xl text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-                aria-label="Tutup Detail Soal"
-              >
-                <XMarkIcon className="w-5 h-5" />
-              </button>
-
-              {renderDetailContent()}
+              {renderDetailContent(() => setIsModalOpen(false))}
 
               <div className="mt-5 pt-3 border-t border-slate-100 dark:border-slate-800 flex justify-end">
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-bold text-xs rounded-xl transition-colors"
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-bold text-xs rounded-xl transition-colors cursor-pointer"
                 >
                   Tutup
                 </button>

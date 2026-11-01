@@ -169,8 +169,8 @@ class StorageService {
       return resultService.finishAllExams(examCode);
   }
 
-  async stopExamOverall(examCode: string): Promise<void> {
-      return resultService.stopExamOverall(examCode);
+  async stopExamOverall(examCode: string, providedExam?: Exam): Promise<Exam | null> {
+      return resultService.stopExamOverall(examCode, providedExam);
   }
 
   async extendExamTime(examCode: string, additionalMinutes: number): Promise<void> {
