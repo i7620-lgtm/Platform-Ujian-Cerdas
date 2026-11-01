@@ -100,7 +100,7 @@ export const KisiKisiModal: React.FC<{
                       <td className="p-3 text-slate-800 dark:text-slate-200 leading-relaxed">
                         {q.kisiKisi ? (
                           <div
-                            className="prose prose-sm dark:prose-invert max-w-none break-words"
+                            className="text-xs text-slate-800 dark:text-slate-200 leading-relaxed break-words [&_p]:my-0.5 [&_p]:leading-relaxed"
                             dangerouslySetInnerHTML={{
                               __html: renderMathInHtml(q.kisiKisi),
                             }}
