@@ -217,7 +217,7 @@ export const analyzeClassPerformance = (
   const correctMult = Number(exam.config?.olympiadScoring?.correctMultiplier ?? 4);
   const maxScore = isOlympiad
     ? (exam.questions
-        .filter((q) => q.questionType !== "INFO")
+        .filter((q) => q.questionType !== "INFO" && q.questionType !== "QUESTIONNAIRE")
         .reduce((sum, q) => sum + (q.scoreWeight || 1) * correctMult, 0) || 100)
     : 100;
 
@@ -824,7 +824,7 @@ export const calculateAggregateStats = (exam: Exam, results: Result[]) => {
 
   // 1. Initialize Maps
   exam.questions.forEach((q) => {
-    if (q.questionType === "INFO") return;
+    if (q.questionType === "INFO" || q.questionType === "QUESTIONNAIRE") return;
     const cat =
       q.category && q.category.trim() !== ""
         ? q.category.trim()
@@ -975,7 +975,7 @@ export const analyzeStudentPerformance = (
   if (isOlympiad) {
     const correctMult = Number(exam.config?.olympiadScoring?.correctMultiplier ?? 4);
     const maxScore = exam.questions
-      .filter((q) => q.questionType !== "INFO")
+      .filter((q) => q.questionType !== "INFO" && q.questionType !== "QUESTIONNAIRE")
       .reduce((sum, q) => sum + (q.scoreWeight || 1) * correctMult, 0) || 100;
     const tier = getOlympiadMedalTier(score, maxScore);
 
