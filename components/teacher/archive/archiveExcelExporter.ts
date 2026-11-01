@@ -147,6 +147,45 @@ export const downloadArchiveExcel = (exam: Exam, results: Result[]) => {
     let correctCount = 0;
     const answerCounts: Record<string, number> = {};
 
+    if (q.questionType === "QUESTIONNAIRE") {
+      let answeredCount = 0;
+      let numericSum = 0;
+      let numericCount = 0;
+
+      results.forEach((r) => {
+        const ans = r.answers[q.id];
+        if (ans !== undefined && ans !== null && String(ans).trim() !== "") {
+          answeredCount++;
+          const val = String(ans).replace(/<[^>]*>/g, "").trim();
+          answerCounts[val] = (answerCounts[val] || 0) + 1;
+          const num = parseFloat(val);
+          if (!isNaN(num)) {
+            numericSum += num;
+            numericCount++;
+          }
+        }
+      });
+
+      const total = results.length;
+      const partRate = total > 0 ? Math.round((answeredCount / total) * 100) : 0;
+      const avgStr = numericCount > 0 ? ` (Rata-rata: ${(numericSum / numericCount).toFixed(1)})` : "";
+
+      const distStr = Object.entries(answerCounts)
+        .map(([k, v]) => `${k}: ${v}`)
+        .join(", ");
+
+      analisisSoalData.push([
+        String(idx + 1),
+        q.questionText.replace(/<[^>]*>/g, ""),
+        `Kuisioner / Angket (Non-Skor)`,
+        `Partisipasi ${partRate}%${avgStr}`,
+        `${answeredCount} Respon`,
+        `${total - answeredCount} Kosong`,
+        distStr || "Belum ada respon",
+      ]);
+      return;
+    }
+
     results.forEach((r) => {
       const ans = r.answers[q.id];
       const status = checkAnswerStatus(q, r.answers);
