@@ -133,24 +133,13 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
 
   return (
     <div className="w-full max-w-7xl mx-auto space-y-6 pb-16">
-      {/* Top Header & Breadcrumb Context */}
+      {/* Top Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-slate-200 dark:border-slate-800">
         <div>
-          <div className="flex items-center gap-2 text-xs font-medium text-slate-500 dark:text-slate-400">
-            <span>Dasbor Pengajar</span>
-            <span aria-hidden="true">·</span>
-            <span>Observabilitas & Analitik</span>
-            <span aria-hidden="true">·</span>
-            <span className="text-indigo-600 dark:text-indigo-400 font-semibold">
-              {isGuru && 'Statistik Guru Mandiri'}
-              {isAdminSekolah && `Statistik Sekolah (${teacherProfile.school || 'Sekolah'})`}
-              {isSuperAdmin && 'Statistik Nasional & Multi-Sekolah'}
-            </span>
-          </div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white mt-1">
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
             Statistik & Penggunaan Aplikasi
           </h1>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
             Mencatat pengguna bulanan, jenjang kelas, durasi pengerjaan, kuota data riil via Performance API, dan daerah asal.
           </p>
         </div>
@@ -188,11 +177,11 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
         </div>
       </div>
 
-      {/* Filter Bar (Segmented & Dropdowns) */}
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 shadow-sm space-y-3">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          {/* Segmented Date Range Selector */}
-          <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-lg">
+      {/* Filter Bar (Capsule Filters & Search) */}
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-3.5 sm:p-4 shadow-sm space-y-3.5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          {/* Capsule Date Range Selector with automatic wrap */}
+          <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
             {(
               [
                 { id: 'this_month', label: 'Bulan Ini' },
@@ -201,23 +190,26 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
                 { id: 'this_year', label: 'Tahun Ini' },
                 { id: 'all', label: 'Semua Waktu' }
               ] as const
-            ).map(opt => (
-              <button
-                key={opt.id}
-                onClick={() => setFilter(prev => ({ ...prev, dateRange: opt.id }))}
-                className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all whitespace-nowrap ${
-                  filter.dateRange === opt.id
-                    ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm font-semibold'
-                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-                }`}
-              >
-                {opt.label}
-              </button>
-            ))}
+            ).map(opt => {
+              const isActive = filter.dateRange === opt.id;
+              return (
+                <button
+                  key={opt.id}
+                  onClick={() => setFilter(prev => ({ ...prev, dateRange: opt.id }))}
+                  className={`px-3 py-1.5 text-xs rounded-lg border transition-all whitespace-nowrap ${
+                    isActive
+                      ? 'bg-indigo-50 border-indigo-200 dark:bg-indigo-950/60 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300 font-semibold shadow-xs'
+                      : 'bg-slate-50 dark:bg-slate-800/80 border-slate-200 dark:border-slate-700/80 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white font-medium'
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              );
+            })}
           </div>
 
-          {/* Search Box */}
-          <div className="relative flex-1 min-w-[200px] max-w-xs">
+          {/* Search Box: Full-width on mobile, constrained on desktop */}
+          <div className="relative w-full sm:w-auto sm:min-w-[220px] sm:max-w-xs">
             <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
@@ -227,17 +219,19 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
                 setCurrentPage(1);
               }}
               placeholder="Cari siswa, kelas, kode..."
-              className="w-full pl-9 pr-3 py-1.5 text-xs bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              className="w-full pl-9 pr-3 py-2 sm:py-1.5 text-xs bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-indigo-500"
             />
           </div>
         </div>
 
-        {/* Secondary Dropdown Filters */}
-        <div className="flex flex-wrap items-center gap-3 pt-2 border-t border-slate-100 dark:border-slate-800/60 text-xs">
+        {/* Secondary Dropdown Filters: Stacked on mobile, row on tablet/desktop */}
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3 pt-2.5 border-t border-slate-100 dark:border-slate-800/60 text-xs">
           {/* Class Filter */}
-          <div className="flex items-center gap-1.5">
-            <Layers className="w-3.5 h-3.5 text-slate-400" />
-            <span className="text-slate-500 font-medium">Jenjang Kelas:</span>
+          <div className="flex items-center justify-between sm:justify-start gap-2 bg-slate-50 sm:bg-transparent dark:bg-slate-800/40 sm:dark:bg-transparent p-2 sm:p-0 rounded-lg">
+            <div className="flex items-center gap-1.5">
+              <Layers className="w-3.5 h-3.5 text-slate-400" />
+              <span className="text-slate-500 font-medium">Jenjang Kelas:</span>
+            </div>
             <select
               value={filter.classLevel || 'ALL'}
               onChange={e => {
@@ -257,9 +251,11 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
 
           {/* School Filter (Super Admin & Admin Sekolah) */}
           {(isSuperAdmin || availableSchools.length > 1) && (
-            <div className="flex items-center gap-1.5">
-              <Globe className="w-3.5 h-3.5 text-slate-400" />
-              <span className="text-slate-500 font-medium">Asal Sekolah:</span>
+            <div className="flex items-center justify-between sm:justify-start gap-2 bg-slate-50 sm:bg-transparent dark:bg-slate-800/40 sm:dark:bg-transparent p-2 sm:p-0 rounded-lg">
+              <div className="flex items-center gap-1.5">
+                <Globe className="w-3.5 h-3.5 text-slate-400" />
+                <span className="text-slate-500 font-medium">Asal Sekolah:</span>
+              </div>
               <select
                 value={filter.school || 'ALL'}
                 onChange={e => {
