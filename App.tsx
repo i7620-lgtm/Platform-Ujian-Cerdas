@@ -815,8 +815,8 @@ const App: React.FC = () => {
                         </button>
                     </div>
 
-                    <p className="mt-12 text-center text-[10px] font-bold text-slate-300 dark:text-slate-600 uppercase tracking-widest">
-                        Versi 3.0.1 • Hemat Data
+                    <p className="mt-12 text-center text-[11px] font-medium text-slate-400 dark:text-slate-500 tracking-wide select-none px-4 leading-relaxed">
+                        © {new Date().getFullYear()} I Made Hermawan Surya Putra · Hak Cipta Dilindungi
                     </p>
                 </div>
             </div>
