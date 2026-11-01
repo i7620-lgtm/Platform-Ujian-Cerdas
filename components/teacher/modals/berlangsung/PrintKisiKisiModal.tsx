@@ -152,8 +152,14 @@ export const PrintKisiKisiModal: React.FC<PrintKisiKisiModalProps> = ({
           table.kisi-table td {
             border: 1px solid #000000 !important;
             padding: 5px 6px !important;
-            font-size: 9pt !important;
+            font-size: 8.5pt !important;
             color: #000000 !important;
+          }
+
+          .kisi-indicator-cell,
+          .kisi-indicator-cell * {
+            font-size: 8.5pt !important;
+            line-height: 1.35 !important;
           }
 
           table.kisi-table tr {
@@ -165,6 +171,13 @@ export const PrintKisiKisiModal: React.FC<PrintKisiKisiModalProps> = ({
             break-inside: avoid !important;
             page-break-inside: avoid !important;
             margin-top: 24px !important;
+          }
+
+          .print-signature-line {
+            border-bottom: 1.5px solid #000000 !important;
+            width: 210px !important;
+            margin: 0 auto 6px auto !important;
+            height: 20px !important;
           }
 
           .no-print {
@@ -383,12 +396,12 @@ export const PrintKisiKisiModal: React.FC<PrintKisiKisiModalProps> = ({
                       <td className="border border-black p-2 text-center font-semibold text-black">
                         <span className="font-mono text-[11px]">{itemLevel}</span>
                       </td>
-                      <td className="border border-black p-2 text-black font-medium">
+                      <td className="border border-black p-2 text-black font-medium text-[11px]">
                         {itemCategory}
                       </td>
-                      <td className="border border-black p-2 text-black leading-relaxed">
+                      <td className="border border-black p-2 text-black align-top">
                         <div
-                          className="prose prose-xs max-w-none text-black break-words"
+                          className="kisi-indicator-cell text-[11px] text-left leading-snug text-black break-words [&_p]:my-0.5 [&_p]:leading-snug [&_p]:text-[11px] [&_em]:italic [&_strong]:font-semibold [&_ul]:my-1 [&_ul]:pl-4 [&_ol]:my-1 [&_ol]:pl-4"
                           dangerouslySetInnerHTML={{ __html: indicatorHtml }}
                         />
                       </td>
@@ -417,22 +430,26 @@ export const PrintKisiKisiModal: React.FC<PrintKisiKisiModalProps> = ({
 
         {/* Concise Distribution Summary */}
         {validQuestions.length > 0 && (
-          <div className="mt-4 p-3 border border-black bg-slate-50/50 rounded-sm text-xs">
-            <div className="font-bold uppercase tracking-wider mb-1.5 border-b border-black pb-1">
+          <div className="mt-4 p-3 border border-black bg-slate-50/50 print:bg-white rounded-sm text-xs">
+            <div className="font-bold uppercase tracking-wider mb-2 border-b border-black pb-1">
               Rekapitulasi Bentuk & Tingkat Kognitif:
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <span className="font-semibold">Distribusi Bentuk Soal: </span>
-                {Object.entries(typeCounts)
-                  .map(([type, count]) => `${type}: ${count}`)
-                  .join(" • ")}
+            <div className="space-y-2">
+              <div className="leading-relaxed">
+                <span className="font-bold text-black">Distribusi Bentuk Soal: </span>
+                <span className="text-black">
+                  {Object.entries(typeCounts)
+                    .map(([type, count]) => `${type}: ${count}`)
+                    .join(" • ")}
+                </span>
               </div>
-              <div>
-                <span className="font-semibold">Distribusi Level: </span>
-                {Object.entries(levelCounts)
-                  .map(([lvl, count]) => `${lvl}: ${count}`)
-                  .join(" • ")}
+              <div className="leading-relaxed">
+                <span className="font-bold text-black">Distribusi Level: </span>
+                <span className="text-black">
+                  {Object.entries(levelCounts)
+                    .map(([lvl, count]) => `${lvl}: ${count}`)
+                    .join(" • ")}
+                </span>
               </div>
             </div>
           </div>
@@ -443,26 +460,17 @@ export const PrintKisiKisiModal: React.FC<PrintKisiKisiModalProps> = ({
           <div className="text-center w-64">
             <p className="mb-1">Mengetahui,</p>
             <p className="mb-14 font-semibold">Kepala Sekolah</p>
-            <p className="font-bold underline uppercase">
-              {exam.authorSchool ? `Kepala ${exam.authorSchool}` : "Kepala Sekolah"}
-            </p>
-            <p className="text-[11px] text-slate-700">NIP. .....................................................</p>
+            <div className="print-signature-line border-b-2 border-black w-52 sm:w-60 mx-auto mb-1.5 h-6"></div>
+            <p className="text-[11px] text-black">NIP/NIPPPK. .....................................................</p>
           </div>
 
           <div className="text-center w-64">
-            <p className="mb-1">
-              {exam.authorSchool?.split(" ")?.[0] || "Tempat"},{" "}
-              {new Date().toLocaleDateString("id-ID", {
-                day: "numeric",
-                month: "long",
-                year: "numeric",
-              })}
+            <p className="mb-1 font-mono text-[11px] tracking-widest text-black select-none">
+              .................................................................
             </p>
             <p className="mb-14 font-semibold">Guru Pengampu / Penyusun</p>
-            <p className="font-bold underline uppercase">
-              {exam.author || "Guru Mata Pelajaran"}
-            </p>
-            <p className="text-[11px] text-slate-700">NIP. .....................................................</p>
+            <div className="print-signature-line border-b-2 border-black w-52 sm:w-60 mx-auto mb-1.5 h-6"></div>
+            <p className="text-[11px] text-black">NIP/NIPPPK. .....................................................</p>
           </div>
         </div>
       </div>
