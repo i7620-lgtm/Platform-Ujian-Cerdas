@@ -484,11 +484,27 @@ export class ExamService {
         if (studentId === 'check_schedule') {
             const { data: scheduleData, error: scheduleError } = await supabase
                 .from('exams')
-                .select('code, author_id, author_name, school, config, status, created_at, version')
+                .select('code, author_id, author_name, school, config, status, created_at')
                 .eq('code', cleanCode)
                 .maybeSingle();
 
-            if (scheduleError || !scheduleData) throw new Error("EXAM_NOT_FOUND");
+            if (scheduleError || !scheduleData) {
+                const localExams = this.getLocalTeacherExams();
+                if (localExams[cleanCode]) {
+                    const local = localExams[cleanCode];
+                    return {
+                        code: local.code,
+                        authorId: local.authorId,
+                        authorName: local.authorName || 'Pengajar',
+                        authorSchool: local.authorSchool,
+                        config: local.config,
+                        questions: [],
+                        status: local.status,
+                        version: local.config?.version || 1
+                    };
+                }
+                throw new Error("EXAM_NOT_FOUND");
+            }
             if (scheduleData.status === 'DRAFT' && !isPreview) throw new Error("EXAM_IS_DRAFT");
 
             return {
@@ -499,14 +515,14 @@ export class ExamService {
                 config: scheduleData.config,
                 questions: [],
                 status: scheduleData.status,
-                version: scheduleData.version || 1
+                version: scheduleData.config?.version || 1
             };
         }
 
         // 2. Fetch lightweight exam metadata from Supabase (excludes heavy questions column!)
         const { data: metaData, error: metaError } = await supabase
             .from('exams')
-            .select('code, author_id, author_name, school, config, status, created_at, version')
+            .select('code, author_id, author_name, school, config, status, created_at')
             .eq('code', cleanCode)
             .maybeSingle();
 
@@ -526,7 +542,7 @@ export class ExamService {
 
         if (metaData.status === 'DRAFT' && !isPreview) throw new Error("EXAM_IS_DRAFT");
 
-        const examVersion = typeof metaData.version === 'number' ? metaData.version : 1;
+        const examVersion = (metaData.config && typeof (metaData.config as any).version === 'number') ? (metaData.config as any).version : 1;
         let loadedQuestions: Question[] = [];
 
         // 3. Check IndexedDB local cache matching current version
@@ -557,7 +573,10 @@ export class ExamService {
 
             // Fallback: If edge endpoint was unreachable, check local cached questions or query database
             if (loadedQuestions.length === 0) {
-                if (localCached && Array.isArray(localCached.questions) && localCached.questions.length > 0) {
+                const localExams = this.getLocalTeacherExams();
+                if (localExams[cleanCode] && Array.isArray(localExams[cleanCode].questions) && localExams[cleanCode].questions.length > 0) {
+                    loadedQuestions = isPreview ? localExams[cleanCode].questions : localExams[cleanCode].questions.map(q => this.stripAnswersFromQuestion(q));
+                } else if (localCached && Array.isArray(localCached.questions) && localCached.questions.length > 0) {
                     loadedQuestions = localCached.questions;
                 } else {
                     const { data: fullData } = await supabase
@@ -566,13 +585,7 @@ export class ExamService {
                         .eq('code', cleanCode)
                         .maybeSingle();
                     if (fullData && Array.isArray(fullData.questions)) {
-                        loadedQuestions = fullData.questions.map(q => this.stripAnswersFromQuestion(q));
-                    } else {
-                        // Check local teacher cache questions
-                        const localExams = this.getLocalTeacherExams();
-                        if (localExams[cleanCode] && Array.isArray(localExams[cleanCode].questions)) {
-                            loadedQuestions = localExams[cleanCode].questions;
-                        }
+                        loadedQuestions = isPreview ? fullData.questions : fullData.questions.map(q => this.stripAnswersFromQuestion(q));
                     }
                 }
             }
@@ -647,7 +660,7 @@ export class ExamService {
                     filter: `code=eq.${cleanCode}`
                 },
                 (payload: any) => {
-                    const newVer = payload.new?.version;
+                    const newVer = payload.new?.config?.version ?? payload.new?.version;
                     if (typeof newVer === 'number' && newVer > currentVersion) {
                         onUpdate(newVer);
                     }
@@ -656,19 +669,20 @@ export class ExamService {
             .subscribe();
 
         // 2. Normal Mode Fallback: Staggered Periodic Check (every 3 minutes + random jitter)
-        // Only queries { version } from Supabase (<50 bytes payload)
+        // Only queries { config } from Supabase
         const jitterMs = Math.floor(Math.random() * 20000) + 180000;
         const timerId = setInterval(async () => {
             if (!active) return;
             try {
                 const { data } = await supabase
                     .from('exams')
-                    .select('version')
+                    .select('config')
                     .eq('code', cleanCode)
                     .maybeSingle();
 
-                if (data && typeof data.version === 'number' && data.version > currentVersion) {
-                    onUpdate(data.version);
+                const ver = (data?.config as any)?.version;
+                if (typeof ver === 'number' && ver > currentVersion) {
+                    onUpdate(ver);
                 }
             } catch {
                 /* silent fallback */
@@ -708,22 +722,25 @@ export class ExamService {
         const BUCKET_NAME = 'soal';
         const examCode = exam.code;
 
-        const { data: existing } = await supabase.from('exams').select('code, author_id, version').eq('code', examCode).maybeSingle();
-        const nextVersion = typeof existing?.version === 'number' ? existing.version + 1 : 2;
+        const { data: existing } = await supabase.from('exams').select('code, author_id, config').eq('code', examCode).maybeSingle();
+        const existingVersion = (existing?.config && typeof (existing.config as any).version === 'number') ? (existing.config as any).version : 1;
+        const nextVersion = existingVersion + 1;
+        if (!exam.config) exam.config = {} as any;
+        (exam.config as any).version = nextVersion;
         
         let finalAuthorId = exam.authorId;
 
         if (existing) {
             finalAuthorId = existing.author_id;
         } else {
+            (exam.config as any).version = 1;
             const { error: initError } = await supabase.from('exams').insert({
                 code: exam.code, 
                 author_id: finalAuthorId, 
                 school: exam.authorSchool,
                 config: exam.config, 
                 questions: [], 
-                status: 'DRAFT',
-                version: 1
+                status: 'DRAFT'
             });
             if (initError) throw initError;
         }
@@ -826,8 +843,7 @@ export class ExamService {
             school: exam.authorSchool,
             config: exam.config, 
             questions: processedQuestions, 
-            status: exam.status || 'PUBLISHED',
-            version: nextVersion
+            status: exam.status || 'PUBLISHED'
         }).eq('code', exam.code).select();
 
         if (error) throw error;
@@ -838,8 +854,7 @@ export class ExamService {
             console.log("Attempting partial update (questions & config only)...");
             const { data: partialData, error: partialError } = await supabase.from('exams').update({
                 config: exam.config,
-                questions: processedQuestions,
-                version: nextVersion
+                questions: processedQuestions
             }).eq('code', exam.code).select();
 
             if (partialData && partialData.length > 0) {
@@ -873,8 +888,7 @@ export class ExamService {
                 author_id: existingExam.author_id,
                 config: exam.config,
                 questions: processedQuestions,
-                status: exam.status || 'PUBLISHED',
-                version: nextVersion
+                status: exam.status || 'PUBLISHED'
             }, { onConflict: 'code' });
 
             if (upsertError) {
