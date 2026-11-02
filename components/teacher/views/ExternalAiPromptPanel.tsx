@@ -299,7 +299,7 @@ export const ExternalAiPromptPanel: React.FC<ExternalAiPromptPanelProps> = ({
   const handleTextChange = (text: string) => {
     setPastedText(text);
     if (text.trim()) {
-      const result = parseExternalAiOutput(text);
+      const result = parseExternalAiOutput(text, selectedTypes);
       setParseResult(result);
     } else {
       setParseResult(null);
