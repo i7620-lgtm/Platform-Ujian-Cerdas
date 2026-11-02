@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import {
   Sparkles,
   Copy,
@@ -29,35 +29,19 @@ interface ExternalAiPromptPanelProps {
   onCancel?: () => void;
 }
 
-const SUBJECT_OPTIONS = [
-  "Matematika",
-  "Bahasa Indonesia",
-  "Ilmu Pengetahuan Alam (IPA)",
-  "Ilmu Pengetahuan Sosial (IPS)",
-  "Ilmu Pengetahuan Alam dan Sosial (IPAS)",
-  "Pendidikan Pancasila",
-  "Bahasa Inggris",
-  "Pendidikan Jasmani, Olahraga & Kesehatan (PJOK)",
-  "Informatika / TIK",
-  "Seni Budaya",
-  "Agama Islam",
-  "Koding dan AI (KKA)",
-  "Umum / Lainnya",
-];
-
 const GRADE_OPTIONS = [
-  "Kelas 1 SD",
-  "Kelas 2 SD",
-  "Kelas 3 SD",
-  "Kelas 4 SD",
-  "Kelas 5 SD",
-  "Kelas 6 SD",
-  "Kelas 7 SMP",
-  "Kelas 8 SMP",
-  "Kelas 9 SMP",
-  "Kelas 10 SMA/SMK",
-  "Kelas 11 SMA/SMK",
-  "Kelas 12 SMA/SMK",
+  "Kelas 1 SD (Fase A)",
+  "Kelas 2 SD (Fase A)",
+  "Kelas 3 SD (Fase B)",
+  "Kelas 4 SD (Fase B)",
+  "Kelas 5 SD (Fase C)",
+  "Kelas 6 SD (Fase C)",
+  "Kelas 7 SMP (Fase D)",
+  "Kelas 8 SMP (Fase D)",
+  "Kelas 9 SMP (Fase D)",
+  "Kelas 10 SMA/SMK (Fase E)",
+  "Kelas 11 SMA/SMK (Fase F)",
+  "Kelas 12 SMA/SMK (Fase F)",
 ];
 
 const QUESTION_TYPES_LIST = [
@@ -84,6 +68,114 @@ const BLOOM_LEVELS = [
   { id: "C6 - Mencipta", label: "C6 Mencipta", desc: "Merancang solusi atau memadukan elemen menjadi bentuk baru" },
 ];
 
+/**
+ * Returns allowed subjects dynamically filtered by assessment standard and grade level (A-Z sorted, with "Umum / Lainnya" at bottom).
+ */
+const getSubjectsForStandardAndGrade = (standard: AssessmentStandard, grade: string): string[] => {
+  if (standard === "tka_bskap") {
+    // TKA Kemendikdasmen (BSKAP No. 047/H/AN/2025) official subjects
+    if (grade.includes("SMA") || grade.includes("SMK") || grade.includes("Fase E") || grade.includes("Fase F")) {
+      return ["Bahasa Indonesia", "Bahasa Inggris", "Matematika", "Umum / Lainnya"];
+    }
+    // SD (Fase A, B, C) and SMP (Fase D) official TKA tests
+    return ["Bahasa Indonesia", "Matematika", "Umum / Lainnya"];
+  }
+
+  // Kurikulum Merdeka official subjects per phase
+  let subjects: string[] = [];
+
+  if (grade.includes("Fase A")) {
+    // SD Kelas 1-2
+    subjects = [
+      "Bahasa Indonesia",
+      "Bahasa Inggris",
+      "Matematika",
+      "Muatan Lokal",
+      "Pendidikan Agama dan Budi Pekerti",
+      "Pendidikan Jasmani, Olahraga, dan Kesehatan (PJOK)",
+      "Pendidikan Pancasila",
+      "Seni Budaya",
+    ];
+  } else if (grade.includes("Fase B") || grade.includes("Fase C")) {
+    // SD Kelas 3-6 (IPAS integrates science & social studies)
+    subjects = [
+      "Bahasa Indonesia",
+      "Bahasa Inggris",
+      "Ilmu Pengetahuan Alam dan Sosial (IPAS)",
+      "Matematika",
+      "Muatan Lokal",
+      "Pendidikan Agama dan Budi Pekerti",
+      "Pendidikan Jasmani, Olahraga, dan Kesehatan (PJOK)",
+      "Pendidikan Pancasila",
+      "Seni Budaya",
+    ];
+  } else if (grade.includes("Fase D")) {
+    // SMP Kelas 7-9
+    subjects = [
+      "Bahasa Indonesia",
+      "Bahasa Inggris",
+      "Ilmu Pengetahuan Alam (IPA)",
+      "Ilmu Pengetahuan Sosial (IPS)",
+      "Informatika",
+      "Matematika",
+      "Muatan Lokal",
+      "Pendidikan Agama dan Budi Pekerti",
+      "Pendidikan Jasmani, Olahraga, dan Kesehatan (PJOK)",
+      "Pendidikan Pancasila",
+      "Seni Budaya",
+    ];
+  } else if (grade.includes("Fase E")) {
+    // SMA Kelas 10
+    subjects = [
+      "Bahasa Indonesia",
+      "Bahasa Inggris",
+      "Biologi",
+      "Ekonomi",
+      "Fisika",
+      "Geografi",
+      "Informatika",
+      "Kimia",
+      "Matematika",
+      "Muatan Lokal",
+      "Pendidikan Agama dan Budi Pekerti",
+      "Pendidikan Jasmani, Olahraga, dan Kesehatan (PJOK)",
+      "Pendidikan Pancasila",
+      "Sejarah",
+      "Seni Budaya",
+      "Sosiologi",
+    ];
+  } else {
+    // SMA/SMK Kelas 11-12 (Fase F)
+    subjects = [
+      "Antropologi",
+      "Bahasa Indonesia",
+      "Bahasa Indonesia Tingkat Lanjut",
+      "Bahasa Inggris",
+      "Bahasa Inggris Tingkat Lanjut",
+      "Biologi",
+      "Ekonomi",
+      "Fisika",
+      "Geografi",
+      "Informatika",
+      "Kimia",
+      "Matematika",
+      "Matematika Tingkat Lanjut",
+      "Muatan Lokal",
+      "Pendidikan Agama dan Budi Pekerti",
+      "Pendidikan Jasmani, Olahraga, dan Kesehatan (PJOK)",
+      "Pendidikan Pancasila",
+      "Sejarah",
+      "Sejarah Tingkat Lanjut",
+      "Seni Budaya",
+      "Sosiologi",
+    ];
+  }
+
+  // Sort A to Z, then ensure "Umum / Lainnya" is at the bottom
+  const sorted = [...subjects].sort((a, b) => a.localeCompare(b, "id"));
+  return [...sorted, "Umum / Lainnya"];
+};
+
 export const ExternalAiPromptPanel: React.FC<ExternalAiPromptPanelProps> = ({
   onQuestionsGenerated,
   onCancel,
@@ -92,6 +184,23 @@ export const ExternalAiPromptPanel: React.FC<ExternalAiPromptPanelProps> = ({
 
   // Standard: Kurikulum Merdeka or TKA BSKAP
   const [standard, setStandard] = useState<AssessmentStandard>("kurikulum_merdeka");
+
+  // Grade/Jenjang first (with Phase notation)
+  const [gradeClass, setGradeClass] = useState("Kelas 6 SD (Fase C)");
+
+  // Compute available subjects dynamically
+  const availableSubjects = useMemo(() => {
+    return getSubjectsForStandardAndGrade(standard, gradeClass);
+  }, [standard, gradeClass]);
+
+  // Subject state
+  const [subjectState, setSubjectState] = useState("");
+  const [customSubject, setCustomSubject] = useState("");
+
+  // Determine active subject (fallback to first available if current state is not valid)
+  const activeSubject = availableSubjects.includes(subjectState)
+    ? subjectState
+    : availableSubjects[0] || "Matematika";
 
   // Cognitive framework tab & multi-select states
   const [cognitiveFramework, setCognitiveFramework] = useState<CognitiveFramework>("TKA");
@@ -105,8 +214,6 @@ export const ExternalAiPromptPanel: React.FC<ExternalAiPromptPanelProps> = ({
   ]);
 
   // Generator Config State
-  const [subject, setSubject] = useState("Matematika");
-  const [gradeClass, setGradeClass] = useState("Kelas 6 SD");
   const [topic, setTopic] = useState("");
   const [count, setCount] = useState(5);
   const [selectedTypes, setSelectedTypes] = useState<string[]>([
@@ -149,10 +256,16 @@ export const ExternalAiPromptPanel: React.FC<ExternalAiPromptPanelProps> = ({
     }
   };
 
+  // Resolved final subject name for prompt
+  const effectiveSubjectName =
+    activeSubject === "Umum / Lainnya"
+      ? customSubject.trim() || "Mata Pelajaran Umum"
+      : activeSubject;
+
   // Generate current prompt string live
   const generatedPrompt = buildExternalAiPrompt({
     standard,
-    subject,
+    subject: effectiveSubjectName,
     gradeClass,
     topic: topic.trim() || "Topik Utama Pembelajaran",
     count,
@@ -229,7 +342,7 @@ export const ExternalAiPromptPanel: React.FC<ExternalAiPromptPanelProps> = ({
               Buat & Impor Soal dari AI Luar
             </h3>
             <p className="text-xs md:text-sm text-indigo-100 max-w-2xl">
-              Pilih standar Kurikulum Merdeka atau TKA BSKAP, tentukan beberapa tingkat kognitif, salin prompt berstandar resmi, dan tempelkan balasan hasil AI luar langsung ke Editor Soal.
+              Pilih standar Kurikulum Merdeka atau TKA Kemendikdasmen, atur jenjang dan mata pelajaran, salin prompt AI, lalu tempelkan balasan hasilnya untuk dideploy langsung ke Editor Soal.
             </p>
           </div>
 
@@ -272,114 +385,95 @@ export const ExternalAiPromptPanel: React.FC<ExternalAiPromptPanelProps> = ({
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
             {/* Form Settings (Left) */}
             <div className="lg:col-span-6 space-y-6">
-              {/* Standar Acuan Kurikulum */}
+              {/* Standar Acuan Soal (Simplified, compact buttons without extra descriptions) */}
               <div>
                 <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-2">
                   Standar Acuan Soal
                 </label>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="grid grid-cols-2 gap-3">
                   <button
                     type="button"
                     onClick={() => setStandard("kurikulum_merdeka")}
-                    className={`p-3.5 rounded-2xl border-2 text-left transition-all flex flex-col justify-between ${
+                    className={`py-3 px-4 rounded-xl border-2 text-center transition-all flex items-center justify-center gap-2 font-bold text-xs ${
                       standard === "kurikulum_merdeka"
-                        ? "border-indigo-600 bg-indigo-50/70 dark:bg-indigo-950/40 shadow-sm"
-                        : "border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-slate-300"
+                        ? "border-indigo-600 bg-indigo-50/80 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300 shadow-sm"
+                        : "border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:border-slate-300"
                     }`}
                   >
-                    <div className="flex items-center justify-between mb-1">
-                      <div className="flex items-center gap-2">
-                        <BookOpen className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
-                        <span className="font-extrabold text-xs text-slate-800 dark:text-slate-100">
-                          Kurikulum Merdeka
-                        </span>
-                      </div>
-                      <div
-                        className={`w-4 h-4 rounded-full border flex items-center justify-center ${
-                          standard === "kurikulum_merdeka"
-                            ? "border-indigo-600 bg-indigo-600"
-                            : "border-slate-300"
-                        }`}
-                      >
-                        {standard === "kurikulum_merdeka" && (
-                          <div className="w-1.5 h-1.5 rounded-full bg-white" />
-                        )}
-                      </div>
-                    </div>
-                    <span className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
-                      Berbasis Capaian Pembelajaran (CP/TP), kontekstual, autentik, & Profil Pelajar Pancasila.
-                    </span>
+                    <BookOpen className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+                    <span>Kurikulum Merdeka</span>
                   </button>
 
                   <button
                     type="button"
                     onClick={() => setStandard("tka_bskap")}
-                    className={`p-3.5 rounded-2xl border-2 text-left transition-all flex flex-col justify-between ${
+                    className={`py-3 px-4 rounded-xl border-2 text-center transition-all flex items-center justify-center gap-2 font-bold text-xs ${
                       standard === "tka_bskap"
-                        ? "border-indigo-600 bg-indigo-50/70 dark:bg-indigo-950/40 shadow-sm"
-                        : "border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-slate-300"
+                        ? "border-indigo-600 bg-indigo-50/80 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300 shadow-sm"
+                        : "border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:border-slate-300"
                     }`}
                   >
-                    <div className="flex items-center justify-between mb-1">
-                      <div className="flex items-center gap-2">
-                        <GraduationCap className="w-4 h-4 text-purple-600 dark:text-purple-400" />
-                        <span className="font-extrabold text-xs text-slate-800 dark:text-slate-100">
-                          TKA BSKAP Kemendikdasmen
-                        </span>
-                      </div>
-                      <div
-                        className={`w-4 h-4 rounded-full border flex items-center justify-center ${
-                          standard === "tka_bskap"
-                            ? "border-indigo-600 bg-indigo-600"
-                            : "border-slate-300"
-                        }`}
-                      >
-                        {standard === "tka_bskap" && (
-                          <div className="w-1.5 h-1.5 rounded-full bg-white" />
-                        )}
-                      </div>
-                    </div>
-                    <span className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
-                      Keputusan No. 047/H/AN/2025: Standarisasi akademik, penalaran MOTS/HOTS & format Pusmendik.
-                    </span>
+                    <GraduationCap className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+                    <span>TKA Kemendikdasmen</span>
                   </button>
                 </div>
               </div>
 
-              {/* Subject & Grade */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-bold text-slate-600 dark:text-slate-300 mb-1.5">
-                    Mata Pelajaran
-                  </label>
-                  <select
-                    value={subject}
-                    onChange={(e) => setSubject(e.target.value)}
-                    className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-sm font-semibold text-slate-800 dark:text-slate-100 focus:ring-2 focus:ring-indigo-500 outline-none"
-                  >
-                    {SUBJECT_OPTIONS.map((sub) => (
-                      <option key={sub} value={sub}>
-                        {sub}
-                      </option>
-                    ))}
-                  </select>
+              {/* Order changed: Jenjang/Kelas FIRST, Mata Pelajaran SECOND */}
+              <div className="space-y-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* Column 1: Jenjang / Kelas */}
+                  <div>
+                    <label className="block text-xs font-bold text-slate-600 dark:text-slate-300 mb-1.5">
+                      Jenjang / Kelas
+                    </label>
+                    <select
+                      value={gradeClass}
+                      onChange={(e) => setGradeClass(e.target.value)}
+                      className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-sm font-semibold text-slate-800 dark:text-slate-100 focus:ring-2 focus:ring-indigo-500 outline-none"
+                    >
+                      {GRADE_OPTIONS.map((grd) => (
+                        <option key={grd} value={grd}>
+                          {grd}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Column 2: Mata Pelajaran (Filtered dynamically by Standard & Grade) */}
+                  <div>
+                    <label className="block text-xs font-bold text-slate-600 dark:text-slate-300 mb-1.5">
+                      Mata Pelajaran
+                    </label>
+                    <select
+                      value={activeSubject}
+                      onChange={(e) => setSubjectState(e.target.value)}
+                      className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-sm font-semibold text-slate-800 dark:text-slate-100 focus:ring-2 focus:ring-indigo-500 outline-none"
+                    >
+                      {availableSubjects.map((sub) => (
+                        <option key={sub} value={sub}>
+                          {sub}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
-                <div>
-                  <label className="block text-xs font-bold text-slate-600 dark:text-slate-300 mb-1.5">
-                    Jenjang / Kelas
-                  </label>
-                  <select
-                    value={gradeClass}
-                    onChange={(e) => setGradeClass(e.target.value)}
-                    className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-sm font-semibold text-slate-800 dark:text-slate-100 focus:ring-2 focus:ring-indigo-500 outline-none"
-                  >
-                    {GRADE_OPTIONS.map((grd) => (
-                      <option key={grd} value={grd}>
-                        {grd}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+
+                {/* Custom Subject Text Input if "Umum / Lainnya" is selected */}
+                {activeSubject === "Umum / Lainnya" && (
+                  <div className="animate-fade-in pt-1">
+                    <label className="block text-xs font-bold text-slate-600 dark:text-slate-300 mb-1">
+                      Tuliskan Nama Mata Pelajaran:
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Misal: Bahasa Sunda, Koding & Robotik, Seni Musik..."
+                      value={customSubject}
+                      onChange={(e) => setCustomSubject(e.target.value)}
+                      className="w-full bg-slate-50 dark:bg-slate-800 border border-indigo-300 dark:border-indigo-700 rounded-xl px-4 py-2 text-sm font-semibold text-slate-800 dark:text-slate-100 placeholder:text-slate-400 focus:ring-2 focus:ring-indigo-500 outline-none"
+                    />
+                  </div>
+                )}
               </div>
 
               {/* Topic */}
@@ -429,7 +523,7 @@ export const ExternalAiPromptPanel: React.FC<ExternalAiPromptPanelProps> = ({
                 </div>
               </div>
 
-              {/* Tingkat Kognitif (Tab Switch & Multi-select) */}
+              {/* Tingkat Kognitif (Tabs renamed to TKA (Level 1-3) & Bloom (C1-C6)) */}
               <div className="space-y-2.5">
                 <div className="flex items-center justify-between">
                   <label className="block text-xs font-bold text-slate-600 dark:text-slate-300">
@@ -451,7 +545,7 @@ export const ExternalAiPromptPanel: React.FC<ExternalAiPromptPanelProps> = ({
                         : "text-slate-600 dark:text-slate-400 hover:text-slate-800"
                     }`}
                   >
-                    Standar TKA (Level 1–3)
+                    TKA (Level 1-3)
                   </button>
                   <button
                     type="button"
@@ -462,7 +556,7 @@ export const ExternalAiPromptPanel: React.FC<ExternalAiPromptPanelProps> = ({
                         : "text-slate-600 dark:text-slate-400 hover:text-slate-800"
                     }`}
                   >
-                    Taksonomi Bloom (C1–C6)
+                    Bloom (C1-C6)
                   </button>
                 </div>
 
@@ -599,7 +693,7 @@ export const ExternalAiPromptPanel: React.FC<ExternalAiPromptPanelProps> = ({
                     </h4>
                   </div>
                   <span className="text-[11px] font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/50 px-2.5 py-1 rounded-full border border-indigo-200 dark:border-indigo-800">
-                    {standard === "kurikulum_merdeka" ? "Kurikulum Merdeka" : "TKA BSKAP 047"}
+                    {standard === "kurikulum_merdeka" ? "Kurikulum Merdeka" : "TKA Kemendikdasmen"}
                   </span>
                 </div>
 
