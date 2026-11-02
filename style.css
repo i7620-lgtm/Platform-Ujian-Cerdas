@@ -34,7 +34,7 @@
   
   .math-visual {
     display: inline-block;
-    vertical-align: middle;
+    vertical-align: baseline;
   }
 
   /* --- Unified Table Styles for Editor & Viewers (Fixes Dark Mode Headers) --- */
@@ -580,13 +580,13 @@
 
 .math-visual {
   display: inline-block;
-  vertical-align: -0.22em;
-  line-height: normal;
+  vertical-align: baseline;
+  line-height: inherit;
   max-width: 100%;
-  margin: 0.15rem 0.25rem;
-  padding: 0.08rem 0.18rem;
+  margin: 0 0.15rem;
+  padding: 0 0.08rem;
   cursor: pointer;
-  border-radius: 6px;
+  border-radius: 4px;
   transition: background-color 0.15s ease, box-shadow 0.15s ease;
 }
 
@@ -606,10 +606,20 @@
 }
 
 .option-content .math-visual {
-  display: inline-flex;
-  align-items: center;
+  display: inline-block;
   max-width: 100%;
-  vertical-align: middle;
+  vertical-align: baseline;
+}
+
+.student-question-text .math-visual,
+.wysiwyg-content .math-visual,
+.prose .math-visual {
+  vertical-align: baseline;
+}
+
+.math-visual .katex {
+  font-size: 1.02em;
+  line-height: inherit;
 }
 
 .math-visual .katex-display {
