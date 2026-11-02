@@ -22,6 +22,7 @@ export default async function handler(req: any, res: any) {
   const action = match ? match[2] : (req.query?.action || req.query?.type || url.searchParams.get('action') || url.searchParams.get('type') || 'test');
   const versionParam = req.query?.v || url.searchParams.get('v');
   const versionNum = versionParam ? parseInt(versionParam, 10) : undefined;
+  const isPreview = req.query?.preview === 'true' || req.query?.isPreview === 'true' || url.searchParams.get('preview') === 'true' || url.searchParams.get('isPreview') === 'true';
 
   code = (code || '').trim().toUpperCase();
 
@@ -31,7 +32,7 @@ export default async function handler(req: any, res: any) {
 
   try {
     if (action === 'test') {
-      const bundle = await getStudentQuestionBundle(code, versionNum);
+      const bundle = await getStudentQuestionBundle(code, versionNum, isPreview);
       if (!bundle.success) {
         return res.status(bundle.status || 500).json(bundle);
       }
