@@ -249,7 +249,7 @@ export const useTeacherDashboard = ({
         };
       });
 
-      const code = editingExam ? editingExam.code : generateExamCode();
+      const code = editingExam ? editingExam.code : (generatedCode || generateExamCode());
       const now = new Date();
       const todayDateStr = now.toLocaleDateString("en-CA");
       const readableDate = now.toLocaleString("id-ID").replace(/\//g, "-");
@@ -382,45 +382,84 @@ export const useTeacherDashboard = ({
 
   // 7. Duplicate Exam Action
   const handleDuplicateExam = (exam: Exam) => {
-    setQuestions(exam.questions);
+    const newExamCode = generateExamCode();
+    const clonedQuestions = (exam.questions || []).map((q, idx) => ({
+      ...JSON.parse(JSON.stringify(q)),
+      id: `q-${Date.now()}-${idx}-${Math.random().toString(36).substring(2, 7)}`,
+    }));
+
     const today = new Date();
     const tomorrow = new Date(today.getTime() + 86400000);
     const localDate = today.toLocaleDateString("en-CA");
     const localTomorrow = tomorrow.toLocaleDateString("en-CA");
 
-    setConfig({
-      ...exam.config,
+    const rawConfig = JSON.parse(JSON.stringify(exam.config || {}));
+    delete (rawConfig as any).code;
+    delete (rawConfig as any).examCode;
+    delete (rawConfig as any).version;
+
+    const newConfig = {
+      ...rawConfig,
       date: localDate,
       startDate: localDate,
       endDate: localTomorrow,
       isFinished: false,
-    });
+      collaborators: [],
+      registeredStudents: Array.isArray(rawConfig.registeredStudents)
+        ? rawConfig.registeredStudents.map((s: any) => ({
+            ...s,
+            exam_code: newExamCode,
+          }))
+        : [],
+    };
+
+    setQuestions(clonedQuestions);
+    setConfig(newConfig);
     setManualMode(true);
     setEditingExam(null);
-    setGeneratedCode("");
+    setGeneratedCode(newExamCode);
     setView("UPLOAD");
     incrementResetKey();
   };
 
   // 8. Reuse Exam from Archive
   const handleReuseExam = (examToReuse: Exam) => {
-    setQuestions(examToReuse.questions);
+    const newExamCode = generateExamCode();
+    const clonedQuestions = (examToReuse.questions || []).map((q, idx) => ({
+      ...JSON.parse(JSON.stringify(q)),
+      id: `q-${Date.now()}-${idx}-${Math.random().toString(36).substring(2, 7)}`,
+    }));
+
     const today = new Date();
     const tomorrow = new Date(today.getTime() + 86400000);
     const localDate = today.toLocaleDateString("en-CA");
     const localTomorrow = tomorrow.toLocaleDateString("en-CA");
 
+    const rawConfig = JSON.parse(JSON.stringify(examToReuse.config || {}));
+    delete (rawConfig as any).code;
+    delete (rawConfig as any).examCode;
+    delete (rawConfig as any).version;
+
     const newConfig = {
-      ...examToReuse.config,
+      ...rawConfig,
       date: localDate,
       startDate: localDate,
       endDate: localTomorrow,
       isFinished: false,
+      collaborators: [],
+      registeredStudents: Array.isArray(rawConfig.registeredStudents)
+        ? rawConfig.registeredStudents.map((s: any) => ({
+            ...s,
+            exam_code: newExamCode,
+          }))
+        : [],
     };
+
+    setQuestions(clonedQuestions);
     setConfig(newConfig);
     setManualMode(true);
     setEditingExam(null);
-    setGeneratedCode("");
+    setGeneratedCode(newExamCode);
     setView("UPLOAD");
     incrementResetKey();
   };
