@@ -480,13 +480,52 @@ export class ExamService {
     async getExamForStudent(code: string, studentId?: string, isPreview = false): Promise<Exam | null> {
         const cleanCode = (code || '').trim().toUpperCase();
 
+        // 0. FAST PATH FOR PREVIEW MODE (0ms latency, resilient against any DB schema/network issues)
+        if (isPreview) {
+            try {
+                if (typeof window !== 'undefined') {
+                    const previewCacheKey = `ujiancerdas_preview_exam_${cleanCode}`;
+                    const rawPreview = localStorage.getItem(previewCacheKey);
+                    if (rawPreview) {
+                        const parsed = JSON.parse(rawPreview) as Exam;
+                        if (parsed && Array.isArray(parsed.questions) && parsed.questions.length > 0) {
+                            return this.sanitizeExamForStudent(parsed, studentId, true);
+                        }
+                    }
+                }
+            } catch (e) {
+                console.warn("Preview cache check failed:", e);
+            }
+
+            const localExams = this.getLocalTeacherExams();
+            if (localExams[cleanCode] && Array.isArray(localExams[cleanCode].questions) && localExams[cleanCode].questions.length > 0) {
+                return this.sanitizeExamForStudent(localExams[cleanCode], studentId, true);
+            }
+        }
+
         // 1. FAST PATH: Check Schedule / Pre-login (Zero questions payload, saves 100% egress)
         if (studentId === 'check_schedule') {
-            const { data: scheduleData, error: scheduleError } = await supabase
+            let scheduleData: any = null;
+            let scheduleError: any = null;
+
+            const res = await supabase
                 .from('exams')
-                .select('code, author_id, author_name, school, config, status, created_at')
+                .select('code, author_id, school, config, status, created_at')
                 .eq('code', cleanCode)
                 .maybeSingle();
+
+            scheduleData = res.data;
+            scheduleError = res.error;
+
+            if (scheduleError) {
+                const fallbackRes = await supabase
+                    .from('exams')
+                    .select('*')
+                    .eq('code', cleanCode)
+                    .maybeSingle();
+                scheduleData = fallbackRes.data;
+                scheduleError = fallbackRes.error;
+            }
 
             if (scheduleError || !scheduleData) {
                 const localExams = this.getLocalTeacherExams();
@@ -495,7 +534,7 @@ export class ExamService {
                     return {
                         code: local.code,
                         authorId: local.authorId,
-                        authorName: local.authorName || 'Pengajar',
+                        authorName: local.authorName || (local.config as any)?.authorName || 'Pengajar',
                         authorSchool: local.authorSchool,
                         config: local.config,
                         questions: [],
@@ -510,7 +549,7 @@ export class ExamService {
             return {
                 code: scheduleData.code,
                 authorId: scheduleData.author_id,
-                authorName: (scheduleData.author_name as string) || 'Pengajar',
+                authorName: scheduleData.author_name || scheduleData.config?.authorName || 'Pengajar',
                 authorSchool: scheduleData.school,
                 config: scheduleData.config,
                 questions: [],
@@ -520,13 +559,40 @@ export class ExamService {
         }
 
         // 2. Fetch lightweight exam metadata from Supabase (excludes heavy questions column!)
-        const { data: metaData, error: metaError } = await supabase
+        let metaData: any = null;
+        let metaError: any = null;
+
+        const metaRes = await supabase
             .from('exams')
-            .select('code, author_id, author_name, school, config, status, created_at')
+            .select('code, author_id, school, config, status, created_at')
             .eq('code', cleanCode)
             .maybeSingle();
 
+        metaData = metaRes.data;
+        metaError = metaRes.error;
+
+        if (metaError) {
+            const fallbackRes = await supabase
+                .from('exams')
+                .select('*')
+                .eq('code', cleanCode)
+                .maybeSingle();
+            metaData = fallbackRes.data;
+            metaError = fallbackRes.error;
+        }
+
         if (metaError || !metaData) {
+            // Check preview cache
+            try {
+                if (typeof window !== 'undefined') {
+                    const rawPreview = localStorage.getItem(`ujiancerdas_preview_exam_${cleanCode}`);
+                    if (rawPreview) {
+                        const parsed = JSON.parse(rawPreview) as Exam;
+                        return this.sanitizeExamForStudent(parsed, studentId, isPreview);
+                    }
+                }
+            } catch { /* ignore */ }
+
             // Check if student has offline saved exam in IndexedDB
             const offlineExam = await offlineService.getLocalProgress(`offline_exam_${cleanCode}`) as Exam | null;
             if (offlineExam) {
@@ -594,7 +660,7 @@ export class ExamService {
         const exam: Exam = {
             code: metaData.code,
             authorId: metaData.author_id,
-            authorName: (metaData.author_name as string) || 'Pengajar',
+            authorName: (metaData.author_name as string) || (metaData.config as any)?.authorName || 'Pengajar',
             authorSchool: metaData.school,
             config: metaData.config,
             questions: loadedQuestions,
