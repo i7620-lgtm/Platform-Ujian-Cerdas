@@ -473,15 +473,19 @@ export const useExamEditorStore = create<ExamEditorState>()(
             const insertIndex = useExamEditorUIStore.getState().insertIndex;
             if (insertIndex === null) {
                 state.questions.push(newQuestion);
-                setTimeout(() => {
-                    document.getElementById(newQuestion.id)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                }, 100);
             } else {
                 state.questions.splice(insertIndex + 1, 0, newQuestion);
             }
             useExamEditorUIStore.getState().setTypeSelectionModalOpen(false);
             useExamEditorUIStore.getState().setInsertIndex(null);
             checkAndCascade(state);
+
+            setTimeout(() => {
+                const el = document.getElementById(newQuestion.id);
+                if (el) {
+                    el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+            }, 120);
         }),
 
         handleAddOption: (questionId) => set((state) => {
