@@ -97,7 +97,14 @@ export const DraftExamCard: React.FC<DraftExamCardProps> = ({
 
       <div className="flex gap-2">
         <button
-          onClick={onPreview}
+          onClick={() => {
+            try {
+              localStorage.setItem(`ujiancerdas_preview_exam_${exam.code}`, JSON.stringify(exam));
+            } catch {
+              // ignore
+            }
+            onPreview();
+          }}
           className="flex-1 py-2.5 px-3 bg-white dark:bg-slate-700 border border-gray-200 dark:border-slate-600 text-gray-600 dark:text-slate-300 font-bold rounded-xl hover:bg-gray-50 dark:hover:bg-slate-600 hover:text-primary dark:hover:text-white transition-colors flex items-center justify-center gap-2 shadow-sm"
           title="Preview Soal"
         >
