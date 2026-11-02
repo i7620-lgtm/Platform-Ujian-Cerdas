@@ -192,7 +192,7 @@ export const UpcomingExamsView: React.FC<UpcomingExamsViewProps> = ({
                   title="Duplikasi Soal"
                 >
                   <DocumentDuplicateIcon className="w-4 h-4" />
-                  <span className="hidden lg:inline">Duplikasi</span>
+                  <span className="hidden lg:inline">Duplikasi Soal</span>
                 </button>
                 <button
                   id={`btn-collab-${exam.code}`}

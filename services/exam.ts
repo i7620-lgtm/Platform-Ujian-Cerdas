@@ -803,7 +803,7 @@ export class ExamService {
             const { error: initError } = await supabase.from('exams').insert({
                 code: exam.code, 
                 author_id: finalAuthorId, 
-                school: exam.authorSchool,
+                school: exam.authorSchool || "",
                 config: exam.config, 
                 questions: [], 
                 status: 'DRAFT'
@@ -906,7 +906,7 @@ export class ExamService {
         }
 
         const { data, error } = await supabase.from('exams').update({
-            school: exam.authorSchool,
+            school: exam.authorSchool || "",
             config: exam.config, 
             questions: processedQuestions, 
             status: exam.status || 'PUBLISHED'

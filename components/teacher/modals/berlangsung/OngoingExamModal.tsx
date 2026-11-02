@@ -17,6 +17,8 @@ import {
   DocumentDuplicateIcon,
   BookOpenIcon,
   TableCellsIcon,
+  SunIcon,
+  MoonIcon,
 } from "../../../Icons";
 import { RemainingTime } from "../../DashboardViews";
 
@@ -102,6 +104,28 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
     uniqueClassesInResults,
     uniqueSchoolsInResults,
   } = useOngoingExamModal({ exam, teacherProfile, onClose, onExamFinished, isPremium });
+
+  // Mode Terang / Gelap State & Sinkronisasi
+  const [isDarkTheme, setIsDarkTheme] = React.useState(() => {
+    if (typeof window !== "undefined") {
+      return document.documentElement.classList.contains("dark");
+    }
+    return false;
+  });
+
+  const handleToggleTheme = () => {
+    const nextTheme = !isDarkTheme;
+    setIsDarkTheme(nextTheme);
+    if (nextTheme) {
+      document.documentElement.classList.add("dark");
+      document.querySelector('meta[name="theme-color"]')?.setAttribute("content", "#0f172a");
+      try { localStorage.setItem("theme", "dark"); } catch { /* ignore */ }
+    } else {
+      document.documentElement.classList.remove("dark");
+      document.querySelector('meta[name="theme-color"]')?.setAttribute("content", "#ffffff");
+      try { localStorage.setItem("theme", "light"); } catch { /* ignore */ }
+    }
+  };
 
   // Auto-scroll student list table in live monitoring (smooth top-to-bottom and bottom-to-top)
   const [autoScrollEnabled, setAutoScrollEnabled] = React.useState(true);
@@ -199,13 +223,27 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                 </div>
               </div>
 
-              <button
-                onClick={onClose}
-                className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-400 dark:text-slate-500 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 transition-all shadow-xs shrink-0"
-                title="Tutup Modal"
-              >
-                <XMarkIcon className="w-4 h-4" />
-              </button>
+              <div className="flex items-center gap-1.5 shrink-0">
+                <button
+                  onClick={handleToggleTheme}
+                  className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 transition-all shadow-xs flex items-center justify-center"
+                  title={isDarkTheme ? "Ganti ke Mode Terang" : "Ganti ke Mode Gelap"}
+                >
+                  {isDarkTheme ? (
+                    <SunIcon className="w-4 h-4 text-amber-400" />
+                  ) : (
+                    <MoonIcon className="w-4 h-4 text-slate-600 dark:text-slate-300" />
+                  )}
+                </button>
+
+                <button
+                  onClick={onClose}
+                  className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-400 dark:text-slate-500 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 transition-all shadow-xs shrink-0"
+                  title="Tutup Modal"
+                >
+                  <XMarkIcon className="w-4 h-4" />
+                </button>
+              </div>
             </div>
 
             {/* Bottom Row: All Filter and Action Buttons Flowing Adjacent to Each Other */}

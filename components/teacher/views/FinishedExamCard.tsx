@@ -98,10 +98,10 @@ export const FinishedExamCard: React.FC<FinishedExamCardProps> = ({
         <button
           onClick={() => onDuplicate(exam)}
           className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-gray-50 dark:bg-slate-700 text-gray-600 dark:text-slate-300 px-4 py-2.5 text-sm rounded-xl hover:bg-gray-100 dark:hover:bg-slate-600 hover:text-gray-900 dark:hover:text-white transition-colors font-bold shadow-sm border border-gray-200 dark:border-slate-600"
-          title="Gunakan Kembali Soal"
+          title="Duplikasi Soal"
         >
           <DocumentDuplicateIcon className="w-4 h-4" />
-          <span className="md:hidden lg:inline">Reuse</span>
+          <span className="md:hidden lg:inline">Duplikasi Soal</span>
         </button>
         <button
           onClick={() => onViewResults(exam)}
