@@ -53,8 +53,8 @@ export function stripAnswersFromQuestion(q: Question): Question {
  * Fetch and prepare the sanitized student question package.
  * Answers and solution steps are 100% stripped before return.
  */
-export async function getStudentQuestionBundle(code: string, requestedVersion?: number) {
-  const cacheKey = `${code}:${requestedVersion || 'latest'}`;
+export async function getStudentQuestionBundle(code: string, requestedVersion?: number, isPreview = false) {
+  const cacheKey = `${code}:${requestedVersion || 'latest'}:${isPreview ? 'preview' : 'std'}`;
   const cached = memoryBundleCache.get(cacheKey);
 
   if (cached && Date.now() - cached.timestamp < MEMORY_CACHE_TTL_MS) {
@@ -69,7 +69,7 @@ export async function getStudentQuestionBundle(code: string, requestedVersion?: 
 
   const { data, error } = await supabase
     .from('exams')
-    .select('code, questions, config, status, version, updated_at')
+    .select('code, questions, config, status, created_at')
     .eq('code', code)
     .maybeSingle();
 
@@ -81,7 +81,7 @@ export async function getStudentQuestionBundle(code: string, requestedVersion?: 
     };
   }
 
-  if (data.status === 'DRAFT') {
+  if (data.status === 'DRAFT' && !isPreview) {
     return {
       success: false,
       status: 403,
@@ -91,7 +91,7 @@ export async function getStudentQuestionBundle(code: string, requestedVersion?: 
 
   const rawQuestions: Question[] = Array.isArray(data.questions) ? data.questions : [];
   const sanitizedQuestions = rawQuestions.map(q => stripAnswersFromQuestion(q));
-  const examVersion = typeof data.version === 'number' ? data.version : 1;
+  const examVersion = (data.config && typeof (data.config as any).version === 'number') ? (data.config as any).version : 1;
 
   memoryBundleCache.set(cacheKey, {
     code,

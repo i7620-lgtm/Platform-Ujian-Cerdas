@@ -174,6 +174,14 @@ ATURAN STRUKTUR PILIHAN & KUNCI JAWABAN (SESUAI BENTUK SOAL):
 6. Jika "${assignedType}" adalah "Esai":
    - Berikan rubrik penyelesaian lengkap di 'solutionSteps'.
 
+ATURAN STIMULUS VISUAL RINGKAS & EDUKATIF (SIAP DIEDIT GURU):
+- Evaluasi topik "${category}" dan soal #${questionNumber}. Jika materi secara hakiki memerlukan atau sangat dibantu oleh visual (Geometri 2D/3D, Koordinat Kartesius & Fungsi, Diagram Sains/Biologi, Diagram Statistika Data, Piktogram Emoji, atau Monumen Sejarah):
+  * Tipe 'geometry': Sisipkan tag [GEOMETRY:shape_name:{"width":"...","height":"...","vertices":"..."}] pada 'questionText' dan set 'visualStimulusType': 'geometry'.
+  * Tipe 'chart': Sisipkan tag [CHART], isi 'chartData' (type = 'cartesian' | 'bar' | 'pie' | 'line' | 'venn' | 'relation'), dan set 'visualStimulusType': 'chart'.
+  * Tipe 'ai_svg': Isi 'svgPrompt' dengan deskripsi teknis ringkas dan set 'svgStyle' ("geometry" | "diagram" | "infographic" | "flowchart") serta 'visualStimulusType': 'ai_svg'.
+  * Tipe 'table' / Piktogram: Gunakan tabel Markdown atau emoji piktogram (🍎, 🚗, ⭐️, 👦) langsung di 'questionText'.
+  * Tipe 'wikimedia_photo': Isi 'imageSearchKeyword' dengan 1-2 kata kunci Inggris otentik dan set 'visualStimulusType': 'wikimedia_photo'.
+
 ATURAN PETUNJUK PENGERJAAN & PEMBAHASAN JAWABAN:
 - Field 'hint' WAJIB DIISI! Berikan petunjuk konsep inti, petunjuk arah penalaran, atau rumus pembimbing yang memandu siswa berpikir TANPA membocorkan kunci/jawaban akhir.
 - Field 'solutionSteps' WAJIB DIISI! Berikan pembahasan jawaban lengkap dan tahapan langkah penyelesaian terperinci dari awal hingga akhir pembuktian jawaban benar.
@@ -183,7 +191,7 @@ Balas HANYA berupa JSON Array berisi tepat 1 objek dengan struktur:
   {
     "id": "q_client_${Date.now()}_${questionNumber}",
     "questionType": "${assignedType}",
-    "questionText": "Narasi stimulus kontekstual dan pertanyaan yang jelas",
+    "questionText": "Narasi stimulus kontekstual dan pertanyaan yang jelas (dapat memuat tag [GEOMETRY:...] atau [CHART] atau [ai_svg:...])",
     "options": ["Opsi 1 substantif", "Opsi 2 substantif", "Opsi 3 substantif", "Opsi 4 substantif"],
     "correctAnswer": "Isi teks opsi benar yang persis sama dengan salah satu pilihan di atas",
     "explanation": "Pembahasan detail langkah demi langkah pembuktian jawaban benar",
@@ -192,7 +200,11 @@ Balas HANYA berupa JSON Array berisi tepat 1 objek dengan struktur:
     "kisiKisi": "${kisiKisi ? kisiKisi.replace(/"/g, '\\"') : `Disajikan stimulus kontekstual terkait ${category}, peserta didik dapat menganalisis permasalahan dengan tepat.`}",
     "level": "${assignedDiff}",
     "category": "${category}",
-    "scoreWeight": ${weight}
+    "scoreWeight": ${weight},
+    "visualStimulusType": "none",
+    "svgPrompt": "",
+    "svgStyle": "diagram",
+    "imageSearchKeyword": ""
   }
 ]
 `;

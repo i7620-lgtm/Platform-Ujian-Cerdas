@@ -615,6 +615,17 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({
               <ClockIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
               <span className="text-xs sm:text-sm">{formatTime(timeLeft)}</span>
             </div>
+
+            {(student.class === "PREVIEW" || student.studentId.includes("PREVIEW")) && onBack && (
+              <button
+                type="button"
+                onClick={onBack}
+                className="px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs shadow-sm transition-all flex items-center gap-1 cursor-pointer shrink-0"
+                title="Keluar dari mode preview dan kembali ke Dashboard Guru"
+              >
+                <span className="hidden sm:inline">Kembali ke </span>Dashboard
+              </button>
+            )}
           </div>
         </div>
       </header>
@@ -792,6 +803,34 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({
           } as React.CSSProperties
         }
       >
+        {/* Banner Mode Pratinjau Guru */}
+        {(student.class === "PREVIEW" || student.studentId.includes("PREVIEW")) && (
+          <div className="p-3.5 sm:p-4 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900/60 text-amber-900 dark:text-amber-100 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs animate-fade-in mb-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-xl bg-amber-100 dark:bg-amber-900/60 text-amber-700 dark:text-amber-300 shrink-0">
+                <span className="w-2.5 h-2.5 rounded-full bg-amber-500 block"></span>
+              </div>
+              <div>
+                <strong className="block font-bold text-sm text-amber-900 dark:text-amber-100">
+                  Mode Pratinjau Guru {activeExam.status === "DRAFT" ? "(Draf Soal)" : "(Jadwal Mendatang)"}
+                </strong>
+                <p className="text-xs text-amber-700 dark:text-amber-300 mt-0.5">
+                  Anda sedang mencoba tampilan soal dari perspektif siswa. Jawaban atau skor dalam mode ini tidak dicatat ke database resmi.
+                </p>
+              </div>
+            </div>
+            {onBack && (
+              <button
+                type="button"
+                onClick={onBack}
+                className="px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs shrink-0 self-end sm:self-center transition-all shadow-sm cursor-pointer flex items-center gap-1.5"
+              >
+                Kembali ke Dashboard
+              </button>
+            )}
+          </div>
+        )}
+
         {/* Banner Grace Period Saat Batas Jam Sesi Habis Namun Durasi Masih Ada */}
         {isSessionGracePeriodActive && !isSessionBannerDismissed && (
           <div className="p-4 sm:p-5 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900/60 text-amber-800 dark:text-amber-200 text-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs animate-fade-in">

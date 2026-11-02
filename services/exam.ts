@@ -480,48 +480,135 @@ export class ExamService {
     async getExamForStudent(code: string, studentId?: string, isPreview = false): Promise<Exam | null> {
         const cleanCode = (code || '').trim().toUpperCase();
 
+        // 0. FAST PATH FOR PREVIEW MODE (0ms latency, resilient against any DB schema/network issues)
+        if (isPreview) {
+            try {
+                if (typeof window !== 'undefined') {
+                    const previewCacheKey = `ujiancerdas_preview_exam_${cleanCode}`;
+                    const rawPreview = localStorage.getItem(previewCacheKey);
+                    if (rawPreview) {
+                        const parsed = JSON.parse(rawPreview) as Exam;
+                        if (parsed && Array.isArray(parsed.questions) && parsed.questions.length > 0) {
+                            return this.sanitizeExamForStudent(parsed, studentId, true);
+                        }
+                    }
+                }
+            } catch (e) {
+                console.warn("Preview cache check failed:", e);
+            }
+
+            const localExams = this.getLocalTeacherExams();
+            if (localExams[cleanCode] && Array.isArray(localExams[cleanCode].questions) && localExams[cleanCode].questions.length > 0) {
+                return this.sanitizeExamForStudent(localExams[cleanCode], studentId, true);
+            }
+        }
+
         // 1. FAST PATH: Check Schedule / Pre-login (Zero questions payload, saves 100% egress)
         if (studentId === 'check_schedule') {
-            const { data: scheduleData, error: scheduleError } = await supabase
+            let scheduleData: any = null;
+            let scheduleError: any = null;
+
+            const res = await supabase
                 .from('exams')
-                .select('code, author_id, author_name, school, config, status, created_at, version')
+                .select('code, author_id, school, config, status, created_at')
                 .eq('code', cleanCode)
                 .maybeSingle();
 
-            if (scheduleError || !scheduleData) throw new Error("EXAM_NOT_FOUND");
+            scheduleData = res.data;
+            scheduleError = res.error;
+
+            if (scheduleError) {
+                const fallbackRes = await supabase
+                    .from('exams')
+                    .select('*')
+                    .eq('code', cleanCode)
+                    .maybeSingle();
+                scheduleData = fallbackRes.data;
+                scheduleError = fallbackRes.error;
+            }
+
+            if (scheduleError || !scheduleData) {
+                const localExams = this.getLocalTeacherExams();
+                if (localExams[cleanCode]) {
+                    const local = localExams[cleanCode];
+                    return {
+                        code: local.code,
+                        authorId: local.authorId,
+                        authorName: local.authorName || (local.config as any)?.authorName || 'Pengajar',
+                        authorSchool: local.authorSchool,
+                        config: local.config,
+                        questions: [],
+                        status: local.status,
+                        version: local.config?.version || 1
+                    };
+                }
+                throw new Error("EXAM_NOT_FOUND");
+            }
             if (scheduleData.status === 'DRAFT' && !isPreview) throw new Error("EXAM_IS_DRAFT");
 
             return {
                 code: scheduleData.code,
                 authorId: scheduleData.author_id,
-                authorName: (scheduleData.author_name as string) || 'Pengajar',
+                authorName: scheduleData.author_name || scheduleData.config?.authorName || 'Pengajar',
                 authorSchool: scheduleData.school,
                 config: scheduleData.config,
                 questions: [],
                 status: scheduleData.status,
-                version: scheduleData.version || 1
+                version: scheduleData.config?.version || 1
             };
         }
 
         // 2. Fetch lightweight exam metadata from Supabase (excludes heavy questions column!)
-        const { data: metaData, error: metaError } = await supabase
+        let metaData: any = null;
+        let metaError: any = null;
+
+        const metaRes = await supabase
             .from('exams')
-            .select('code, author_id, author_name, school, config, status, created_at, version')
+            .select('code, author_id, school, config, status, created_at')
             .eq('code', cleanCode)
             .maybeSingle();
 
+        metaData = metaRes.data;
+        metaError = metaRes.error;
+
+        if (metaError) {
+            const fallbackRes = await supabase
+                .from('exams')
+                .select('*')
+                .eq('code', cleanCode)
+                .maybeSingle();
+            metaData = fallbackRes.data;
+            metaError = fallbackRes.error;
+        }
+
         if (metaError || !metaData) {
+            // Check preview cache
+            try {
+                if (typeof window !== 'undefined') {
+                    const rawPreview = localStorage.getItem(`ujiancerdas_preview_exam_${cleanCode}`);
+                    if (rawPreview) {
+                        const parsed = JSON.parse(rawPreview) as Exam;
+                        return this.sanitizeExamForStudent(parsed, studentId, isPreview);
+                    }
+                }
+            } catch { /* ignore */ }
+
             // Check if student has offline saved exam in IndexedDB
             const offlineExam = await offlineService.getLocalProgress(`offline_exam_${cleanCode}`) as Exam | null;
             if (offlineExam) {
-                return this.sanitizeExamForStudent(offlineExam, studentId, false);
+                return this.sanitizeExamForStudent(offlineExam, studentId, isPreview);
+            }
+            // Check local teacher exam cache (for drafts or unsynced exams)
+            const localExams = this.getLocalTeacherExams();
+            if (localExams[cleanCode]) {
+                return this.sanitizeExamForStudent(localExams[cleanCode], studentId, isPreview);
             }
             throw new Error("EXAM_NOT_FOUND");
         }
 
         if (metaData.status === 'DRAFT' && !isPreview) throw new Error("EXAM_IS_DRAFT");
 
-        const examVersion = typeof metaData.version === 'number' ? metaData.version : 1;
+        const examVersion = (metaData.config && typeof (metaData.config as any).version === 'number') ? (metaData.config as any).version : 1;
         let loadedQuestions: Question[] = [];
 
         // 3. Check IndexedDB local cache matching current version
@@ -533,7 +620,7 @@ export class ExamService {
         } else {
             // 4. Download question package from Vercel Edge Network CDN (s-maxage=86400)
             try {
-                const response = await fetch(`/api/exam-content/${cleanCode}/test?v=${examVersion}`);
+                const response = await fetch(`/api/exam-content/${cleanCode}/test?v=${examVersion}&preview=${isPreview}`);
                 if (response.ok) {
                     const json = await response.json();
                     if (json.success && Array.isArray(json.questions)) {
@@ -552,7 +639,10 @@ export class ExamService {
 
             // Fallback: If edge endpoint was unreachable, check local cached questions or query database
             if (loadedQuestions.length === 0) {
-                if (localCached && Array.isArray(localCached.questions) && localCached.questions.length > 0) {
+                const localExams = this.getLocalTeacherExams();
+                if (localExams[cleanCode] && Array.isArray(localExams[cleanCode].questions) && localExams[cleanCode].questions.length > 0) {
+                    loadedQuestions = isPreview ? localExams[cleanCode].questions : localExams[cleanCode].questions.map(q => this.stripAnswersFromQuestion(q));
+                } else if (localCached && Array.isArray(localCached.questions) && localCached.questions.length > 0) {
                     loadedQuestions = localCached.questions;
                 } else {
                     const { data: fullData } = await supabase
@@ -561,7 +651,7 @@ export class ExamService {
                         .eq('code', cleanCode)
                         .maybeSingle();
                     if (fullData && Array.isArray(fullData.questions)) {
-                        loadedQuestions = fullData.questions.map(q => this.stripAnswersFromQuestion(q));
+                        loadedQuestions = isPreview ? fullData.questions : fullData.questions.map(q => this.stripAnswersFromQuestion(q));
                     }
                 }
             }
@@ -570,7 +660,7 @@ export class ExamService {
         const exam: Exam = {
             code: metaData.code,
             authorId: metaData.author_id,
-            authorName: (metaData.author_name as string) || 'Pengajar',
+            authorName: (metaData.author_name as string) || (metaData.config as any)?.authorName || 'Pengajar',
             authorSchool: metaData.school,
             config: metaData.config,
             questions: loadedQuestions,
@@ -636,7 +726,7 @@ export class ExamService {
                     filter: `code=eq.${cleanCode}`
                 },
                 (payload: any) => {
-                    const newVer = payload.new?.version;
+                    const newVer = payload.new?.config?.version ?? payload.new?.version;
                     if (typeof newVer === 'number' && newVer > currentVersion) {
                         onUpdate(newVer);
                     }
@@ -645,19 +735,20 @@ export class ExamService {
             .subscribe();
 
         // 2. Normal Mode Fallback: Staggered Periodic Check (every 3 minutes + random jitter)
-        // Only queries { version } from Supabase (<50 bytes payload)
+        // Only queries { config } from Supabase
         const jitterMs = Math.floor(Math.random() * 20000) + 180000;
         const timerId = setInterval(async () => {
             if (!active) return;
             try {
                 const { data } = await supabase
                     .from('exams')
-                    .select('version')
+                    .select('config')
                     .eq('code', cleanCode)
                     .maybeSingle();
 
-                if (data && typeof data.version === 'number' && data.version > currentVersion) {
-                    onUpdate(data.version);
+                const ver = (data?.config as any)?.version;
+                if (typeof ver === 'number' && ver > currentVersion) {
+                    onUpdate(ver);
                 }
             } catch {
                 /* silent fallback */
@@ -697,22 +788,25 @@ export class ExamService {
         const BUCKET_NAME = 'soal';
         const examCode = exam.code;
 
-        const { data: existing } = await supabase.from('exams').select('code, author_id, version').eq('code', examCode).maybeSingle();
-        const nextVersion = typeof existing?.version === 'number' ? existing.version + 1 : 2;
+        const { data: existing } = await supabase.from('exams').select('code, author_id, config').eq('code', examCode).maybeSingle();
+        const existingVersion = (existing?.config && typeof (existing.config as any).version === 'number') ? (existing.config as any).version : 1;
+        const nextVersion = existingVersion + 1;
+        if (!exam.config) exam.config = {} as any;
+        (exam.config as any).version = nextVersion;
         
         let finalAuthorId = exam.authorId;
 
         if (existing) {
             finalAuthorId = existing.author_id;
         } else {
+            (exam.config as any).version = 1;
             const { error: initError } = await supabase.from('exams').insert({
                 code: exam.code, 
                 author_id: finalAuthorId, 
                 school: exam.authorSchool,
                 config: exam.config, 
                 questions: [], 
-                status: 'DRAFT',
-                version: 1
+                status: 'DRAFT'
             });
             if (initError) throw initError;
         }
@@ -815,8 +909,7 @@ export class ExamService {
             school: exam.authorSchool,
             config: exam.config, 
             questions: processedQuestions, 
-            status: exam.status || 'PUBLISHED',
-            version: nextVersion
+            status: exam.status || 'PUBLISHED'
         }).eq('code', exam.code).select();
 
         if (error) throw error;
@@ -827,8 +920,7 @@ export class ExamService {
             console.log("Attempting partial update (questions & config only)...");
             const { data: partialData, error: partialError } = await supabase.from('exams').update({
                 config: exam.config,
-                questions: processedQuestions,
-                version: nextVersion
+                questions: processedQuestions
             }).eq('code', exam.code).select();
 
             if (partialData && partialData.length > 0) {
@@ -862,8 +954,7 @@ export class ExamService {
                 author_id: existingExam.author_id,
                 config: exam.config,
                 questions: processedQuestions,
-                status: exam.status || 'PUBLISHED',
-                version: nextVersion
+                status: exam.status || 'PUBLISHED'
             }, { onConflict: 'code' });
 
             if (upsertError) {
@@ -1221,16 +1312,38 @@ export class ExamService {
     }
 
     async addCollaborator(examCode: string, label: string, role: 'editor' | 'viewer'): Promise<string> {
-        // Fetch raw to avoid status checks
-        const { data, error } = await supabase
+        const cleanCode = (examCode || '').trim().toUpperCase();
+        let config: ExamConfig | null = null;
+        let localExam: Exam | null = null;
+
+        const { data } = await supabase
             .from('exams')
             .select('config')
-            .eq('code', examCode)
-            .single();
-            
-        if (error || !data) throw new Error("Exam not found");
+            .eq('code', cleanCode)
+            .maybeSingle();
 
-        const config = data.config as ExamConfig;
+        if (data && data.config) {
+            config = data.config as ExamConfig;
+        }
+
+        const localExams = this.getLocalTeacherExams();
+        if (localExams[cleanCode]) {
+            localExam = localExams[cleanCode];
+            if (!config) config = localExam.config;
+        }
+
+        if (!config) {
+            config = {
+                examName: 'Ujian Baru',
+                subject: 'Umum',
+                durationMinutes: 60,
+                shuffleQuestions: false,
+                shuffleAnswers: false,
+                showScore: true,
+                collaborators: []
+            };
+        }
+
         const token = (typeof crypto !== 'undefined' && crypto.randomUUID) 
             ? crypto.randomUUID() 
             : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
@@ -1246,65 +1359,103 @@ export class ExamService {
 
         const currentCollaborators = config.collaborators || [];
         const updatedCollaborators = [...currentCollaborators, newCollaborator];
-        
         const updatedConfig = { ...config, collaborators: updatedCollaborators };
-        
-        const { error: updateError } = await supabase
-            .from('exams')
-            .update({ config: updatedConfig })
-            .eq('code', examCode);
 
-        if (updateError) throw updateError;
+        // Save locally first so UI updates immediately
+        if (localExam) {
+            localExam.config = updatedConfig;
+            this.saveLocalTeacherExam(localExam);
+        }
+
+        // Save to Supabase
+        try {
+            await supabase
+                .from('exams')
+                .update({ config: updatedConfig })
+                .eq('code', cleanCode);
+        } catch (e) {
+            console.warn("Supabase update for addCollaborator failed, relying on local cache:", e);
+        }
+
         return token;
     }
 
     async removeCollaborator(examCode: string, token: string): Promise<void> {
-        const { data, error } = await supabase
+        const cleanCode = (examCode || '').trim().toUpperCase();
+        let config: ExamConfig | null = null;
+        let localExam: Exam | null = null;
+
+        const { data } = await supabase
             .from('exams')
             .select('config')
-            .eq('code', examCode)
-            .single();
-            
-        if (error || !data) throw new Error("Exam not found");
+            .eq('code', cleanCode)
+            .maybeSingle();
 
-        const config = data.config as ExamConfig;
+        if (data && data.config) {
+            config = data.config as ExamConfig;
+        }
+
+        const localExams = this.getLocalTeacherExams();
+        if (localExams[cleanCode]) {
+            localExam = localExams[cleanCode];
+            if (!config) config = localExam.config;
+        }
+
+        if (!config) return;
+
         const currentCollaborators = config.collaborators || [];
         const updatedCollaborators = currentCollaborators.filter(c => c.token !== token);
-        
         const updatedConfig = { ...config, collaborators: updatedCollaborators };
-        
-        const { error: updateError } = await supabase
-            .from('exams')
-            .update({ config: updatedConfig })
-            .eq('code', examCode);
 
-        if (updateError) throw updateError;
+        if (localExam) {
+            localExam.config = updatedConfig;
+            this.saveLocalTeacherExam(localExam);
+        }
+
+        try {
+            await supabase
+                .from('exams')
+                .update({ config: updatedConfig })
+                .eq('code', cleanCode);
+        } catch (e) {
+            console.warn("Supabase update for removeCollaborator failed:", e);
+        }
     }
 
     async getExamByCollaboratorToken(code: string, token: string): Promise<{ exam: Exam, role: 'editor' | 'viewer' } | null> {
-        const { data, error } = await supabase
+        const cleanCode = (code || '').trim().toUpperCase();
+
+        const { data } = await supabase
             .from('exams')
             .select('*')
-            .eq('code', code)
+            .eq('code', cleanCode)
             .maybeSingle();
 
-        if (error || !data) return null;
+        let exam: Exam | null = null;
+        if (data) {
+            exam = {
+                code: data.code,
+                authorId: data.author_id,
+                authorName: 'Pengajar Utama',
+                authorSchool: data.school,
+                config: data.config,
+                questions: data.questions,
+                status: data.status
+            };
+        } else {
+            const localExams = this.getLocalTeacherExams();
+            if (localExams[cleanCode]) {
+                exam = localExams[cleanCode];
+            }
+        }
 
-        const config = data.config as ExamConfig;
-        const collaborators = config.collaborators || [];
+        if (!exam) return null;
+
+        const config = exam.config as ExamConfig;
+        const collaborators = config?.collaborators || [];
         const collaborator = collaborators.find(c => c.token === token);
 
         if (!collaborator) return null;
-
-        const exam: Exam = {
-            code: data.code,
-            authorId: data.author_id,
-            authorName: 'Pengajar Utama',
-            authorSchool: data.school,
-            config: data.config,
-            questions: data.questions,
-            status: data.status
-        };
 
         return { exam, role: collaborator.role };
     }

@@ -14,6 +14,24 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
   onClose,
   onCopyLink,
 }) => {
+  React.useEffect(() => {
+    try {
+      if (exam) {
+        localStorage.setItem(`ujiancerdas_preview_exam_${exam.code}`, JSON.stringify(exam));
+      }
+    } catch {
+      // ignore
+    }
+  }, [exam]);
+
+  const handleLaunchPreview = () => {
+    try {
+      localStorage.setItem(`ujiancerdas_preview_exam_${exam.code}`, JSON.stringify(exam));
+    } catch {
+      // ignore
+    }
+  };
+
   return createPortal(
     <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-4 z-50 animate-fade-in">
       <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-slide-in-up border border-white dark:border-slate-700 max-h-[95vh] flex flex-col">
@@ -58,6 +76,7 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
             </button>
             <a
               href={`/?preview=${exam.code}`}
+              onClick={handleLaunchPreview}
               target="_blank"
               rel="noreferrer"
               className="flex-1 bg-blue-600 text-white font-bold py-2.5 px-3 rounded-xl hover:bg-blue-700 transition-colors text-xs flex items-center justify-center gap-2 shadow-lg shadow-blue-200 dark:shadow-none"

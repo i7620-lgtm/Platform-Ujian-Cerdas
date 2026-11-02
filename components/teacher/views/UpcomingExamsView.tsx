@@ -171,9 +171,14 @@ export const UpcomingExamsView: React.FC<UpcomingExamsViewProps> = ({
               <div className="flex gap-2 self-end md:self-center w-full md:w-auto flex-wrap">
                 <button
                   id={`btn-preview-${exam.code}`}
-                  onClick={() =>
-                    window.open(`/?preview=${exam.code}`, "_blank")
-                  }
+                  onClick={() => {
+                    try {
+                      localStorage.setItem(`ujiancerdas_preview_exam_${exam.code}`, JSON.stringify(exam));
+                    } catch {
+                      // ignore
+                    }
+                    window.open(`/?preview=${exam.code}`, "_blank");
+                  }}
                   className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 px-5 py-2.5 text-sm rounded-xl hover:bg-amber-100 dark:hover:bg-amber-900/50 transition-all font-bold shadow-sm border border-amber-100 dark:border-amber-800"
                   title="Preview Soal"
                 >

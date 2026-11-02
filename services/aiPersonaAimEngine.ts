@@ -11,7 +11,7 @@
  * 3. RESULT: Luaran terstruktur, efisien, siap uji, dan optimal.
  */
 
-import { Question, QuizConfig } from "../types";
+import type { Question, QuizConfig } from "../types.ts";
 
 export interface EducationalProfile {
   phase: "Fase A" | "Fase B" | "Fase C" | "Fase D" | "Fase E" | "Fase F" | "Umum";
@@ -154,10 +154,16 @@ ${isMathOrScience ? `- LATEX PERSAMAAN & SIMBOL MATEMATIKA:
   * DILARANG menggunakan karakter akar unicode (√) secara langsung; WAJIB $\\\\sqrt{...}$.
   * DILARANG menggunakan format LaTeX untuk: mata uang (tulis TEKS BIASA: "Rp 50.000"), derajat suhu (tulis "35°C"), dan satuan baku murni tanpa pangkat (tulis "8 cm", "15 km", "250 gram").` : `- TEKS FORMATTING & TIPOGRAFI:
   * Gunakan Markdown rapi: **tebal** untuk istilah kunci, *miring* untuk kata asing, dan tabel Markdown untuk perbandingan.`}
-- REPRESENTASI VISUAL EDUKATIF:
-  ${isGeometrySubject ? `* Karena materi eksplisit adalah Geometri, tampilkan bentuk menggunakan tag [GEOMETRY:shape_name:{"label_key":"label_value"}] dengan dimensi lengkap.
-  * Untuk geometri kompleks 3D (irisan bidang, limas terpancung), gunakan visualStimulusType = 'ai_svg' dan svgStyle = 'geometry'.` : `* MATERI SAAT INI BUKAN GEOMETRI: DILARANG KERAS menyisipkan tag [GEOMETRY:...] atau membuat gambar bangun ruang kubus/balok jika materi adalah Polinomial, Aljabar, Sains, atau Bahasa!
-  * Gunakan visualStimulusType = 'ai_svg' (diagram sains, siklus, bagan alur) atau 'chart' (diagram batang/garis/lingkaran) atau 'table' (tabel data Markdown) jika materi membutuhkan ilustrasi pendukung.`}
+- REPRESENTASI VISUAL EDUKATIF & DETEKSI CERDAS (SPEKTRUM VISUAL LENGKAP):
+  * Pengguna dapat mengaktifkan opsi visual ("Sertakan Gambar, Diagram & Geometri") atau membiarkannya tidak dicentang (Auto-Deteksi Konteks).
+  * DETEKSI OTOMATIS: Jika topik/materi atau butir soal secara hakiki membutuhkan atau sangat dibantu oleh ilustrasi visual (misalnya: Geometri Bangun Datar/Ruang, Koordinat Kartesius & Grafik Fungsi, Organ Tubuh/Siklus Sains, Diagram Statistika, Piktogram Data, Peta/Monumen), Anda WAJIB menyertakan visual representatif yang tepat.
+  * Spektrum Format Visual yang Didukung:
+    1. Bangun Geometri 2D & 3D: Gunakan tag [GEOMETRY:shape_name:{"label_key":"label_value"}] jika materi adalah Geometri standar (kubus, balok, prisma, limas, tabung, kerucut, segitiga siku-siku, gabungan). Untuk geometri 3D kompleks (limas terpancung, irisan bidang), gunakan visualStimulusType = 'ai_svg' & svgStyle = 'geometry'.
+    2. Diagram Statistik & Grafik Kartesius: Gunakan tag [CHART] dan isi 'chartData' (type = 'cartesian' untuk fungsi kuadrat/parabola/koordinat; 'bar'/'pie'/'line' untuk statistik data; 'venn' untuk himpunan; 'relation' untuk fungsi).
+    3. Gambar Vektor SVG AI ('ai_svg'): Digunakan untuk bagan sains, siklus air/rantai makanan, organ tubuh, fisika, atau infografis materi.
+    4. Emoji & Piktogram: Sangat disarankan untuk matematika dasar / SD / piktogram data (🍎, 🚗, ⭐️, 👦) dalam tabel Markdown atau narasi.
+    5. Foto Wikimedia Otentik ('wikimedia_photo'): Digunakan untuk foto nyata tokoh sejarah, pahlawan, candi, monumen, fauna/flora endemik. Tuliskan 1-2 kata kunci bahasa Inggris di 'imageSearchKeyword'.
+  * DILARANG MEMBUAT KARTU PPT / SLIDE MATERI! Seluruh visual harus murni bentuk fisik geometri, diagram berlabel, atau gambar teknis presisi.
 - SCAFFOLDING PEDAGOGIS:
   * Field 'hint' (Petunjuk Pengerjaan): WAJIB diisi panduan konsep dasar atau arahan strategi berpikir TANPA membocorkan pilihan atau kunci jawaban.
   * Field 'solutionSteps' (Langkah Pengerjaan): WAJIB diisi alur deduksi atau tahapan matematis lengkap tahap demi tahap hingga tuntas.

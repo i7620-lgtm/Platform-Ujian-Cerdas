@@ -966,31 +966,42 @@ export const CreationView: React.FC<CreationViewProps> = ({
                     )}
                   </div>
 
-                  {/* Section 5: Visual Stimulus Toggle */}
-                  <div className="flex items-center justify-between p-3.5 bg-slate-50 dark:bg-slate-900/50 rounded-xl border border-slate-200 dark:border-slate-700">
-                    <div className="flex items-center gap-3">
-                      <input
-                        type="checkbox"
-                        id="includeImages"
-                        checked={aiConfig.includeImages}
-                        onChange={(e) =>
-                          setAiConfig({
-                            ...aiConfig,
-                            includeImages: e.target.checked,
-                          })
-                        }
-                        className="w-4 h-4 text-primary bg-white border-gray-300 rounded focus:ring-primary dark:focus:ring-primary dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600 cursor-pointer"
-                      />
-                      <label
-                        htmlFor="includeImages"
-                        className="text-xs sm:text-sm font-semibold text-slate-700 dark:text-slate-300 cursor-pointer select-none"
-                      >
-                        Sertakan Gambar, Geometri Bangun & Diagram Representatif
-                      </label>
+                  {/* Section 5: Visual Stimulus Toggle & Auto-Detection Mode */}
+                  <div className="p-4 bg-slate-50/90 dark:bg-slate-900/50 rounded-2xl border border-slate-200/80 dark:border-slate-800 space-y-2">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <div className="flex items-center gap-3">
+                        <input
+                          type="checkbox"
+                          id="includeImages"
+                          checked={aiConfig.includeImages}
+                          onChange={(e) =>
+                            setAiConfig({
+                              ...aiConfig,
+                              includeImages: e.target.checked,
+                            })
+                          }
+                          className="w-4 h-4 text-primary bg-white border-gray-300 rounded focus:ring-primary dark:focus:ring-primary dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600 cursor-pointer"
+                        />
+                        <label
+                          htmlFor="includeImages"
+                          className="text-xs sm:text-sm font-bold text-slate-800 dark:text-slate-200 cursor-pointer select-none flex items-center gap-1.5"
+                        >
+                          <span>Sertakan Visual (Diagram, Geometri 2D/3D, Kartesius & Gambar)</span>
+                        </label>
+                      </div>
+                      <span className={`text-[10px] px-2.5 py-1 rounded-lg font-bold shrink-0 self-start sm:self-auto ${
+                        aiConfig.includeImages 
+                          ? "bg-primary/10 text-primary border border-primary/20" 
+                          : "bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/20"
+                      }`}>
+                        {aiConfig.includeImages ? "✨ Mode Visual Diutamakan" : "🔍 Mode Auto-Deteksi Konteks"}
+                      </span>
                     </div>
-                    <span className="text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded font-bold">
-                      Auto Vektor AI, Geometri & Diagram
-                    </span>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400 pl-7 leading-relaxed">
+                      {aiConfig.includeImages
+                        ? "AI akan mengutamakan menyertakan gambar SVG, diagram sains, geometri 2D/3D, grafik Kartesius, piktogram emoji, atau Wikimedia pada setiap butir soal."
+                        : "Jika tidak dicentang, AI secara otomatis menganalisis topik. Apabila soal memerlukan geometri, diagram, kartesius, atau visual representatif, AI akan menyertakannya sesuai kebutuhan."}
+                    </p>
                   </div>
                 </div>
               )}
