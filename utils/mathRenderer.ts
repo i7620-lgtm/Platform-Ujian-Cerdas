@@ -129,13 +129,13 @@ const convertTextToMathSpans = (text: string): string => {
   result = result.replace(/\$([^$\n]+?)\$/g, (_, latex) => {
     const clean = normalizeLatex(latex);
     const rendered = renderLatexToString(clean, false);
-    return `&#8203;<span class="math-visual" style="display: inline-block; vertical-align: middle;" contenteditable="false" data-latex="${clean.replace(/"/g, "&quot;")}">${rendered}</span>&#8203;`;
+    return `&#8203;<span class="math-visual" style="display: inline-block; vertical-align: baseline;" contenteditable="false" data-latex="${clean.replace(/"/g, "&quot;")}">${rendered}</span>&#8203;`;
   });
 
   result = result.replace(/\\\(([\s\S]+?)\\\)/g, (_, latex) => {
     const clean = normalizeLatex(latex);
     const rendered = renderLatexToString(clean, false);
-    return `&#8203;<span class="math-visual" style="display: inline-block; vertical-align: middle;" contenteditable="false" data-latex="${clean.replace(/"/g, "&quot;")}">${rendered}</span>&#8203;`;
+    return `&#8203;<span class="math-visual" style="display: inline-block; vertical-align: baseline;" contenteditable="false" data-latex="${clean.replace(/"/g, "&quot;")}">${rendered}</span>&#8203;`;
   });
 
   // 3. Process un-delimited LaTeX fractions, roots, or units
@@ -146,7 +146,7 @@ const convertTextToMathSpans = (text: string): string => {
       const rendered = renderLatexToString(clean, false);
       const prefix = fullMatch.startsWith(" ") ? " " : "";
       const suffix = fullMatch.endsWith(" ") ? " " : "";
-      return `${prefix}&#8203;<span class="math-visual" style="display: inline-block; vertical-align: middle;" contenteditable="false" data-latex="${clean.replace(/"/g, "&quot;")}">${rendered}</span>&#8203;${suffix}`;
+      return `${prefix}&#8203;<span class="math-visual" style="display: inline-block; vertical-align: baseline;" contenteditable="false" data-latex="${clean.replace(/"/g, "&quot;")}">${rendered}</span>&#8203;${suffix}`;
     },
   );
 
