@@ -452,11 +452,15 @@ export class ResultService {
                   endDate: nowIso,
                   endTime: nowTime,
               };
-              const newVer = typeof data.version === 'number' ? data.version + 1 : 2;
+              const existingVersion = typeof (data.config as any)?.version === 'number'
+                  ? (data.config as any).version
+                  : (typeof data.version === 'number' ? data.version : 1);
+              const newVer = existingVersion + 1;
+              (newConfig as any).version = newVer;
               
               await supabase
                   .from('exams')
-                  .update({ config: newConfig, version: newVer })
+                  .update({ config: newConfig })
                   .eq('code', cleanCode);
 
               if (!updatedExam) {
