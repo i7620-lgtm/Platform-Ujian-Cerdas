@@ -19,7 +19,7 @@ export const buildExternalAiPrompt = (config: ExternalAiPromptConfig): string =>
   const {
     standard = "kurikulum_merdeka",
     subject = "Umum",
-    gradeClass = "Kelas 6 SD",
+    gradeClass = "Kelas 6 SD (Fase C)",
     topic = "Materi Utama",
     count = 5,
     questionTypes = ["Pilihan Ganda"],
@@ -29,7 +29,8 @@ export const buildExternalAiPrompt = (config: ExternalAiPromptConfig): string =>
     includeVisuals = true,
   } = config;
 
-  const typesFormatted = questionTypes.join(", ");
+  const validTypes = questionTypes.length > 0 ? questionTypes : ["Pilihan Ganda"];
+  const typesFormatted = validTypes.join(", ");
   const levelsFormatted =
     cognitiveLevels.length > 0
       ? cognitiveLevels.join(", ")
@@ -61,9 +62,116 @@ Karena opsi stimulus visual diaktifkan, **JIKA butir soal melibatkan geometri (s
 - Soal yang tidak memerlukan geometri dapat menggunakan stimulus cerita atau teks narasi autentik.`
     : `- Stimulus visual: Menggunakan narasi teks kontekstual yang jelas.`;
 
+  // Flags for selected question types
+  const hasPgTunggal = validTypes.includes("Pilihan Ganda");
+  const hasPgKompleks = validTypes.includes("Pilihan Ganda Kompleks");
+  const hasBenarSalah = validTypes.includes("Benar/Salah");
+  const hasMenjodohkan = validTypes.includes("Menjodohkan");
+  const hasIsian = validTypes.includes("Isian Singkat");
+  const hasEsai = validTypes.includes("Esai");
+
+  // Strict constraints block
+  let strictTypeRules = `### ⛔ ATURAN KETAT BENTUK SOAL (DILARANG MEMBUAT BENTUK SOAL LAIN!):\n`;
+  strictTypeRules += `1. Anda HANYA DIIZINKAN membuat bentuk soal berikut: **${typesFormatted}**.\n`;
+  strictTypeRules += `2. DILARANG KERAS menghasilkan bentuk soal yang TIDAK ADA dalam daftar pilihan di atas!\n`;
+
+  if (hasPgTunggal && !hasPgKompleks) {
+    strictTypeRules += `3. **PERINGATAN SANGAT PENTING UNTUK PILIHAN GANDA (PG):** Karena hanya 'Pilihan Ganda' (PG biasa) yang dipilih dan BUKAN PG Kompleks, maka SEMUA butir soal Pilihan Ganda WAJIB bertipe \`"MULTIPLE_CHOICE"\` dengan **TEPAT 1 (SATU) KUNCI JAWABAN BENAR** (misalnya hanya \`"A"\`, \`"B"\`, \`"C"\`, atau \`"D"\`). DILARANG KERAS menggunakan kunci majemuk/multi-centang (seperti \`"A,C"\`) atau memberi label \`COMPLEX_MULTIPLE_CHOICE\`!\n`;
+  } else if (hasPgKompleks && !hasPgTunggal) {
+    strictTypeRules += `3. **PILIHAN GANDA KOMPLEKS (PGK MCMA):** Gunakan tipe \`"COMPLEX_MULTIPLE_CHOICE"\` dengan 2 atau lebih jawaban benar (misal \`"A,C"\`).\n`;
+  } else if (hasPgTunggal && hasPgKompleks) {
+    strictTypeRules += `3. **PILIHAN GANDA BIASA vs KOMPLEKS:**\n`;
+    strictTypeRules += `   - Untuk Pilihan Ganda biasa: Tipe \`"MULTIPLE_CHOICE"\` dengan tepat 1 kunci jawaban.\n`;
+    strictTypeRules += `   - Untuk Pilihan Ganda Kompleks: Tipe \`"COMPLEX_MULTIPLE_CHOICE"\` dengan multi-kunci (misal \`"A,C"\`).\n`;
+  }
+
+  // Build dynamic few-shot JSON example ONLY containing selected types
+  const jsonExamples: string[] = [];
+
+  if (hasPgTunggal) {
+    jsonExamples.push(`  {
+    "questionText": "Tuliskan stimulus & pertanyaan di sini. Sisipkan <svg>...</svg> jika ada gambar geometri/diagram. Gunakan $rumus$ untuk KaTeX.",
+    "questionType": "MULTIPLE_CHOICE",
+    "options": [
+      "Pilihan A",
+      "Pilihan B",
+      "Pilihan C",
+      "Pilihan D"
+    ],
+    "correctAnswer": "A",
+    "category": "${topic}",
+    "level": "${cognitiveLevels[0] || "Level 2 - Penerapan"}",
+    "kisiKisi": "Indikator capaian butir soal ini",
+    "explanation": "Pembahasan lengkap dan mendalam mengapa jawaban A benar dan mengapa opsi lain salah.",
+    "solutionSteps": "Langkah 1: Identifikasi data diketahui... Langkah 2: Hitung rumus... Langkah 3: Kesimpulan akhir...",
+    "hint": "Petunjuk pengerjaan singkat untuk siswa"
+  }`);
+  }
+
+  if (hasPgKompleks) {
+    jsonExamples.push(`  {
+    "questionText": "Pilihlah jawaban yang benar! (Jawaban benar lebih dari satu)",
+    "questionType": "COMPLEX_MULTIPLE_CHOICE",
+    "options": [
+      "Pernyataan 1 (Benar)",
+      "Pernyataan 2 (Salah)",
+      "Pernyataan 3 (Benar)",
+      "Pernyataan 4 (Salah)"
+    ],
+    "correctAnswer": "A,C",
+    "explanation": "Pembahasan rinci untuk masing-masing opsi pernyataan...",
+    "solutionSteps": "Analisis opsi 1... Analisis opsi 3..."
+  }`);
+  }
+
+  if (hasBenarSalah) {
+    jsonExamples.push(`  {
+    "questionText": "Tentukan Benar atau Salah untuk setiap pernyataan berikut!",
+    "questionType": "TRUE_FALSE",
+    "categoryLabels": ["Benar", "Salah"],
+    "trueFalseRows": [
+      { "text": "Pernyataan 1", "answer": true },
+      { "text": "Pernyataan 2", "answer": false },
+      { "text": "Pernyataan 3", "answer": true }
+    ],
+    "explanation": "Pembahasan lengkap per baris pernyataan: Pernyataan 1 benar karena... Pernyataan 2 salah karena..."
+  }`);
+  }
+
+  if (hasMenjodohkan) {
+    jsonExamples.push(`  {
+    "questionText": "Jodohkanlah item di sebelah kiri dengan pasangan yang tepat di sebelah kanan!",
+    "questionType": "MATCHING",
+    "matchingPairs": [
+      { "left": "Istilah / Konsep 1", "right": "Pasangan Jawaban 1" },
+      { "left": "Istilah / Konsep 2", "right": "Pasangan Jawaban 2" }
+    ],
+    "explanation": "Penjelasan relasi pasangan yang tepat..."
+  }`);
+  }
+
+  if (hasIsian) {
+    jsonExamples.push(`  {
+    "questionText": "Pertanyaan isian singkat yang membutuhkan jawaban eksak atau angka pasti...",
+    "questionType": "FILL_IN_THE_BLANK",
+    "correctAnswer": "Jawaban Singkat",
+    "explanation": "Pembahasan konseptual dan perhitungan eksak..."
+  }`);
+  }
+
+  if (hasEsai) {
+    jsonExamples.push(`  {
+    "questionText": "Pertanyaan uraian terbuka yang menguji daya nalar dan analisis mendalam...",
+    "questionType": "ESSAY",
+    "explanation": "Rubrik penilaian lengkap, kata kunci utama, dan jawaban ideal siswa..."
+  }`);
+  }
+
+  const dynamicJsonBlock = `[\n${jsonExamples.join(",\n")}\n]`;
+
   return `${standardIntro}
 
-Tolong buatkan **${count} butir soal** berkualitas tinggi dengan spesifikasi berikut:
+Tolong buatkan **TOTAL TEPAT ${count} butir soal** berkualitas tinggi dengan spesifikasi berikut:
 
 ### 📋 SPESIFIKASI SOAL:
 - **Standar Acuan:** ${standard === "kurikulum_merdeka" ? "Kurikulum Merdeka (Capaian Pembelajaran CP/TP)" : "Tes Kemampuan Akademik (TKA) BSKAP No. 047/H/AN/2025"}
@@ -71,8 +179,10 @@ Tolong buatkan **${count} butir soal** berkualitas tinggi dengan spesifikasi ber
 - **Jenjang / Kelas:** ${gradeClass}
 - **Materi Pokok / Topik:** ${topic}
 - **Kerangka & Tingkat Kognitif:** ${cognitiveFramework === "TKA" ? "Standar TKA" : "Taksonomi Bloom"} (${levelsFormatted})
-- **Ragam Jenis Soal:** ${typesFormatted}
+- **Ragam Jenis Soal yang Diminta:** ${typesFormatted}
 ${kisiKisi ? `- **Kisi-kisi / Indikator Capaian:** ${kisiKisi}` : ""}
+
+${strictTypeRules}
 
 ${standardPrinciples}
 
@@ -90,74 +200,11 @@ ${visualInstruction}
 ### ⚠️ PETUNJUK FORMAT OUTPUT (SANGAT PENTING):
 Mohon kembalikan HASIL AKHIR berupa **KODE JSON MURNI** di dalam blok kode \`\`\`json ... \`\`\` tanpa kata pengantar atau penutup tambahan, agar dapat langsung di-import otomatis ke aplikasi editor ujian.
 
-Gunakan skema array JSON berikut:
+CONTOH SKEMA JSON YANG HANYA SESUAI DENGAN BENTUK SOAL TERPILIH DI ATAS:
 
 \`\`\`json
-[
-  {
-    "questionText": "Tuliskan stimulus & pertanyaan di sini. Sisipkan <svg>...</svg> jika ada gambar geometri/diagram. Gunakan $rumus$ untuk KaTeX.",
-    "questionType": "MULTIPLE_CHOICE",
-    "options": [
-      "Pilihan A",
-      "Pilihan B",
-      "Pilihan C",
-      "Pilihan D"
-    ],
-    "correctAnswer": "A",
-    "category": "${topic}",
-    "level": "${cognitiveLevels[0] || "Level 2 - Penerapan"}",
-    "kisiKisi": "Indikator capaian butir soal ini",
-    "explanation": "Pembahasan lengkap dan mendalam mengapa jawaban A benar dan mengapa opsi lain salah.",
-    "solutionSteps": "Langkah 1: Identifikasi data diketahui... Langkah 2: Hitung rumus... Langkah 3: Kesimpulan akhir...",
-    "hint": "Petunjuk pengerjaan singkat untuk siswa",
-    "svgContent": ""
-  },
-  {
-    "questionText": "Contoh soal Pilihan Ganda Kompleks (Multi-jawaban). Pilihlah jawaban yang benar! Jawaban benar lebih dari satu.",
-    "questionType": "COMPLEX_MULTIPLE_CHOICE",
-    "options": [
-      "Pernyataan 1 (Benar)",
-      "Pernyataan 2 (Salah)",
-      "Pernyataan 3 (Benar)",
-      "Pernyataan 4 (Salah)"
-    ],
-    "correctAnswer": "A,C",
-    "explanation": "Pembahasan rinci untuk masing-masing opsi pernyataan...",
-    "solutionSteps": "Analisis pernyataan 1... Analisis pernyataan 2..."
-  },
-  {
-    "questionText": "Tentukan Benar atau Salah untuk setiap pernyataan berikut!",
-    "questionType": "TRUE_FALSE",
-    "categoryLabels": ["Benar", "Salah"],
-    "trueFalseRows": [
-      { "text": "Pernyataan 1", "answer": true },
-      { "text": "Pernyataan 2", "answer": false },
-      { "text": "Pernyataan 3", "answer": true }
-    ],
-    "explanation": "Pembahasan lengkap per baris pernyataan: Pernyataan 1 benar karena... Pernyataan 2 salah karena..."
-  },
-  {
-    "questionText": "Jodohkanlah item di sebelah kiri dengan pasangan yang tepat di sebelah kanan!",
-    "questionType": "MATCHING",
-    "matchingPairs": [
-      { "left": "Istilah / Pertanyaan 1", "right": "Pasangan Jawaban 1" },
-      { "left": "Istilah / Pertanyaan 2", "right": "Pasangan Jawaban 2" }
-    ],
-    "explanation": "Penjelasan relasi pasangan yang tepat..."
-  },
-  {
-    "questionText": "Contoh soal Isian Singkat.",
-    "questionType": "FILL_IN_THE_BLANK",
-    "correctAnswer": "Jawaban Singkat",
-    "explanation": "Pembahasan konseptual dan perhitungan eksak..."
-  },
-  {
-    "questionText": "Contoh soal Uraian / Esai.",
-    "questionType": "ESSAY",
-    "explanation": "Rubrik penilaian lengkap, kata kunci utama, dan jawaban ideal siswa..."
-  }
-]
+${dynamicJsonBlock}
 \`\`\`
 
-Pastikan kunci jawaban 100% akurat, logis secara akademis, dan seluruh butir soal dilengkapi pembahasan mendalam! Mohon buatkan sekarang.`;
+Pastikan jumlah butir soal tepat ${count} butir, jenis soal 100% mematuhi pilihan di atas, dan seluruh butir dilengkapi pembahasan mendalam! Mohon buatkan sekarang.`;
 };

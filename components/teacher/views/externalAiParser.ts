@@ -42,14 +42,29 @@ export const extractJsonFromRawText = (rawText: string): string => {
 };
 
 /**
- * Normalizes question types into internal QuestionType enum.
+ * Normalizes question types into internal QuestionType enum with smart auto-correction.
+ * If user requested only single Pilihan Ganda but AI returned PG Kompleks with a single answer key,
+ * this automatically converts it into MULTIPLE_CHOICE.
  */
-const normalizeQuestionType = (typeStr?: string, item?: any): QuestionType => {
+const normalizeQuestionType = (
+  typeStr?: string,
+  item?: any,
+  requestedTypes?: string[]
+): QuestionType => {
+  // Check if answer key is multiple or single
+  const rawKey = String(item?.correctAnswer || item?.kunciJawaban || item?.kunci || "").trim();
+  const isMultiKey = rawKey.includes(",") || (rawKey.length > 1 && !rawKey.startsWith("{") && !rawKey.includes(" "));
+
+  const onlySingleChoiceRequested =
+    requestedTypes &&
+    requestedTypes.includes("Pilihan Ganda") &&
+    !requestedTypes.includes("Pilihan Ganda Kompleks");
+
   if (!typeStr && item) {
     if (Array.isArray(item.trueFalseRows) || item.pernyataanKategori) return "TRUE_FALSE";
     if (Array.isArray(item.matchingPairs) || item.pasangan) return "MATCHING";
     if (item.options && item.options.length > 0) {
-      if (item.correctAnswer && (item.correctAnswer.includes(",") || item.correctAnswer.length > 1)) {
+      if (isMultiKey && !onlySingleChoiceRequested) {
         return "COMPLEX_MULTIPLE_CHOICE";
       }
       return "MULTIPLE_CHOICE";
@@ -60,9 +75,15 @@ const normalizeQuestionType = (typeStr?: string, item?: any): QuestionType => {
 
   const upper = (typeStr || "").toUpperCase().trim();
 
+  // If AI labeled as COMPLEX or PGK:
   if (upper.includes("COMPLEX") || upper.includes("PGK") || upper.includes("MULTI")) {
+    // Auto-correct: If only single key exists (e.g. "A") or if only single choice was requested by the teacher:
+    if (!isMultiKey || onlySingleChoiceRequested) {
+      return "MULTIPLE_CHOICE";
+    }
     return "COMPLEX_MULTIPLE_CHOICE";
   }
+
   if (upper.includes("TRUE") || upper.includes("BENAR") || upper.includes("SALAH") || upper.includes("KATEGORI")) {
     return "TRUE_FALSE";
   }
@@ -79,13 +100,21 @@ const normalizeQuestionType = (typeStr?: string, item?: any): QuestionType => {
     return "INFO";
   }
 
+  // If labeled MULTIPLE_CHOICE but has multi-key (and user asked for PGK)
+  if (isMultiKey && requestedTypes?.includes("Pilihan Ganda Kompleks") && !onlySingleChoiceRequested) {
+    return "COMPLEX_MULTIPLE_CHOICE";
+  }
+
   return "MULTIPLE_CHOICE";
 };
 
 /**
  * Parses raw AI text output into validated Question[] array.
  */
-export const parseExternalAiOutput = (rawText: string): ParseResult => {
+export const parseExternalAiOutput = (
+  rawText: string,
+  requestedTypes?: string[]
+): ParseResult => {
   try {
     const jsonStr = extractJsonFromRawText(rawText);
 
@@ -131,7 +160,11 @@ export const parseExternalAiOutput = (rawText: string): ParseResult => {
     }
 
     const parsedQuestions: Question[] = itemsArray.map((item, index) => {
-      const qType = normalizeQuestionType(item.questionType || item.bentukSoal || item.tipe, item);
+      const qType = normalizeQuestionType(
+        item.questionType || item.bentukSoal || item.tipe,
+        item,
+        requestedTypes
+      );
       const uniqueId = `q_ext_${Date.now()}_${index}_${Math.random().toString(36).substring(2, 6)}`;
 
       // Clean up question text
@@ -176,6 +209,15 @@ export const parseExternalAiOutput = (rawText: string): ParseResult => {
       // Correct answer string formatting
       let cAnswer = item.correctAnswer || item.kunciJawaban || item.kunci || "";
       if (typeof cAnswer === "object") cAnswer = JSON.stringify(cAnswer);
+      cAnswer = String(cAnswer).trim();
+
+      // If MULTIPLE_CHOICE, ensure answer is normalized to single letter if in format "A. ..."
+      if (qType === "MULTIPLE_CHOICE" && cAnswer.length > 1 && !cAnswer.includes(",")) {
+        const letterMatch = cAnswer.match(/^([A-E])(?:\.|:|\s|$)/i);
+        if (letterMatch && letterMatch[1]) {
+          cAnswer = letterMatch[1].toUpperCase();
+        }
+      }
 
       // SVG / Visual handling
       let finalQuestionText = String(qText);
@@ -207,7 +249,7 @@ export const parseExternalAiOutput = (rawText: string): ParseResult => {
         questionText: finalQuestionText,
         questionType: qType,
         options: opts,
-        correctAnswer: String(cAnswer).trim(),
+        correctAnswer: cAnswer,
         trueFalseRows: tfRows,
         matchingPairs: mPairs,
         categoryLabels: item.categoryLabels || ["Benar", "Salah"],
