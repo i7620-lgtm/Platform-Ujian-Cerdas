@@ -153,8 +153,9 @@ export const ArchiveHeaderActions: React.FC<ArchiveHeaderActionsProps> = ({
           <button
             onClick={() => onReuseExam(exam)}
             className="flex-1 sm:flex-none px-4 py-2 bg-indigo-600 dark:bg-indigo-600 text-white text-xs font-bold uppercase rounded-lg hover:bg-indigo-700 dark:hover:bg-indigo-700 transition-all shadow-md shadow-indigo-100 dark:shadow-indigo-900/30 flex items-center gap-2"
+            title="Duplikasi Soal"
           >
-            <DocumentDuplicateIcon className="w-4 h-4" /> Gunakan Ulang
+            <DocumentDuplicateIcon className="w-4 h-4" /> Duplikasi Soal
           </button>
 
           {isNoAuthor && onReclaimArchive && (
