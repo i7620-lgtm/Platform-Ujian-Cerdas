@@ -77,7 +77,7 @@ export const OngoingExamCard: React.FC<OngoingExamCardProps> = ({
             onDuplicateClick();
           }}
           className="p-2 bg-white dark:bg-slate-700 text-slate-400 hover:bg-gray-50 dark:hover:bg-slate-600 hover:text-primary dark:hover:text-white rounded-lg border border-slate-100 dark:border-slate-600 hover:border-gray-200 dark:hover:border-slate-500 transition-all shadow-sm"
-          title="Gunakan Kembali Soal"
+          title="Duplikasi Soal"
         >
           <DocumentDuplicateIcon className="w-4 h-4" />
         </button>
