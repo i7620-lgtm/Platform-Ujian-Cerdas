@@ -642,136 +642,145 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({
 
       <div
         ref={navMenuRef}
-        className={`fixed top-16 left-0 w-full bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl z-50 border-b border-slate-200 dark:border-slate-800 shadow-xl transition-all duration-300 ease-in-out origin-top ${isNavOpen ? "translate-y-0 opacity-100 visible" : "-translate-y-full opacity-0 invisible"}`}
+        className={`fixed top-16 inset-x-0 bottom-0 z-50 bg-white dark:bg-slate-900 flex flex-col transition-all duration-300 ease-in-out origin-top shadow-2xl ${
+          isNavOpen
+            ? "translate-y-0 opacity-100 visible pointer-events-auto"
+            : "-translate-y-full opacity-0 invisible pointer-events-none"
+        }`}
       >
-        <div className="w-full max-w-full mx-auto p-4 sm:p-6 max-h-[70vh] overflow-y-auto">
-          {/* Header Ringkasan Daftar Soal (X dari Y Soal tanpa persentase) */}
-          <div className="flex items-center justify-between pb-3 mb-4 border-b border-slate-100 dark:border-slate-800/80 max-w-4xl mx-auto">
+        {/* Header Ringkasan Daftar Soal */}
+        <div className="shrink-0 border-b border-slate-100 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/70 px-4 sm:px-6 py-2.5 sm:py-3">
+          <div className="flex items-center justify-between max-w-5xl mx-auto w-full">
             <div className="flex items-center gap-2">
-              <div className="w-7 h-7 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center">
+              <div className="w-7 h-7 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0">
                 <ListBulletIcon className="w-4 h-4" />
               </div>
               <span className="text-xs sm:text-sm font-bold text-slate-800 dark:text-slate-200">
                 Daftar Nomor Soal
               </span>
             </div>
-            <div className="flex items-center gap-1.5 px-3 py-1 bg-slate-100/90 dark:bg-slate-800/90 rounded-lg text-xs font-bold text-slate-700 dark:text-slate-300 border border-slate-200/60 dark:border-slate-700/60">
-              <span className="text-indigo-600 dark:text-indigo-400 font-black tabular-nums">{answeredCount}</span>
-              <span className="text-slate-400 dark:text-slate-500 font-normal">dari</span>
-              <span className="font-bold text-slate-900 dark:text-white tabular-nums">{totalQuestions}</span>
-              <span className="text-slate-600 dark:text-slate-400">Soal</span>
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5 px-2.5 py-1 bg-white dark:bg-slate-800 rounded-lg text-xs font-bold text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 shadow-2xs">
+                <span className="text-indigo-600 dark:text-indigo-400 font-black tabular-nums">{answeredCount}</span>
+                <span className="text-slate-400 dark:text-slate-500 font-normal">dari</span>
+                <span className="font-bold text-slate-900 dark:text-white tabular-nums">{totalQuestions}</span>
+                <span className="text-slate-600 dark:text-slate-400">Soal</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsNavOpen(false)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                title="Tutup laci soal"
+                aria-label="Tutup laci soal"
+              >
+                <ChevronUpIcon className="w-4 h-4 sm:w-5 sm:h-5" />
+              </button>
             </div>
           </div>
+        </div>
 
-          <div className="flex flex-wrap gap-2 justify-center">
-            {activeExam.questions.map((q, idx) => {
-              if (q.questionType === "INFO") return null;
-              const num =
-                activeExam.questions
-                  .slice(0, idx)
-                  .filter((i) => i.questionType !== "INFO").length + 1;
-              const answered = isAnswered(q, answers);
-              return (
-                <button
-                  key={q.id}
-                  onClick={() => scrollToQuestion(q.id)}
-                  className={`w-9 h-9 sm:w-10 sm:h-10 rounded-lg border flex items-center justify-center text-xs font-bold transition-all ${answered ? "bg-indigo-600 border-indigo-600 text-white" : hasAttemptedSubmit ? "bg-rose-50 border-rose-300 text-rose-600 animate-pulse" : "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700"}`}
+        {/* Konten Utama Laci: Grid Nomor Soal & Kartu Informasi Adaptif Tanpa Scroll Vertikal */}
+        <div className="flex-1 min-h-0 overflow-y-auto px-3 sm:px-6 py-3 sm:py-4 flex flex-col justify-center items-center overscroll-contain">
+          <div className="w-full max-w-5xl mx-auto flex flex-col items-center justify-center gap-3 sm:gap-4 my-auto">
+            {/* Grid Tombol Nomor Soal */}
+            <div className="flex flex-wrap gap-1.5 sm:gap-2 justify-center w-full max-w-4xl mx-auto">
+              {activeExam.questions.map((q, idx) => {
+                if (q.questionType === "INFO") return null;
+                const num =
+                  activeExam.questions
+                    .slice(0, idx)
+                    .filter((i) => i.questionType !== "INFO").length + 1;
+                const answered = isAnswered(q, answers);
+                return (
+                  <button
+                    key={q.id}
+                    type="button"
+                    onClick={() => scrollToQuestion(q.id)}
+                    className={`w-8 h-8 sm:w-9 sm:h-9 md:w-10 md:h-10 rounded-lg border flex items-center justify-center text-xs font-bold transition-all cursor-pointer shrink-0 select-none ${
+                      answered
+                        ? "bg-indigo-600 border-indigo-600 text-white shadow-xs"
+                        : hasAttemptedSubmit
+                          ? "bg-rose-50 border-rose-300 text-rose-600 animate-pulse"
+                          : "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 hover:border-indigo-300 dark:hover:border-indigo-600"
+                    }`}
+                    title={`Soal nomor ${num} (${answered ? "Sudah dijawab" : "Belum dijawab"})`}
+                  >
+                    {num}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Informasi Pengawasan, Batas Jam Sesi & Mode Olimpiade yang Ringkas & Adaptif */}
+            {(isMonitoring || isSessionGracePeriodActive || activeExam.config?.isOlympiadMode) && (
+              <div className="w-full max-w-3xl mx-auto mt-1 sm:mt-2 pt-2 sm:pt-3 border-t border-slate-100 dark:border-slate-800">
+                <div
+                  className={`grid grid-cols-1 ${
+                    (Number(!!isMonitoring) + Number(!!isSessionGracePeriodActive) + Number(!!activeExam.config?.isOlympiadMode)) >= 3
+                      ? "md:grid-cols-3 max-w-4xl"
+                      : (Number(!!isMonitoring) + Number(!!isSessionGracePeriodActive) + Number(!!activeExam.config?.isOlympiadMode)) === 2
+                        ? "md:grid-cols-2 max-w-2xl"
+                        : "max-w-lg"
+                  } gap-2 sm:gap-2.5 mx-auto`}
                 >
-                  {num}
-                </button>
-              );
-            })}
-          </div>
-
-          {/* Informasi Pengawasan, Batas Jam Sesi & Mode Olimpiade di Laci Soal */}
-          {(isMonitoring || isSessionGracePeriodActive || activeExam.config?.isOlympiadMode) && (
-            <div className="mt-6 pt-4 border-t border-slate-100 dark:border-slate-800 animate-fade-in">
-              <div
-                className={`grid grid-cols-1 ${
-                  (Number(!!isMonitoring) + Number(!!isSessionGracePeriodActive) + Number(!!activeExam.config?.isOlympiadMode)) >= 3
-                    ? "md:grid-cols-2 lg:grid-cols-3 max-w-5xl"
-                    : (Number(!!isMonitoring) + Number(!!isSessionGracePeriodActive) + Number(!!activeExam.config?.isOlympiadMode)) === 2
-                      ? "md:grid-cols-2 max-w-4xl"
-                      : "max-w-md"
-                } gap-3.5 mx-auto`}
-              >
-                {/* Kolom 1: Peringatan Pengawasan Sistem */}
-                {isMonitoring && (
-                  <div className="p-4 rounded-2xl bg-indigo-50/70 dark:bg-indigo-950/30 border border-indigo-100 dark:border-indigo-900/50 flex flex-col items-center text-center justify-between shadow-xs">
-                    <div className="flex flex-col items-center w-full">
-                      <div className="bg-indigo-100/80 dark:bg-indigo-900/50 px-3.5 py-1.5 rounded-full border border-indigo-200/60 dark:border-indigo-800 flex items-center gap-2 mb-2.5">
-                        <span className="relative flex h-2.5 w-2.5">
-                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
-                          <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-indigo-500"></span>
-                        </span>
-                        <span className="text-xs font-black uppercase tracking-wider text-indigo-700 dark:text-indigo-300">
+                  {/* Peringatan Pengawasan Sistem Ringkas */}
+                  {isMonitoring && (
+                    <div className="p-2 sm:p-2.5 rounded-xl bg-indigo-50/70 dark:bg-indigo-950/30 border border-indigo-100 dark:border-indigo-900/50 flex items-center gap-2.5 shadow-2xs text-left">
+                      <span className="relative flex h-2.5 w-2.5 shrink-0 ml-1">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-indigo-500"></span>
+                      </span>
+                      <div className="min-w-0">
+                        <span className="text-[10px] sm:text-[11px] font-black uppercase tracking-wider text-indigo-700 dark:text-indigo-300 block">
                           {monitoringLabel || "Sistem Pengawasan Aktif"}
                         </span>
+                        <p className="text-[10px] sm:text-[11px] text-slate-600 dark:text-slate-300 font-medium leading-snug line-clamp-2">
+                          {activeExam.config.continueWithPermission
+                            ? "Berpindah tab atau keluar akan mengunci ujian dan butuh token guru."
+                            : "Seluruh aktivitas pengerjaan dipantau secara realtime oleh pengawas."}
+                        </p>
                       </div>
-                      <p className="text-xs text-slate-600 dark:text-slate-300 font-medium leading-relaxed">
-                        {activeExam.config.continueWithPermission
-                          ? "Peringatan: Ujian sedang diawasi oleh sistem. Jika Anda berpindah tab atau keluar dari halaman, ujian akan terkunci dan membutuhkan token guru untuk melanjutkan."
-                          : "Peringatan: Ujian sedang diawasi oleh sistem. Seluruh aktivitas dan riwayat pengerjaan Anda dipantau serta dicatat secara realtime oleh pengawas."}
-                      </p>
                     </div>
-                  </div>
-                )}
+                  )}
 
-                {/* Kolom 2: Mode Olimpiade Aktif */}
-                {activeExam.config?.isOlympiadMode && (
-                  <div className="p-4 rounded-2xl bg-amber-50/70 dark:bg-amber-950/30 border border-amber-200/80 dark:border-amber-900/50 flex flex-col items-center text-center justify-between shadow-xs">
-                    <div className="flex flex-col items-center w-full">
-                      <div className="bg-amber-100/90 dark:bg-amber-900/50 px-3.5 py-1.5 rounded-full border border-amber-200/70 dark:border-amber-800 flex items-center gap-2 mb-2 text-amber-800 dark:text-amber-200">
-                        <span className="w-2 h-2 rounded-full bg-amber-500"></span>
-                        <span className="text-xs font-black uppercase tracking-wider">
-                          Mode Olimpiade Aktif
+                  {/* Mode Olimpiade Ringkas */}
+                  {activeExam.config?.isOlympiadMode && (
+                    <div className="p-2 sm:p-2.5 rounded-xl bg-amber-50/70 dark:bg-amber-950/30 border border-amber-200/80 dark:border-amber-900/50 flex items-center gap-2.5 shadow-2xs text-left">
+                      <span className="w-2.5 h-2.5 rounded-full bg-amber-500 shrink-0 ml-1"></span>
+                      <div className="min-w-0">
+                        <span className="text-[10px] sm:text-[11px] font-black uppercase tracking-wider text-amber-800 dark:text-amber-200 block">
+                          Mode Olimpiade
                         </span>
+                        <p className="text-[10px] sm:text-[11px] text-amber-950/80 dark:text-amber-200/80 font-medium leading-snug">
+                          Benar +{activeExam.config.olympiadScoring?.correctMultiplier ?? 4} · Salah {activeExam.config.olympiadScoring?.wrongMultiplier ?? -1} · Kosong {activeExam.config.olympiadScoring?.emptyMultiplier ?? 0}
+                        </p>
                       </div>
-                      <div className="flex items-center gap-1.5 text-xs font-mono font-bold text-amber-900 dark:text-amber-200 mb-2 bg-white/70 dark:bg-slate-800/70 px-3 py-1 rounded-lg border border-amber-200/50 dark:border-amber-800/40">
-                        <span className="text-emerald-700 dark:text-emerald-400">Benar +{activeExam.config.olympiadScoring?.correctMultiplier ?? 4}</span>
-                        <span>·</span>
-                        <span className="text-rose-700 dark:text-rose-400">Salah {activeExam.config.olympiadScoring?.wrongMultiplier ?? -1}</span>
-                        <span>·</span>
-                        <span className="text-slate-600 dark:text-slate-400">Kosong {activeExam.config.olympiadScoring?.emptyMultiplier ?? 0}</span>
-                      </div>
-                      <p className="text-xs text-amber-950/80 dark:text-amber-200/80 font-medium leading-relaxed">
-                        Jawaban salah mengurangi nilai akhir. Mengosongkan jawaban yang diragukan terhindar dari penalti poin.
-                      </p>
                     </div>
-                  </div>
-                )}
+                  )}
 
-                {/* Kolom 3: Informasi Batas Jam Sesi & Toleransi Waktu */}
-                {isSessionGracePeriodActive && (
-                  <div className="p-4 rounded-2xl bg-amber-50/80 dark:bg-amber-950/30 border border-amber-200/80 dark:border-amber-900/50 flex flex-col items-center text-center justify-between shadow-xs">
-                    <div className="flex flex-col items-center w-full">
-                      <div className="bg-amber-100 dark:bg-amber-900/50 px-3.5 py-1.5 rounded-full border border-amber-200 dark:border-amber-800 flex items-center gap-2 mb-2.5 text-amber-800 dark:text-amber-200">
-                        <ClockIcon className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
-                        <span className="text-xs font-black uppercase tracking-wider">
-                          Batas Jam Sesi: {sessionEndTime || "Selesai"}
+                  {/* Batas Jam Sesi Ringkas */}
+                  {isSessionGracePeriodActive && (
+                    <div className="p-2 sm:p-2.5 rounded-xl bg-amber-50/80 dark:bg-amber-950/30 border border-amber-200/80 dark:border-amber-900/50 flex items-center gap-2.5 shadow-2xs text-left">
+                      <ClockIcon className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0 ml-1" />
+                      <div className="min-w-0">
+                        <span className="text-[10px] sm:text-[11px] font-black uppercase tracking-wider text-amber-800 dark:text-amber-200 block">
+                          Batas Sesi: {sessionEndTime || "Selesai"}
                         </span>
+                        <p className="text-[10px] sm:text-[11px] text-amber-900/90 dark:text-amber-200/90 font-medium leading-snug">
+                          Selesaikan soal sebelum hitung mundur durasi habis.
+                        </p>
                       </div>
-                      <p className="text-xs text-amber-900/90 dark:text-amber-200/90 font-medium leading-relaxed">
-                        Batas jam sesi ujian telah berakhir, namun Anda diberikan kesempatan menyelesaikan soal hingga hitung mundur durasi habis.
-                      </p>
                     </div>
-                    {isSessionBannerDismissed && (
-                      <button
-                        type="button"
-                        onClick={() => setIsSessionBannerDismissed(false)}
-                        className="mt-3 text-[11px] font-bold text-amber-700 dark:text-amber-300 hover:text-amber-900 dark:hover:text-amber-100 underline underline-offset-2 cursor-pointer transition-colors"
-                      >
-                        Tampilkan kembali banner di layar utama
-                      </button>
-                    )}
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
-            </div>
-          )}
+            )}
+          </div>
+        </div>
 
-          {/* Tombol Selesai di Bagian Bawah Laci Soal */}
-          <div className="mt-5 pt-4 border-t border-slate-200/80 dark:border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-3 max-w-4xl mx-auto">
+        {/* Tombol Selesai di Bagian Bawah Laci Soal (Menempel di dasar layar) */}
+        <div className="shrink-0 border-t border-slate-200/80 dark:border-slate-800 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md px-4 sm:px-6 py-2.5 sm:py-3.5 shadow-lg">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-2.5 sm:gap-4 max-w-5xl mx-auto w-full">
             <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
               <span className="font-bold text-slate-700 dark:text-slate-200">{answeredCount} dari {totalQuestions}</span>
               <span>soal terjawab ({progress}%)</span>
@@ -783,7 +792,7 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({
                 handleSubmit(false);
               }}
               disabled={isSubmitting}
-              className="w-full sm:w-auto px-6 py-3 bg-slate-900 hover:bg-indigo-600 dark:bg-indigo-600 dark:hover:bg-indigo-500 text-white rounded-xl font-bold text-xs sm:text-sm transition-all flex items-center justify-center gap-2 shadow-md active:scale-95 disabled:opacity-70 cursor-pointer"
+              className="w-full sm:w-auto px-6 py-2.5 sm:py-3 bg-slate-900 hover:bg-indigo-600 dark:bg-indigo-600 dark:hover:bg-indigo-500 text-white rounded-xl font-bold text-xs sm:text-sm transition-all flex items-center justify-center gap-2 shadow-md active:scale-95 disabled:opacity-70 cursor-pointer"
             >
               <CheckCircleIcon className="w-4 h-4" />
               <span>{isSubmitting ? "Mengirim..." : "Selesai & Kumpulkan Ujian"}</span>
@@ -1101,7 +1110,11 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({
       </main>
 
       {/* Floating Drawer Button di Sudut Kanan Bawah (Hanya Angka X / Y Tebal dan Ikon Naik/Turun) */}
-      <div className="fixed bottom-5 right-5 sm:bottom-6 sm:right-6 z-40 pointer-events-auto">
+      <div
+        className={`fixed bottom-5 right-5 sm:bottom-6 sm:right-6 z-40 transition-opacity duration-200 ${
+          isNavOpen ? "opacity-0 pointer-events-none" : "opacity-100 pointer-events-auto"
+        }`}
+      >
         <button
           type="button"
           onClick={() => setIsNavOpen(!isNavOpen)}
