@@ -362,8 +362,10 @@ const App: React.FC = () => {
           if (!isProfileComplete(profile)) {
             setShowProfileCompletion(true);
           }
-          setView('TEACHER_DASHBOARD');
-          return;
+          if (!hasDirectRoute) {
+            setView('TEACHER_DASHBOARD');
+            return;
+          }
         }
 
         // Auto-restore student session if page was reloaded or crashed on mobile/iPhone
@@ -706,6 +708,36 @@ const App: React.FC = () => {
     window.history.replaceState({}, '', '/');
   };
 
+  const exitPreviewToDashboard = useCallback(async () => {
+    try {
+      localStorage.removeItem('ujiancerdas_active_exam_session');
+      sessionStorage.removeItem('is_exam_in_progress');
+    } catch {
+      // ignore
+    }
+    setCurrentExam(null);
+    setCurrentStudent(null);
+    setStudentResult(null);
+    setResumedResult(null);
+    window.history.replaceState({}, document.title, '/');
+
+    let profile = teacherProfile;
+    if (!profile) {
+      try {
+        profile = await storageService.getCurrentUser();
+        if (profile) setTeacherProfile(profile);
+      } catch {
+        // ignore
+      }
+    }
+
+    if (profile) {
+      setView('TEACHER_DASHBOARD');
+    } else {
+      setView('SELECTOR');
+    }
+  }, [teacherProfile]);
+
   const handleLogout = async () => {
     // Immediate state clear to prevent flash
     resetToHome();
@@ -928,7 +960,7 @@ const App: React.FC = () => {
                 student={currentStudent} 
                 initialData={resumedResult}
                 onSubmit={handleExamSubmit}
-                onBack={resetToHome}
+                onBack={currentStudent.class === 'PREVIEW' ? exitPreviewToDashboard : resetToHome}
                 isDarkMode={darkMode}
                 toggleTheme={toggleTheme}
             />
