@@ -100,7 +100,7 @@ export const QuestionCard = React.memo(
       <React.Fragment key={q.id}>
         <div
           id={q.id}
-          className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-700 group transition-all duration-300 hover:shadow-md relative overflow-hidden"
+          className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-700 group transition-all duration-300 hover:shadow-md relative overflow-hidden scroll-mt-28"
         >
           {/* Header Bar Terintegrasi (Bebas dari Overlap pada Tablet & Mobile) */}
           <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-3 border-b border-gray-100 dark:border-slate-700/80 bg-slate-50/70 dark:bg-slate-800/60">
