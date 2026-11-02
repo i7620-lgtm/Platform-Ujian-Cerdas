@@ -21,10 +21,12 @@ import {
   CheckCircle2,
   X,
   ChevronDown,
+  Code2,
 } from "lucide-react";
 import { useCreationView } from "../useCreationView";
 import { TKA_PRESETS, type TKAPreset } from "../../../utils/tkaPresets";
 import { WysiwygEditor } from "../WysiwygEditor";
+import { ExternalAiPromptPanel } from "../features/external-ai/ExternalAiPromptPanel";
 
 interface CreationViewProps {
   onQuestionsGenerated: (
@@ -323,7 +325,7 @@ export const CreationView: React.FC<CreationViewProps> = ({
             membantu Anda menyusun ujian dengan mudah.
           </p>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
           <div
             className={`p-6 border-2 rounded-2xl cursor-pointer transition-all duration-300 group border-gray-100 dark:border-slate-700 hover:border-primary/50 dark:hover:border-primary/50 hover:shadow-lg bg-white dark:bg-slate-800`}
             onClick={handleManualCreateClick}
@@ -362,6 +364,36 @@ export const CreationView: React.FC<CreationViewProps> = ({
             </div>
           </div>
           <div
+            className={`p-6 border-2 rounded-2xl cursor-pointer transition-all duration-300 group ${inputMethod === "external_ai" ? "border-indigo-500 bg-indigo-50/40 dark:bg-indigo-950/20 shadow-md" : "border-gray-100 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-indigo-500/50 hover:shadow-lg"}`}
+            onClick={() => {
+              setInputMethod("external_ai");
+              if (aiSectionRef.current) {
+                setTimeout(() => {
+                  aiSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+                }, 100);
+              }
+            }}
+          >
+            <div className="flex flex-col items-center text-center space-y-3">
+              <div
+                className={`p-4 rounded-2xl transition-colors ${inputMethod === "external_ai" ? "bg-indigo-600 text-white" : "bg-gray-50 dark:bg-slate-700 text-gray-500 dark:text-slate-300 group-hover:bg-indigo-50 group-hover:text-indigo-600 dark:group-hover:bg-indigo-950/40"}`}
+              >
+                <Code2 className="w-8 h-8" />
+              </div>
+              <div className="flex flex-col items-center gap-1">
+                <h3 className="font-bold text-lg text-neutral dark:text-white">
+                  Prompt & Impor AI Luar
+                </h3>
+                <span className="text-[10px] font-extrabold text-indigo-600 dark:text-indigo-400 bg-indigo-100 dark:bg-indigo-950/70 px-2 py-0.5 rounded-full">
+                  ChatGPT • Gemini • Claude
+                </span>
+              </div>
+              <p className="text-sm text-gray-500 dark:text-slate-400">
+                Buat prompt TKA Kemendikdasmen dan tempelkan hasil dari AI luar.
+              </p>
+            </div>
+          </div>
+          <div
             className={`p-6 border-2 rounded-2xl transition-all duration-300 group relative ${inputMethod === "ai" ? "border-primary bg-primary/5 dark:bg-primary/10 shadow-md cursor-pointer" : "border-gray-100 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-primary/50 hover:shadow-lg cursor-pointer"}`}
             onClick={handleAiClick}
           >
@@ -383,11 +415,10 @@ export const CreationView: React.FC<CreationViewProps> = ({
             </div>
           </div>
         </div>
-        <div
-          ref={aiSectionRef}
-          className="bg-white dark:bg-slate-800 p-6 rounded-2xl border border-gray-100 dark:border-slate-700 shadow-sm transition-all duration-300 relative overflow-hidden"
-        >
-          {isLoading && inputMethod === "ai" ? (
+        <div ref={aiSectionRef}>
+          {inputMethod === "external_ai" ? (
+            <ExternalAiPromptPanel onQuestionsGenerated={onQuestionsGenerated} />
+          ) : isLoading && inputMethod === "ai" ? (
             /* Kartu Progres Kerja AI Terfokus Ultra-Ringkas (Desktop & Mobile Friendly) */
             <div className="w-full max-w-md mx-auto py-8 px-6 sm:px-8 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl flex flex-col items-center text-center space-y-5 my-4 animate-scale-in">
               {/* Smooth Spinning Ring Indicator */}
