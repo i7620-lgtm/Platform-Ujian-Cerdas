@@ -26,7 +26,7 @@ import {
 import { useCreationView } from "../useCreationView";
 import { TKA_PRESETS, type TKAPreset } from "../../../utils/tkaPresets";
 import { WysiwygEditor } from "../WysiwygEditor";
-import { ExternalAiPromptPanel } from "../features/external-ai/ExternalAiPromptPanel";
+import { ExternalAiPromptPanel } from "./ExternalAiPromptPanel";
 
 interface CreationViewProps {
   onQuestionsGenerated: (
