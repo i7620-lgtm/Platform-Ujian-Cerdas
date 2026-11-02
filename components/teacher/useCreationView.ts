@@ -10,7 +10,7 @@ interface UseCreationViewParams {
   ) => void;
 }
 
-export type InputMethod = "ai" | "upload";
+export type InputMethod = "ai" | "upload" | "external_ai";
 
 export interface FailSafeModalState {
   isOpen: boolean;
