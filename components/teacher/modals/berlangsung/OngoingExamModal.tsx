@@ -399,7 +399,7 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                 <span>AKSES SISWA</span>
               </button>
 
-              {isOwner && (
+              {isOwner && Boolean(proctorUrl || liveUrl) && (
                 <button
                   id="ongoing-share-stream-btn"
                   onClick={() => setIsShareModalOpen(true)}
