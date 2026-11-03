@@ -527,7 +527,7 @@ export const StudentResultPage: React.FC<StudentResultPageProps> = ({
                         <span>Rincian Hasil Pengerjaan Soal</span>
                       </h3>
                       <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
-                        Arahkan kursor atau ketuk nomor soal untuk melihat pertanyaan, jawaban Anda, kunci yang benar, serta pembahasannya.
+                        Klik atau ketuk nomor soal untuk melihat pertanyaan, jawaban Anda, kunci yang benar, serta pembahasannya.
                       </p>
                     </div>
                     {/* Legend */}
