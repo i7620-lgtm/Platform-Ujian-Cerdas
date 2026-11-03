@@ -14,7 +14,12 @@ export const ParentQrModal: React.FC<ParentQrModalProps> = ({
   onClose,
   onCopyLink,
 }) => {
-  const liveUrl = `${window.location.origin}/?live=${exam.code}`;
+  const publicCollab = exam.config?.collaborators?.find((c) => c.role === "public");
+  const viewerCollab = exam.config?.collaborators?.find((c) => c.role === "viewer");
+  const activeCollab = publicCollab || viewerCollab;
+  const liveUrl = activeCollab
+    ? `${window.location.origin}/?collab_code=${exam.code}&collab_token=${activeCollab.token}`
+    : "";
 
   return createPortal(
     <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-4 z-[70] animate-fade-in">
