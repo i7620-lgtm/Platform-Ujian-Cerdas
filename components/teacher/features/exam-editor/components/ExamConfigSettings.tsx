@@ -1193,36 +1193,6 @@ export const ExamConfigSettings: React.FC<ExamConfigSettingsProps> = ({
                 </p>
               </div>
             </div>
-            
-            <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700">
-               <label className="flex items-center cursor-pointer group">
-                  <input
-                    type="checkbox"
-                    name="enablePublicStream"
-                    checked={config.enablePublicStream || false}
-                    onChange={(e) => {
-                       store.handleConfigChangeManual((prev: any) => ({
-                         ...prev,
-                         enablePublicStream: e.target.checked
-                       }))
-                    }}
-                    className="h-5 w-5 rounded text-indigo-600 focus:ring-indigo-500 border-gray-300"
-                  />
-                  <div className="ml-3 flex items-center gap-2">
-                    <span className="text-sm font-bold text-gray-800 dark:text-slate-200 group-hover:text-indigo-600 transition-colors">
-                      Izinkan Penonton Publik
-                    </span>
-                    {!isPremium && (
-                      <span className="text-[9px] bg-gradient-to-r from-amber-200 to-amber-400 text-amber-900 px-2 py-0.5 rounded-full uppercase tracking-widest font-black shadow-sm flex items-center gap-1">
-                        <SparklesIcon className="w-3 h-3" /> Premium
-                      </span>
-                    )}
-                  </div>
-                </label>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-2 pl-8">
-                  Menyediakan link streaming public sehingga penonton atau orang tua dapat melihat kemajuan/nilai siswa secara live selama ujian berlangsung.
-                </p>
-            </div>
           </div>
         </div>
       </div>

@@ -211,7 +211,7 @@ class StorageService {
       return archiveService.deleteArchive(filename);
   }
 
-  async addCollaborator(examCode: string, label: string, role: 'editor' | 'viewer'): Promise<string> {
+  async addCollaborator(examCode: string, label: string, role: 'editor' | 'viewer' | 'public'): Promise<string> {
       return examService.addCollaborator(examCode, label, role);
   }
 
@@ -219,7 +219,7 @@ class StorageService {
       return examService.removeCollaborator(examCode, token);
   }
 
-  async getExamByCollaboratorToken(code: string, token: string): Promise<{ exam: Exam, role: 'editor' | 'viewer' } | null> {
+  async getExamByCollaboratorToken(code: string, token: string): Promise<{ exam: Exam, role: 'editor' | 'viewer' | 'public' } | null> {
       return examService.getExamByCollaboratorToken(code, token);
   }
 
