@@ -4,7 +4,7 @@ import { XMarkIcon, DocumentDuplicateIcon, ShieldCheckIcon, UserIcon } from "../
 interface ShareModalProps {
   isOpen: boolean;
   onClose: () => void;
-  liveUrl: string;
+  liveUrl?: string;
   proctorUrl?: string;
   examCode?: string;
 }
@@ -16,17 +16,30 @@ export const ShareModal: React.FC<ShareModalProps> = ({
   proctorUrl,
   examCode,
 }) => {
+  const hasProctor = Boolean(proctorUrl && proctorUrl.trim().length > 0);
+  const hasPublic = Boolean(liveUrl && liveUrl.trim().length > 0);
+
   const [activeTab, setActiveTab] = useState<"proctor" | "public">(
-    proctorUrl ? "proctor" : "public"
+    hasProctor ? "proctor" : "public"
   );
   const [copied, setCopied] = useState(false);
 
-  if (!isOpen) return null;
+  React.useEffect(() => {
+    if (hasProctor && !hasPublic) {
+      setActiveTab("proctor");
+    } else if (!hasProctor && hasPublic) {
+      setActiveTab("public");
+    }
+  }, [hasProctor, hasPublic]);
 
-  const currentUrl = activeTab === "proctor" && proctorUrl ? proctorUrl : liveUrl;
-  const isProctorTab = activeTab === "proctor";
+  if (!isOpen || (!hasProctor && !hasPublic)) return null;
+
+  const effectiveTab = activeTab === "proctor" && hasProctor ? "proctor" : hasPublic ? "public" : "proctor";
+  const isProctorTab = effectiveTab === "proctor";
+  const currentUrl = isProctorTab ? (proctorUrl || "") : (liveUrl || "");
 
   const handleCopy = () => {
+    if (!currentUrl) return;
     navigator.clipboard.writeText(currentUrl);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
@@ -51,33 +64,49 @@ export const ShareModal: React.FC<ShareModalProps> = ({
           Bagikan Akses Pantauan Live
         </h3>
 
-        {/* Tab Selection: Pengawas vs Orang Tua */}
-        <div className="flex items-center p-1 bg-slate-100 dark:bg-slate-900 rounded-2xl mb-5">
-          <button
-            type="button"
-            onClick={() => setActiveTab("proctor")}
-            className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
-              isProctorTab
-                ? "bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 shadow-sm"
-                : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
-            }`}
-          >
-            <ShieldCheckIcon className="w-4 h-4" />
-            <span>Pengawas Ujian</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab("public")}
-            className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
-              !isProctorTab
-                ? "bg-white dark:bg-slate-800 text-teal-600 dark:text-teal-400 shadow-sm"
-                : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
-            }`}
-          >
-            <UserIcon className="w-4 h-4" />
-            <span>Orang Tua / Publik</span>
-          </button>
-        </div>
+        {/* Tab Selection: Only render switcher if BOTH roles are active */}
+        {hasProctor && hasPublic ? (
+          <div className="flex items-center p-1 bg-slate-100 dark:bg-slate-900 rounded-2xl mb-5">
+            <button
+              type="button"
+              onClick={() => setActiveTab("proctor")}
+              className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+                isProctorTab
+                  ? "bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 shadow-sm"
+                  : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+              }`}
+            >
+              <ShieldCheckIcon className="w-4 h-4" />
+              <span>Pengawas Ujian</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab("public")}
+              className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+                !isProctorTab
+                  ? "bg-white dark:bg-slate-800 text-teal-600 dark:text-teal-400 shadow-sm"
+                  : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+              }`}
+            >
+              <UserIcon className="w-4 h-4" />
+              <span>Orang Tua / Publik</span>
+            </button>
+          </div>
+        ) : (
+          <div className="mb-4 inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-700/60 text-xs font-bold text-slate-700 dark:text-slate-200">
+            {isProctorTab ? (
+              <>
+                <ShieldCheckIcon className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+                <span>Pengawas Ujian</span>
+              </>
+            ) : (
+              <>
+                <UserIcon className="w-4 h-4 text-teal-600 dark:text-teal-400" />
+                <span>Orang Tua / Publik</span>
+              </>
+            )}
+          </div>
+        )}
 
         {/* Role Permissions Badge */}
         <div
