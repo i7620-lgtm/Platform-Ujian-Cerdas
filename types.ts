@@ -225,7 +225,7 @@ export interface Exam {
 export interface Collaborator {
     token: string;
     label: string; // e.g. "Pak Budi"
-    role: 'editor' | 'viewer';
+    role: 'editor' | 'viewer' | 'public';
     createdAt: number;
 }
 
