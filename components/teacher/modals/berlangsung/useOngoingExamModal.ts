@@ -809,40 +809,37 @@ export const useOngoingExamModal = ({
     [displayExam],
   );
 
-  const [proctorToken, setProctorToken] = useState<string>("");
+  const proctorCollab = useMemo(() => {
+    const collabs = displayExam?.config?.collaborators || [];
+    return collabs.find((c) => c.role === "viewer");
+  }, [displayExam?.config?.collaborators]);
 
-  useEffect(() => {
-    if (!displayExam?.code) return;
-    const collabs = displayExam.config?.collaborators || [];
-    const viewer = collabs.find((c) => c.role === "viewer");
-    if (viewer?.token) {
-      setProctorToken(viewer.token);
-    } else {
-      storageService
-        .addCollaborator(displayExam.code, "Pengawas (Live Monitor)", "viewer")
-        .then((token) => {
-          if (token) setProctorToken(token);
-        })
-        .catch(() => {});
-    }
-  }, [displayExam?.code, displayExam?.config?.collaborators]);
+  const publicCollab = useMemo(() => {
+    const collabs = displayExam?.config?.collaborators || [];
+    return collabs.find((c) => c.role === "public");
+  }, [displayExam?.config?.collaborators]);
 
   const proctorUrl = useMemo(() => {
-    if (typeof window !== "undefined" && displayExam?.code) {
-      if (proctorToken) {
-        return `${window.location.origin}/?collab_code=${displayExam.code}&collab_token=${proctorToken}`;
-      }
-      return `${window.location.origin}/?live=${displayExam.code}`;
+    if (
+      typeof window !== "undefined" &&
+      displayExam?.code &&
+      proctorCollab?.token
+    ) {
+      return `${window.location.origin}/?collab_code=${displayExam.code}&collab_token=${proctorCollab.token}`;
     }
     return "";
-  }, [displayExam?.code, proctorToken]);
+  }, [displayExam?.code, proctorCollab?.token]);
 
   const liveUrl = useMemo(() => {
-    if (typeof window !== "undefined" && displayExam?.code) {
-      return `${window.location.origin}/?live=${displayExam.code}`;
+    if (
+      typeof window !== "undefined" &&
+      displayExam?.code &&
+      publicCollab?.token
+    ) {
+      return `${window.location.origin}/?collab_code=${displayExam.code}&collab_token=${publicCollab.token}`;
     }
     return "";
-  }, [displayExam?.code]);
+  }, [displayExam?.code, publicCollab?.token]);
 
   const joinUrl = useMemo(() => {
     if (typeof window !== "undefined" && displayExam?.code) {
