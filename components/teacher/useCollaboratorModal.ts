@@ -12,9 +12,9 @@ export const useCollaboratorModal = ({
   onUpdate,
 }: UseCollaboratorModalParams) => {
   const [isLoading, setIsLoading] = useState(false);
-  const [copiedRole, setCopiedRole] = useState<"viewer" | "editor" | null>(
-    null,
-  );
+  const [copiedRole, setCopiedRole] = useState<
+    "viewer" | "editor" | "public" | null
+  >(null);
 
   const collaborators = exam.config.collaborators || [];
 
@@ -26,12 +26,26 @@ export const useCollaboratorModal = ({
     .filter((c) => c.role === "editor")
     .sort((a, b) => b.createdAt - a.createdAt)[0];
 
+  const publicCollaborator = collaborators
+    .filter((c) => c.role === "public")
+    .sort((a, b) => b.createdAt - a.createdAt)[0];
+
+  const getRoleLabel = (role: "viewer" | "editor" | "public") => {
+    switch (role) {
+      case "viewer":
+        return "Pengawas (Live Monitor)";
+      case "editor":
+        return "Editor (Shared)";
+      case "public":
+        return "Orang Tua / Publik (Live Stream)";
+    }
+  };
+
   const handleCreateLink = useCallback(
-    async (role: "viewer" | "editor") => {
+    async (role: "viewer" | "editor" | "public") => {
       setIsLoading(true);
       try {
-        const label =
-          role === "viewer" ? "Pengawas (Shared)" : "Editor (Shared)";
+        const label = getRoleLabel(role);
         await storageService.addCollaborator(exam.code, label, role);
         onUpdate();
       } catch {
@@ -44,7 +58,7 @@ export const useCollaboratorModal = ({
   );
 
   const handleResetLink = useCallback(
-    async (role: "viewer" | "editor", oldToken: string) => {
+    async (role: "viewer" | "editor" | "public", oldToken: string) => {
       if (
         !confirm("Link lama akan hangus dan link baru akan dibuat. Lanjutkan?")
       )
@@ -52,8 +66,7 @@ export const useCollaboratorModal = ({
       setIsLoading(true);
       try {
         await storageService.removeCollaborator(exam.code, oldToken);
-        const label =
-          role === "viewer" ? "Pengawas (Shared)" : "Editor (Shared)";
+        const label = getRoleLabel(role);
         await storageService.addCollaborator(exam.code, label, role);
         onUpdate();
       } catch {
@@ -96,7 +109,7 @@ export const useCollaboratorModal = ({
   );
 
   const copyLink = useCallback(
-    (token: string, role: "viewer" | "editor") => {
+    (token: string, role: "viewer" | "editor" | "public") => {
       navigator.clipboard.writeText(getLink(token));
       setCopiedRole(role);
       setTimeout(() => setCopiedRole(null), 2000);
@@ -109,6 +122,7 @@ export const useCollaboratorModal = ({
     copiedRole,
     viewerCollaborator,
     editorCollaborator,
+    publicCollaborator,
     handleCreateLink,
     handleResetLink,
     handleDeleteLink,
