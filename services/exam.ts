@@ -673,7 +673,7 @@ export class ExamService {
 
         let includeAnswers = false;
         if (studentId === 'monitor') {
-            includeAnswers = !!exam.config.enablePublicStream;
+            includeAnswers = !!exam.config.enablePublicStream || (exam.config.collaborators || []).some(c => c.role === 'public' || c.role === 'viewer');
         }
 
         return this.sanitizeExamForStudent(exam, studentId, includeAnswers);
@@ -1311,7 +1311,7 @@ export class ExamService {
         }
     }
 
-    async addCollaborator(examCode: string, label: string, role: 'editor' | 'viewer'): Promise<string> {
+    async addCollaborator(examCode: string, label: string, role: 'editor' | 'viewer' | 'public'): Promise<string> {
         const cleanCode = (examCode || '').trim().toUpperCase();
         let config: ExamConfig | null = null;
         let localExam: Exam | null = null;
@@ -1422,7 +1422,7 @@ export class ExamService {
         }
     }
 
-    async getExamByCollaboratorToken(code: string, token: string): Promise<{ exam: Exam, role: 'editor' | 'viewer' } | null> {
+    async getExamByCollaboratorToken(code: string, token: string): Promise<{ exam: Exam, role: 'editor' | 'viewer' | 'public' } | null> {
         const cleanCode = (code || '').trim().toUpperCase();
 
         const { data } = await supabase
