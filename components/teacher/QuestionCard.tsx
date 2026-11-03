@@ -24,8 +24,8 @@ interface QuestionCardProps {
   q: Question;
   index: number;
   questionNumber: number;
-  isGenerating: boolean;
-  onGenerate: (q: Question) => void;
+  isGenerating?: boolean;
+  onGenerate?: (q: Question) => void;
 }
 
 export const QuestionCard = React.memo(
@@ -122,28 +122,6 @@ export const QuestionCard = React.memo(
             </div>
 
             <div className="flex items-center gap-2 flex-wrap">
-              {q.questionType !== "INFO" && (
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onGenerate(q);
-                  }}
-                  disabled={isGenerating}
-                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border transition-colors shadow-2xs disabled:opacity-50 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 border-emerald-200 dark:border-emerald-800"
-                  title="Buat dengan AI"
-                >
-                  {isGenerating ? (
-                    <ArrowPathIcon className="w-3.5 h-3.5 animate-spin" />
-                  ) : (
-                    <SparklesIcon className="w-3.5 h-3.5" />
-                  )}
-                  <span className="text-[10px] font-black uppercase tracking-wider">
-                    AI
-                  </span>
-                </button>
-              )}
-
               <div className="relative inline-block bg-white dark:bg-slate-800 rounded-lg shadow-2xs">
                 <select
                   value={q.questionType}
@@ -260,7 +238,7 @@ export const QuestionCard = React.memo(
                           />
                           {validation?.category && (
                             <p className="text-[10px] text-red-600 dark:text-red-400 font-semibold mt-1">
-                              * Wajib diisi sebelum membuat dengan AI
+                              * Wajib diisi
                             </p>
                           )}
                         </div>
@@ -286,7 +264,7 @@ export const QuestionCard = React.memo(
                           />
                           {validation?.level && (
                             <p className="text-[10px] text-red-600 dark:text-red-400 font-semibold mt-1">
-                              * Wajib diisi sebelum membuat dengan AI
+                              * Wajib diisi
                             </p>
                           )}
                         </div>
