@@ -52,11 +52,12 @@ export class AnalyticsService {
       const exam = examMap.get(res.examCode);
 
       if (isGuru) {
-        // GURU: Hanya naskah buatannya sendiri
-        if (exam && exam.authorId && profile.id) {
+        // GURU: Hanya naskah buatannya sendiri (entah sekolahnya sama ataupun tidak, selama guru tersebut yang memiliki soalnya)
+        if (!exam) return false;
+        if (exam.authorId && profile.id) {
           if (exam.authorId !== profile.id) return false;
-        } else if (res.student.schoolName && profile.school) {
-          if (res.student.schoolName !== profile.school) return false;
+        } else if (profile.id) {
+          return false;
         }
       } else if (isAdminSekolah) {
         // ADMIN SEKOLAH: Hanya ujian dalam naungan sekolahnya
@@ -184,9 +185,11 @@ export class AnalyticsService {
       } else if (answers['_duration']) {
         const parsed = parseInt(answers['_duration']);
         if (!isNaN(parsed) && parsed > 0) durationSec = parsed;
-      } else if (res.timestamp) {
-        // Estimasi konservatif 15 menit jika data lama tidak memiliki log durasi
-        durationSec = 900;
+      } else if (answers['_startTime'] && res.timestamp) {
+        const start = parseInt(answers['_startTime']);
+        if (!isNaN(start) && res.timestamp > start) {
+          durationSec = Math.max(0, Math.round((res.timestamp - start) / 1000));
+        }
       }
       totalTimeSpentSeconds += durationSec;
 
