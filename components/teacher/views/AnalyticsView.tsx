@@ -52,28 +52,48 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
   const isAdminSekolah = teacherProfile.accountType === 'admin_sekolah';
   const isGuru = !isSuperAdmin && !isAdminSekolah;
 
-  // 1. Ekstrak opsi filter unik (Daftar Kelas & Daftar Sekolah)
+  // Saring data berdasarkan hak akses guru (hanya naskah ciptaan guru tersebut)
+  const roleScopedResults = useMemo(() => {
+    const { filteredResults: roleResults } = analyticsService.filterResultsByRoleAndCriteria(
+      results,
+      exams,
+      teacherProfile,
+      { dateRange: 'this_year', classLevel: 'ALL', school: 'ALL', searchQuery: '' }
+    );
+    return roleResults;
+  }, [results, exams, teacherProfile]);
+
+  // 1. Ekstrak opsi filter unik (Daftar Kelas & Daftar Sekolah khusus ujian milik guru)
   const availableClasses = useMemo(() => {
     const classSet = new Set<string>();
-    results.forEach(r => {
+    const source = isSuperAdmin ? results : roleScopedResults;
+    source.forEach(r => {
       if (r.student?.class && r.student.class !== 'PREVIEW') {
         classSet.add(r.student.class.trim());
       }
     });
     return Array.from(classSet).sort();
-  }, [results]);
+  }, [results, roleScopedResults, isSuperAdmin]);
 
   const availableSchools = useMemo(() => {
     const schoolSet = new Set<string>();
-    results.forEach(r => {
-      if (r.student?.schoolName) schoolSet.add(r.student.schoolName.trim());
-    });
-    Object.values(exams).forEach(e => {
-      if (e.authorSchool) schoolSet.add(e.authorSchool.trim());
-    });
-    if (teacherProfile.school) schoolSet.add(teacherProfile.school.trim());
+    if (isSuperAdmin) {
+      results.forEach(r => {
+        if (r.student?.schoolName) schoolSet.add(r.student.schoolName.trim());
+      });
+      Object.values(exams).forEach(e => {
+        if (e.authorSchool) schoolSet.add(e.authorSchool.trim());
+      });
+      if (teacherProfile.school) schoolSet.add(teacherProfile.school.trim());
+    } else {
+      // Guru & Admin Sekolah: HANYA sekolah dari siswa yang mengikuti ujian milik guru/sekolah ini
+      roleScopedResults.forEach(r => {
+        if (r.student?.schoolName) schoolSet.add(r.student.schoolName.trim());
+      });
+      if (teacherProfile.school) schoolSet.add(teacherProfile.school.trim());
+    }
     return Array.from(schoolSet).filter(Boolean).sort();
-  }, [results, exams, teacherProfile.school]);
+  }, [results, exams, roleScopedResults, isSuperAdmin, teacherProfile.school]);
 
   // 2. Filter data hasil & hitung statistik komprehensif
   const { filteredResults } = useMemo(() => {
@@ -700,7 +720,14 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
                     durationSec = res.completionTime;
                   } else if (answers['_duration']) {
                     durationSec = parseInt(answers['_duration']) || 0;
+                  } else if (answers['_startTime'] && res.timestamp) {
+                    const start = parseInt(answers['_startTime']);
+                    if (!isNaN(start) && res.timestamp > start) {
+                      durationSec = Math.max(0, Math.round((res.timestamp - start) / 1000));
+                    }
                   }
+
+                  const isFinished = res.status === 'completed' || res.status === 'force_closed';
 
                   // Kuota
                   let bandwidthBytes = 0;
@@ -738,7 +765,20 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
                         {res.score ?? '-'}
                       </td>
                       <td className="py-3 px-4 text-right font-mono text-slate-600 dark:text-slate-400 tabular-nums">
-                        {Math.round(durationSec / 60)}m
+                        {durationSec > 0 ? (
+                          formatDurationHuman(durationSec)
+                        ) : !isFinished ? (
+                          <span
+                            className="text-amber-600 dark:text-amber-400 text-[11px] font-semibold"
+                            title="Siswa belum menyelesaikan pengerjaan"
+                          >
+                            Belum Selesai
+                          </span>
+                        ) : (
+                          <span className="text-slate-400 text-[11px] font-medium">
+                            0 detik
+                          </span>
+                        )}
                       </td>
                       <td className="py-3 px-4 text-right font-mono text-slate-700 dark:text-slate-300 tabular-nums font-semibold">
                         {formatBandwidth(bandwidthBytes)}
