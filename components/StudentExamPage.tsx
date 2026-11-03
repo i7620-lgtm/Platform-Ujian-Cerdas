@@ -280,7 +280,7 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({
     };
     window.addEventListener("beforeunload", handleBeforeUnload);
 
-    // 3. Prevent iOS Safari & Android pull-to-refresh when dragging down from top
+    // 3. Cegah tarikan notifikasi dari area 50px teratas layar dan cegah pull-to-refresh
     let startY = 0;
     const handleTouchStart = (e: TouchEvent) => {
       if (e.touches.length === 1) {
@@ -291,7 +291,18 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({
       if (e.touches.length === 1) {
         const currentY = e.touches[0].clientY;
         const scrollTop = window.scrollY || document.documentElement.scrollTop;
-        if (scrollTop <= 0 && currentY > startY + 12) {
+
+        // Kunci fungsi lihat notifikasi melayang: Cegah drag dari atas ke bawah pada area 50 piksel teratas layar
+        if ((startY <= 50 || currentY <= 50) && currentY >= startY) {
+          if (e.cancelable) {
+            e.preventDefault();
+            e.stopPropagation();
+          }
+          return;
+        }
+
+        // Cegah pull-to-refresh peramban saat berada di posisi paling atas
+        if (scrollTop <= 0 && currentY > startY + 8) {
           if (e.cancelable) {
             e.preventDefault();
           }
@@ -299,14 +310,14 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({
       }
     };
 
-    window.addEventListener("touchstart", handleTouchStart, { passive: true });
-    window.addEventListener("touchmove", handleTouchMove, { passive: false });
+    window.addEventListener("touchstart", handleTouchStart, { passive: true, capture: true });
+    window.addEventListener("touchmove", handleTouchMove, { passive: false, capture: true });
 
     return () => {
       window.removeEventListener("popstate", handlePopState);
       window.removeEventListener("beforeunload", handleBeforeUnload);
-      window.removeEventListener("touchstart", handleTouchStart);
-      window.removeEventListener("touchmove", handleTouchMove);
+      window.removeEventListener("touchstart", handleTouchStart, true);
+      window.removeEventListener("touchmove", handleTouchMove, true);
     };
   }, [isSubmitting]);
 
@@ -315,8 +326,97 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({
     window.scrollTo({ top: 0, left: 0, behavior: "instant" });
   }, []);
 
+  // Proteksi keamanan ujian: Cegah tekan lama (long-press), seleksi teks, klik kanan, drag, dan copy-paste
+  useEffect(() => {
+    // 1. Cegah context menu (klik kanan atau long-press context menu di Chrome / browser ponsel)
+    const handleContextMenu = (e: MouseEvent) => {
+      e.preventDefault();
+    };
+
+    // 2. Cegah seleksi teks / blok teks di luar input & textarea
+    const handleSelectStart = (e: Event) => {
+      const target = e.target as HTMLElement | null;
+      if (
+        target &&
+        (target.tagName === "INPUT" ||
+          target.tagName === "TEXTAREA" ||
+          target.isContentEditable)
+      ) {
+        return; // Izinkan penempatan kursor / pengetikan di kolom esai atau isian
+      }
+      e.preventDefault();
+    };
+
+    // 3. Cegah drag and drop teks maupun gambar
+    const handleDragStart = (e: DragEvent) => {
+      e.preventDefault();
+    };
+
+    // 4. Cegah operasi clipboard (copy, cut, paste) di seluruh halaman ujian secara senyap
+    const handleCopy = (e: ClipboardEvent) => {
+      e.preventDefault();
+    };
+    const handleCut = (e: ClipboardEvent) => {
+      e.preventDefault();
+    };
+    const handlePaste = (e: ClipboardEvent) => {
+      e.preventDefault();
+    };
+
+    // 5. Cegah tombol pintas keyboard (Ctrl/Cmd + C, V, X, U, A di luar input, F12, Ctrl+Shift+I)
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const isCtrlOrCmd = e.ctrlKey || e.metaKey;
+      const key = e.key.toLowerCase();
+      const target = e.target as HTMLElement | null;
+      const isInput =
+        target &&
+        (target.tagName === "INPUT" ||
+          target.tagName === "TEXTAREA" ||
+          target.isContentEditable);
+
+      // Blokir pintasan developer tools (F12, Ctrl+Shift+I/J/C)
+      if (
+        e.key === "F12" ||
+        (isCtrlOrCmd && e.shiftKey && ["i", "j", "c"].includes(key)) ||
+        (isCtrlOrCmd && key === "u") // View source
+      ) {
+        e.preventDefault();
+        return;
+      }
+
+      // Blokir Copy, Paste, Cut
+      if (isCtrlOrCmd && ["c", "v", "x"].includes(key)) {
+        e.preventDefault();
+        return;
+      }
+
+      // Blokir Select All jika tidak sedang mengetik di input/textarea
+      if (isCtrlOrCmd && key === "a" && !isInput) {
+        e.preventDefault();
+      }
+    };
+
+    document.addEventListener("contextmenu", handleContextMenu, { capture: true });
+    document.addEventListener("selectstart", handleSelectStart, { capture: true });
+    document.addEventListener("dragstart", handleDragStart, { capture: true });
+    document.addEventListener("copy", handleCopy, { capture: true });
+    document.addEventListener("cut", handleCut, { capture: true });
+    document.addEventListener("paste", handlePaste, { capture: true });
+    document.addEventListener("keydown", handleKeyDown, { capture: true });
+
+    return () => {
+      document.removeEventListener("contextmenu", handleContextMenu, { capture: true });
+      document.removeEventListener("selectstart", handleSelectStart, { capture: true });
+      document.removeEventListener("dragstart", handleDragStart, { capture: true });
+      document.removeEventListener("copy", handleCopy, { capture: true });
+      document.removeEventListener("cut", handleCut, { capture: true });
+      document.removeEventListener("paste", handlePaste, { capture: true });
+      document.removeEventListener("keydown", handleKeyDown, { capture: true });
+    };
+  }, []);
+
   return (
-    <div className="min-h-screen bg-[#F8FAFC] dark:bg-slate-950 font-sans selection:bg-indigo-100 selection:text-indigo-900 pb-40 transition-colors duration-300">
+    <div className="min-h-screen bg-[#F8FAFC] dark:bg-slate-950 font-sans exam-secure-shield select-none pb-40 transition-colors duration-300">
       {/* Modal Informasi Aturan Ujian */}
       {showConfigIntro && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-md animate-fade-in">
@@ -965,7 +1065,11 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({
                           onChange={(e) =>
                             handleAnswerChange(q.id, e.target.value)
                           }
-                          className="w-full p-5 bg-slate-50 dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 rounded-xl focus:bg-white dark:focus:bg-slate-900 focus:border-indigo-500 dark:focus:border-indigo-500 outline-none min-h-[160px] text-slate-700 dark:text-slate-200 transition-all resize-y placeholder:text-slate-400 dark:placeholder:text-slate-600 leading-relaxed"
+                          onCopy={(e) => e.preventDefault()}
+                          onCut={(e) => e.preventDefault()}
+                          onPaste={(e) => e.preventDefault()}
+                          onContextMenu={(e) => e.preventDefault()}
+                          className="w-full p-5 bg-slate-50 dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 rounded-xl focus:bg-white dark:focus:bg-slate-900 focus:border-indigo-500 dark:focus:border-indigo-500 outline-none min-h-[160px] text-slate-700 dark:text-slate-200 transition-all resize-y placeholder:text-slate-400 dark:placeholder:text-slate-600 leading-relaxed exam-input-secure"
                           placeholder="Tulis jawaban lengkap Anda..."
                         />
                       )}
@@ -981,7 +1085,11 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({
                             onChange={(e) =>
                               handleAnswerChange(q.id, e.target.value)
                             }
-                            className="w-full pl-12 pr-4 py-4 bg-slate-50 dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 rounded-xl focus:bg-white dark:focus:bg-slate-900 focus:border-indigo-500 dark:focus:border-indigo-500 outline-none font-bold text-slate-800 dark:text-slate-200 placeholder:text-slate-400 dark:placeholder:text-slate-600 transition-all"
+                            onCopy={(e) => e.preventDefault()}
+                            onCut={(e) => e.preventDefault()}
+                            onPaste={(e) => e.preventDefault()}
+                            onContextMenu={(e) => e.preventDefault()}
+                            className="w-full pl-12 pr-4 py-4 bg-slate-50 dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 rounded-xl focus:bg-white dark:focus:bg-slate-900 focus:border-indigo-500 dark:focus:border-indigo-500 outline-none font-bold text-slate-800 dark:text-slate-200 placeholder:text-slate-400 dark:placeholder:text-slate-600 transition-all exam-input-secure"
                             placeholder="Ketik jawaban singkat..."
                           />
                         </div>

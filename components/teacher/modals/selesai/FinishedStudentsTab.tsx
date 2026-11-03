@@ -341,7 +341,7 @@ export const FinishedStudentsTab: React.FC<FinishedStudentsTabProps> = ({
                             })}
                         </div>
                         <p className="text-[10px] text-slate-400 dark:text-slate-500 italic mb-4">
-                          * Arahkan kursor (hover) atau klik nomor soal untuk melihat soal, opsi, kunci jawaban, jawaban siswa, dan pembahasan.
+                          * Klik nomor soal untuk melihat soal, opsi, kunci jawaban, jawaban siswa, dan pembahasan.
                         </p>
 
                         {/* MANUAL GRADING UI (ONLY ESSAY & FILL_IN_THE_BLANK) */}

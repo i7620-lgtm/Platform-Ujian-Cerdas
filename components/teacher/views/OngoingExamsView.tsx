@@ -1,18 +1,10 @@
 import React from "react";
-import { createPortal } from "react-dom";
 import type { Exam, Result } from "../../../types";
 import {
   ClockIcon,
-  QrCodeIcon,
-  ShareIcon,
-  DocumentDuplicateIcon,
-  XMarkIcon,
-  UserIcon,
 } from "../../Icons";
-import { RemainingTime, MetaBadge } from "./SharedComponents";
 import { CollaboratorModal } from "../CollaboratorModal";
 import { JoinQrModal } from "./JoinQrModal";
-import { ParentQrModal } from "./ParentQrModal";
 import { OngoingExamCard } from "./OngoingExamCard";
 import { useOngoingExamsView } from "../useOngoingExamsView";
 export const OngoingExamsView: React.FC<{
@@ -30,12 +22,9 @@ export const OngoingExamsView: React.FC<{
 }) => {
   const {
     joinQrExam,
-    parentQrExam,
     collabExam,
     setJoinQrExam,
-    setParentQrExam,
     setCollabExam,
-    handleCopyLiveLink,
     handleCopyJoinLink,
     handleDuplicate,
   } = useOngoingExamsView({ onDuplicateExam, setSelectedOngoingExam });
@@ -70,7 +59,6 @@ export const OngoingExamsView: React.FC<{
                 onClick={() => setSelectedOngoingExam(exam)}
                 onQrClick={() => setJoinQrExam(exam)}
                 onCollabClick={() => setCollabExam(exam)}
-                onShareClick={() => setParentQrExam(exam)}
                 onDuplicateClick={() => handleDuplicate(exam)}
               />
             );
@@ -95,14 +83,6 @@ export const OngoingExamsView: React.FC<{
           exam={joinQrExam}
           onClose={() => setJoinQrExam(null)}
           onCopyLink={handleCopyJoinLink}
-        />
-      )}
-
-      {parentQrExam && (
-        <ParentQrModal
-          exam={parentQrExam}
-          onClose={() => setParentQrExam(null)}
-          onCopyLink={handleCopyLiveLink}
         />
       )}
 

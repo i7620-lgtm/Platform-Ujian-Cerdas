@@ -135,6 +135,7 @@ export const useExamAntiCheat = ({
         if (student.class === 'PREVIEW' || !exam.config.detectBehavior || isPR) return;
 
         let blurTimeout: ReturnType<typeof setTimeout> | null = null;
+        let notifLockTimeout: ReturnType<typeof setTimeout> | null = null;
 
         const handleViolation = (type: 'soft' | 'hard', reason: string) => {
             const currentIsPR = (exam.config.examMode || '').trim().toUpperCase() === 'PR';
@@ -147,7 +148,7 @@ export const useExamAntiCheat = ({
                 logs: logRef.current,
             });
 
-            // Hanya kunci sesi jika merupakan pelanggaran 'hard' (terbukti meninggalkan aplikasi/tab)
+            // Hanya kunci sesi jika merupakan pelanggaran 'hard' (terbukti meninggalkan aplikasi/tab atau buka notifikasi > 5 detik)
             if (type === 'hard' && exam.config.continueWithPermission) {
                 onForceSubmit(true, 'force_closed');
             }
@@ -177,24 +178,35 @@ export const useExamAntiCheat = ({
                 return;
             }
 
-            // 2. Berikan toleransi waktu 1500ms untuk transisi gestur / notifikasi sebelum memutuskan
+            // 2. Berikan toleransi waktu 1500ms untuk pencatatan log awal jika kehilangan fokus
             if (blurTimeout) clearTimeout(blurTimeout);
             blurTimeout = setTimeout(() => {
-                // Jika setelah 1500ms layar masih tersembunyi, catat sebagai pelanggaran
                 if (document.hidden && !isSubmittingRef.current) {
                     handleViolation('hard', 'Meninggalkan halaman ujian');
                 } else if (!document.hasFocus() && !isSubmittingRef.current) {
-                    // Hanya catat log soft tanpa mengunci sesi
-                    handleViolation('soft', 'Kehilangan fokus sementara');
+                    handleViolation('soft', 'Kehilangan fokus sementara / notifikasi');
                 }
             }, 1500);
+
+            // 3. Batas toleransi 5 detik (5000ms): Jika siswa tetap melihat notifikasi / tidak kembali fokus selama > 5 detik,
+            // dan guru mengaktifkan 'Kunci Akses Jika Melanggar' (continueWithPermission), kunci aplikasi secara otomatis
+            if (notifLockTimeout) clearTimeout(notifLockTimeout);
+            notifLockTimeout = setTimeout(() => {
+                if (!isSubmittingRef.current && (!document.hasFocus() || document.hidden)) {
+                    handleViolation('hard', 'Melihat notifikasi / kehilangan fokus lebih dari 5 detik');
+                }
+            }, 5000);
         };
 
         const handleFocus = () => {
-            // Batalkan timer blur jika pengguna kembali fokus seketika
+            // Batalkan kedua timer jika pengguna kembali fokus sebelum batas waktu
             if (blurTimeout) {
                 clearTimeout(blurTimeout);
                 blurTimeout = null;
+            }
+            if (notifLockTimeout) {
+                clearTimeout(notifLockTimeout);
+                notifLockTimeout = null;
             }
         };
 
@@ -204,6 +216,7 @@ export const useExamAntiCheat = ({
 
         return () => {
             if (blurTimeout) clearTimeout(blurTimeout);
+            if (notifLockTimeout) clearTimeout(notifLockTimeout);
             document.removeEventListener('visibilitychange', handleVisibilityChange);
             window.removeEventListener('blur', handleBlur);
             window.removeEventListener('focus', handleFocus);

@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState } from "react";
 import { createPortal } from "react-dom";
 import type { Question } from "../types";
 import {
@@ -40,13 +40,7 @@ export const QuestionResultDetailPopover: React.FC<
   showSolutionSteps = true,
   size = "sm",
 }) => {
-  const [isHovered, setIsHovered] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [coords, setCoords] = useState<{ top: number; left: number } | null>(
-    null,
-  );
-  const triggerRef = useRef<HTMLButtonElement>(null);
-  const hoverTimeoutRef = useRef<number | null>(null);
 
   const studentAns = answers[question.id] || "";
   const correctAns = question.correctAnswer || "";
@@ -106,56 +100,10 @@ export const QuestionResultDetailPopover: React.FC<
       "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border-slate-200 dark:border-slate-700";
   }
 
-  const statusLabel = `${statusText} (${pointsText})`;
-
-  // Hitung posisi popover hover agar selalu berada di dalam viewport layar
-  const updatePosition = () => {
-    if (!triggerRef.current) return;
-    const rect = triggerRef.current.getBoundingClientRect();
-    const popoverWidth = Math.min(420, window.innerWidth - 32);
-
-    let left = rect.left + rect.width / 2 - popoverWidth / 2;
-    if (left < 16) left = 16;
-    if (left + popoverWidth > window.innerWidth - 16) {
-      left = window.innerWidth - 16 - popoverWidth;
-    }
-
-    let top = rect.bottom + 8;
-    // Jika terlalu mepet ke bawah layar, posisikan ke atas tombol
-    if (top + 280 > window.innerHeight && rect.top > 300) {
-      top = rect.top - 8;
-    }
-
-    setCoords({ top, left });
-  };
-
-  const handleMouseEnter = () => {
-    // Hanya trigger hover pada perangkat yang memiliki mouse hover
-    if (window.matchMedia("(pointer: fine)").matches) {
-      if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
-      updatePosition();
-      setIsHovered(true);
-    }
-  };
-
-  const handleMouseLeave = () => {
-    if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
-    hoverTimeoutRef.current = window.setTimeout(() => {
-      setIsHovered(false);
-    }, 150);
-  };
-
   const handleTriggerClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    setIsHovered(false);
     setIsModalOpen(true);
   };
-
-  useEffect(() => {
-    return () => {
-      if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
-    };
-  }, []);
 
   // Helper render konten soal
   const renderDetailContent = (onClose?: () => void) => {
@@ -508,11 +456,8 @@ export const QuestionResultDetailPopover: React.FC<
     <>
       {/* Tombol Kotak Nomor Soal */}
       <button
-        ref={triggerRef}
         type="button"
         onClick={handleTriggerClick}
-        onMouseEnter={handleMouseEnter}
-        onMouseLeave={handleMouseLeave}
         className={`${
           size === "md" ? "w-8 h-8 text-xs" : "w-6 h-6 text-[10px]"
         } flex items-center justify-center rounded font-bold cursor-pointer transition-all duration-150 transform hover:scale-110 active:scale-95 shadow-2xs select-none ${badgeColorClass}`}
@@ -522,31 +467,7 @@ export const QuestionResultDetailPopover: React.FC<
         {questionIndex + 1}
       </button>
 
-      {/* Popover Desktop Saat Kursor Hover */}
-      {isHovered &&
-        coords &&
-        createPortal(
-          <div
-            style={{
-              position: "fixed",
-              top: `${coords.top}px`,
-              left: `${coords.left}px`,
-              width: "min(420px, calc(100vw - 32px))",
-              maxHeight: "80vh",
-            }}
-            className="z-[9999] bg-white/98 dark:bg-slate-900/98 backdrop-blur-xl rounded-2xl p-4 shadow-2xl border border-slate-200/90 dark:border-slate-800 ring-1 ring-black/5 dark:ring-white/10 overflow-y-auto animate-fade-in custom-scrollbar pointer-events-auto"
-            onMouseEnter={() => {
-              if (hoverTimeoutRef.current)
-                clearTimeout(hoverTimeoutRef.current);
-            }}
-            onMouseLeave={handleMouseLeave}
-          >
-            {renderDetailContent()}
-          </div>,
-          document.body,
-        )}
-
-      {/* Modal Dialog Pop-up Saat Diklik / di Perangkat Mobile */}
+      {/* Modal Dialog Pop-up Rincian Saat Diklik */}
       {isModalOpen &&
         createPortal(
           <div

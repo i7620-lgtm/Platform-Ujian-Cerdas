@@ -332,14 +332,11 @@ export const ExternalAiPromptPanel: React.FC<ExternalAiPromptPanelProps> = ({
             <div className="flex items-center gap-2 flex-wrap">
               <span className="bg-white/20 backdrop-blur-md px-3 py-1 rounded-full text-xs font-bold tracking-wide uppercase flex items-center gap-1.5">
                 <Sparkles className="w-3.5 h-3.5 text-yellow-300 fill-yellow-300" />
-                Generator Prompt AI Eksternal
-              </span>
-              <span className="text-xs text-indigo-200">
-                ChatGPT • Gemini • Claude • DeepSeek
+                Prompt & Impor Soal
               </span>
             </div>
             <h3 className="text-xl md:text-2xl font-black text-white">
-              Buat & Impor Soal dari AI Luar
+              Prompt & Impor Soal
             </h3>
             <p className="text-xs md:text-sm text-indigo-100 max-w-2xl">
               Pilih standar Kurikulum Merdeka atau TKA Kemendikdasmen, atur jenjang dan mata pelajaran, salin prompt AI, lalu tempelkan balasan hasilnya untuk dideploy langsung ke Editor Soal.
@@ -726,65 +723,19 @@ export const ExternalAiPromptPanel: React.FC<ExternalAiPromptPanelProps> = ({
                 </div>
               </div>
 
-              {/* Direct External AI Shortcuts & Next Step */}
-              <div className="space-y-4 pt-2">
-                <div>
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block mb-2">
-                    Buka AI Luar untuk Memproses Prompt Ini:
-                  </span>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                    <a
-                      href="https://chatgpt.com"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 hover:border-emerald-500 bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-bold flex items-center justify-center gap-1.5 transition-all hover:shadow-md"
-                    >
-                      <span>ChatGPT</span>
-                      <ExternalLink className="w-3.5 h-3.5 text-slate-400" />
-                    </a>
-                    <a
-                      href="https://gemini.google.com"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 hover:border-blue-500 bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-bold flex items-center justify-center gap-1.5 transition-all hover:shadow-md"
-                    >
-                      <span>Gemini</span>
-                      <ExternalLink className="w-3.5 h-3.5 text-slate-400" />
-                    </a>
-                    <a
-                      href="https://claude.ai"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 hover:border-amber-500 bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-bold flex items-center justify-center gap-1.5 transition-all hover:shadow-md"
-                    >
-                      <span>Claude</span>
-                      <ExternalLink className="w-3.5 h-3.5 text-slate-400" />
-                    </a>
-                    <a
-                      href="https://chat.deepseek.com"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 hover:border-cyan-500 bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-bold flex items-center justify-center gap-1.5 transition-all hover:shadow-md"
-                    >
-                      <span>DeepSeek</span>
-                      <ExternalLink className="w-3.5 h-3.5 text-slate-400" />
-                    </a>
-                  </div>
-                </div>
-
-                <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
-                  <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">
-                    Sudah menyalin & mendapat balasan dari AI?
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setActiveStep("importer")}
-                    className="bg-indigo-600 text-white font-bold px-5 py-2.5 rounded-xl hover:bg-indigo-700 text-xs transition-all flex items-center gap-2 shadow-md active:scale-95"
-                  >
-                    <span>Lanjut ke Langkah 2: Impor Soal</span>
-                    <ArrowRight className="w-4 h-4" />
-                  </button>
-                </div>
+              {/* Next Step */}
+              <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">
+                  Sudah menyalin & mendapat balasan dari AI?
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setActiveStep("importer")}
+                  className="bg-indigo-600 text-white font-bold px-5 py-2.5 rounded-xl hover:bg-indigo-700 text-xs transition-all flex items-center gap-2 shadow-md active:scale-95"
+                >
+                  <span>Lanjut ke Langkah 2: Impor Soal</span>
+                  <ArrowRight className="w-4 h-4" />
+                </button>
               </div>
             </div>
           </div>
@@ -794,10 +745,10 @@ export const ExternalAiPromptPanel: React.FC<ExternalAiPromptPanelProps> = ({
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100 dark:border-slate-800">
               <div>
                 <h4 className="font-bold text-slate-800 dark:text-slate-100 text-base">
-                  Kotak Penerima & Parser Soal Hasil AI Luar
+                  Kotak Penerima & Parser Soal
                 </h4>
                 <p className="text-xs text-slate-500 dark:text-slate-400">
-                  Tempelkan (*paste*) seluruh jawaban atau blok kode JSON yang diberikan oleh ChatGPT, Gemini, Claude, atau DeepSeek.
+                  Tempelkan (*paste*) seluruh jawaban atau blok kode JSON yang diberikan oleh AI.
                 </p>
               </div>
 
@@ -816,9 +767,9 @@ export const ExternalAiPromptPanel: React.FC<ExternalAiPromptPanelProps> = ({
               <div className="lg:col-span-7 space-y-3">
                 <textarea
                   rows={14}
-                  placeholder={`Tempelkan hasil teks dari ChatGPT / Gemini / Claude di sini...
+                  placeholder={`Tempelkan hasil teks atau format JSON dari AI di sini...
 
-Contoh balasan dari AI:
+Contoh format JSON dari AI:
 \`\`\`json
 [
   {
