@@ -280,7 +280,7 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({
     };
     window.addEventListener("beforeunload", handleBeforeUnload);
 
-    // 3. Prevent iOS Safari & Android pull-to-refresh when dragging down from top
+    // 3. Cegah tarikan notifikasi dari area 50px teratas layar dan cegah pull-to-refresh
     let startY = 0;
     const handleTouchStart = (e: TouchEvent) => {
       if (e.touches.length === 1) {
@@ -291,7 +291,18 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({
       if (e.touches.length === 1) {
         const currentY = e.touches[0].clientY;
         const scrollTop = window.scrollY || document.documentElement.scrollTop;
-        if (scrollTop <= 0 && currentY > startY + 12) {
+
+        // Kunci fungsi lihat notifikasi melayang: Cegah drag dari atas ke bawah pada area 50 piksel teratas layar
+        if ((startY <= 50 || currentY <= 50) && currentY >= startY) {
+          if (e.cancelable) {
+            e.preventDefault();
+            e.stopPropagation();
+          }
+          return;
+        }
+
+        // Cegah pull-to-refresh peramban saat berada di posisi paling atas
+        if (scrollTop <= 0 && currentY > startY + 8) {
           if (e.cancelable) {
             e.preventDefault();
           }
@@ -299,14 +310,14 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({
       }
     };
 
-    window.addEventListener("touchstart", handleTouchStart, { passive: true });
-    window.addEventListener("touchmove", handleTouchMove, { passive: false });
+    window.addEventListener("touchstart", handleTouchStart, { passive: true, capture: true });
+    window.addEventListener("touchmove", handleTouchMove, { passive: false, capture: true });
 
     return () => {
       window.removeEventListener("popstate", handlePopState);
       window.removeEventListener("beforeunload", handleBeforeUnload);
-      window.removeEventListener("touchstart", handleTouchStart);
-      window.removeEventListener("touchmove", handleTouchMove);
+      window.removeEventListener("touchstart", handleTouchStart, true);
+      window.removeEventListener("touchmove", handleTouchMove, true);
     };
   }, [isSubmitting]);
 
