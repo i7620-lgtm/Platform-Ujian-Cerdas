@@ -9,6 +9,7 @@ import {
   ShieldCheckIcon,
   PencilIcon,
   TrashIcon,
+  EyeIcon,
 } from "../Icons";
 import { useCollaboratorModal } from "./useCollaboratorModal";
 
@@ -28,6 +29,7 @@ export const CollaboratorModal: React.FC<CollaboratorModalProps> = ({
     copiedRole,
     viewerCollaborator,
     editorCollaborator,
+    publicCollaborator,
     handleCreateLink,
     handleResetLink,
     handleDeleteLink,
@@ -36,18 +38,30 @@ export const CollaboratorModal: React.FC<CollaboratorModalProps> = ({
   } = useCollaboratorModal({ exam, onUpdate });
 
   const renderRow = (
-    role: "viewer" | "editor",
+    role: "viewer" | "editor" | "public",
     collaborator?: Collaborator,
   ) => {
-    const isViewer = role === "viewer";
-    const title = isViewer ? "Pengawas (Live Monitor)" : "Editor (Edit Soal)";
-    const desc = isViewer
-      ? "Akses pantauan ujian, edit data siswa, dan buat token."
-      : "Akses penuh untuk mengedit soal dan konfigurasi ujian.";
-    const Icon = isViewer ? ShieldCheckIcon : PencilIcon;
-    const colorClass = isViewer
-      ? "text-emerald-600 bg-emerald-50 border-emerald-100"
-      : "text-amber-600 bg-amber-50 border-amber-100";
+    let title = "";
+    let desc = "";
+    let Icon = ShieldCheckIcon;
+    let colorClass = "";
+
+    if (role === "viewer") {
+      title = "Pengawas (Live Monitor)";
+      desc = "Akses pantauan ujian, edit data siswa, dan buat token.";
+      Icon = ShieldCheckIcon;
+      colorClass = "text-emerald-600 bg-emerald-50 border-emerald-100 dark:bg-emerald-950/40 dark:border-emerald-800 dark:text-emerald-300";
+    } else if (role === "editor") {
+      title = "Editor (Edit Soal)";
+      desc = "Akses penuh untuk mengedit soal dan konfigurasi ujian.";
+      Icon = PencilIcon;
+      colorClass = "text-amber-600 bg-amber-50 border-amber-100 dark:bg-amber-950/40 dark:border-amber-800 dark:text-amber-300";
+    } else {
+      title = "Orang Tua / Publik (Live Stream)";
+      desc = "Akses pantauan langsung nilai & progres siswa secara read-only tanpa hak intervensi.";
+      Icon = EyeIcon;
+      colorClass = "text-teal-600 bg-teal-50 border-teal-100 dark:bg-teal-950/40 dark:border-teal-800 dark:text-teal-300";
+    }
 
     return (
       <div
@@ -150,6 +164,7 @@ export const CollaboratorModal: React.FC<CollaboratorModalProps> = ({
 
         <div className="p-5 bg-slate-50/50 dark:bg-slate-900/50 flex flex-col gap-3 overflow-y-auto">
           {renderRow("viewer", viewerCollaborator)}
+          {renderRow("public", publicCollaborator)}
           {renderRow("editor", editorCollaborator)}
         </div>
       </div>
