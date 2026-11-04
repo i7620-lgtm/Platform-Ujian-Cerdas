@@ -779,7 +779,7 @@ const App: React.FC = () => {
             </div>
         )}
         
-        {/* Halaman Awal / Selector: Pas Satu Layar Penuh Tanpa Scroll Horizontal */}
+        {/* Halaman Awal / Selector: Pas Satu Layar Penuh Tanpa Scroll Vertikal & Horizontal */}
         {view === 'SELECTOR' && (
             <div className="h-[100dvh] max-h-[100dvh] w-full max-w-full flex flex-col justify-between relative overflow-hidden select-none">
                 {/* Background Decor Terisolasi */}
@@ -788,8 +788,8 @@ const App: React.FC = () => {
                     <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] rounded-full bg-blue-50 dark:bg-slate-800 blur-[100px]"></div>
                 </div>
 
-                {/* Top Navigation Bar Terintegrasi */}
-                <header className="w-full max-w-full px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between z-20 shrink-0">
+                {/* Tombol Melayang Pojok Kiri Atas (Tidak memakan tinggi alur dokumen) */}
+                <div className="absolute top-3.5 sm:top-5 left-3.5 sm:left-6 z-20">
                     <button
                         onClick={() => setIsInviteOpen(true)}
                         className="flex items-center gap-2 px-3.5 sm:px-4 py-2 sm:py-2.5 rounded-full bg-white/90 dark:bg-slate-800/90 text-slate-600 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-white dark:hover:bg-slate-800 transition-all shadow-md shadow-slate-200/50 dark:shadow-none border border-slate-200/60 dark:border-slate-700 backdrop-blur-sm group active:scale-95"
@@ -798,34 +798,35 @@ const App: React.FC = () => {
                         <QrCodeIcon className="w-4 h-4 group-hover:scale-110 transition-transform shrink-0" />
                         <span className="text-xs font-bold uppercase tracking-wider">Bagikan App</span>
                     </button>
+                </div>
 
-                    <div className="flex items-center gap-2">
-                        {!isOnline && (
-                            <div className="bg-rose-500/90 backdrop-blur-md text-white px-3 py-1.5 rounded-full text-[10px] sm:text-[11px] font-bold uppercase tracking-wide shadow-md flex items-center gap-1.5 animate-bounce ring-1 ring-white/20">
-                                <NoWifiIcon className="w-3.5 h-3.5" />
-                                <span>Offline</span>
-                            </div>
-                        )}
+                {/* Tombol Melayang Pojok Kanan Atas (Theme Toggle & Status Jaringan) */}
+                <div className="absolute top-3.5 sm:top-5 right-3.5 sm:right-6 z-20 flex items-center gap-2">
+                    {!isOnline && (
+                        <div className="bg-rose-500/90 backdrop-blur-md text-white px-3 py-1.5 rounded-full text-[10px] sm:text-[11px] font-bold uppercase tracking-wide shadow-md flex items-center gap-1.5 animate-bounce ring-1 ring-white/20">
+                            <NoWifiIcon className="w-3.5 h-3.5" />
+                            <span>Offline</span>
+                        </div>
+                    )}
 
-                        {isSyncing && isOnline && (
-                            <div className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-md text-indigo-600 dark:text-indigo-400 px-3 py-1.5 rounded-full text-[10px] sm:text-[11px] font-bold uppercase tracking-wide shadow-md border border-indigo-50 dark:border-slate-700 flex items-center gap-1.5">
-                                <div className="w-3 h-3 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
-                                <span className="hidden sm:inline">Menyimpan...</span>
-                            </div>
-                        )}
+                    {isSyncing && isOnline && (
+                        <div className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-md text-indigo-600 dark:text-indigo-400 px-3 py-1.5 rounded-full text-[10px] sm:text-[11px] font-bold uppercase tracking-wide shadow-md border border-indigo-50 dark:border-slate-700 flex items-center gap-1.5">
+                            <div className="w-3 h-3 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
+                            <span className="hidden sm:inline">Menyimpan...</span>
+                        </div>
+                    )}
 
-                        <ThemeToggle />
-                    </div>
-                </header>
+                    <ThemeToggle />
+                </div>
 
-                {/* Main Content: Hero & Tombol Aksi */}
-                <main className="flex-1 flex flex-col items-center justify-center px-4 sm:px-6 w-full max-w-sm mx-auto z-10 shrink min-h-0 my-auto">
-                    <div className="text-center mb-6 sm:mb-8">
-                        <div className="inline-flex p-3 sm:p-3.5 bg-white dark:bg-slate-800 rounded-2xl shadow-sm mb-3 sm:mb-4 border border-slate-50 dark:border-slate-700 ring-1 ring-slate-100 dark:ring-slate-800">
+                {/* Alur Konten Utama: Jarak atas dihitung langsung dari batas atas layar ke ikon UjianCerdas */}
+                <main className="flex-1 w-full max-w-sm mx-auto px-4 sm:px-6 flex flex-col items-center justify-center pt-6 sm:pt-8 md:pt-10 z-10 min-h-0">
+                    <div className="text-center mb-5 sm:mb-6 shrink-0">
+                        <div className="inline-flex p-3 sm:p-3.5 bg-white dark:bg-slate-800 rounded-2xl shadow-sm mb-2.5 sm:mb-3 border border-slate-50 dark:border-slate-700 ring-1 ring-slate-100 dark:ring-slate-800">
                             <LogoIcon className="w-8 h-8 sm:w-10 sm:h-10 text-indigo-600 dark:text-indigo-400" />
                         </div>
                         
-                        <h1 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white tracking-tight mb-1.5 sm:mb-2">
+                        <h1 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white tracking-tight mb-1 sm:mb-1.5">
                             UjianCerdas
                         </h1>
                         <p className="text-slate-500 dark:text-slate-400 text-xs sm:text-sm font-medium leading-relaxed">
@@ -833,7 +834,7 @@ const App: React.FC = () => {
                         </p>
                     </div>
                     
-                    <div className="w-full space-y-2.5 sm:space-y-3.5">
+                    <div className="w-full space-y-2.5 sm:space-y-3 shrink-0">
                         <button 
                             onClick={() => setView('STUDENT_LOGIN')} 
                             className="w-full group relative overflow-hidden bg-slate-900 dark:bg-indigo-600 text-white p-3.5 sm:p-4 rounded-xl shadow-lg shadow-slate-200 dark:shadow-none transition-all duration-300 hover:scale-[1.02] active:scale-[0.98]"
@@ -862,8 +863,8 @@ const App: React.FC = () => {
                     </div>
                 </main>
 
-                {/* Footer Bar Terintegrasi */}
-                <footer className="w-full max-w-full px-4 py-2 sm:py-3 z-10 shrink-0">
+                {/* Footer Teks HAKI: Jarak bawah dihitung langsung dari tombol panduan & fitur menuju teks HAKI yang menempel di batas paling bawah layar */}
+                <footer className="w-full max-w-full px-4 pt-2 pb-3 sm:pb-4 z-10 shrink-0">
                     <p className="text-center text-[10px] sm:text-[11px] font-medium text-slate-400 dark:text-slate-500 tracking-wide select-none leading-relaxed">
                         © {new Date().getFullYear()} I Made Hermawan Surya Putra · Hak Cipta Dilindungi
                     </p>
