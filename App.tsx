@@ -115,6 +115,35 @@ const App: React.FC = () => {
     }
   }, [view]);
 
+  // Kunci total scroll window/body dan gesture overscroll saat berada di halaman SELECTOR
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (view === 'SELECTOR') {
+      const origHtmlOverflow = document.documentElement.style.overflow;
+      const origHtmlHeight = document.documentElement.style.height;
+      const origBodyOverflow = document.body.style.overflow;
+      const origBodyHeight = document.body.style.height;
+      const origBodyOverscroll = document.body.style.overscrollBehavior;
+      const origBodyTouchAction = document.body.style.touchAction;
+
+      document.documentElement.style.overflow = 'hidden';
+      document.documentElement.style.height = '100%';
+      document.body.style.overflow = 'hidden';
+      document.body.style.height = '100%';
+      document.body.style.overscrollBehavior = 'none';
+      document.body.style.touchAction = 'none';
+
+      return () => {
+        document.documentElement.style.overflow = origHtmlOverflow;
+        document.documentElement.style.height = origHtmlHeight;
+        document.body.style.overflow = origBodyOverflow;
+        document.body.style.height = origBodyHeight;
+        document.body.style.overscrollBehavior = origBodyOverscroll;
+        document.body.style.touchAction = origBodyTouchAction;
+      };
+    }
+  }, [view]);
+
   // Global Math Hydration Effect (Optimized for iPhone WebKit & Mobile to prevent DOM loops)
   useEffect(() => {
     // Initial hydration
@@ -779,9 +808,9 @@ const App: React.FC = () => {
             </div>
         )}
         
-        {/* Halaman Awal / Selector: Pas Satu Layar Penuh Tanpa Scroll Vertikal & Horizontal */}
+        {/* Halaman Awal / Selector: Terkunci Total Pas Satu Layar Tanpa Scroll Vertikal & Horizontal */}
         {view === 'SELECTOR' && (
-            <div className="h-[100dvh] max-h-[100dvh] w-full max-w-full flex flex-col justify-between relative overflow-hidden select-none">
+            <div className="fixed inset-0 w-full h-[100dvh] max-h-[100dvh] flex flex-col justify-between overflow-hidden select-none bg-[#FAFAFA] dark:bg-slate-950 touch-none overscroll-none z-10">
                 {/* Background Decor Terisolasi */}
                 <div className="absolute inset-0 z-0 opacity-40 overflow-hidden pointer-events-none">
                     <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] rounded-full bg-indigo-100 dark:bg-slate-800 blur-[100px]"></div>
