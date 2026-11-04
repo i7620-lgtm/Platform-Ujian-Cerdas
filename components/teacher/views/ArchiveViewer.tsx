@@ -26,6 +26,7 @@ import { ArchiveQuestionAnalysis } from "../archive/ArchiveQuestionAnalysis";
 import { ArchiveClassAnalysis } from "../archive/ArchiveClassAnalysis";
 import { ArchiveHeaderActions } from "../archive/ArchiveHeaderActions";
 import { AiAnalysisTargetModal } from "../archive/AiAnalysisTargetModal";
+import { ArchiveAiPromptPanel } from "../archive/ArchiveAiPromptPanel";
 import { AiAnalysisProgressModal } from "../archive/AiAnalysisProgressModal";
 import { PrintSoalModal } from "../modals/berlangsung/PrintSoalModal";
 import {
@@ -107,6 +108,8 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({
     averageCompletionTime,
     handleGenerateAI,
     handleDeleteAIAnalysis,
+    handleSaveImportedAnalysisBatch,
+    studentStatsMap,
   } = useArchiveViewerLogic({ archiveViewer: archiveViewerInstance, teacherProfile });
   const {
     activeTab, setActiveTab, selectedSchool, setSelectedSchool, selectedClass,
@@ -144,6 +147,35 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({
 
   const exam = archiveData?.exam;
   const results = archiveData?.results || [];
+
+  const [isPrintingActive, setIsPrintingActive] = React.useState(false);
+
+  const handlePrintWithOnDemandLayout = React.useCallback(() => {
+    setIsPrintingActive(true);
+    const isDark = document.documentElement.classList.contains("dark");
+    if (isDark) {
+      document.documentElement.classList.remove("dark");
+    }
+    // Beri waktu 250ms agar DOM ArchivePrintLayout termuat & siap dicetak
+    setTimeout(() => {
+      window.print();
+      if (isDark) {
+        document.documentElement.classList.add("dark");
+      }
+      setIsPrintingActive(false);
+    }, 250);
+  }, []);
+
+  React.useEffect(() => {
+    const handleBeforePrint = () => setIsPrintingActive(true);
+    const handleAfterPrint = () => setIsPrintingActive(false);
+    window.addEventListener("beforeprint", handleBeforePrint);
+    window.addEventListener("afterprint", handleAfterPrint);
+    return () => {
+      window.removeEventListener("beforeprint", handleBeforePrint);
+      window.removeEventListener("afterprint", handleAfterPrint);
+    };
+  }, []);
 
   const handleDownloadJSON = React.useCallback(() => {
     if (!archiveData) return;
@@ -267,7 +299,7 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({
         isLoadingCloud={isLoadingCloud}
         onReset={resetView}
         onEditMetadata={() => setShowEditMetadata(true)}
-        onPrint={handlePrint}
+        onPrint={handlePrintWithOnDemandLayout}
         onDownloadPDF={handleDownloadQuestionsPDF}
         onDownloadExcel={handleDownloadExcel}
         onReuseExam={onReuseExam}
@@ -373,6 +405,7 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({
             uniqueSchools={uniqueSchools}
             selectedSchool={selectedSchool}
             expandedStudent={expandedStudent}
+            studentStatsMap={studentStatsMap}
             toggleStudent={(id) =>
               setExpandedStudent(expandedStudent === id ? null : id)
             }
@@ -437,25 +470,27 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({
         )}
       </div>
 
-      {/* STATIC PRINT STYLES Sequential Blueprint View */}
-      <React.Suspense fallback={<div className="hidden print:block">Memuat layout cetak...</div>}>
-        <ArchivePrintLayout
-          exam={exam}
-          results={results}
-          averageScore={averageScore}
-          highestScore={highestScore}
-          lowestScore={lowestScore}
-          totalStudents={realStudentCount}
-          averageCompletionTime={averageCompletionTime}
-          categoryStats={categoryStats}
-          levelStats={levelStats}
-          questionTypeStats={questionTypeStats}
-          uniqueSchools={uniqueSchools}
-          sortedResults={sortedResults}
-          questionAnalysisData={questionAnalysisData}
-          ai_analyses={archiveData?.ai_analyses}
-        />
-      </React.Suspense>
+      {/* ON-DEMAND PRINT STYLES Sequential Blueprint View */}
+      {isPrintingActive && (
+        <React.Suspense fallback={<div className="hidden print:block">Memuat layout cetak...</div>}>
+          <ArchivePrintLayout
+            exam={exam}
+            results={results}
+            averageScore={averageScore}
+            highestScore={highestScore}
+            lowestScore={lowestScore}
+            totalStudents={realStudentCount}
+            averageCompletionTime={averageCompletionTime}
+            categoryStats={categoryStats}
+            levelStats={levelStats}
+            questionTypeStats={questionTypeStats}
+            uniqueSchools={uniqueSchools}
+            sortedResults={sortedResults}
+            questionAnalysisData={questionAnalysisData}
+            ai_analyses={archiveData?.ai_analyses}
+          />
+        </React.Suspense>
+      )}
 
       {showEditMetadata && (
         <EditMetadataModal
@@ -506,13 +541,16 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({
         exam={exam || null}
       />
 
-      <AiAnalysisTargetModal
-        isOpen={isTargetModalOpen}
-        onClose={() => setIsTargetModalOpen(false)}
-        targets={analysisTargets}
-        onStart={handleStartBatchAiAnalysis}
-        hasExistingAnalyses={Boolean(archiveData?.ai_analyses && Object.keys(archiveData.ai_analyses).length > 0)}
-      />
+      {exam && (
+        <ArchiveAiPromptPanel
+          isOpen={isTargetModalOpen}
+          onClose={() => setIsTargetModalOpen(false)}
+          exam={exam}
+          results={results}
+          targets={analysisTargets}
+          onSaveAnalysisBatch={handleSaveImportedAnalysisBatch}
+        />
+      )}
 
       <AiAnalysisProgressModal
         isOpen={isProgressModalOpen}
