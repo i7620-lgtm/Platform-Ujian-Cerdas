@@ -115,10 +115,10 @@ const App: React.FC = () => {
     }
   }, [view]);
 
-  // Kunci total scroll window/body dan gesture overscroll saat berada di halaman SELECTOR
+  // Kunci total scroll window/body dan gesture overscroll saat berada di SELECTOR, STUDENT_LOGIN, dan TEACHER_LOGIN
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    if (view === 'SELECTOR') {
+    if (view === 'SELECTOR' || view === 'STUDENT_LOGIN' || view === 'TEACHER_LOGIN') {
       const origHtmlOverflow = document.documentElement.style.overflow;
       const origHtmlHeight = document.documentElement.style.height;
       const origBodyOverflow = document.body.style.overflow;
