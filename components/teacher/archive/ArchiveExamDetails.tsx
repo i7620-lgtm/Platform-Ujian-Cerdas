@@ -205,6 +205,10 @@ interface ArchiveStudentsRecapViewProps {
   selectedSchool: string;
   expandedStudent: string | null;
   toggleStudent: (id: string) => void;
+  studentStatsMap?: Map<
+    string,
+    { correct: number; wrong: number; empty: number; score: number; duration: number }
+  >;
 }
 
 export const ArchiveStudentsRecapView: React.FC<
@@ -216,7 +220,32 @@ export const ArchiveStudentsRecapView: React.FC<
   selectedSchool,
   expandedStudent,
   toggleStudent,
+  studentStatsMap,
 }) => {
+  const [currentPage, setCurrentPage] = React.useState(1);
+  const [pageSize, setPageSize] = React.useState<number | "ALL">(15);
+
+  React.useEffect(() => {
+    setCurrentPage(1);
+  }, [selectedSchool, filteredResults.length]);
+
+  const totalStudents = filteredResults.length;
+  const effectivePageSize = pageSize === "ALL" ? totalStudents : Number(pageSize);
+  const totalPages = Math.max(1, Math.ceil(totalStudents / (effectivePageSize || 1)));
+
+  const activePage = Math.min(currentPage, totalPages);
+  const startIndex = (activePage - 1) * effectivePageSize;
+  const endIndex = Math.min(startIndex + effectivePageSize, totalStudents);
+
+  const displayedResults = React.useMemo(() => {
+    return filteredResults.slice(startIndex, endIndex);
+  }, [filteredResults, startIndex, endIndex]);
+
+  const displayedSchools = React.useMemo(() => {
+    const schools = new Set(displayedResults.map((r) => r.student.schoolName || "Tanpa Sekolah"));
+    return uniqueSchools.filter((s) => schools.has(s));
+  }, [displayedResults, uniqueSchools]);
+
   return (
     <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm overflow-hidden">
       <div className="overflow-x-auto custom-scrollbar">
@@ -244,8 +273,8 @@ export const ArchiveStudentsRecapView: React.FC<
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-50 dark:divide-slate-700">
-            {uniqueSchools.map((school) => {
-              const schoolResults = filteredResults.filter(
+            {displayedSchools.map((school) => {
+              const schoolResults = displayedResults.filter(
                 (r) => (r.student.schoolName || "Tanpa Sekolah") === school,
               );
               if (schoolResults.length === 0) return null;
@@ -263,10 +292,11 @@ export const ArchiveStudentsRecapView: React.FC<
                     </tr>
                   )}
                   {schoolResults.map((r) => {
-                    const { correct, wrong, empty, score } = getCalculatedStats(
+                    const stats = studentStatsMap?.get(r.student.studentId) || getCalculatedStats(
                       r,
                       exam,
                     );
+                    const { correct, wrong, empty, score } = stats;
                     return (
                       <React.Fragment key={r.student.studentId}>
                         <tr
@@ -425,6 +455,62 @@ export const ArchiveStudentsRecapView: React.FC<
           </tbody>
         </table>
       </div>
+
+      {totalStudents > 0 && (
+        <div className="px-6 py-3.5 bg-slate-50/70 dark:bg-slate-700/30 border-t border-slate-100 dark:border-slate-700 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-500 dark:text-slate-400">
+          <div className="flex items-center gap-2">
+            <span>
+              Menampilkan <span className="font-bold text-slate-800 dark:text-slate-200">{totalStudents > 0 ? startIndex + 1 : 0}</span> -{" "}
+              <span className="font-bold text-slate-800 dark:text-slate-200">{endIndex}</span> dari{" "}
+              <span className="font-bold text-slate-800 dark:text-slate-200">{totalStudents}</span> Siswa
+            </span>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1.5">
+              <span className="text-[11px]">Per Halaman:</span>
+              <select
+                value={pageSize}
+                onChange={(e) => {
+                  setPageSize(e.target.value === "ALL" ? "ALL" : Number(e.target.value));
+                  setCurrentPage(1);
+                }}
+                className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 text-xs rounded-lg px-2 py-1 outline-none font-bold"
+              >
+                <option value={10}>10</option>
+                <option value={15}>15</option>
+                <option value={25}>25</option>
+                <option value={50}>50</option>
+                <option value="ALL">Semua</option>
+              </select>
+            </div>
+
+            {totalPages > 1 && (
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => setCurrentPage((p) => Math.max(p - 1, 1))}
+                  disabled={activePage <= 1}
+                  className="px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed text-xs font-bold transition-colors"
+                >
+                  Sebelumnya
+                </button>
+                <span className="px-2 py-1 font-bold text-slate-700 dark:text-slate-200">
+                  {activePage} / {totalPages}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setCurrentPage((p) => Math.min(p + 1, totalPages))}
+                  disabled={activePage >= totalPages}
+                  className="px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed text-xs font-bold transition-colors"
+                >
+                  Selanjutnya
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 };
