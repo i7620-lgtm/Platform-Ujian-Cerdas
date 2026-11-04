@@ -147,9 +147,12 @@ export const ArchiveClassAnalysis: React.FC<ArchiveClassAnalysisProps> = ({
     }
     const match = currentSubTabKey.match(/school_(.*)_class_(.*)/);
     if (match) {
+      const schoolName = match[1];
+      const className = match[2];
+      const isMultiSchool = uniqueSchools.length > 1 || analysisSchools.length > 1;
       return {
-        title: `Analisis Khusus Kelas ${match[2]}`,
-        badge: `Khusus Kelas ${match[2]}`,
+        title: isMultiSchool ? `Analisis Khusus Kelas ${className} (${schoolName})` : `Analisis Khusus Kelas ${className}`,
+        badge: isMultiSchool ? `Kelas ${className} (${schoolName})` : `Khusus Kelas ${className}`,
         studentCount: currentSubTabResults.length,
       };
     }
@@ -158,7 +161,7 @@ export const ArchiveClassAnalysis: React.FC<ArchiveClassAnalysisProps> = ({
       badge: "Khusus",
       studentCount: currentSubTabResults.length,
     };
-  }, [currentSubTabKey, filteredResults.length, currentSubTabResults.length]);
+  }, [currentSubTabKey, filteredResults.length, currentSubTabResults.length, uniqueSchools.length, analysisSchools.length]);
 
   const handlePrintAI = () => {
     const printContent = document.getElementById("ai-analysis-print-content");
@@ -415,7 +418,10 @@ export const ArchiveClassAnalysis: React.FC<ArchiveClassAnalysisProps> = ({
                 if (key !== "OVERALL") {
                   const match = key.match(/school_(.*)_class_(.*)/);
                   if (match) {
-                    label = `Kelas ${match[2]}`;
+                    const schoolName = match[1];
+                    const className = match[2];
+                    const isMultiSchool = uniqueSchools.length > 1 || analysisSchools.length > 1;
+                    label = isMultiSchool ? `Kelas ${className} (${schoolName})` : `Kelas ${className}`;
                     icon = "🏫";
                   } else {
                     label = key.replace("class_", "Kelas ");
@@ -621,16 +627,16 @@ export const ArchiveClassAnalysis: React.FC<ArchiveClassAnalysisProps> = ({
             Belum Ada Analisis AI
           </h3>
           <p className="text-xs text-slate-500 dark:text-slate-400 max-w-md">
-            Gunakan tombol "Buat Analisis AI" untuk menghasilkan analisis umum dan analisis khusus per kelas secara mendalam, lengkap dengan matriks 4 jenjang dan bank soal remedial.
+            Gunakan tombol "Prompt & Impor" untuk merancang prompt statistik kelas ke AI luar (ChatGPT, Claude, Gemini, DeepSeek) dan mengimpor laporan analisisnya.
           </p>
           {onOpenTargetModal && (
             <button
               type="button"
               onClick={onOpenTargetModal}
-              className="mt-3 px-5 py-2.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white text-xs font-bold rounded-xl shadow-md transition-all active:scale-95 flex items-center gap-2"
+              className="mt-3 px-5 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white text-xs font-bold rounded-xl shadow-md transition-all active:scale-95 flex items-center gap-2"
             >
-              <SparklesIcon className="w-4 h-4" />
-              <span>Mulai Analisis AI Sekarang</span>
+              <SparklesIcon className="w-4 h-4 text-amber-300" />
+              <span>Prompt & Impor Analisis AI</span>
             </button>
           )}
         </div>
