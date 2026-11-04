@@ -7,6 +7,7 @@ export interface AnalysisTargetItem {
   label: string;
   isOverall: boolean;
   className?: string;
+  schoolName?: string;
   studentCount: number;
 }
 
