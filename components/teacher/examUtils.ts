@@ -3254,14 +3254,14 @@ export const generateQuestionsPDF = async (exam: Exam): Promise<void> => {
                 .option-item > span.font-bold { min-width: 20px; text-align: right; margin-top: 2px; }
                 .option-item > .prose { flex: 1; }
                 .answer-key { page-break-before: always; }
-                .chart-wrapper { width: 100%; max-width: 750px; margin: 20px auto; page-break-inside: avoid; display: flex; justify-content: center; }
-                .chart-wrapper canvas { width: 100% !important; max-width: 750px !important; }
-                img { max-width: 100%; height: auto; object-fit: contain; }
-                table { border-collapse: collapse; width: 100%; margin: 10px 0; }
-                table, th, td { border: 1px solid #ddd; padding: 8px; }
+                .chart-wrapper { width: 100%; max-width: 420px; max-height: 240px; margin: 12px auto; page-break-inside: avoid; display: flex; justify-content: center; overflow: hidden; }
+                .chart-wrapper canvas, .chart-wrapper svg { max-width: 100% !important; max-height: 230px !important; width: auto !important; height: auto !important; }
+                img, svg:not(.katex *):not(.lucide) { max-width: 100% !important; width: auto !important; max-height: 240px !important; height: auto !important; object-fit: contain !important; margin: 6px auto !important; display: block !important; page-break-inside: avoid !important; }
+                p:has(> img), p:has(> svg) { margin-top: 4px !important; margin-bottom: 4px !important; text-align: center !important; }
+                table { border-collapse: collapse; width: 100%; max-width: 100%; margin: 8px 0; table-layout: auto; word-break: break-word; overflow-x: auto; }
+                table, th, td { border: 1px solid #ddd; padding: 6px 8px; word-break: break-word; }
                 .prose { max-width: none !important; }
-                blockquote { border-left: 3px solid #cbd5e1; padding-left: 1rem; color: #475569; font-style: italic; margin: 1.5em 0; }
-                /* Untuk indentasi yang di-generate dengan style inline */
+                blockquote { border-left: 3px solid #cbd5e1; padding-left: 1rem; color: #475569; font-style: italic; margin: 1em 0; }
                 blockquote[style*="margin"] { border-left: 3px solid #cbd5e1 !important; padding-left: 1rem !important; }
             </style>
         </head>
