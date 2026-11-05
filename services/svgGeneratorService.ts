@@ -62,6 +62,7 @@ MANDAT KESELAMATAN & ETIKA PENDIDIKAN K-12 (ZERO TOLERANCE):
 PANDUAN TATA LETAK & EFISIENSI RUANG SVG (TIGHT BOUNDING BOX):
 - viewBox="0 0 700 380" xmlns="http://www.w3.org/2000/svg" width="100%" height="100%"
 - Baris pertama wajib: <rect width="100%" height="100%" fill="#ffffff" rx="12" />
+- BATASAN TAMPILAN: Visual ditampilkan di layar ujian siswa maksimal 35% tinggi viewport (max-height: 35vh).
 - DILARANG menyisakan padding atau ruang kosong tebal di atas/bawah/kiri/kanan objek diagram!
 ${isGeom ? `- MODE DIAGRAM GEOMETRI TEKNIS MURNI (DILARANG KERAS MEMBUAT KARTU PRESENTASI / SLIDE PPT):
   * DILARANG MEMBUAT KARTU 1-2-3 KONSEP ATAU KOTAK KESIMPULAN PPT!
