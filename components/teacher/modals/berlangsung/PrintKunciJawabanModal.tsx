@@ -214,6 +214,25 @@ export const PrintKunciJawabanModal: React.FC<PrintKunciJawabanModalProps> = ({
             max-width: 100% !important;
             box-shadow: none !important;
           }
+          .print-kunci-content img,
+          .print-kunci-content svg:not(.katex *):not(.lucide) {
+            max-width: 100% !important;
+            width: auto !important;
+            max-height: 240px !important;
+            height: auto !important;
+            object-fit: contain !important;
+            display: block !important;
+            margin: 6px auto !important;
+            break-inside: avoid !important;
+            page-break-inside: avoid !important;
+          }
+          .print-kunci-content table {
+            width: 100% !important;
+            max-width: 100% !important;
+            border-collapse: collapse !important;
+            table-layout: auto !important;
+            word-break: break-word !important;
+          }
           .page-break-before {
             break-before: page !important;
             page-break-before: always !important;
