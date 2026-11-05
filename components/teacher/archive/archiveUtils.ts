@@ -174,9 +174,26 @@ export const normalizeQuestion = (q: any): any => {
         ? q.score_weight
         : 1;
   const kisiKisi = q.kisiKisi || q.kisi_kisi || "";
+  const explanation =
+    q.explanation ||
+    q.solution ||
+    q.pembahasan ||
+    q.solutionSteps ||
+    q.solution_steps ||
+    "";
 
   let matchingPairs = q.matchingPairs || q.matching_pairs || [];
-  matchingPairs = matchingPairs.map((pair: any) => ({
+  if ((!matchingPairs || matchingPairs.length === 0) && questionType === "MATCHING" && correctAnswer) {
+    try {
+      const parsed = typeof correctAnswer === "string" ? JSON.parse(correctAnswer) : correctAnswer;
+      if (Array.isArray(parsed)) {
+        matchingPairs = parsed;
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+  matchingPairs = (matchingPairs || []).map((pair: any) => ({
     left: pair.left || "",
     right: pair.right || "",
     leftChart: pair.leftChart || pair.left_chart,
@@ -184,15 +201,39 @@ export const normalizeQuestion = (q: any): any => {
   }));
 
   let trueFalseRows = q.trueFalseRows || q.true_false_rows || [];
-  trueFalseRows = trueFalseRows.map((row: any) => ({
-    text: row.text || "",
-    answer:
-      row.answer === true ||
-      row.answer === "true" ||
-      row.answer === "Benar" ||
-      row.answer === "BENAR",
-    chartData: row.chartData || row.chart_data,
-  }));
+  if ((!trueFalseRows || trueFalseRows.length === 0) && questionType === "TRUE_FALSE" && correctAnswer) {
+    try {
+      const parsed = typeof correctAnswer === "string" ? JSON.parse(correctAnswer) : correctAnswer;
+      if (Array.isArray(parsed)) {
+        trueFalseRows = parsed;
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+  const categoryLabels = q.categoryLabels || q.category_labels;
+  const firstLabel = categoryLabels && categoryLabels[0] ? String(categoryLabels[0]).toLowerCase() : "benar";
+
+  trueFalseRows = (trueFalseRows || []).map((row: any) => {
+    const rawAns = row.answer;
+    const strAns = String(rawAns).toLowerCase().trim();
+    const isTrue =
+      rawAns === true ||
+      strAns === "true" ||
+      strAns === "1" ||
+      strAns === "benar" ||
+      strAns === "ya" ||
+      strAns === "sesuai" ||
+      strAns === "fakta" ||
+      strAns === "setuju" ||
+      strAns === firstLabel;
+
+    return {
+      text: row.text || "",
+      answer: isTrue,
+      chartData: row.chartData || row.chart_data,
+    };
+  });
 
   return {
     id: String(q.id || Math.random()),
@@ -210,9 +251,10 @@ export const normalizeQuestion = (q: any): any => {
     level,
     scoreWeight,
     kisiKisi,
+    explanation,
     matchingPairs,
     trueFalseRows,
-    categoryLabels: q.categoryLabels || q.category_labels,
+    categoryLabels,
   };
 };
 
