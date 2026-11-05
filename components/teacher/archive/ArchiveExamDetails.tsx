@@ -17,6 +17,101 @@ interface ArchiveDetailUjianViewProps {
 export const ArchiveDetailUjianView: React.FC<ArchiveDetailUjianViewProps> = ({
   exam,
 }) => {
+  const isCorrectMCOption = (q: Question, opt: string, index: number): boolean => {
+    const ans = String(q.correctAnswer || "").trim();
+    if (!ans) return false;
+    const letter = String.fromCharCode(65 + index);
+    if (ans.toUpperCase() === letter) return true;
+    if (ans.toUpperCase().startsWith(`${letter}.`) || ans.toUpperCase().startsWith(`${letter})`)) return true;
+    if (ans === String(index)) return true;
+    if (isAnswerMatch(ans, opt, q.questionType, q.options)) return true;
+    const strip = (s: string) => s.replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").replace(/\s+/g, " ").trim().toLowerCase();
+    const cleanAns = strip(ans);
+    const cleanOpt = strip(opt);
+    if (cleanAns.length > 0 && cleanAns === cleanOpt) return true;
+    if (cleanOpt.startsWith(`${letter.toLowerCase()}.`) || cleanOpt.startsWith(`${letter.toLowerCase()})`)) {
+      const strippedOptText = cleanOpt.substring(2).trim();
+      if (strippedOptText === cleanAns) return true;
+    }
+    return false;
+  };
+
+  const isCorrectCMCOption = (q: Question, opt: string, index: number): boolean => {
+    if (!q.correctAnswer) return false;
+    const letter = String.fromCharCode(65 + index);
+    const answers = parseList(q.correctAnswer, q.options);
+    if (answers.length === 0) {
+      const rawAns = String(q.correctAnswer).trim();
+      if (rawAns.toUpperCase().includes(letter)) return true;
+    }
+    return answers.some((a) => {
+      const cleanA = String(a).trim();
+      if (cleanA.toUpperCase() === letter) return true;
+      if (cleanA === String(index)) return true;
+      if (cleanA.toUpperCase().startsWith(`${letter}.`) || cleanA.toUpperCase().startsWith(`${letter})`)) return true;
+      if (isAnswerMatch(cleanA, opt, q.questionType, q.options)) return true;
+      const strip = (s: string) => s.replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").replace(/\s+/g, " ").trim().toLowerCase();
+      if (strip(cleanA).length > 0 && strip(cleanA) === strip(opt)) return true;
+      return false;
+    });
+  };
+
+  const getTrueFalseRows = (q: Question) => {
+    let rows = q.trueFalseRows || (q as any).true_false_rows;
+    if ((!rows || rows.length === 0) && q.correctAnswer) {
+      try {
+        const parsed = typeof q.correctAnswer === "string" ? JSON.parse(q.correctAnswer) : q.correctAnswer;
+        if (Array.isArray(parsed)) rows = parsed;
+      } catch {
+        /* ignore */
+      }
+    }
+    const categoryLabels = q.categoryLabels || (q as any).category_labels;
+    const firstLabel = categoryLabels && categoryLabels[0] ? String(categoryLabels[0]).toLowerCase() : "benar";
+    return (rows || []).map((row: any) => {
+      const rawAns = row.answer;
+      const strAns = String(rawAns).toLowerCase().trim();
+      const isTrue =
+        rawAns === true ||
+        strAns === "true" ||
+        strAns === "1" ||
+        strAns === "benar" ||
+        strAns === "ya" ||
+        strAns === "sesuai" ||
+        strAns === "fakta" ||
+        strAns === "setuju" ||
+        strAns === firstLabel;
+      return {
+        text: row.text || "",
+        answer: isTrue,
+      };
+    });
+  };
+
+  const getMatchingPairs = (q: Question) => {
+    let pairs = q.matchingPairs || (q as any).matching_pairs;
+    if ((!pairs || pairs.length === 0) && q.correctAnswer) {
+      try {
+        const parsed = typeof q.correctAnswer === "string" ? JSON.parse(q.correctAnswer) : q.correctAnswer;
+        if (Array.isArray(parsed)) pairs = parsed;
+      } catch {
+        /* ignore */
+      }
+    }
+    return pairs || [];
+  };
+
+  const getExplanation = (q: Question): string => {
+    return (
+      q.explanation ||
+      (q as any).solution ||
+      (q as any).pembahasan ||
+      q.solutionSteps ||
+      (q as any).solution_steps ||
+      ""
+    );
+  };
+
   return (
     <div className="space-y-4">
       {exam.questions.map((q, index) => {
@@ -25,6 +120,11 @@ export const ArchiveDetailUjianView: React.FC<ArchiveDetailUjianViewProps> = ({
           exam.questions
             .slice(0, index)
             .filter((i) => i.questionType !== "INFO" && (i as any).type !== "INFO").length + 1;
+
+        const tfRows = q.questionType === "TRUE_FALSE" ? getTrueFalseRows(q) : [];
+        const matchingPairs = q.questionType === "MATCHING" ? getMatchingPairs(q) : [];
+        const explanation = getExplanation(q);
+
         return (
           <div
             key={q.id}
@@ -47,21 +147,23 @@ export const ArchiveDetailUjianView: React.FC<ArchiveDetailUjianViewProps> = ({
               <div className="flex-1 space-y-4 min-w-0">
                 {/* Metadata Badge */}
                 {!isInfo && (q.category || q.level || q.scoreWeight) && (
-                  <div className="flex flex-wrap gap-2 mb-3">
-                      {q.category && (
-                        <span className="text-[10px] font-bold bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 px-2 py-0.5 rounded border border-slate-200 dark:border-slate-600 uppercase tracking-wide">
-                          Kategori: {q.category}
-                        </span>
-                      )}
-                      {q.level && (
-                        <span className="text-[10px] font-bold bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-300 px-2 py-0.5 rounded border border-blue-100 dark:border-blue-800 uppercase tracking-wide">
-                          Level: {q.level}
-                        </span>
-                      )}
-                      <span className="text-[10px] font-bold bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-300 px-2 py-0.5 rounded border border-purple-100 dark:border-purple-800 uppercase tracking-wide">
-                        Bobot: {q.scoreWeight || 1}
+                  <div className="flex flex-wrap items-center gap-2 mb-3 text-[11px] text-slate-500 dark:text-slate-400">
+                    {q.category && (
+                      <span className="font-semibold text-slate-700 dark:text-slate-300">
+                        Kategori: {q.category}
                       </span>
-                    </div>
+                    )}
+                    {q.category && (q.level || q.scoreWeight) && <span aria-hidden="true">&bull;</span>}
+                    {q.level && (
+                      <span className="font-semibold text-indigo-600 dark:text-indigo-400">
+                        Level: {q.level}
+                      </span>
+                    )}
+                    {q.level && q.scoreWeight && <span aria-hidden="true">&bull;</span>}
+                    <span className="font-semibold text-purple-600 dark:text-purple-400">
+                      Bobot: {q.scoreWeight || 1}
+                    </span>
+                  </div>
                 )}
 
                 <div
@@ -69,106 +171,136 @@ export const ArchiveDetailUjianView: React.FC<ArchiveDetailUjianViewProps> = ({
                   dangerouslySetInnerHTML={{ __html: q.questionText }}
                 ></div>
 
+                {/* Pilihan Ganda (MC) */}
                 {q.questionType === "MULTIPLE_CHOICE" &&
                   q.options &&
-                  q.options.map((opt, i) => (
-                    <div
-                      key={i}
-                      className={`flex items-start gap-3 p-3 rounded-lg border text-sm ${isAnswerMatch(q.correctAnswer, opt, q.questionType) ? "bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800 font-bold text-emerald-800 dark:text-emerald-300" : "bg-slate-50 dark:bg-slate-700/50 border-slate-100 dark:border-slate-600 text-slate-600 dark:text-slate-300"}`}
-                    >
-                      <span className="font-bold">
-                        {String.fromCharCode(65 + i)}.
-                      </span>
-                      <div
-                        className="flex-1 min-w-0 option-content"
-                        dangerouslySetInnerHTML={{ __html: opt }}
-                      ></div>
-                      {isAnswerMatch(q.correctAnswer, opt, q.questionType) && (
-                        <CheckCircleIcon className="w-5 h-5 text-emerald-500 ml-auto shrink-0" />
-                      )}
-                    </div>
-                  ))}
-
-                {q.questionType === "COMPLEX_MULTIPLE_CHOICE" &&
-                  q.options &&
                   q.options.map((opt, i) => {
-                    const isSelected = parseList(q.correctAnswer || "").some(
-                      (a) => isAnswerMatch(a, opt, q.questionType),
-                    );
+                    const isCorrect = isCorrectMCOption(q, opt, i);
                     return (
                       <div
                         key={i}
-                        className={`flex items-start gap-3 p-3 rounded-lg border text-sm ${isSelected ? "bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800 font-bold text-emerald-800 dark:text-emerald-300" : "bg-slate-50 dark:bg-slate-700/50 border-slate-100 dark:border-slate-600 text-slate-600 dark:text-slate-300"}`}
+                        className={`flex items-start gap-3 p-3.5 rounded-xl border text-sm transition-colors ${
+                          isCorrect
+                            ? "bg-emerald-50 dark:bg-emerald-950/40 border-emerald-300 dark:border-emerald-700 font-bold text-emerald-900 dark:text-emerald-200 ring-1 ring-emerald-400/30"
+                            : "bg-slate-50 dark:bg-slate-700/50 border-slate-100 dark:border-slate-600 text-slate-600 dark:text-slate-300"
+                        }`}
                       >
-                        <span className="font-bold">
+                        <span
+                          className={`font-extrabold w-6 text-center ${
+                            isCorrect
+                              ? "text-emerald-700 dark:text-emerald-400"
+                              : "text-slate-500 dark:text-slate-400"
+                          }`}
+                        >
                           {String.fromCharCode(65 + i)}.
                         </span>
                         <div
                           className="flex-1 min-w-0 option-content"
                           dangerouslySetInnerHTML={{ __html: opt }}
                         ></div>
-                        {isSelected && (
-                          <CheckCircleIcon className="w-5 h-5 text-emerald-500 ml-auto shrink-0" />
-                        )}
                       </div>
                     );
                   })}
 
-                {q.questionType === "TRUE_FALSE" && q.trueFalseRows && (
-                  <div className="border border-slate-200 dark:border-slate-600 rounded-lg overflow-x-auto custom-scrollbar">
+                {/* Pilihan Ganda Kompleks (CMC) */}
+                {q.questionType === "COMPLEX_MULTIPLE_CHOICE" &&
+                  q.options &&
+                  q.options.map((opt, i) => {
+                    const isSelected = isCorrectCMCOption(q, opt, i);
+                    return (
+                      <div
+                        key={i}
+                        className={`flex items-start gap-3 p-3.5 rounded-xl border text-sm transition-colors ${
+                          isSelected
+                            ? "bg-emerald-50 dark:bg-emerald-950/40 border-emerald-300 dark:border-emerald-700 font-bold text-emerald-900 dark:text-emerald-200 ring-1 ring-emerald-400/30"
+                            : "bg-slate-50 dark:bg-slate-700/50 border-slate-100 dark:border-slate-600 text-slate-600 dark:text-slate-300"
+                        }`}
+                      >
+                        <span
+                          className={`font-extrabold w-6 text-center ${
+                            isSelected
+                              ? "text-emerald-700 dark:text-emerald-400"
+                              : "text-slate-500 dark:text-slate-400"
+                          }`}
+                        >
+                          {String.fromCharCode(65 + i)}.
+                        </span>
+                        <div
+                          className="flex-1 min-w-0 option-content"
+                          dangerouslySetInnerHTML={{ __html: opt }}
+                        ></div>
+                      </div>
+                    );
+                  })}
+
+                {/* Benar / Salah (TF) */}
+                {q.questionType === "TRUE_FALSE" && tfRows.length > 0 && (
+                  <div className="border border-slate-200 dark:border-slate-600 rounded-xl overflow-x-auto custom-scrollbar">
                     <table className="w-full text-sm min-w-[500px]">
                       <thead className="bg-slate-50 dark:bg-slate-700">
                         <tr>
-                          <th className="p-2 font-bold text-slate-600 dark:text-slate-300 text-left">
+                          <th className="p-3 font-bold text-slate-600 dark:text-slate-300 text-left">
                             Pernyataan
                           </th>
-                          <th className="p-2 font-bold text-slate-600 dark:text-slate-300 text-center w-32">
-                            Jawaban
+                          <th className="p-3 font-bold text-slate-600 dark:text-slate-300 text-center w-36">
+                            Kunci Jawaban
                           </th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
-                        {q.trueFalseRows.map((row, rIdx) => (
-                          <tr
-                            key={rIdx}
-                            className="border-t border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-800"
-                          >
-                            <td className="p-2 dark:text-slate-200">
-                              <div
-                                className="[&_*]:!bg-transparent [&_*]:!text-inherit [&_*]:!p-0 [&_*]:!m-0 option-content"
-                                dangerouslySetInnerHTML={{ __html: row.text }}
-                              ></div>
-                            </td>
-                            <td
-                              className={`p-2 text-center font-bold ${row.answer ? "text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20" : "text-rose-700 dark:text-rose-400 bg-rose-50 dark:bg-rose-900/20"}`}
+                        {tfRows.map((row, rIdx) => {
+                          const trueText = (q.categoryLabels && q.categoryLabels[0]) || "Benar";
+                          const falseText = (q.categoryLabels && q.categoryLabels[1]) || "Salah";
+                          return (
+                            <tr
+                              key={rIdx}
+                              className="border-t border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-800"
                             >
-                              {row.answer
-                                ? (q.categoryLabels && q.categoryLabels[0]) || "Benar"
-                                : (q.categoryLabels && q.categoryLabels[1]) || "Salah"}
-                            </td>
-                          </tr>
-                        ))}
+                              <td className="p-3 dark:text-slate-200">
+                                <div
+                                  className="[&_*]:!bg-transparent [&_*]:!text-inherit [&_*]:!p-0 [&_*]:!m-0 option-content"
+                                  dangerouslySetInnerHTML={{ __html: row.text }}
+                                ></div>
+                              </td>
+                              <td className="p-3 text-center">
+                                <span
+                                  className={`inline-block px-3 py-1 rounded-md text-xs font-bold ${
+                                    row.answer
+                                      ? "text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-900/30 border border-emerald-200 dark:border-emerald-800"
+                                      : "text-rose-700 dark:text-rose-300 bg-rose-50 dark:bg-rose-900/30 border border-rose-200 dark:border-rose-800"
+                                  }`}
+                                >
+                                  {row.answer ? trueText : falseText}
+                                </span>
+                              </td>
+                            </tr>
+                          );
+                        })}
                       </tbody>
                     </table>
                   </div>
                 )}
 
-                {q.questionType === "MATCHING" && q.matchingPairs && (
+                {/* Menjodohkan (Matching) */}
+                {q.questionType === "MATCHING" && matchingPairs.length > 0 && (
                   <div className="space-y-2">
-                    {q.matchingPairs.map((pair, pIdx) => (
+                    <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-1">
+                      Pasangan Kunci Jawaban:
+                    </p>
+                    {matchingPairs.map((pair, pIdx) => (
                       <div
                         key={pIdx}
-                        className="flex items-center gap-2 p-2 rounded-lg bg-slate-50 dark:bg-slate-700/50 border border-slate-100 dark:border-slate-600 text-sm"
+                        className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-600 text-sm"
                       >
                         <div
                           className="flex-1 min-w-0 font-medium dark:text-slate-200 option-content"
                           dangerouslySetInnerHTML={{ __html: pair.left }}
                         ></div>
-                        <div className="text-slate-300 dark:text-slate-500">
-                          →
+                        <div className="text-slate-400 dark:text-slate-500 font-bold px-1">
+                          &rarr;
                         </div>
                         <div
-                          className="flex-1 min-w-0 font-bold dark:text-slate-200 option-content"
+                          className="flex-1 min-w-0 font-bold text-emerald-700 dark:text-emerald-300 option-content bg-emerald-50/60 dark:bg-emerald-950/30 px-3 py-1 rounded-lg border border-emerald-200/60 dark:border-emerald-800/60"
                           dangerouslySetInnerHTML={{ __html: pair.right }}
                         ></div>
                       </div>
@@ -176,19 +308,40 @@ export const ArchiveDetailUjianView: React.FC<ArchiveDetailUjianViewProps> = ({
                   </div>
                 )}
 
+                {/* Esai & Isian Singkat */}
                 {(q.questionType === "ESSAY" ||
                   q.questionType === "FILL_IN_THE_BLANK") &&
-                  q.correctAnswer && (
-                    <div className="mt-4 pt-3 border-t dark:border-slate-700">
-                      <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase">
-                        Kunci Jawaban
+                  (q.correctAnswer || (q as any).correct_answer) && (
+                    <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-700">
+                      <p className="text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1.5">
+                        Kunci Jawaban:
                       </p>
                       <div
-                        className="mt-1 p-3 rounded-lg bg-slate-50 dark:bg-slate-700/50 text-sm prose prose-sm max-w-none dark:text-slate-200"
-                        dangerouslySetInnerHTML={{ __html: q.correctAnswer }}
+                        className="p-3.5 rounded-xl bg-emerald-50/60 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800/50 text-sm text-emerald-900 dark:text-emerald-200 font-medium prose prose-sm max-w-none dark:prose-invert"
+                        dangerouslySetInnerHTML={{
+                          __html: q.correctAnswer || (q as any).correct_answer,
+                        }}
                       ></div>
                     </div>
                   )}
+
+                {/* Seksi Pembahasan / Solusi Soal */}
+                {explanation && (
+                  <div className="mt-4 pt-3.5 border-t border-slate-100 dark:border-slate-700">
+                    <div className="p-4 rounded-xl bg-indigo-50/60 dark:bg-indigo-950/20 border border-indigo-100 dark:border-indigo-900/40">
+                      <div className="flex items-center gap-2 text-indigo-700 dark:text-indigo-300 text-sm font-bold mb-2">
+                        <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                        </svg>
+                        <span>Pembahasan Soal:</span>
+                      </div>
+                      <div
+                        className="prose prose-sm max-w-none text-slate-700 dark:text-slate-200"
+                        dangerouslySetInnerHTML={{ __html: explanation }}
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>
