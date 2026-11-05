@@ -210,6 +210,7 @@ PANDUAN TATA LETAK & EFISIENSI RUANG SVG (TIGHT BOUNDING BOX):
    - Batas konten aman: koordinat X antara 25 dan 675, koordinat Y antara 15 dan 365.
 ${layoutInstruction}
 5. ATURAN KERATAPATAN & ANTI-PEMBOROSAN RUANG VERTIKAL:
+   - BATASAN TAMPILAN: Visual ini akan ditampilkan pada layar soal ujian siswa dengan batas tinggi maksimal 35% tinggi layar (max-height: 35vh) dan auto fit contain. Seluruh elemen harus proporsional agar terbaca tajam dan tidak terdistorsi.
    - DILARANG KERAS menyisakan ruang/padding kosong tebal di atas, bawah, kiri, atau kanan gambar! Objek visual harus mengisi ruang secara maksimal dan proporsional.
    - SEMUA LABEL HARUS SINGKAT & PADAT (1 sampai 4 kata saja). DILARANG membuat paragraf panjang di dalam diagram!
    - Jarak antar elemen proporsional (20-30px) agar tidak berdesakan namun tetap padat dan tidak buang-buang tempat.
