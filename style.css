@@ -249,6 +249,34 @@
       border: 1px solid #cbd5e1 !important;
       background: #f8fafc !important;
     }
+    
+    /* Strict Print & PDF Boundaries: Ensure images, SVGs, charts, and tables do not overflow A4 paper */
+    .wysiwyg-content img,
+    .prose img,
+    .option-content img,
+    .wysiwyg-content svg:not(.katex *):not(.lucide),
+    .prose svg:not(.katex *):not(.lucide),
+    .option-content svg:not(.katex *):not(.lucide) {
+      max-width: 100% !important;
+      width: auto !important;
+      max-height: 240px !important;
+      height: auto !important;
+      object-fit: contain !important;
+      display: block !important;
+      margin: 0.35rem auto !important;
+      break-inside: avoid !important;
+      page-break-inside: avoid !important;
+    }
+    .wysiwyg-content table,
+    .prose table,
+    .option-content table {
+      width: 100% !important;
+      max-width: 100% !important;
+      table-layout: auto !important;
+      word-break: break-word !important;
+      overflow-x: auto !important;
+      margin: 0.4rem auto !important;
+    }
   }
 
   /* Fix Image Alignment: Ensure images respect parent text-align (e.g. Center, Right) */
