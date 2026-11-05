@@ -13,6 +13,7 @@ import { ProfileCompletionModal } from './components/teacher/ProfileCompletionMo
 import { TermsPage, PrivacyPage } from './components/LegalPages';
 import { TutorialPage } from './components/TutorialPage';
 import { CollaboratorView } from './components/CollaboratorView';
+import { VisualLightboxModal } from './components/VisualLightboxModal';
 import { supabase } from './lib/supabase';
 import { hydrateMathInContainer } from './utils/mathRenderer';
 import { calculateStudentAccess } from './utils/scheduleUtils';
@@ -1072,6 +1073,9 @@ const App: React.FC = () => {
         {view === 'TUTORIAL' && (
             <TutorialPage onBack={() => setView('SELECTOR')} />
         )}
+
+        {/* Global Visual Lightbox Modal for Fullscreen Zoom */}
+        <VisualLightboxModal />
     </div>
   );
 };
