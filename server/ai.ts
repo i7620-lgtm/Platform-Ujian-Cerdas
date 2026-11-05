@@ -171,24 +171,25 @@ Tugas Anda adalah menggambar BENTUK BANGUN GEOMETRI 2D/3D TEKNIS MATEMATIS MURNI
 
     let layoutInstruction = "";
     if (isGeometryMode) {
-        layoutInstruction = `4. TATA LETAK DIAGRAM GEOMETRI TEKNIS MURNI (BUKAN SLIDE PPT / BUKAN POSTER):
+        layoutInstruction = `4. TATA LETAK DIAGRAM GEOMETRI TEKNIS MURNI & HEMAT TEMPAT (BUKAN SLIDE PPT):
    - DILARANG KERAS MEMBUAT KARTU PRESENTASI, SLIDE PPT, KARTU KONSEP 1-2-3, ATAU KOTAK KESIMPULAN!
-   - Posisikan gambar bangun geometri di tengah kanvas (center x=425, y=280).
-   - Di pojok kiri atas (x=45, y=40), hanya berikan teks judul teknis kecil (maks 1 baris, font-size="14-16", font-weight="800", fill="#0f172a").
+   - TIGHT BOUNDING BOX: Posisikan gambar bangun geometri tepat di tengah kanvas (center x=350, y=190) dengan ukuran proporsional mengisi 80-90% area vertikal kanvas tanpa ruang kosong tebal di atas/bawah.
+   - Di pojok kiri atas (x=30, y=28), hanya berikan teks judul teknis kecil jika relevan (maks 1 baris, font-size="13-14", font-weight="700", fill="#0f172a").
    - Bangun gabungan: kedua bangun harus menempel berhimpit presisi tanpa celah.
    - Berikan garis putus-putus (stroke-dasharray="5 5") untuk rusuk di belakang yang tak tampak.
    - Anotasi Ukuran: Gambarkan garis dimensi berpanah dengan teks ukuran jelas (contoh: '12 cm', '8 cm', 't = 15 cm', 'r = 7 cm').
    - Sudut & Titik Sudut: Berikan label titik sudut (A, B, C, D, ...) dan tanda siku-siku pada sudut 90°.
    - Stroke utama: stroke="#0f172a" ketebalan 2 sampai 2.5, fill transparan pastel sangat lembut (contoh: rgba(59, 130, 246, 0.08)).`;
     } else {
-        layoutInstruction = `4. TATA LETAK HEADER ATAS (y=25 sampai y=90):
-   - Gunakan wadah header elegan di bagian atas: <rect x="40" y="25" width="770" height="65" rx="12" fill="#f8fafc" stroke="#e2e8f0" />
-   - Judul Utama: 1 baris ringkas, jelas (maksimal 35 karakter), font-size="20-22" font-weight="800", text-anchor="middle" di x="425" y="55".
-   - Subjudul materi: 1 baris, font-size="12-13", text-anchor="middle" di x="425" y="78".`;
+        layoutInstruction = `4. TATA LETAK RINGKAS & HEMAT TEMPAT (y=15 sampai y=365):
+   - Header Ringkas Atas (y=15 sampai y=45): 
+     Judul Utama 1 baris ringkas padat di x=350 y=32 (font-size="15-17", font-weight="800", text-anchor="middle", fill="#0f172a"). DILARANG membuat header box besar bertumpuk yang memakan ruang!
+   - Area Diagram Utama (y=55 sampai y=365):
+     Gunakan seluruh area ini untuk objek, organ, siklus, atau alur diagram. DILARANG menyisakan ruang kosong besar di bagian atas maupun bawah!`;
     }
 
     const systemInstruction = `Anda adalah Ahli Desain Grafis Vektor dan Ilustrator Edukasi SVG profesional kelas dunia untuk kurikulum sekolah Indonesia (K-12).
-Tugas Anda adalah membuat kode SVG murni (<svg ...> ... </svg>) berkualitas tinggi, modern, sangat rapi, proporsional, dan 100% edukatif.
+Tugas Anda adalah membuat kode SVG murni (<svg ...> ... </svg>) berkualitas tinggi, modern, sangat rapi, proporsional, hemat ruang vertikal (compact & tight bounding box), dan 100% edukatif.
 
 MANDAT KESELAMATAN & ETIKA PENDIDIKAN K-12 (ZERO-TOLERANCE SAFETY POLICY):
 1. DILARANG KERAS memuat pornografi, erotisme, ketelanjangan (nudity), tubuh tanpa busana, pakaian tidak senonoh, atau pose vulgar apapun.
@@ -200,18 +201,18 @@ MANDAT KESELAMATAN & ETIKA PENDIDIKAN K-12 (ZERO-TOLERANCE SAFETY POLICY):
 INSTRUKSI GAYA KHUSUS:
 ${styleInstruction}
 
-PANDUAN TATA LETAK & KEJELASAN TEKS SVG:
+PANDUAN TATA LETAK & EFISIENSI RUANG SVG (TIGHT BOUNDING BOX):
 1. Kembalikan HANYA kode SVG valid yang diawali dengan <svg> dan diakhiri dengan </svg>. JANGAN sertakan penjelasan teks dan JANGAN gunakan markdown codeblock.
 2. Atribut elemen <svg> WAJIB:
-   viewBox="0 0 850 560" xmlns="http://www.w3.org/2000/svg" width="100%" height="100%"
+   viewBox="0 0 700 380" xmlns="http://www.w3.org/2000/svg" width="100%" height="100%"
 3. Latar Belakang & Ruang Aman:
-   - Baris pertama wajib: <rect width="100%" height="100%" fill="#ffffff" rx="16" />
-   - Batas konten aman: koordinat X antara 40 dan 810, koordinat Y antara 30 dan 530.
+   - Baris pertama wajib: <rect width="100%" height="100%" fill="#ffffff" rx="12" />
+   - Batas konten aman: koordinat X antara 25 dan 675, koordinat Y antara 15 dan 365.
 ${layoutInstruction}
-5. RUANG DIAGRAM UTAMA LAPANG (y=105 sampai y=520):
-   - Berikan ruang vertikal luas (415px) agar bentuk, organ, alur proses, atau kartu diagram tidak berdesakan.
-   - SEMUA LABEL HARUS SINGKAT & PADAT (1 sampai 4 kata saja). DILARANG membuat paragraf panjang atau uraian narasi di dalam diagram!
-   - Hindari tumpang-tindih: Jarak vertikal antar elemen atau baris teks MINIMAL 30px.
+5. ATURAN KERATAPATAN & ANTI-PEMBOROSAN RUANG VERTIKAL:
+   - DILARANG KERAS menyisakan ruang/padding kosong tebal di atas, bawah, kiri, atau kanan gambar! Objek visual harus mengisi ruang secara maksimal dan proporsional.
+   - SEMUA LABEL HARUS SINGKAT & PADAT (1 sampai 4 kata saja). DILARANG membuat paragraf panjang di dalam diagram!
+   - Jarak antar elemen proporsional (20-30px) agar tidak berdesakan namun tetap padat dan tidak buang-buang tempat.
    - Label pada garis/panah: Tempatkan di atas background badge (<rect rx="4" ...>) atau beri jarak aman agar tidak menimpa garis.
    - Gunakan text-anchor="middle" dan pasang koordinat x tepat di tengah kartu/bentuk.
    - Wajib gunakan entitas XML &amp; jika menggunakan simbol '&' (dilarang karakter '&' mentah).
