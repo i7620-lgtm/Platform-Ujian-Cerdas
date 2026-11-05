@@ -430,6 +430,7 @@ export const PrintSoalModal: React.FC<PrintSoalModalProps> = ({
           .print-chart-container {
             width: 100% !important;
             max-width: 400px !important;
+            max-height: 230px !important;
             margin: 6px auto !important;
             padding: 4px 6px !important;
             border: 1px solid #94a3b8 !important;
@@ -441,6 +442,7 @@ export const PrintSoalModal: React.FC<PrintSoalModalProps> = ({
             break-inside: avoid !important;
             page-break-inside: avoid !important;
             box-shadow: none !important;
+            overflow: hidden !important;
           }
 
           .print-chart-container svg {
@@ -448,7 +450,7 @@ export const PrintSoalModal: React.FC<PrintSoalModalProps> = ({
             margin: 0 auto !important;
             max-width: 100% !important;
             height: auto !important;
-            max-height: 200px !important;
+            max-height: 190px !important;
             overflow: hidden !important;
           }
 
@@ -457,11 +459,16 @@ export const PrintSoalModal: React.FC<PrintSoalModalProps> = ({
             margin-bottom: 2px !important;
           }
 
-          /* Compact Tables */
+          /* Compact & Responsive Printable Tables */
           table {
             width: 100% !important;
+            max-width: 100% !important;
             border-collapse: collapse !important;
+            table-layout: auto !important;
+            word-break: break-word !important;
+            overflow-x: auto !important;
             page-break-inside: auto;
+            margin: 6px 0 !important;
           }
           tr {
             break-inside: avoid !important;
@@ -469,13 +476,29 @@ export const PrintSoalModal: React.FC<PrintSoalModalProps> = ({
           }
           th, td {
             padding: 3px 6px !important;
+            word-break: break-word !important;
           }
 
-          /* Images */
-          img {
+          /* Images & SVG Diagram Boundaries (Strict 240px Max Height for Print/PDF) */
+          .print-soal-content img,
+          .print-soal-content svg:not(.katex *):not(.lucide) {
             max-width: 100% !important;
+            width: auto !important;
+            max-height: 240px !important;
+            height: auto !important;
+            object-fit: contain !important;
+            display: block !important;
+            margin: 6px auto !important;
+            border-radius: 4px !important;
             break-inside: avoid !important;
             page-break-inside: avoid !important;
+          }
+
+          .print-soal-content p:has(> img),
+          .print-soal-content p:has(> svg) {
+            margin-top: 3px !important;
+            margin-bottom: 3px !important;
+            text-align: center !important;
           }
 
           .no-print {
