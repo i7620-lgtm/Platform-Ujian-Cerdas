@@ -257,7 +257,7 @@
     display: inline-block;
   }
 
-  /* Ensure images, tables, and diagrams inside options don't overflow */
+  /* Ensure images, tables, and diagrams inside questions and options are compact and don't overflow */
   .option-content img,
   .option-content svg:not(.katex *):not(.math-visual *):not(.geometry-shape *):not(.geometry-shape),
   .option-content canvas,
@@ -268,28 +268,54 @@
   .prose svg:not(.katex *):not(.math-visual *):not(.geometry-shape *):not(.geometry-shape),
   .prose canvas {
     max-width: 100%;
+    width: auto;
+    max-height: min(35vh, 320px);
     height: auto;
+    object-fit: contain;
     display: block;
-    margin: 1.5rem auto;
-    border-radius: 0.75rem;
+    margin: 0.35rem auto;
+    border-radius: 0.625rem;
+    cursor: zoom-in;
+    transition: transform 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+  }
+
+  .wysiwyg-content img:hover,
+  .prose img:hover,
+  .option-content img:hover,
+  .wysiwyg-content svg:not(.katex *):not(.math-visual *):not(.geometry-shape *):not(.geometry-shape):hover,
+  .prose svg:not(.katex *):not(.math-visual *):not(.geometry-shape *):not(.geometry-shape):hover {
+    transform: scale(1.015);
+  }
+
+  /* Compact paragraph margin when paragraph holds an image, SVG diagram, or visual */
+  .wysiwyg-content p:has(> img),
+  .prose p:has(> img),
+  .option-content p:has(> img),
+  .wysiwyg-content p:has(> svg),
+  .prose p:has(> svg),
+  .option-content p:has(> svg) {
+    margin-top: 0.25rem !important;
+    margin-bottom: 0.25rem !important;
+    text-align: center;
   }
 
   /* Compact & Non-Intrusive Geometry Diagram Styling */
   .geometry-shape {
     display: block !important;
     text-align: center;
-    margin: 0.35rem auto !important;
+    margin: 0.25rem auto !important;
     max-width: 250px !important;
     width: auto;
     line-height: 1;
     user-select: none;
+    cursor: zoom-in;
   }
 
   .geometry-shape svg {
     display: block !important;
     margin: 0 auto !important;
     max-width: 250px !important;
-    max-height: 160px !important;
+    max-height: min(30vh, 180px) !important;
     width: auto !important;
     height: auto !important;
     border-radius: 0 !important;
@@ -299,17 +325,37 @@
   .wysiwyg-content p:has(> .geometry-shape),
   .prose p:has(> .geometry-shape),
   .option-content p:has(> .geometry-shape) {
-    margin-top: 0.35rem !important;
-    margin-bottom: 0.35rem !important;
+    margin-top: 0.25rem !important;
+    margin-bottom: 0.25rem !important;
     text-align: center;
   }
   
+  /* Responsive Tables: Otomatis scroll horizontal dengan scrollbar halus tanpa merusak tata letak */
   .wysiwyg-content table,
   .prose table,
   .option-content table {
-    display: table;
-    width: 100%;
+    display: block;
+    width: max-content;
     max-width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    margin: 0.4rem auto;
+    border-collapse: collapse;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(148, 163, 184, 0.5) transparent;
+  }
+
+  .wysiwyg-content table::-webkit-scrollbar,
+  .prose table::-webkit-scrollbar,
+  .option-content table::-webkit-scrollbar {
+    height: 6px;
+  }
+
+  .wysiwyg-content table::-webkit-scrollbar-thumb,
+  .prose table::-webkit-scrollbar-thumb,
+  .option-content table::-webkit-scrollbar-thumb {
+    background-color: rgba(148, 163, 184, 0.5);
+    border-radius: 9999px;
   }
 
   .wysiwyg-content table thead,
@@ -344,7 +390,8 @@
   .option-content table td {
     white-space: normal; 
     word-break: normal;
-    min-width: 100px;
+    padding: 0.35rem 0.65rem;
+    font-size: 0.875rem;
   }
 
   /* --- Aggressive Dark Mode Text Visibility Fixes --- */

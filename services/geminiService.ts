@@ -316,6 +316,20 @@ export async function generateQuestions(
            b) BANGUN GEOMETRI SULIT / 3D DIMENSI TIGA (Limas Terpancung, Irisan Bidang Kubus/Balok, Frustum Kerucut, Prisma Segi Enam Beraturan, Jaring-jaring Kompleks). WAJIB pilih 'svgStyle': "geometry" dan tuliskan deskripsi teknis 3D isometrik dengan garis putus-putus rusuk belakang dan dimensi ukuran berpanah. DILARANG KERAS MEMBUAT KARTU PRESENTASI ATAU SLIDE MATERI PPT!
            Tuliskan deskripsi gambar yang detail pada 'svgPrompt' dan pilih 'svgStyle' ("geometry", "diagram", "infographic", "flowchart", atau "flat_art"). Anda juga dapat menyisipkan tag [ai_svg: Deskripsi gambar teknis/ilmiah] di dalam 'questionText' pada letak stimulus yang diinginkan. Sistem akan OTOMATIS memanggil Generator Gambar AI untuk menggambar vektor SVG tajam langsung pada soal ini! Set 'visualStimulusType': "ai_svg".` : `* MODE AUTO-DETEKSI VISUAL CERDAS (TIDAK DICENTANG):
         Evaluasi materi dan butir soal secara cermat. JIKA topik/soal yang diminta SECARA HAKIKI MEMERLUKAN ATAU SANGAT DIBANTU OLEH VISUAL (seperti Geometri Bangun Datar/Ruang, Koordinat Kartesius & Parabola, Organ Tubuh/Siklus Sains, Diagram Statistika, Piktogram Data, Peta/Monumen), Anda TETAP WAJIB MENYERTAKAN visual representatif yang presisi (tag [GEOMETRY:...], [CHART] / 'chartData', [ai_svg:...], emoji piktogram, atau 'wikimedia_photo'). Jika soal murni teori/bacaan biasa tanpa butuh gambar, utamakan narasi teks & tabel Markdown.`}
+
+    ATURAN MUTLAK PROPORSI VISUAL, UKURAN HEMAT TEMPAT & TIGHT BOUNDING BOX (ANTI MELEWATI LAYAR):
+    1. BATAS PROPORSI VISUAL DI LAYAR SOAL:
+       - Seluruh visual yang dihasilkan (gambar [ai_svg:...], bangun [GEOMETRY:...], grafik [CHART], kartesius, maupun tabel Markdown) WAJIB proporsional dan hemat tempat vertikal.
+       - Tampilan visual di layar siswa dibatasi maksimal 35% tinggi layar (max-height: 35vh) dan tidak boleh meluap (overflow) melebihi batas vertikal maupun horizontal.
+    2. DESKRIPSI UNTUK GENERATOR AI SVG ([ai_svg: ...] & 'svgPrompt'):
+       - WAJIB menyertakan instruksi TIGHT BOUNDING BOX: kanvas proporsional 700x380, objek mengisi 80-90% area kanvas tanpa ruang kosong tebal di atas/bawah/samping.
+       - DILARANG menyisakan margin/gap kosong tebal antara teks dan visual.
+       - DILARANG membuat banner/header bertumpuk besar yang memakan tinggi kanvas. Judul diagram cukup 1 baris teks kecil atau langsung diuraikan pada teks soal.
+    3. TABEL DATA MARKDOWN:
+       - Buat tabel Markdown yang ringkas dan padat (compact padding). Jika kolom banyak (lebih dari 3 kolom), pastikan teks judul kolom singkat agar mendukung scroll horizontal mulus pada layar smartphone tanpa memotong tata letak layar.
+    4. DIAGRAM STATISTIK & KARTESIUS:
+       - Pastikan rentang sumbu dan jumlah elemen seimbang, tidak terlalu panjang secara vertikal, agar grafik tetap padat dan terbaca jelas dalam batas 35% tinggi layar.
+
     - LARANGAN KERAS: DILARANG KERAS menyisipkan tag HTML, tag <img>, atau tag semacam <span class="chart-placeholder"> untuk tabel, gambar raster, atau ilustrasi umum. Gunakan tabel Markdown murni untuk tabel.
     - PENTING (AKSARA BALI): Jika materi atau konteks soal berkaitan dengan mata pelajaran "Bahasa Bali", Anda WAJIB berinisiatif dan memutuskan secara mandiri untuk menggunakan teks Aksara Bali pada narasi soal dan/atau opsi jawaban jika dirasa relevan. Bungkus teks tersebut dengan tag HTML <span class="aksara-bali" style="font-family: 'Noto Sans Balinese', sans-serif;">teks aksara bali</span>.
     - PENTING (ATURAN SATUAN MURNI, SUHU & NILAI UANG - WAJIB TEKS BIASA):

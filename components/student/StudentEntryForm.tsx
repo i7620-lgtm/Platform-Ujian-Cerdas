@@ -170,7 +170,7 @@ export const StudentEntryForm: React.FC<StudentEntryFormProps> = ({
   }
 
   return (
-    <div className="min-h-screen w-full flex flex-col items-center justify-center bg-[#FAFAFA] dark:bg-slate-950 relative font-sans selection:bg-indigo-100 selection:text-indigo-800 transition-colors duration-300">
+    <div className="fixed inset-0 w-full h-[100dvh] max-h-[100dvh] overflow-hidden flex flex-col justify-between items-center bg-[#FAFAFA] dark:bg-slate-950 relative font-sans selection:bg-indigo-100 selection:text-indigo-800 transition-colors duration-300 touch-none overscroll-none select-none">
       <div className="fixed inset-0 pointer-events-none overflow-hidden">
         <div
           className="absolute top-[-10%] left-[-10%] w-[60%] h-[60%] bg-gradient-to-br from-indigo-50/60 to-purple-50/60 dark:from-indigo-900/20 dark:to-purple-900/20 rounded-full blur-[100px] animate-pulse"
@@ -183,44 +183,76 @@ export const StudentEntryForm: React.FC<StudentEntryFormProps> = ({
       </div>
 
       {toggleTheme && (
-        <div className="absolute top-6 right-6 z-50">
+        <div className="absolute top-3.5 sm:top-5 right-3.5 sm:right-6 z-50">
           <button
             onClick={toggleTheme}
-            className="p-2.5 rounded-full bg-white/50 dark:bg-slate-800/50 backdrop-blur-md text-slate-500 dark:text-slate-400 hover:bg-white dark:hover:bg-slate-800 hover:text-indigo-600 dark:hover:text-indigo-400 transition-all shadow-sm border border-white/20 dark:border-slate-700"
+            className="p-2.5 rounded-full bg-white/70 dark:bg-slate-800/70 backdrop-blur-md text-slate-500 dark:text-slate-400 hover:bg-white dark:hover:bg-slate-800 hover:text-indigo-600 dark:hover:text-indigo-400 transition-all shadow-sm border border-white/20 dark:border-slate-700 active:scale-95"
           >
             {isDarkMode ? (
-              <SunIcon className="w-5 h-5" />
+              <SunIcon className="w-4 h-4 sm:w-5 sm:h-5" />
             ) : (
-              <MoonIcon className="w-5 h-5" />
+              <MoonIcon className="w-4 h-4 sm:w-5 sm:h-5" />
             )}
           </button>
         </div>
       )}
 
-      <div className="w-full max-w-[420px] px-4 relative z-10 flex flex-col sm:h-auto justify-center py-10 my-auto animate-gentle-slide">
-        <button
-          onClick={onBack}
-          className="group self-start flex items-center gap-2 text-slate-400 dark:text-slate-500 hover:text-slate-800 dark:hover:text-slate-300 mb-4 text-[10px] font-bold uppercase tracking-widest transition-all pl-2 py-2"
-        >
-          <div className="w-6 h-6 rounded-full bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 flex items-center justify-center shadow-sm group-hover:scale-110 transition-transform">
-            <ArrowLeftIcon className="w-3 h-3" />
-          </div>
-          <span>Kembali</span>
-        </button>
+      {/* Main Container Layout (Adaptive 2-Column for Landscape/Desktop) */}
+      <div className="w-full max-w-4xl px-4 sm:px-6 relative z-10 flex-1 flex flex-col justify-center items-center min-h-0 py-3 sm:py-6">
+        <div className="w-full flex flex-col landscape:flex-row lg:flex-row items-center justify-center gap-4 sm:gap-6 lg:gap-8 animate-gentle-slide max-h-full overflow-y-auto custom-scrollbar">
+          
+          {/* Kolom Kiri Hero (Tampil di Desktop & Landscape) */}
+          <div className="hidden landscape:flex lg:flex flex-col items-start text-left max-w-xs shrink-0 space-y-3">
+            <button
+              onClick={onBack}
+              className="group flex items-center gap-2 text-slate-400 dark:text-slate-500 hover:text-slate-800 dark:hover:text-slate-300 text-[10px] font-bold uppercase tracking-widest transition-all mb-1"
+            >
+              <div className="w-6 h-6 rounded-full bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 flex items-center justify-center shadow-xs group-hover:scale-110 transition-transform">
+                <ArrowLeftIcon className="w-3 h-3" />
+              </div>
+              <span>Kembali</span>
+            </button>
 
-        <div className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl p-6 sm:p-8 rounded-[2rem] shadow-[0_20px_60px_-15px_rgba(0,0,0,0.03)] dark:shadow-black/20 border border-white dark:border-slate-800 ring-1 ring-slate-50 dark:ring-slate-800">
-          <div className="text-center mb-6">
-            <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-white dark:bg-slate-800 shadow-[0_10px_20px_-5px_rgba(79,70,229,0.15)] dark:shadow-none mb-3 text-indigo-600 dark:text-indigo-400 border border-indigo-50 dark:border-slate-700 relative overflow-hidden">
+            <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-white dark:bg-slate-800 shadow-[0_10px_20px_-5px_rgba(79,70,229,0.15)] dark:shadow-none text-indigo-600 dark:text-indigo-400 border border-indigo-50 dark:border-slate-700 relative overflow-hidden">
               <div className="absolute inset-0 bg-indigo-50/50 dark:bg-indigo-900/20 rounded-2xl transform rotate-45 translate-y-6 translate-x-6"></div>
               <UserIcon className="w-6 h-6 relative z-10" />
             </div>
-            <h2 className="text-xl font-black text-slate-800 dark:text-white tracking-tight">
-              Selamat Datang
-            </h2>
-            <p className="text-slate-400 dark:text-slate-500 text-xs font-medium mt-1">
-              Siapkan diri untuk ujian hari ini.
-            </p>
+
+            <div>
+              <h2 className="text-2xl font-black text-slate-800 dark:text-white tracking-tight">
+                Selamat Datang
+              </h2>
+              <p className="text-slate-500 dark:text-slate-400 text-xs font-medium leading-relaxed mt-1">
+                Siapkan diri untuk ujian hari ini. Masukkan identitas dan kode ujian dari pengawas.
+              </p>
+            </div>
           </div>
+
+          {/* Form Card */}
+          <div className="w-full max-w-[420px] shrink-0">
+            {/* Tombol kembali khusus Portrait Mobile */}
+            <button
+              onClick={onBack}
+              className="landscape:hidden lg:hidden group self-start flex items-center gap-2 text-slate-400 dark:text-slate-500 hover:text-slate-800 dark:hover:text-slate-300 mb-2.5 text-[10px] font-bold uppercase tracking-widest transition-all pl-1"
+            >
+              <div className="w-6 h-6 rounded-full bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 flex items-center justify-center shadow-xs group-hover:scale-110 transition-transform">
+                <ArrowLeftIcon className="w-3 h-3" />
+              </div>
+              <span>Kembali</span>
+            </button>
+
+            <div className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl p-5 sm:p-7 rounded-[2rem] shadow-[0_20px_60px_-15px_rgba(0,0,0,0.03)] dark:shadow-black/20 border border-white dark:border-slate-800 ring-1 ring-slate-50 dark:ring-slate-800">
+              <div className="text-center mb-4 landscape:hidden lg:hidden">
+                <div className="inline-flex items-center justify-center w-10 h-10 rounded-2xl bg-white dark:bg-slate-800 shadow-xs mb-2 text-indigo-600 dark:text-indigo-400 border border-indigo-50 dark:border-slate-700 relative overflow-hidden">
+                  <UserIcon className="w-5 h-5 relative z-10" />
+                </div>
+                <h2 className="text-lg font-black text-slate-800 dark:text-white tracking-tight">
+                  Selamat Datang
+                </h2>
+                <p className="text-slate-400 dark:text-slate-500 text-[11px] font-medium">
+                  Siapkan diri untuk ujian hari ini.
+                </p>
+              </div>
 
           <form onSubmit={handleSubmit} className="space-y-3">
             <div className="space-y-3">
@@ -575,12 +607,14 @@ export const StudentEntryForm: React.FC<StudentEntryFormProps> = ({
             </button>
           </form>
         </div>
+      </div>
+    </div>
+  </div>
 
-        <div className="mt-4 text-center">
-          <p className="text-[10px] font-bold text-slate-300 dark:text-slate-600 uppercase tracking-[0.2em]">
-            Platform Ujian Cerdas
-          </p>
-        </div>
+  <div className="py-2 text-center shrink-0 z-10">
+        <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-[0.2em]">
+          Platform Ujian Cerdas
+        </p>
       </div>
 
       {isQrScannerOpen && (

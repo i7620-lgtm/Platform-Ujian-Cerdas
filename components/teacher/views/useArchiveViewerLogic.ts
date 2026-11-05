@@ -75,9 +75,13 @@ export const useArchiveViewerLogic = ({ archiveViewer, teacherProfile }: UseArch
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Auto fix mismatches on load (enrich and repair)
+  const hasRepairedArchiveRef = React.useRef<string | null>(null);
+
+  // Auto fix mismatches on load (enrich and repair) with guard against repeat cycles
   React.useEffect(() => {
     if (!archiveData) return;
+    const archiveKey = `${archiveData.exam.code}_${archiveData.results.length}`;
+    if (hasRepairedArchiveRef.current === archiveKey) return;
 
     let mismatchCount = 0;
     const fixedResults = archiveData.results.map((r) => {
@@ -95,6 +99,8 @@ export const useArchiveViewerLogic = ({ archiveViewer, teacherProfile }: UseArch
       }
       return r;
     });
+
+    hasRepairedArchiveRef.current = archiveKey;
 
     if (mismatchCount > 0) {
       setFixMessage(
@@ -135,6 +141,21 @@ export const useArchiveViewerLogic = ({ archiveViewer, teacherProfile }: UseArch
       URL.revokeObjectURL(url);
     }
   }, [archiveData, teacherProfile, setFixMessage, setArchiveData]);
+
+  // Single-pass memoized scoring for all students (O(1) fast lookup across tabs)
+  const studentStatsMap = React.useMemo(() => {
+    const map = new Map<
+      string,
+      { correct: number; wrong: number; empty: number; score: number; duration: number }
+    >();
+    if (!archiveData) return map;
+
+    const { exam, results } = archiveData;
+    results.forEach((r) => {
+      map.set(r.student.studentId, getCalculatedStats(r, exam));
+    });
+    return map;
+  }, [archiveData]);
 
   // Sorting & filters memoized
   const sortedResults = React.useMemo(() => {
@@ -289,10 +310,10 @@ export const useArchiveViewerLogic = ({ archiveViewer, teacherProfile }: UseArch
           (r) => r.student.class === className,
         );
         const scores = classResults.map(
-          (r) => getCalculatedStats(r, archiveData.exam).score,
+          (r) => studentStatsMap.get(r.student.studentId)?.score ?? (r.score || 0),
         );
         const times = classResults
-          .map((r) => getCalculatedStats(r, archiveData.exam).duration)
+          .map((r) => studentStatsMap.get(r.student.studentId)?.duration ?? (r.completionTime || 0))
           .filter((t) => t > 0);
 
         const averageScore =
@@ -336,7 +357,7 @@ export const useArchiveViewerLogic = ({ archiveViewer, teacherProfile }: UseArch
       });
     });
     return finalDetails;
-  }, [archiveData, filteredResults]);
+  }, [archiveData, filteredResults, studentStatsMap]);
 
   const isNoAuthor = checkIsNoAuthor();
 
@@ -445,57 +466,52 @@ export const useArchiveViewerLogic = ({ archiveViewer, teacherProfile }: UseArch
       return;
     }
 
-    const classesSet = new Set<string>();
+    // Map unique combinations of (schoolName, className)
+    const schoolClassMap = new Map<string, { schoolName: string; className: string; count: number }>();
+
     archiveData.results.forEach((r) => {
-      const c = String(r.student.class || r.student.className || "").trim();
-      if (c) classesSet.add(c);
+      if (r.student?.class === "PREVIEW" || r.isPlaceholder) return;
+      const c = String(r.student?.class || r.student?.className || "").trim();
+      if (!c) return;
+      const s = String(r.student?.schoolName || archiveData.exam.authorSchool || "Sekolah").trim();
+      const comboKey = `${s}___${c}`;
+
+      if (!schoolClassMap.has(comboKey)) {
+        schoolClassMap.set(comboKey, { schoolName: s, className: c, count: 0 });
+      }
+      schoolClassMap.get(comboKey)!.count += 1;
     });
-    const classes = Array.from(classesSet).sort((a, b) =>
-      a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" })
-    );
+
+    const uniqueSchoolsSet = new Set(Array.from(schoolClassMap.values()).map((v) => v.schoolName));
+    const hasMultipleSchools = uniqueSchoolsSet.size > 1;
 
     const targets: AnalysisTargetItem[] = [];
 
-    // General analysis if multiple classes exist
-    if (classes.length > 1) {
-      targets.push({
-        key: "OVERALL",
-        label: "Analisis Umum (Semua Kelas)",
-        isOverall: true,
-        studentCount: archiveData.results.length,
-      });
-    }
-
-    // Class specific analyses
-    classes.forEach((cls) => {
-      const classResults = archiveData.results.filter(
-        (r) => String(r.student.class || r.student.className || "").trim() === cls
-      );
-      const schoolName = classResults[0]?.student.schoolName || archiveData.exam.authorSchool || "ALL";
-      targets.push({
-        key: `school_${schoolName}_class_${cls}`,
-        label: `Kelas ${cls}`,
-        isOverall: false,
-        className: cls,
-        studentCount: classResults.length,
-      });
+    // General Analysis (OVERALL)
+    targets.push({
+      key: "OVERALL",
+      label: "Analisis Umum (Semua Kelas)",
+      isOverall: true,
+      studentCount: archiveData.results.filter((r) => r.student?.class !== "PREVIEW" && !r.isPlaceholder).length,
     });
 
-    if (targets.length === 0) {
-      targets.push({
-        key: "OVERALL",
-        label: "Analisis Umum",
-        isOverall: true,
-        studentCount: archiveData.results.length,
+    // Class & School Specific Analyses
+    Array.from(schoolClassMap.entries())
+      .sort((a, b) => a[0].localeCompare(b[0], undefined, { numeric: true, sensitivity: "base" }))
+      .forEach(([, group]) => {
+        const label = hasMultipleSchools
+          ? `Kelas ${group.className} (${group.schoolName})`
+          : `Kelas ${group.className}`;
+
+        targets.push({
+          key: `school_${group.schoolName}_class_${group.className}`,
+          label,
+          isOverall: false,
+          className: group.className,
+          schoolName: group.schoolName,
+          studentCount: group.count,
+        });
       });
-    } else if (classes.length === 1 && !targets.some(t => t.key === "OVERALL")) {
-      targets.unshift({
-        key: "OVERALL",
-        label: `Analisis Umum (${classes[0]})`,
-        isOverall: true,
-        studentCount: archiveData.results.length,
-      });
-    }
 
     setAnalysisTargets(targets);
     setIsTargetModalOpen(true);
@@ -680,9 +696,42 @@ export const useArchiveViewerLogic = ({ archiveViewer, teacherProfile }: UseArch
     saveArchiveToCloudSilently(updatedData);
   };
 
+  const handleSaveImportedAnalysisBatch = React.useCallback(
+    async (analysesMap: Record<string, string>, primaryTargetKey: string) => {
+      if (!archiveData) return;
+
+      const currentAnalyses = archiveData.ai_analyses || {};
+      const updatedAnalyses = {
+        ...currentAnalyses,
+        ...analysesMap,
+      };
+
+      const updatedData: ArchiveData = {
+        ...archiveData,
+        ai_analyses: updatedAnalyses,
+      };
+
+      setArchiveData(updatedData);
+      archiveViewer.setActiveTab("AI_ANALYSIS");
+      setActiveAiSubTab(primaryTargetKey || Object.keys(analysesMap)[0] || "OVERALL");
+
+      await saveArchiveToCloudSilently(updatedData);
+    },
+    [archiveData, archiveViewer, saveArchiveToCloudSilently, setArchiveData]
+  );
+
+  const handleSaveImportedAnalysis = React.useCallback(
+    async (targetKey: string, content: string) => {
+      await handleSaveImportedAnalysisBatch({ [targetKey]: content }, targetKey);
+    },
+    [handleSaveImportedAnalysisBatch]
+  );
+
   return {
     isGeneratingAI,
     aiProgressStatus,
+    handleSaveImportedAnalysis,
+    handleSaveImportedAnalysisBatch,
     aiProgressMessage,
     aiAnalysisResult,
     activeAiSubTab,
@@ -719,5 +768,6 @@ export const useArchiveViewerLogic = ({ archiveViewer, teacherProfile }: UseArch
     averageCompletionTime,
     handleGenerateAI,
     handleDeleteAIAnalysis,
+    studentStatsMap,
   };
 };

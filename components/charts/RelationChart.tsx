@@ -31,7 +31,7 @@ export const RelationChart: React.FC<{ data: ChartData }> = ({ data }) => {
     <div className="w-full h-auto flex items-center justify-center relative">
       <svg
         viewBox={`0 0 ${svgW} ${svgH}`}
-        className="w-full max-w-[400px] h-auto"
+        className="w-full max-w-[340px] max-h-[35vh] h-auto cursor-zoom-in zoomable-svg"
       >
         <defs>
           <marker

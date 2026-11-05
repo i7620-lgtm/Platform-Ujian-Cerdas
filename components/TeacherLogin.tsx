@@ -97,51 +97,83 @@ export const TeacherLogin: React.FC<TeacherLoginProps> = ({
   };
 
   return (
-    <div className="min-h-screen w-full flex flex-col items-center justify-center bg-[#EEF2FF] dark:bg-slate-950 font-sans selection:bg-indigo-100 selection:text-indigo-900 transition-colors duration-300 relative overflow-y-auto">
+    <div className="fixed inset-0 w-full h-[100dvh] max-h-[100dvh] overflow-hidden flex flex-col justify-between items-center bg-[#EEF2FF] dark:bg-slate-950 font-sans selection:bg-indigo-100 selection:text-indigo-900 transition-colors duration-300 relative touch-none overscroll-none select-none">
       {/* Theme Toggle Top Right */}
       {toggleTheme && (
-        <div className="absolute top-6 right-6 z-50">
+        <div className="absolute top-3.5 sm:top-5 right-3.5 sm:right-6 z-50">
           <button
             onClick={toggleTheme}
-            className="p-2.5 rounded-full bg-white/50 dark:bg-slate-800/50 backdrop-blur-md text-slate-500 dark:text-slate-400 hover:bg-white dark:hover:bg-slate-800 hover:text-indigo-600 dark:hover:text-indigo-400 transition-all shadow-sm border border-white/20 dark:border-slate-700"
+            className="p-2.5 rounded-full bg-white/70 dark:bg-slate-800/70 backdrop-blur-md text-slate-500 dark:text-slate-400 hover:bg-white dark:hover:bg-slate-800 hover:text-indigo-600 dark:hover:text-indigo-400 transition-all shadow-sm border border-white/20 dark:border-slate-700 active:scale-95"
           >
             {isDarkMode ? (
-              <SunIcon className="w-5 h-5" />
+              <SunIcon className="w-4 h-4 sm:w-5 sm:h-5" />
             ) : (
-              <MoonIcon className="w-5 h-5" />
+              <MoonIcon className="w-4 h-4 sm:w-5 sm:h-5" />
             )}
           </button>
         </div>
       )}
 
-      <div className="w-full max-w-[440px] animate-fade-in flex flex-col p-6 my-auto">
-        <button
-          onClick={onBack}
-          className="group flex items-center gap-2 text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 mb-4 font-bold transition-all self-start text-xs uppercase tracking-widest"
-        >
-          <ArrowLeftIcon className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
-          Kembali
-        </button>
+      {/* Main Container Layout (Adaptive 2-Column for Landscape/Desktop) */}
+      <div className="w-full max-w-4xl px-4 sm:px-6 relative z-10 flex-1 flex flex-col justify-center items-center min-h-0 py-3 sm:py-6">
+        <div className="w-full flex flex-col landscape:flex-row lg:flex-row items-center justify-center gap-4 sm:gap-6 lg:gap-8 animate-gentle-slide max-h-full overflow-y-auto custom-scrollbar">
+          
+          {/* Kolom Kiri Hero (Tampil di Desktop & Landscape) */}
+          <div className="hidden landscape:flex lg:flex flex-col items-start text-left max-w-xs shrink-0 space-y-3">
+            <button
+              onClick={onBack}
+              className="group flex items-center gap-2 text-slate-400 dark:text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-400 text-xs font-bold uppercase tracking-widest transition-all mb-1"
+            >
+              <ArrowLeftIcon className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
+              Kembali
+            </button>
 
-        <div className="bg-white dark:bg-slate-900 p-8 rounded-[2rem] shadow-[0_15px_50px_-15px_rgba(79,70,229,0.1)] dark:shadow-black/30 border border-white dark:border-slate-800 text-center relative overflow-hidden transition-colors duration-300">
-          <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-indigo-600 to-blue-500"></div>
-
-          <div className="flex justify-center mb-6">
             <div className="bg-indigo-50 dark:bg-indigo-900/30 p-3 rounded-2xl border border-indigo-100 dark:border-indigo-800">
               <UserIcon className="w-8 h-8 text-indigo-600 dark:text-indigo-400" />
             </div>
+
+            <div>
+              <h2 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">
+                {isRegistering ? "Daftar Pengajar" : "Area Pengajar"}
+              </h2>
+              <p className="text-slate-500 dark:text-slate-400 text-xs font-medium leading-relaxed mt-1">
+                {isRegistering
+                  ? "Daftar akun baru untuk mulai membuat soal, menjadwalkan ujian, dan memantau evaluasi siswa."
+                  : "Masuk untuk mengelola bank soal, melihat hasil analisis AI, dan memantau ujian secara langsung."}
+              </p>
+            </div>
           </div>
 
-          <h2 className="text-2xl font-black text-slate-900 dark:text-white mb-2 tracking-tight">
-            {isRegistering ? "Daftar Pengajar" : "Area Pengajar"}
-          </h2>
-          <p className="text-slate-400 dark:text-slate-500 text-xs mb-6 font-medium">
-            {isRegistering
-              ? "Daftar untuk mengelola ujian Anda."
-              : "Masuk untuk mengelola ujian dan data siswa."}
-          </p>
+          {/* Form Card */}
+          <div className="w-full max-w-[440px] shrink-0">
+            {/* Tombol kembali khusus Portrait Mobile */}
+            <button
+              onClick={onBack}
+              className="landscape:hidden lg:hidden group flex items-center gap-2 text-slate-400 dark:text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-400 mb-2.5 font-bold transition-all text-xs uppercase tracking-widest"
+            >
+              <ArrowLeftIcon className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
+              Kembali
+            </button>
 
-          <form
+            <div className="bg-white dark:bg-slate-900 p-6 sm:p-8 rounded-[2rem] shadow-[0_15px_50px_-15px_rgba(79,70,229,0.1)] dark:shadow-black/30 border border-white dark:border-slate-800 text-center relative overflow-hidden transition-colors duration-300 max-h-[82vh] overflow-y-auto custom-scrollbar">
+              <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-indigo-600 to-blue-500"></div>
+
+              <div className="flex justify-center mb-4 landscape:hidden lg:hidden">
+                <div className="bg-indigo-50 dark:bg-indigo-900/30 p-2.5 rounded-2xl border border-indigo-100 dark:border-indigo-800">
+                  <UserIcon className="w-7 h-7 text-indigo-600 dark:text-indigo-400" />
+                </div>
+              </div>
+
+              <h2 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white mb-1.5 tracking-tight landscape:hidden lg:hidden">
+                {isRegistering ? "Daftar Pengajar" : "Area Pengajar"}
+              </h2>
+              <p className="text-slate-400 dark:text-slate-500 text-xs mb-4 font-medium landscape:hidden lg:hidden">
+                {isRegistering
+                  ? "Daftar untuk mengelola ujian Anda."
+                  : "Masuk untuk mengelola ujian dan data siswa."}
+              </p>
+
+              <form
             onSubmit={handleAuthAction}
             className="space-y-3 text-left mt-4"
           >
@@ -393,5 +425,13 @@ export const TeacherLogin: React.FC<TeacherLoginProps> = ({
         </div>
       </div>
     </div>
+  </div>
+
+  <div className="py-2 text-center shrink-0 z-10">
+      <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-[0.2em]">
+        Platform Ujian Cerdas
+      </p>
+    </div>
+  </div>
   );
 };

@@ -29,28 +29,41 @@ export const PrintQuestionBank: React.FC<PrintQuestionBankProps> = ({ exam }) =>
             {(q.questionType === "MULTIPLE_CHOICE" || q.questionType === "COMPLEX_MULTIPLE_CHOICE") && q.options && (
               <div className="space-y-2">
                 {q.options.map((opt, i) => {
-                  const isCorrect = q.questionType === "COMPLEX_MULTIPLE_CHOICE" 
-                    ? parseList(q.correctAnswer || "").some(a => isAnswerMatch(a, opt, q.questionType))
-                    : isAnswerMatch(q.correctAnswer || "", opt, q.questionType);
+                  const letter = String.fromCharCode(65 + i);
+                  let isCorrect = false;
+                  if (q.questionType === "MULTIPLE_CHOICE") {
+                    const ans = String(q.correctAnswer || "").trim();
+                    isCorrect =
+                      ans.toUpperCase() === letter ||
+                      ans.toUpperCase().startsWith(`${letter}.`) ||
+                      ans === String(i) ||
+                      isAnswerMatch(ans, opt, q.questionType, q.options);
+                  } else {
+                    const answers = parseList(q.correctAnswer, q.options);
+                    isCorrect = answers.some((a) => {
+                      const cleanA = String(a).trim().toUpperCase();
+                      return cleanA === letter || cleanA === String(i) || isAnswerMatch(a, opt, q.questionType, q.options);
+                    });
+                  }
                   return (
                     <div 
                       key={i} 
                       className={`p-3 rounded-lg border text-sm flex items-center justify-between ${
                         isCorrect 
-                          ? "border-emerald-300 bg-emerald-50 text-emerald-900" 
+                          ? "border-emerald-300 bg-emerald-50 text-emerald-900 font-bold" 
                           : "border-slate-200 bg-white text-slate-700"
                       }`}
                     >
                       <div className="flex items-center gap-3">
                         <span className={`font-bold ${isCorrect ? "text-emerald-700" : "text-slate-500"}`}>
-                          {String.fromCharCode(65 + i)}.
+                          {letter}.
                         </span>
                         <div dangerouslySetInnerHTML={{ __html: opt }} />
                       </div>
                       {isCorrect && (
-                        <svg className="w-4 h-4 text-emerald-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                        </svg>
+                        <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded border border-emerald-200">
+                          Kunci Benar
+                        </span>
                       )}
                     </div>
                   );
@@ -58,7 +71,7 @@ export const PrintQuestionBank: React.FC<PrintQuestionBankProps> = ({ exam }) =>
               </div>
             )}
             
-            {q.questionType === "TRUE_FALSE" && q.trueFalseRows && (
+            {q.questionType === "TRUE_FALSE" && (q.trueFalseRows || (q as any).true_false_rows) && (
               <table className="w-full text-xs mt-2 border-collapse border border-slate-200">
                 <thead>
                   <tr className="bg-slate-50">
@@ -67,21 +80,24 @@ export const PrintQuestionBank: React.FC<PrintQuestionBankProps> = ({ exam }) =>
                   </tr>
                 </thead>
                 <tbody>
-                  {q.trueFalseRows.map((row, i) => (
-                    <tr key={i}>
-                      <td className="border border-slate-200 p-2">{row.text}</td>
-                      <td className={`border border-slate-200 p-2 text-center font-bold ${row.answer ? "text-emerald-600 bg-emerald-50" : "text-red-500 bg-red-50"}`}>
-                        {row.answer
-                          ? (q.categoryLabels && q.categoryLabels[0]) || "Benar"
-                          : (q.categoryLabels && q.categoryLabels[1]) || "Salah"}
-                      </td>
-                    </tr>
-                  ))}
+                  {(q.trueFalseRows || (q as any).true_false_rows || []).map((row: any, i: number) => {
+                    const isTrue = row.answer === true || String(row.answer).toLowerCase() === "true" || String(row.answer).toLowerCase() === "benar" || String(row.answer) === "1";
+                    return (
+                      <tr key={i}>
+                        <td className="border border-slate-200 p-2">{row.text}</td>
+                        <td className={`border border-slate-200 p-2 text-center font-bold ${isTrue ? "text-emerald-600 bg-emerald-50" : "text-red-500 bg-red-50"}`}>
+                          {isTrue
+                            ? (q.categoryLabels && q.categoryLabels[0]) || "Benar"
+                            : (q.categoryLabels && q.categoryLabels[1]) || "Salah"}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             )}
             
-            {q.questionType === "MATCHING" && q.matchingPairs && (
+            {q.questionType === "MATCHING" && (q.matchingPairs || (q as any).matching_pairs) && (
               <table className="w-full text-xs mt-2 border-collapse border border-slate-200">
                 <thead>
                   <tr className="bg-slate-50">
@@ -90,7 +106,7 @@ export const PrintQuestionBank: React.FC<PrintQuestionBankProps> = ({ exam }) =>
                   </tr>
                 </thead>
                 <tbody>
-                  {q.matchingPairs.map((pair, i) => (
+                  {(q.matchingPairs || (q as any).matching_pairs || []).map((pair: any, i: number) => (
                     <tr key={i}>
                       <td className="border border-slate-200 p-2">{pair.left}</td>
                       <td className="border border-slate-200 p-2 font-bold text-emerald-600 bg-emerald-50">{pair.right}</td>
@@ -105,13 +121,20 @@ export const PrintQuestionBank: React.FC<PrintQuestionBankProps> = ({ exam }) =>
                 <p className="text-[10px] font-bold text-emerald-600 uppercase mb-1">Kunci Jawaban</p>
                 {q.questionType === "FILL_IN_THE_BLANK" ? (
                    <div className="flex flex-wrap gap-2 mt-1">
-                     {parseList(q.correctAnswer || "Tidak ada").map((ans, i) => (
+                     {parseList(q.correctAnswer || (q as any).correct_answer || "Tidak ada").map((ans, i) => (
                        <span key={i} className="px-2 py-1 bg-emerald-100 text-emerald-800 rounded border border-emerald-200 text-sm font-bold" dangerouslySetInnerHTML={{ __html: ans }} />
                      ))}
                    </div>
                 ) : (
-                  <div className="text-emerald-900 text-sm font-medium" dangerouslySetInnerHTML={{ __html: q.correctAnswer || "Tidak ada" }} />
+                  <div className="text-emerald-900 text-sm font-medium" dangerouslySetInnerHTML={{ __html: q.correctAnswer || (q as any).correct_answer || "Tidak ada" }} />
                 )}
+              </div>
+            )}
+
+            {(q.explanation || (q as any).solution || (q as any).pembahasan) && (
+              <div className="mt-3 p-3 bg-blue-50/50 border border-blue-100 rounded-lg">
+                <p className="text-[10px] font-bold text-blue-700 uppercase mb-1">Pembahasan Soal:</p>
+                <div className="text-slate-700 text-xs" dangerouslySetInnerHTML={{ __html: q.explanation || (q as any).solution || (q as any).pembahasan }} />
               </div>
             )}
           </div>

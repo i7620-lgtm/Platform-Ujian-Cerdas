@@ -203,20 +203,10 @@ export const ArchiveHeaderActions: React.FC<ArchiveHeaderActionsProps> = ({
         {(activeTab === "CLASS_ANALYSIS" || activeTab === "AI_ANALYSIS") && onGenerateAI && (
           <button
             onClick={onGenerateAI}
-            disabled={isGeneratingAI}
-            className="flex-shrink-0 px-4 py-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white text-sm font-bold rounded-lg shadow-md transition-all flex items-center gap-2 disabled:opacity-85 cursor-pointer disabled:cursor-wait"
+            className="flex-shrink-0 px-4 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white text-sm font-bold rounded-lg shadow-md transition-all flex items-center gap-2 cursor-pointer active:scale-95"
           >
-            {isGeneratingAI ? (
-              <>
-                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin flex-shrink-0"></div>
-                <span className="truncate max-w-[220px]">{aiProgressMessage || "Menganalisis..."}</span>
-              </>
-            ) : (
-              <>
-                <SparklesIcon className="w-4 h-4" />
-                Buat Analisis AI
-              </>
-            )}
+            <SparklesIcon className="w-4 h-4 text-amber-300" />
+            Prompt & Impor
           </button>
         )}
       </div>

@@ -1,4 +1,6 @@
-import React from "react";
+import React, { useRef } from "react";
+import { Maximize2 } from "lucide-react";
+import { openVisualLightbox } from "../utils/lightboxUtils";
 import { VennChart } from "./charts/VennChart";
 import { RelationChart } from "./charts/RelationChart";
 import { CartesianChart } from "./charts/CartesianChart";
@@ -395,12 +397,37 @@ export const ChartRenderer: React.FC<ChartRendererProps> = ({ data }) => {
     }
   };
 
+  const chartBoxRef = useRef<HTMLDivElement>(null);
+
+  const handleOpenFullscreen = () => {
+    if (chartBoxRef.current) {
+      const svgEl = chartBoxRef.current.querySelector("svg");
+      if (svgEl) {
+        openVisualLightbox({
+          svgHtml: svgEl.outerHTML,
+          title: title || "Grafik Data Soal",
+        });
+      }
+    }
+  };
+
   return (
     <div
-      className={`w-full ${["venn", "relation", "cartesian"].includes(type) ? "h-auto max-w-[500px] mx-auto flex" : "min-h-[350px] h-[350px] sm:h-[450px] flex"} flex-col bg-white dark:bg-slate-900/50 p-4 sm:p-8 rounded-3xl border-2 border-dashed border-slate-300 dark:border-slate-700 shadow-sm transition-all`}
+      ref={chartBoxRef}
+      className={`w-full ${["venn", "relation", "cartesian"].includes(type) ? "h-auto max-w-[380px] mx-auto flex" : "min-h-[190px] h-[230px] sm:h-[260px] max-h-[35vh] max-w-[460px] mx-auto flex"} flex-col bg-white dark:bg-slate-900/50 p-2.5 sm:p-3.5 my-1.5 rounded-2xl border border-dashed border-slate-300 dark:border-slate-700 shadow-sm transition-all relative group select-none`}
     >
+      {/* Fullscreen Zoom Button */}
+      <button
+        type="button"
+        onClick={handleOpenFullscreen}
+        title="Perbesar Grafik Layar Penuh"
+        className="absolute top-2 right-2 p-1.5 rounded-lg bg-slate-100 hover:bg-indigo-50 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-500 hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-400 transition-all opacity-70 group-hover:opacity-100 z-10 no-lightbox"
+      >
+        <Maximize2 className="w-3.5 h-3.5" />
+      </button>
+
       {title && (
-        <h3 className="text-center font-bold mb-[10px] text-slate-800 dark:text-white tracking-tight text-xl sm:text-2xl shrink-0">
+        <h3 className="text-center font-bold mb-1 text-slate-800 dark:text-white tracking-tight text-sm sm:text-base shrink-0 pr-6 pl-6 truncate">
           {title}
         </h3>
       )}
@@ -418,18 +445,18 @@ export const ChartRenderer: React.FC<ChartRendererProps> = ({ data }) => {
         </div>
       </div>
       {data.showLegend !== false && legendItems.length > 0 && (
-        <div className="mt-[10px] flex flex-wrap justify-center items-center gap-x-4 gap-y-1.5 shrink-0">
+        <div className="mt-1 flex flex-wrap justify-center items-center gap-x-3 gap-y-1 shrink-0">
           {legendItems.map((item, index) => (
             <div
               key={`item-${index}`}
-              className="flex items-center text-[13px] sm:text-[14px] font-bold"
+              className="flex items-center text-[11px] sm:text-[12px] font-semibold"
               style={{ color: item.color }}
             >
               <span
-                className="w-3 h-3 rounded-full mr-1.5 shrink-0"
+                className="w-2.5 h-2.5 rounded-full mr-1 shrink-0"
                 style={{ backgroundColor: item.color }}
               />
-              <span className="truncate max-w-[150px] sm:max-w-[200px]">
+              <span className="truncate max-w-[130px] sm:max-w-[180px]">
                 {item.value}
               </span>
             </div>

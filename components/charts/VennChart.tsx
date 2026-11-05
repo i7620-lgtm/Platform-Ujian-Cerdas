@@ -17,7 +17,7 @@ export const VennChart: React.FC<{ data: ChartData }> = ({ data }) => {
       <div className="w-full h-auto flex items-center justify-center relative">
         <svg
           viewBox="0 0 400 300"
-          className="w-full max-w-[400px] h-auto"
+          className="w-full max-w-[340px] max-h-[35vh] h-auto cursor-zoom-in zoomable-svg"
         >
           {/* Universe Rectangle */}
           <rect

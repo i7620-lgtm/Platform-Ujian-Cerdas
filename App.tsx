@@ -13,6 +13,7 @@ import { ProfileCompletionModal } from './components/teacher/ProfileCompletionMo
 import { TermsPage, PrivacyPage } from './components/LegalPages';
 import { TutorialPage } from './components/TutorialPage';
 import { CollaboratorView } from './components/CollaboratorView';
+import { VisualLightboxModal } from './components/VisualLightboxModal';
 import { supabase } from './lib/supabase';
 import { hydrateMathInContainer } from './utils/mathRenderer';
 import { calculateStudentAccess } from './utils/scheduleUtils';
@@ -67,7 +68,8 @@ const App: React.FC = () => {
   const [isLoadingSession, setIsLoadingSession] = useState(true);
   const [prefillCode, setPrefillCode] = useState<string>('');
   const [isInviteOpen, setIsInviteOpen] = useState(false);
-  const [collaboratorData, setCollaboratorData] = useState<{ exam: Exam, role: 'editor' | 'viewer', token: string } | null>(null);
+  const [collaboratorData, setCollaboratorData] = useState<{ exam: Exam, role: 'editor' | 'viewer' | 'public', token: string } | null>(null);
+  const [isMonitorProctor, setIsMonitorProctor] = useState(false);
 
   // Theme State Management
   const [darkMode, setDarkMode] = useState(() => {
@@ -111,6 +113,35 @@ const App: React.FC = () => {
       }
     } catch {
       // Ignore sessionStorage exceptions in private/restricted modes
+    }
+  }, [view]);
+
+  // Kunci total scroll window/body dan gesture overscroll saat berada di SELECTOR, STUDENT_LOGIN, dan TEACHER_LOGIN
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (view === 'SELECTOR' || view === 'STUDENT_LOGIN' || view === 'TEACHER_LOGIN') {
+      const origHtmlOverflow = document.documentElement.style.overflow;
+      const origHtmlHeight = document.documentElement.style.height;
+      const origBodyOverflow = document.body.style.overflow;
+      const origBodyHeight = document.body.style.height;
+      const origBodyOverscroll = document.body.style.overscrollBehavior;
+      const origBodyTouchAction = document.body.style.touchAction;
+
+      document.documentElement.style.overflow = 'hidden';
+      document.documentElement.style.height = '100%';
+      document.body.style.overflow = 'hidden';
+      document.body.style.height = '100%';
+      document.body.style.overscrollBehavior = 'none';
+      document.body.style.touchAction = 'none';
+
+      return () => {
+        document.documentElement.style.overflow = origHtmlOverflow;
+        document.documentElement.style.height = origHtmlHeight;
+        document.body.style.overflow = origBodyOverflow;
+        document.body.style.height = origBodyHeight;
+        document.body.style.overscrollBehavior = origBodyOverscroll;
+        document.body.style.touchAction = origBodyTouchAction;
+      };
     }
   }, [view]);
 
@@ -446,7 +477,7 @@ const App: React.FC = () => {
         }
     }
     
-    // COLLABORATOR / PROCTOR CHECK
+    // COLLABORATOR / PROCTOR / PUBLIC LIVE MONITOR CHECK
     const collabCode = params.get('collab_code') || params.get('proctor');
     const collabToken = params.get('collab_token') || params.get('token') || params.get('proctorToken');
     
@@ -457,8 +488,14 @@ const App: React.FC = () => {
             .then(data => {
                 if (data) {
                     if (data.role === 'viewer') {
-                        // Direct supervisor live monitor view
+                        // Supervisor live monitor view (has proctor action permissions)
                         setCurrentExam(data.exam);
+                        setIsMonitorProctor(true);
+                        setView('LIVE_MONITOR');
+                    } else if (data.role === 'public') {
+                        // Public/Parent live stream view (strict read-only, no proctor actions)
+                        setCurrentExam(data.exam);
+                        setIsMonitorProctor(false);
                         setView('LIVE_MONITOR');
                     } else {
                         setCollaboratorData({ ...data, token: collabToken });
@@ -466,27 +503,13 @@ const App: React.FC = () => {
                     }
                     window.history.replaceState({}, document.title, window.location.pathname);
                 } else {
-                    // Try loading exam directly as monitor mode fallback
-                    storageService.getExamForStudent(cleanCollabCode, 'monitor', true)
-                        .then(exam => {
-                            if (exam) {
-                                setCurrentExam(exam);
-                                setView('LIVE_MONITOR');
-                                window.history.replaceState({}, document.title, window.location.pathname);
-                            } else {
-                                alert("Link pengawas/kolaborator tidak valid atau kadaluarsa.");
-                                window.history.replaceState({}, '', '/');
-                            }
-                        })
-                        .catch(() => {
-                            alert("Link pengawas/kolaborator tidak valid atau kadaluarsa.");
-                            window.history.replaceState({}, '', '/');
-                        });
+                    alert("Tautan pengawas atau publik tidak valid atau akses telah dinonaktifkan.");
+                    window.history.replaceState({}, '', '/');
                 }
             })
             .catch(e => {
                 console.error(e);
-                alert("Gagal memuat sesi pengawas.");
+                alert("Gagal memuat sesi pantauan ujian.");
                 window.history.replaceState({}, '', '/');
             })
             .finally(() => setIsSyncing(false));
@@ -548,24 +571,9 @@ const App: React.FC = () => {
 
     const liveCode = params.get('live');
     if (liveCode) {
-        setIsSyncing(true);
-        const cleanLiveCode = liveCode.trim().toUpperCase();
-        // Live monitor doesn't need student specific shuffling, pass generic ID or empty
-        storageService.getExamForStudent(cleanLiveCode, 'monitor', true)
-            .then(exam => {
-                if (exam) {
-                    setCurrentExam(exam);
-                    setView('LIVE_MONITOR');
-                } else {
-                    alert("Akses Pantauan Ditolak.");
-                    window.history.replaceState({}, '', '/');
-                }
-            })
-            .catch(() => {
-                alert("Gagal memuat data ujian.");
-                window.history.replaceState({}, '', '/');
-            })
-            .finally(() => setIsSyncing(false));
+        alert("Akses pantauan langsung memerlukan tautan resmi ber-token dari guru atau pengawas.");
+        window.history.replaceState({}, '', '/');
+        return;
     }
   }, [handleStudentLoginSuccess]);
 
@@ -780,70 +788,86 @@ const App: React.FC = () => {
   );
 
   return (
-    <div className="min-h-screen bg-[#FAFAFA] dark:bg-slate-950 text-slate-800 dark:text-slate-100 font-sans selection:bg-indigo-100 selection:text-indigo-800 overflow-x-hidden antialiased flex flex-col transition-colors duration-300">
+    <div className={`min-h-screen bg-[#FAFAFA] dark:bg-slate-950 text-slate-800 dark:text-slate-100 font-sans selection:bg-indigo-100 selection:text-indigo-800 overflow-x-hidden antialiased flex flex-col transition-colors duration-300 ${view === 'SELECTOR' ? 'h-[100dvh] max-h-[100dvh] overflow-hidden' : ''}`}>
         
-        {/* Status Jaringan Minimalis & Elegan */}
-        <div className="fixed top-6 right-6 z-[100] pointer-events-none flex flex-col gap-2 items-end">
-            {/* Theme Toggle in Top Right for Selector View */}
-            {view === 'SELECTOR' && (
-                <div className="pointer-events-auto mb-2">
-                    <ThemeToggle />
-                </div>
-            )}
-
-            {!isOnline && (
-                <div className="bg-rose-500/90 backdrop-blur-md text-white px-4 py-2 rounded-full text-[11px] font-bold uppercase tracking-wide shadow-xl flex items-center gap-2 animate-bounce pointer-events-auto ring-1 ring-white/20">
-                    <NoWifiIcon className="w-3.5 h-3.5"/> 
-                    <span>Offline Mode</span>
-                </div>
-            )}
-            
-            {isSyncing && isOnline && (
-                <div className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-md text-indigo-600 dark:text-indigo-400 px-4 py-2 rounded-full text-[11px] font-bold uppercase tracking-wide shadow-lg border border-indigo-50 dark:border-slate-700 flex items-center gap-2 pointer-events-auto">
-                    <div className="w-3 h-3 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
-                    <span>Menyimpan...</span>
-                </div>
-            )}
-        </div>
-
-        {/* Invite Button for Selector View (Redesigned) */}
-        {view === 'SELECTOR' && (
-            <div className="fixed top-6 left-6 z-[100]">
-                <button
-                    onClick={() => setIsInviteOpen(true)}
-                    className="flex items-center gap-2 px-4 py-2.5 rounded-full bg-white/90 dark:bg-slate-800/90 text-slate-600 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-white dark:hover:bg-slate-800 transition-all shadow-lg shadow-slate-200/50 dark:shadow-none border border-slate-200/60 dark:border-slate-700 backdrop-blur-sm group"
-                    title="Bagikan Aplikasi"
-                >
-                    <QrCodeIcon className="w-4 h-4 group-hover:scale-110 transition-transform" />
-                    <span className="text-xs font-bold uppercase tracking-wider">Bagikan App</span>
-                </button>
+        {/* Status Jaringan Minimalis & Elegan untuk Halaman Non-Selector */}
+        {view !== 'SELECTOR' && (
+            <div className="fixed top-6 right-6 z-[100] pointer-events-none flex flex-col gap-2 items-end">
+                {!isOnline && (
+                    <div className="bg-rose-500/90 backdrop-blur-md text-white px-4 py-2 rounded-full text-[11px] font-bold uppercase tracking-wide shadow-xl flex items-center gap-2 animate-bounce pointer-events-auto ring-1 ring-white/20">
+                        <NoWifiIcon className="w-3.5 h-3.5"/> 
+                        <span>Offline Mode</span>
+                    </div>
+                )}
+                
+                {isSyncing && isOnline && (
+                    <div className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-md text-indigo-600 dark:text-indigo-400 px-4 py-2 rounded-full text-[11px] font-bold uppercase tracking-wide shadow-lg border border-indigo-50 dark:border-slate-700 flex items-center gap-2 pointer-events-auto">
+                        <div className="w-3 h-3 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
+                        <span>Menyimpan...</span>
+                    </div>
+                )}
             </div>
         )}
         
+        {/* Halaman Awal / Selector: Terkunci Total Pas Satu Layar Tanpa Scroll Vertikal & Horizontal */}
         {view === 'SELECTOR' && (
-            <div className="flex-1 flex flex-col p-6 relative overflow-y-auto">
-                {/* Background Decor */}
-                <div className="fixed inset-0 z-0 opacity-40 overflow-hidden pointer-events-none">
+            <div className="fixed inset-0 w-full h-[100dvh] max-h-[100dvh] flex flex-col justify-between overflow-hidden select-none bg-[#FAFAFA] dark:bg-slate-950 touch-none overscroll-none z-10">
+                {/* Background Decor Terisolasi */}
+                <div className="absolute inset-0 z-0 opacity-40 overflow-hidden pointer-events-none">
                     <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] rounded-full bg-indigo-100 dark:bg-slate-800 blur-[100px]"></div>
                     <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] rounded-full bg-blue-50 dark:bg-slate-800 blur-[100px]"></div>
                 </div>
-                
-                <div className="w-full max-w-sm z-10 animate-gentle-slide mx-auto my-auto">
-                    <div className="text-center mb-10">
-                        <div className="inline-flex p-4 bg-white dark:bg-slate-800 rounded-2xl shadow-sm mb-6 border border-slate-50 dark:border-slate-700 ring-1 ring-slate-100 dark:ring-slate-800">
-                            <LogoIcon className="w-10 h-10 text-indigo-600 dark:text-indigo-400" />
+
+                {/* Tombol Melayang Pojok Kiri Atas (Tidak memakan tinggi alur dokumen) */}
+                <div className="absolute top-3.5 sm:top-5 left-3.5 sm:left-6 z-20">
+                    <button
+                        onClick={() => setIsInviteOpen(true)}
+                        className="flex items-center gap-2 px-3.5 sm:px-4 py-2 sm:py-2.5 rounded-full bg-white/90 dark:bg-slate-800/90 text-slate-600 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-white dark:hover:bg-slate-800 transition-all shadow-md shadow-slate-200/50 dark:shadow-none border border-slate-200/60 dark:border-slate-700 backdrop-blur-sm group active:scale-95"
+                        title="Bagikan Aplikasi"
+                    >
+                        <QrCodeIcon className="w-4 h-4 group-hover:scale-110 transition-transform shrink-0" />
+                        <span className="text-xs font-bold uppercase tracking-wider">Bagikan App</span>
+                    </button>
+                </div>
+
+                {/* Tombol Melayang Pojok Kanan Atas (Theme Toggle & Status Jaringan) */}
+                <div className="absolute top-3.5 sm:top-5 right-3.5 sm:right-6 z-20 flex items-center gap-2">
+                    {!isOnline && (
+                        <div className="bg-rose-500/90 backdrop-blur-md text-white px-3 py-1.5 rounded-full text-[10px] sm:text-[11px] font-bold uppercase tracking-wide shadow-md flex items-center gap-1.5 animate-bounce ring-1 ring-white/20">
+                            <NoWifiIcon className="w-3.5 h-3.5" />
+                            <span>Offline</span>
+                        </div>
+                    )}
+
+                    {isSyncing && isOnline && (
+                        <div className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-md text-indigo-600 dark:text-indigo-400 px-3 py-1.5 rounded-full text-[10px] sm:text-[11px] font-bold uppercase tracking-wide shadow-md border border-indigo-50 dark:border-slate-700 flex items-center gap-1.5">
+                            <div className="w-3 h-3 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
+                            <span className="hidden sm:inline">Menyimpan...</span>
+                        </div>
+                    )}
+
+                    <ThemeToggle />
+                </div>
+
+                {/* Alur Konten Utama: Jarak atas dihitung langsung dari batas atas layar ke ikon UjianCerdas */}
+                <main className="flex-1 w-full max-w-sm mx-auto px-4 sm:px-6 flex flex-col items-center justify-center pt-6 sm:pt-8 md:pt-10 z-10 min-h-0">
+                    <div className="text-center mb-5 sm:mb-6 shrink-0">
+                        <div className="inline-flex p-3 sm:p-3.5 bg-white dark:bg-slate-800 rounded-2xl shadow-sm mb-2.5 sm:mb-3 border border-slate-50 dark:border-slate-700 ring-1 ring-slate-100 dark:ring-slate-800">
+                            <LogoIcon className="w-8 h-8 sm:w-10 sm:h-10 text-indigo-600 dark:text-indigo-400" />
                         </div>
                         
-                        <h1 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight mb-3">UjianCerdas</h1>
-                        <p className="text-slate-500 dark:text-slate-400 text-sm font-medium leading-relaxed">
+                        <h1 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white tracking-tight mb-1 sm:mb-1.5">
+                            UjianCerdas
+                        </h1>
+                        <p className="text-slate-500 dark:text-slate-400 text-xs sm:text-sm font-medium leading-relaxed">
                             Platform evaluasi modern.<br/>Ringan, Cepat, Terpercaya.
                         </p>
                     </div>
                     
-                    <div className="space-y-4">
+                    <div className="w-full space-y-2.5 sm:space-y-3 shrink-0">
                         <button 
                             onClick={() => setView('STUDENT_LOGIN')} 
-                            className="w-full group relative overflow-hidden bg-slate-900 dark:bg-indigo-600 text-white p-4 rounded-xl shadow-lg shadow-slate-200 dark:shadow-none transition-all duration-300 hover:scale-[1.02] active:scale-[0.98]"
+                            className="w-full group relative overflow-hidden bg-slate-900 dark:bg-indigo-600 text-white p-3.5 sm:p-4 rounded-xl shadow-lg shadow-slate-200 dark:shadow-none transition-all duration-300 hover:scale-[1.02] active:scale-[0.98]"
                         >
                             <div className="relative z-10 flex items-center justify-center gap-3">
                                 <span className="font-bold text-sm tracking-wide">Masuk sebagai Siswa</span>
@@ -853,7 +877,7 @@ const App: React.FC = () => {
 
                         <button 
                             onClick={() => setView('TEACHER_LOGIN')} 
-                            className="w-full flex items-center justify-center gap-2 p-4 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 rounded-xl border border-indigo-100 dark:border-indigo-800 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-all duration-300 font-bold text-sm shadow-sm hover:shadow-md active:scale-[0.98]"
+                            className="w-full flex items-center justify-center gap-2 p-3.5 sm:p-4 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 rounded-xl border border-indigo-100 dark:border-indigo-800 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-all duration-300 font-bold text-sm shadow-xs hover:shadow-md active:scale-[0.98]"
                         >
                             <UserIcon className="w-4 h-4" />
                             Area Pengajar
@@ -861,17 +885,20 @@ const App: React.FC = () => {
 
                         <button 
                             onClick={() => setView('TUTORIAL')} 
-                            className="w-full flex items-center justify-center gap-2 p-4 bg-teal-50 dark:bg-teal-900/30 text-teal-700 dark:text-teal-300 rounded-xl border border-teal-100 dark:border-teal-800 hover:bg-teal-100 dark:hover:bg-teal-900/50 transition-all duration-300 font-bold text-sm shadow-sm hover:shadow-md active:scale-[0.98]"
+                            className="w-full flex items-center justify-center gap-2 p-3.5 sm:p-4 bg-teal-50 dark:bg-teal-900/30 text-teal-700 dark:text-teal-300 rounded-xl border border-teal-100 dark:border-teal-800 hover:bg-teal-100 dark:hover:bg-teal-900/50 transition-all duration-300 font-bold text-sm shadow-xs hover:shadow-md active:scale-[0.98]"
                         >
                             <BookOpenIcon className="w-4 h-4" />
                             Panduan & Fitur
                         </button>
                     </div>
+                </main>
 
-                    <p className="mt-12 text-center text-[11px] font-medium text-slate-400 dark:text-slate-500 tracking-wide select-none px-4 leading-relaxed">
+                {/* Footer Teks HAKI: Jarak bawah dihitung langsung dari tombol panduan & fitur menuju teks HAKI yang menempel di batas paling bawah layar */}
+                <footer className="w-full max-w-full px-4 pt-2 pb-3 sm:pb-4 z-10 shrink-0">
+                    <p className="text-center text-[10px] sm:text-[11px] font-medium text-slate-400 dark:text-slate-500 tracking-wide select-none leading-relaxed">
                         © {new Date().getFullYear()} I Made Hermawan Surya Putra · Hak Cipta Dilindungi
                     </p>
-                </div>
+                </footer>
             </div>
         )}
 
@@ -988,7 +1015,8 @@ const App: React.FC = () => {
                 exam={currentExam}
                 onClose={resetToHome}
                 onExamFinished={() => resetToHome()}
-                isReadOnly={true}
+                isReadOnly={!isMonitorProctor}
+                isProctor={isMonitorProctor}
             />
         )}
 
@@ -1045,6 +1073,9 @@ const App: React.FC = () => {
         {view === 'TUTORIAL' && (
             <TutorialPage onBack={() => setView('SELECTOR')} />
         )}
+
+        {/* Global Visual Lightbox Modal for Fullscreen Zoom */}
+        <VisualLightboxModal />
     </div>
   );
 };

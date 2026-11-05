@@ -36,6 +36,7 @@ interface ArchiveClassAnalysisProps {
   classAnalysisData: ClassAnalysisItem[];
   uniqueSchools: string[];
   selectedSchool: string;
+  selectedClass?: string;
   exam: Exam;
   results?: Result[];
   teacherProfile?: TeacherProfile | null;
@@ -54,6 +55,7 @@ export const ArchiveClassAnalysis: React.FC<ArchiveClassAnalysisProps> = ({
   classAnalysisData,
   uniqueSchools,
   selectedSchool,
+  selectedClass = "ALL",
   exam,
   results = [],
   teacherProfile,
@@ -101,14 +103,40 @@ export const ArchiveClassAnalysis: React.FC<ArchiveClassAnalysisProps> = ({
     return aiAnalysisResult ? ["OVERALL"] : [];
   }, [ai_analyses, aiAnalysisResult]);
 
-  const hasAnalyses = availableKeys.length > 0;
+  // Filter sub-tabs based on selectedSchool and selectedClass dropdowns
+  const displayedKeys = useMemo(() => {
+    return availableKeys.filter((key) => {
+      if (key === "OVERALL") return true; // Tetap tampilkan pil Analisis Umum
+      const match = key.match(/school_(.*)_class_(.*)/);
+      if (match) {
+        const schoolName = match[1];
+        const className = match[2];
+        const matchSchool =
+          selectedSchool === "ALL" || schoolName === "ALL" || schoolName === selectedSchool;
+        const matchClass = selectedClass === "ALL" || className === selectedClass;
+        return matchSchool && matchClass;
+      }
+      const legacyClass = key.replace("class_", "").trim();
+      const matchClass = selectedClass === "ALL" || legacyClass === selectedClass;
+      return matchClass;
+    });
+  }, [availableKeys, selectedSchool, selectedClass]);
+
+  const hasAnalyses = displayedKeys.length > 0;
 
   const currentSubTabKey = useMemo(() => {
-    if (activeAiSubTab && availableKeys.includes(activeAiSubTab)) {
+    if (activeAiSubTab && displayedKeys.includes(activeAiSubTab)) {
       return activeAiSubTab;
     }
-    return availableKeys[0] || "OVERALL";
-  }, [activeAiSubTab, availableKeys]);
+    return displayedKeys[0] || "OVERALL";
+  }, [activeAiSubTab, displayedKeys]);
+
+  // Automatically switch to first available tab when active tab is filtered out
+  React.useEffect(() => {
+    if (displayedKeys.length > 0 && activeAiSubTab && !displayedKeys.includes(activeAiSubTab)) {
+      onSelectAiSubTab?.(displayedKeys[0]);
+    }
+  }, [displayedKeys, activeAiSubTab, onSelectAiSubTab]);
 
   const currentRawAnalysis = useMemo(() => {
     if (ai_analyses && ai_analyses[currentSubTabKey]) {
@@ -147,9 +175,12 @@ export const ArchiveClassAnalysis: React.FC<ArchiveClassAnalysisProps> = ({
     }
     const match = currentSubTabKey.match(/school_(.*)_class_(.*)/);
     if (match) {
+      const schoolName = match[1];
+      const className = match[2];
+      const isMultiSchool = uniqueSchools.length > 1 || analysisSchools.length > 1;
       return {
-        title: `Analisis Khusus Kelas ${match[2]}`,
-        badge: `Khusus Kelas ${match[2]}`,
+        title: isMultiSchool ? `Analisis Khusus Kelas ${className} (${schoolName})` : `Analisis Khusus Kelas ${className}`,
+        badge: isMultiSchool ? `Kelas ${className} (${schoolName})` : `Khusus Kelas ${className}`,
         studentCount: currentSubTabResults.length,
       };
     }
@@ -158,7 +189,7 @@ export const ArchiveClassAnalysis: React.FC<ArchiveClassAnalysisProps> = ({
       badge: "Khusus",
       studentCount: currentSubTabResults.length,
     };
-  }, [currentSubTabKey, filteredResults.length, currentSubTabResults.length]);
+  }, [currentSubTabKey, filteredResults.length, currentSubTabResults.length, uniqueSchools.length, analysisSchools.length]);
 
   const handlePrintAI = () => {
     const printContent = document.getElementById("ai-analysis-print-content");
@@ -405,17 +436,17 @@ export const ArchiveClassAnalysis: React.FC<ArchiveClassAnalysisProps> = ({
         <div className="bg-slate-50 dark:bg-slate-800/50 border-t border-slate-100 dark:border-slate-700">
           {/* Sub-tabs header */}
           <div className="bg-slate-100/70 dark:bg-slate-800/90 border-b border-slate-200 dark:border-slate-700 px-6 py-3 flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-2 overflow-x-auto custom-scrollbar py-1">
-              <span className="text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mr-1 hidden sm:inline">
-                Pilih Tab:
-              </span>
-              {availableKeys.map((key) => {
+            <div className="flex flex-wrap items-center gap-2 py-1 flex-1">
+              {displayedKeys.map((key) => {
                 let label = "Analisis Umum";
                 let icon = "🌐";
                 if (key !== "OVERALL") {
                   const match = key.match(/school_(.*)_class_(.*)/);
                   if (match) {
-                    label = `Kelas ${match[2]}`;
+                    const schoolName = match[1];
+                    const className = match[2];
+                    const isMultiSchool = uniqueSchools.length > 1 || analysisSchools.length > 1;
+                    label = isMultiSchool ? `Kelas ${className} (${schoolName})` : `Kelas ${className}`;
                     icon = "🏫";
                   } else {
                     label = key.replace("class_", "Kelas ");
@@ -441,20 +472,8 @@ export const ArchiveClassAnalysis: React.FC<ArchiveClassAnalysisProps> = ({
               })}
             </div>
 
-            {/* Sub-tab actions: Copy, Print, Delete, New/Re-run */}
+            {/* Sub-tab actions: Copy, Print, Delete */}
             <div className="flex items-center gap-2">
-              {onOpenTargetModal && (
-                <button
-                  type="button"
-                  onClick={onOpenTargetModal}
-                  disabled={isGeneratingAI}
-                  className="px-3 py-1.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white rounded-xl text-xs font-bold shadow-xs flex items-center gap-1.5 transition-all active:scale-95 disabled:opacity-50"
-                  title="Buat ulang atau analisis target lain"
-                >
-                  <SparklesIcon className="w-3.5 h-3.5" />
-                  <span className="hidden sm:inline">Analisis Baru / Ulang</span>
-                </button>
-              )}
               <button
                 type="button"
                 onClick={handleCopyText}
@@ -621,16 +640,16 @@ export const ArchiveClassAnalysis: React.FC<ArchiveClassAnalysisProps> = ({
             Belum Ada Analisis AI
           </h3>
           <p className="text-xs text-slate-500 dark:text-slate-400 max-w-md">
-            Gunakan tombol "Buat Analisis AI" untuk menghasilkan analisis umum dan analisis khusus per kelas secara mendalam, lengkap dengan matriks 4 jenjang dan bank soal remedial.
+            Gunakan tombol "Prompt & Impor" untuk merancang prompt statistik kelas ke AI luar (ChatGPT, Claude, Gemini, DeepSeek) dan mengimpor laporan analisisnya.
           </p>
           {onOpenTargetModal && (
             <button
               type="button"
               onClick={onOpenTargetModal}
-              className="mt-3 px-5 py-2.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white text-xs font-bold rounded-xl shadow-md transition-all active:scale-95 flex items-center gap-2"
+              className="mt-3 px-5 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white text-xs font-bold rounded-xl shadow-md transition-all active:scale-95 flex items-center gap-2"
             >
-              <SparklesIcon className="w-4 h-4" />
-              <span>Mulai Analisis AI Sekarang</span>
+              <SparklesIcon className="w-4 h-4 text-amber-300" />
+              <span>Prompt & Impor Analisis AI</span>
             </button>
           )}
         </div>
