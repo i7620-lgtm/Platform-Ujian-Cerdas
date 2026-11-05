@@ -1,26 +1,24 @@
-import React from "react";
-import { createPortal } from "react-dom";
+import React, { useState } from "react";
 import type { Exam } from "../../../types";
-import {
-  PencilIcon,
-  TrashIcon,
-  CalendarDaysIcon,
-  ListBulletIcon,
-  XMarkIcon,
-  EyeIcon,
-} from "../../Icons";
-import { MetaBadge } from "./SharedComponents";
+import { PencilIcon } from "../../Icons";
 import { useDraftsView } from "../useDraftsView";
 import { PreviewModal } from "./PreviewModal";
 import { DraftExamCard } from "./DraftExamCard";
+import { PrintSoalModal } from "../modals/berlangsung/PrintSoalModal";
+import { PrintKisiKisiModal } from "../modals/berlangsung/PrintKisiKisiModal";
+import { PrintKunciJawabanModal } from "../modals/berlangsung/PrintKunciJawabanModal";
 
-export const DraftsView: React.FC<{ exams: Exam[]; onDeleteDraft: (exam: Exam) => void; onContinueDraft: (exam: Exam) => void }> = ({
-  exams,
-  onDeleteDraft,
-  onContinueDraft,
-}) => {
+export const DraftsView: React.FC<{
+  exams: Exam[];
+  onDeleteDraft: (exam: Exam) => void;
+  onContinueDraft: (exam: Exam) => void;
+}> = ({ exams, onDeleteDraft, onContinueDraft }) => {
   const { previewExam, setPreviewExam, handleCopyPreviewLink } =
     useDraftsView();
+
+  const [printSoalExam, setPrintSoalExam] = useState<Exam | null>(null);
+  const [printKisiKisiExam, setPrintKisiKisiExam] = useState<Exam | null>(null);
+  const [printKunciExam, setPrintKunciExam] = useState<Exam | null>(null);
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -47,6 +45,9 @@ export const DraftsView: React.FC<{ exams: Exam[]; onDeleteDraft: (exam: Exam) =
               onDelete={() => onDeleteDraft(exam)}
               onPreview={() => setPreviewExam(exam)}
               onContinue={() => onContinueDraft(exam)}
+              onPrintSoal={() => setPrintSoalExam(exam)}
+              onPrintKisiKisi={() => setPrintKisiKisiExam(exam)}
+              onPrintKunci={() => setPrintKunciExam(exam)}
             />
           ))}
         </div>
@@ -69,6 +70,30 @@ export const DraftsView: React.FC<{ exams: Exam[]; onDeleteDraft: (exam: Exam) =
           exam={previewExam}
           onClose={() => setPreviewExam(null)}
           onCopyLink={handleCopyPreviewLink}
+        />
+      )}
+
+      {printSoalExam && (
+        <PrintSoalModal
+          isOpen={true}
+          exam={printSoalExam}
+          onClose={() => setPrintSoalExam(null)}
+        />
+      )}
+
+      {printKisiKisiExam && (
+        <PrintKisiKisiModal
+          isOpen={true}
+          exam={printKisiKisiExam}
+          onClose={() => setPrintKisiKisiExam(null)}
+        />
+      )}
+
+      {printKunciExam && (
+        <PrintKunciJawabanModal
+          isOpen={true}
+          exam={printKunciExam}
+          onClose={() => setPrintKunciExam(null)}
         />
       )}
     </div>
