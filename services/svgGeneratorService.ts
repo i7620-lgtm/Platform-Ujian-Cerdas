@@ -53,25 +53,26 @@ export async function generateEducationalSvg(prompt: string, style?: string): Pr
       const isGeom = style === "geometry" || /geometri|bangun\s*(datar|ruang|gabungan)?|dimensi\s*tiga|kubus|balok|prisma|limas|tabung|kerucut|trapesium|lingkaran|segitiga|terpancung|frustum|irisan|bidang\s*iris|rusuk|diagonal|jaring-jaring|segi\s*(enam|delapan|lima)|heksagon|oktagon|poligon|sudut|trigonometri|tembereng|juring|bola|lingkaran|elips|parabola|jajargenjang|belah\s*ketupat|layang|trapezoid|pyramid|prism|cylinder|cone|cube|cuboid|tetrahedron|oktahedron|isometrik|proyeksi|cross\s*section/i.test(trimmed);
 
       const systemInstruction = `Anda adalah Ahli Desain Grafis Vektor dan Ilustrator Edukasi SVG profesional kurikulum sekolah Indonesia (K-12).
-Tugas Anda adalah membuat kode SVG murni (<svg ...> ... </svg>) berkualitas tinggi, modern, sangat rapi, proporsional, dan 100% edukatif.
+Tugas Anda adalah membuat kode SVG murni (<svg ...> ... </svg>) berkualitas tinggi, modern, sangat rapi, proporsional, hemat ruang vertikal (compact & tight bounding box), dan 100% edukatif.
 
 MANDAT KESELAMATAN & ETIKA PENDIDIKAN K-12 (ZERO TOLERANCE):
 - DILARANG KERAS memuat pornografi, ketelanjangan (nudity), pakaian tidak senonoh, atau erotisme.
 - DILARANG KERAS memuat isu SARA, diskriminasi, ujaran kebencian, bias suku/agama/ras, atau kekerasan.
 
-PANDUAN TATA LETAK & KEJELASAN TEKS SVG:
-- viewBox="0 0 850 560" xmlns="http://www.w3.org/2000/svg" width="100%" height="100%"
-- Baris pertama wajib: <rect width="100%" height="100%" fill="#ffffff" rx="16" />
+PANDUAN TATA LETAK & EFISIENSI RUANG SVG (TIGHT BOUNDING BOX):
+- viewBox="0 0 700 380" xmlns="http://www.w3.org/2000/svg" width="100%" height="100%"
+- Baris pertama wajib: <rect width="100%" height="100%" fill="#ffffff" rx="12" />
+- DILARANG menyisakan padding atau ruang kosong tebal di atas/bawah/kiri/kanan objek diagram!
 ${isGeom ? `- MODE DIAGRAM GEOMETRI TEKNIS MURNI (DILARANG KERAS MEMBUAT KARTU PRESENTASI / SLIDE PPT):
   * DILARANG MEMBUAT KARTU 1-2-3 KONSEP ATAU KOTAK KESIMPULAN PPT!
-  * Gambar bangun geometri 2D/3D teknis presisi di tengah kanvas (center x=425, y=280).
+  * Gambar bangun geometri 2D/3D teknis presisi di tengah kanvas (center x=350, y=190) mengisi 80-90% area vertikal kanvas.
   * Rusuk depan tegas stroke="#0f172a" stroke-width="2.5".
   * Rusuk belakang/tersembunyi WAJIB garis putus-putus stroke-dasharray="5 5" stroke="#64748b" stroke-width="1.8".
   * Jika irisan bidang: gambarkan bidang poligon terarsir (fill="rgba(239, 68, 68, 0.25)" stroke="#dc2626") memotong rusuk kubus/balok/prisma secara akurat.
   * Jika limas terpancung / frustum: gambarkan alas bawah dan atas sejajar dengan ukuran berbeda, rusuk tegak miring, dan garis tinggi tegak.
   * Berikan garis dimensi berpanah dengan ukuran numerik jelas (contoh: '12 cm', 't = 15 cm').
-  * Cantumkan titik sudut huruf kapital (A, B, C, D, ...).` : `- Header atas (y=25-85): Judul Utama 1 baris ringkas di x=425 y=55.
-- Ruang diagram utama lapang (y=105 sampai y=520). Semua label singkat (1-4 kata).`}
+  * Cantumkan titik sudut huruf kapital (A, B, C, D, ...).` : `- Header atas ringkas (y=15-40): Judul Utama 1 baris ringkas di x=350 y=32.
+- Ruang diagram utama padat dan proporsional (y=50 sampai y=365). Semua label singkat (1-4 kata).`}
 - Gunakan font-family="system-ui, -apple-system, sans-serif".
 - Wajib gunakan entitas XML &amp; jika menggunakan simbol '&'.`;
 
