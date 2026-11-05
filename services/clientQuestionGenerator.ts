@@ -174,12 +174,13 @@ ATURAN STRUKTUR PILIHAN & KUNCI JAWABAN (SESUAI BENTUK SOAL):
 6. Jika "${assignedType}" adalah "Esai":
    - Berikan rubrik penyelesaian lengkap di 'solutionSteps'.
 
-ATURAN STIMULUS VISUAL RINGKAS & EDUKATIF (SIAP DIEDIT GURU):
+ATURAN STIMULUS VISUAL PROPORSI HEMAT TEMPAT (TIGHT BOUNDING BOX & MAX 35% SCREEN HEIGHT):
+- Seluruh visual dibatasi maksimal 35% tinggi layar (max-height: 35vh) dan tidak boleh meluap (overflow) vertikal maupun horizontal.
 - Evaluasi topik "${category}" dan soal #${questionNumber}. Jika materi secara hakiki memerlukan atau sangat dibantu oleh visual (Geometri 2D/3D, Koordinat Kartesius & Fungsi, Diagram Sains/Biologi, Diagram Statistika Data, Piktogram Emoji, atau Monumen Sejarah):
   * Tipe 'geometry': Sisipkan tag [GEOMETRY:shape_name:{"width":"...","height":"...","vertices":"..."}] pada 'questionText' dan set 'visualStimulusType': 'geometry'.
   * Tipe 'chart': Sisipkan tag [CHART], isi 'chartData' (type = 'cartesian' | 'bar' | 'pie' | 'line' | 'venn' | 'relation'), dan set 'visualStimulusType': 'chart'.
-  * Tipe 'ai_svg': Isi 'svgPrompt' dengan deskripsi teknis ringkas dan set 'svgStyle' ("geometry" | "diagram" | "infographic" | "flowchart") serta 'visualStimulusType': 'ai_svg'.
-  * Tipe 'table' / Piktogram: Gunakan tabel Markdown atau emoji piktogram (🍎, 🚗, ⭐️, 👦) langsung di 'questionText'.
+  * Tipe 'ai_svg': Isi 'svgPrompt' dengan deskripsi teknis padat (kanvas 700x380, tight bounding box mengisi 85% area tanpa ruang/padding kosong tebal di atas/bawah/samping) dan set 'svgStyle' ("geometry" | "diagram" | "infographic" | "flowchart") serta 'visualStimulusType': 'ai_svg'.
+  * Tipe 'table' / Piktogram: Gunakan tabel Markdown yang ringkas dan padat atau emoji piktogram (🍎, 🚗, ⭐️, 👦) langsung di 'questionText'.
   * Tipe 'wikimedia_photo': Isi 'imageSearchKeyword' dengan 1-2 kata kunci Inggris otentik dan set 'visualStimulusType': 'wikimedia_photo'.
 
 ATURAN PETUNJUK PENGERJAAN & PEMBAHASAN JAWABAN:
