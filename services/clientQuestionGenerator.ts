@@ -131,14 +131,16 @@ PARAMETER BUTIR SOAL:
 ${kisiKisi ? `- Indikator Kisi-Kisi Khusus (WAJIB DIIKUTI SECARA KETAT DAN PRESISI): "${kisiKisi}"` : `- Materi Pokok: Rumuskan stimulus dan indikator kisi-kisi pencapaian kompetensi materi "${category}" secara kontekstual`}
 ${blueprint ? `- Pedoman Kurikulum: "${blueprint}"` : ''}
 
-PEDOMAN FORMAT RUMUS MATEMATIKA & SAINS (KaTeX / LaTeX):
-1. Seluruh simbol, pecahan, perbandingan/rasio, akar, pangkat, dan rumus WAJIB menggunakan format LaTeX baku diapit tanda dolar ($...$), contoh:
-   - Rasio/perbandingan: "$1 : 2$" atau "$3 : 4$"
-   - Pecahan: "$\\frac{3}{4}$" atau "$\\frac{a}{b}$"
-   - Pangkat/indeks: "$x^2$" atau "$2x^3 - 5x + 1$"
-   - Satuan volume/luas: "$\\text{cm}^3$" atau "$\\text{m}^2$"
-   - Bentuk akar: "$\\sqrt{144}$" atau "$\\sqrt{x^2 + y^2}$"
-2. PENTING (ESCAPE BACKSLASH): Karena Anda membalas dalam string JSON, selalu gunakan tanda garis miring ganda (double-backslash) untuk perintah LaTeX, contoh: "$\\frac{1}{2}$" bukan "$\frac{1}{2}$".
+PEDOMAN FORMAT RUMUS MATEMATIKA & SAINS (KATEX / LATEX BAKU):
+1. PENEMPATAN INLINE VS BLOCK MATH:
+   - Inline Math (format dollar tunggal): Gunakan HANYA untuk variabel tunggal atau notasi matematika pendek tanpa struktur bertingkat (contoh: "$x$", "$y$", "$n = 5$").
+   - Block Math (format dollar ganda): WAJIB digunakan pada baris tersendiri untuk seluruh persamaan utama atau rumus yang memuat simbol bertingkat (pecahan \\frac{a}{b}, bentuk akar \\sqrt{x}, pangkat bertingkat, matriks, limit, integral, atau trigonometri).
+2. SIMBOL OPERASI PERKALIAN & PEMBAGIAN BAKU:
+   - Operasi Perkalian: WAJIB menggunakan sintaks \\times (atau \\cdot). DILARANG KERAS memakai huruf 'x' biasa atau tanda bintang '*' di dalam rumus! Contoh: "$$L = \\frac{1}{2} \\times a \\times t$$".
+   - Operasi Pembagian: WAJIB menggunakan \\frac{a}{b} untuk pecahan atau \\div untuk pembagian mendatar. DILARANG KERAS memakai garis miring '/' atau titik dua ':' di dalam rumus! Contoh: "$$\\frac{144}{12} = 12$$" atau "$$72 \\div 9 = 8$$".
+3. TEKS & NAMA DESKRIPTIF DI DALAM RUMUS:
+   - Kata/label deskriptif lebih dari 1 huruf di dalam rumus WAJIB dibungkus \\text{...} (Contoh: \\text{Kecepatan} = \\frac{\\text{Jarak}}{\\text{Waktu}}).
+4. PENTING (ESCAPE BACKSLASH): Karena Anda membalas dalam string JSON, selalu gunakan tanda garis miring ganda (double-backslash) untuk perintah LaTeX, contoh: "\\frac{1}{2}" bukan "\frac{1}{2}".
 
 ATURAN STRUKTUR PILIHAN & KUNCI JAWABAN (SESUAI BENTUK SOAL):
 1. Jika "${assignedType}" adalah "Pilihan Ganda":
