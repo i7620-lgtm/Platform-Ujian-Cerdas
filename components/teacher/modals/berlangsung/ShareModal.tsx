@@ -131,7 +131,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({
                 Hak Akses Orang Tua / Tamu:
               </span>
               <span>
-                Murni tampilan pantauan progres dan kehadiran secara langsung <strong>tanpa tombol aksi</strong> atau hak modifikasi data.
+                Murni pantauan progres real-time dan kehadiran serta akses dokumen <strong>PDF Kisi-Kisi Ujian</strong> (bebas naskah soal PDF dan tanpa tombol aksi pengawas).
               </span>
             </div>
           )}
