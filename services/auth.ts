@@ -45,17 +45,28 @@ export class AuthService {
                 accountType: newProfile.role as AccountType,
                 school: newProfile.school,
                 regency: newProfile.regency,
+                nip: meta.nip || '',
+                nipType: meta.nipType || 'NIP',
+                headmasterName: meta.headmasterName || '',
+                headmasterNip: meta.headmasterNip || '',
+                headmasterNipType: meta.headmasterNipType || 'NIP',
                 email: session.user.email,
                 isPremium: newProfile.is_premium
             };
         }
 
+        const meta = session.user.user_metadata || {};
         return {
             id: session.user.id,
             fullName: profile.full_name,
             accountType: profile.role as AccountType,
             school: profile.school,
             regency: profile.regency,
+            nip: profile.nip || meta.nip || '',
+            nipType: (profile.nip_type || meta.nipType || 'NIP') as 'NIP' | 'NIPPPK',
+            headmasterName: profile.headmaster_name || meta.headmasterName || '',
+            headmasterNip: profile.headmaster_nip || meta.headmasterNip || '',
+            headmasterNipType: (profile.headmaster_nip_type || meta.headmasterNipType || 'NIP') as 'NIP' | 'NIPPPK',
             email: session.user.email,
             isPremium: profile.is_premium
         };
@@ -114,19 +125,62 @@ export class AuthService {
         await supabase.auth.signOut();
     }
 
-    async updateTeacherProfile(id: string, updates: Partial<TeacherProfile>): Promise<void> {
+    async updateTeacherProfile(id: string, updates: Partial<TeacherProfile> & { password?: string }): Promise<void> {
         const dbUpdates: Record<string, string | undefined> = {};
         if (updates.fullName !== undefined) dbUpdates.full_name = updates.fullName;
         if (updates.school !== undefined) dbUpdates.school = updates.school;
         if (updates.regency !== undefined) dbUpdates.regency = updates.regency;
         if (updates.accountType !== undefined) dbUpdates.role = updates.accountType;
+        if (updates.nip !== undefined) dbUpdates.nip = updates.nip;
+        if (updates.nipType !== undefined) dbUpdates.nip_type = updates.nipType;
+        if (updates.headmasterName !== undefined) dbUpdates.headmaster_name = updates.headmasterName;
+        if (updates.headmasterNip !== undefined) dbUpdates.headmaster_nip = updates.headmasterNip;
+        if (updates.headmasterNipType !== undefined) dbUpdates.headmaster_nip_type = updates.headmasterNipType;
 
-        const { error } = await supabase
-            .from('profiles')
-            .update(dbUpdates)
-            .eq('id', id);
+        try {
+            const { error } = await supabase
+                .from('profiles')
+                .update(dbUpdates)
+                .eq('id', id);
+            if (error) {
+                // If custom columns don't exist in SQL profiles table, fallback to core fields
+                const { nip, nip_type, headmaster_name, headmaster_nip, headmaster_nip_type, ...baseUpdates } = dbUpdates;
+                await supabase.from('profiles').update(baseUpdates).eq('id', id);
+            }
+        } catch {
+            const { nip, nip_type, headmaster_name, headmaster_nip, headmaster_nip_type, ...baseUpdates } = dbUpdates;
+            await supabase.from('profiles').update(baseUpdates).eq('id', id).catch(() => {});
+        }
 
-        if (error) throw error;
+        // Sync metadata & credentials via Supabase Auth
+        const authUserUpdates: any = {
+            data: {
+                full_name: updates.fullName,
+                school: updates.school,
+                regency: updates.regency,
+                nip: updates.nip,
+                nipType: updates.nipType,
+                headmasterName: updates.headmasterName,
+                headmasterNip: updates.headmasterNip,
+                headmasterNipType: updates.headmasterNipType,
+            }
+        };
+
+        if (updates.email && updates.email.trim()) {
+            const { data: userData } = await supabase.auth.getUser();
+            if (userData?.user && userData.user.email !== updates.email.trim()) {
+                authUserUpdates.email = updates.email.trim();
+            }
+        }
+
+        if (updates.password && updates.password.trim().length > 0) {
+            authUserUpdates.password = updates.password.trim();
+        }
+
+        const { error: authError } = await supabase.auth.updateUser(authUserUpdates);
+        if (authError) {
+            console.warn("Auth user metadata sync warning:", authError.message);
+        }
     }
 
     async getAllUsers(): Promise<UserProfile[]> {
