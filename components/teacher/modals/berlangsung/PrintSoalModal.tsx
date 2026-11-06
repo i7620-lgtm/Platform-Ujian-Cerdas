@@ -479,12 +479,28 @@ export const PrintSoalModal: React.FC<PrintSoalModalProps> = ({
             word-break: break-word !important;
           }
 
-          /* Images & SVG Diagram Boundaries (Strict 240px Max Height for Print/PDF) */
-          .print-soal-content img,
-          .print-soal-content svg:not(.katex *):not(.lucide) {
-            max-width: 100% !important;
+          /* Strict Geometry Shape & SVG Boundaries for Screen Modal Preview & PDF Print */
+          .print-soal-content .geometry-shape {
+            display: block !important;
+            max-width: 250px !important;
             width: auto !important;
-            max-height: 240px !important;
+            margin: 0.35rem auto !important;
+            text-align: center !important;
+          }
+          .print-soal-content .geometry-shape svg {
+            display: block !important;
+            margin: 0 auto !important;
+            max-width: 250px !important;
+            max-height: 180px !important;
+            width: auto !important;
+            height: auto !important;
+          }
+
+          .print-soal-content img,
+          .print-soal-content svg:not(.katex *):not(.lucide):not(.geometry-shape *):not(.geometry-shape) {
+            max-width: 280px !important;
+            width: auto !important;
+            max-height: 220px !important;
             height: auto !important;
             object-fit: contain !important;
             display: block !important;
@@ -495,7 +511,8 @@ export const PrintSoalModal: React.FC<PrintSoalModalProps> = ({
           }
 
           .print-soal-content p:has(> img),
-          .print-soal-content p:has(> svg) {
+          .print-soal-content p:has(> svg),
+          .print-soal-content p:has(> .geometry-shape) {
             margin-top: 3px !important;
             margin-bottom: 3px !important;
             text-align: center !important;
@@ -509,6 +526,43 @@ export const PrintSoalModal: React.FC<PrintSoalModalProps> = ({
             break-before: page !important;
             page-break-before: always !important;
           }
+        }
+
+        /* Screen Preview Rules for Print Soal Modal Container */
+        .print-soal-content .geometry-shape {
+          display: block !important;
+          max-width: 250px !important;
+          width: auto !important;
+          margin: 0.35rem auto !important;
+          text-align: center !important;
+        }
+        .print-soal-content .geometry-shape svg {
+          display: block !important;
+          margin: 0 auto !important;
+          max-width: 250px !important;
+          max-height: 180px !important;
+          width: auto !important;
+          height: auto !important;
+        }
+
+        .print-soal-content img,
+        .print-soal-content svg:not(.katex *):not(.lucide):not(.geometry-shape *):not(.geometry-shape) {
+          max-width: 280px !important;
+          width: auto !important;
+          max-height: 220px !important;
+          height: auto !important;
+          object-fit: contain !important;
+          display: block !important;
+          margin: 6px auto !important;
+          border-radius: 4px !important;
+        }
+
+        .print-soal-content p:has(> img),
+        .print-soal-content p:has(> svg),
+        .print-soal-content p:has(> .geometry-shape) {
+          margin-top: 3px !important;
+          margin-bottom: 3px !important;
+          text-align: center !important;
         }
       `;
       document.head.appendChild(style);
