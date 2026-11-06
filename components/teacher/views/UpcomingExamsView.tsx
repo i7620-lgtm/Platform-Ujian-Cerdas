@@ -168,7 +168,7 @@ export const UpcomingExamsView: React.FC<UpcomingExamsViewProps> = ({
                 </div>
               </div>
 
-              <div className="flex gap-2 self-end md:self-center w-full md:w-auto flex-wrap">
+              <div className="flex gap-1.5 sm:gap-2 self-end md:self-center w-full md:w-auto flex-wrap">
                 <button
                   id={`btn-preview-${exam.code}`}
                   onClick={() => {
@@ -179,54 +179,60 @@ export const UpcomingExamsView: React.FC<UpcomingExamsViewProps> = ({
                     }
                     window.open(`/?preview=${exam.code}`, "_blank");
                   }}
-                  className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 px-5 py-2.5 text-sm rounded-xl hover:bg-amber-100 dark:hover:bg-amber-900/50 transition-all font-bold shadow-sm border border-amber-100 dark:border-amber-800"
+                  className="flex-1 md:flex-none flex items-center justify-center gap-1.5 sm:gap-2 bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 px-2.5 sm:px-4 py-2.5 text-xs sm:text-sm rounded-xl hover:bg-amber-100 dark:hover:bg-amber-900/50 transition-all font-bold shadow-sm border border-amber-100 dark:border-amber-800"
                   title="Preview Soal"
                 >
-                  <EyeIcon className="w-4 h-4" />
-                  <span className="hidden lg:inline">Preview</span>
+                  <EyeIcon className="w-4 h-4 shrink-0" />
+                  <span className="inline sm:hidden">Preview</span>
+                  <span className="hidden sm:inline">Preview</span>
                 </button>
                 <button
                   id={`btn-duplicate-${exam.code}`}
                   onClick={() => onDuplicateExam(exam)}
-                  className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-gray-50 dark:bg-slate-700/50 text-gray-600 dark:text-slate-400 px-5 py-2.5 text-sm rounded-xl hover:bg-gray-100 dark:hover:bg-slate-700 hover:text-primary dark:hover:text-white transition-all font-bold shadow-sm border border-gray-200 dark:border-slate-600"
+                  className="flex-1 md:flex-none flex items-center justify-center gap-1.5 sm:gap-2 bg-gray-50 dark:bg-slate-700/50 text-gray-600 dark:text-slate-400 px-2.5 sm:px-4 py-2.5 text-xs sm:text-sm rounded-xl hover:bg-gray-100 dark:hover:bg-slate-700 hover:text-primary dark:hover:text-white transition-all font-bold shadow-sm border border-gray-200 dark:border-slate-600"
                   title="Duplikasi Soal"
                 >
-                  <DocumentDuplicateIcon className="w-4 h-4" />
-                  <span className="hidden lg:inline">Duplikasi Soal</span>
+                  <DocumentDuplicateIcon className="w-4 h-4 shrink-0" />
+                  <span className="inline sm:hidden">Salin</span>
+                  <span className="hidden sm:inline">Duplikasi</span>
                 </button>
                 <button
                   id={`btn-collab-${exam.code}`}
                   onClick={() => setSelectedCollaboratorExam(exam)}
-                  className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 px-5 py-2.5 text-sm rounded-xl hover:bg-emerald-100 dark:hover:bg-emerald-900/50 transition-all font-bold shadow-sm border border-emerald-100 dark:border-emerald-800"
+                  className="flex-1 md:flex-none flex items-center justify-center gap-1.5 sm:gap-2 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 px-2.5 sm:px-4 py-2.5 text-xs sm:text-sm rounded-xl hover:bg-emerald-100 dark:hover:bg-emerald-900/50 transition-all font-bold shadow-sm border border-emerald-100 dark:border-emerald-800"
                   title="Kelola Kolaborator"
                 >
-                  <UserIcon className="w-4 h-4" />
-                  <span className="hidden lg:inline">Kolaborator</span>
+                  <UserIcon className="w-4 h-4 shrink-0" />
+                  <span className="inline sm:hidden">Tim</span>
+                  <span className="hidden sm:inline">Kolaborator</span>
                 </button>
                 <button
                   id={`btn-invite-${exam.code}`}
                   onClick={() => setSelectedInviteExam(exam)}
-                  className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 px-5 py-2.5 text-sm rounded-xl hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-all font-bold shadow-sm border border-indigo-100 dark:border-indigo-800"
+                  className="flex-1 md:flex-none flex items-center justify-center gap-1.5 sm:gap-2 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 px-2.5 sm:px-4 py-2.5 text-xs sm:text-sm rounded-xl hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-all font-bold shadow-sm border border-indigo-100 dark:border-indigo-800"
+                  title="Undangan Peserta"
                 >
-                  <EnvelopeIcon className="w-4 h-4" />
-                  Undangan
+                  <EnvelopeIcon className="w-4 h-4 shrink-0" />
+                  <span>Undangan</span>
                 </button>
                 <button
                   id={`btn-edit-${exam.code}`}
                   onClick={() => onEditExam(exam)}
-                  className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-white dark:bg-slate-700 border-2 border-gray-100 dark:border-slate-600 text-gray-600 dark:text-slate-300 px-5 py-2.5 text-sm rounded-xl hover:border-primary dark:hover:border-primary hover:text-primary dark:hover:text-white transition-all font-bold shadow-sm"
+                  className="flex-1 md:flex-none flex items-center justify-center gap-1.5 sm:gap-2 bg-white dark:bg-slate-700 border-2 border-gray-100 dark:border-slate-600 text-gray-600 dark:text-slate-300 px-2.5 sm:px-4 py-2.5 text-xs sm:text-sm rounded-xl hover:border-primary dark:hover:border-primary hover:text-primary dark:hover:text-white transition-all font-bold shadow-sm"
+                  title="Edit Ujian"
                 >
-                  <PencilIcon className="w-4 h-4" />
-                  Edit
+                  <PencilIcon className="w-4 h-4 shrink-0" />
+                  <span>Edit</span>
                 </button>
                 <button
                   id={`btn-delete-${exam.code}`}
                   onClick={() => onDeleteExam(exam)}
-                  className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 px-5 py-2.5 text-sm rounded-xl hover:bg-red-100 dark:hover:bg-red-900/50 transition-all font-bold shadow-sm border border-red-100 dark:border-red-800"
+                  className="flex-1 md:flex-none flex items-center justify-center gap-1.5 sm:gap-2 bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 px-2.5 sm:px-4 py-2.5 text-xs sm:text-sm rounded-xl hover:bg-red-100 dark:hover:bg-red-900/50 transition-all font-bold shadow-sm border border-red-100 dark:border-red-800"
                   title="Hapus Ujian"
                 >
-                  <TrashIcon className="w-4 h-4" />
-                  <span className="hidden lg:inline">Hapus</span>
+                  <TrashIcon className="w-4 h-4 shrink-0" />
+                  <span className="inline sm:hidden">Hapus</span>
+                  <span className="hidden sm:inline">Hapus</span>
                 </button>
               </div>
             </div>
