@@ -18,24 +18,30 @@ export const StatWidget: React.FC<{
   value: string | number;
   color: string;
   icon?: React.FC<React.SVGProps<SVGSVGElement>>;
-}> = ({ label, value, color, icon: Icon }) => {
+  className?: string;
+}> = ({ label, value, color, icon: Icon, className = "" }) => {
   const colorName = color.split("-")[1] || "gray";
   return (
-    <div className="bg-white dark:bg-slate-800 p-4 sm:p-5 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm flex items-center gap-4 transition-all hover:shadow-md flex-1 print:border-slate-300 print:shadow-none print:rounded-lg">
+    <div
+      className={`bg-white dark:bg-slate-800 py-3 px-3.5 sm:py-3.5 sm:px-4 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm flex items-center gap-3 sm:gap-4 transition-all hover:shadow-md flex-1 min-w-0 print:border-slate-300 print:shadow-none print:rounded-lg ${className}`}
+    >
       <div
-        className={`p-3 rounded-xl ${color} dark:bg-${colorName}-900/20 bg-opacity-10 text-${colorName}-600 dark:text-${colorName}-400 print:bg-transparent print:p-0`}
+        className={`p-2.5 sm:p-3 rounded-xl shrink-0 ${color} dark:bg-${colorName}-900/20 bg-opacity-10 text-${colorName}-600 dark:text-${colorName}-400 print:bg-transparent print:p-0`}
       >
         {Icon ? (
-          <Icon className="w-6 h-6 print:w-4 print:h-4" />
+          <Icon className="w-5 h-5 sm:w-6 sm:h-6 print:w-4 print:h-4" />
         ) : (
-          <ChartBarIcon className="w-6 h-6 print:w-4 print:h-4" />
+          <ChartBarIcon className="w-5 h-5 sm:w-6 sm:h-6 print:w-4 print:h-4" />
         )}
       </div>
-      <div>
-        <p className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest print:text-slate-600">
+      <div className="min-w-0 flex-1">
+        <p
+          className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider truncate print:text-slate-600"
+          title={label}
+        >
           {label}
         </p>
-        <p className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white leading-none mt-1 print:text-lg">
+        <p className="text-lg sm:text-xl lg:text-2xl font-black text-slate-800 dark:text-white leading-none mt-1 print:text-lg tabular-nums truncate">
           {value}
         </p>
       </div>

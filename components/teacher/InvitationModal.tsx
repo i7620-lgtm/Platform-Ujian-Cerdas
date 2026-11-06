@@ -24,6 +24,7 @@ interface InvitationModalProps {
   schoolName?: string;
   exam?: Exam | null;
   onJoin?: (examCode: string) => void;
+  teacherProfile?: TeacherProfile;
 }
 
 export const InvitationModal: React.FC<InvitationModalProps> = ({
@@ -33,6 +34,7 @@ export const InvitationModal: React.FC<InvitationModalProps> = ({
   schoolName,
   exam,
   onJoin,
+  teacherProfile,
 }) => {
   const hook = useInvitationModal({ isOpen, exam, onClose });
   const {
@@ -677,6 +679,7 @@ export const InvitationModal: React.FC<InvitationModalProps> = ({
         subject={exam?.config.subject || ""}
         schoolName={schoolName}
         teacherName={teacherName}
+        teacherProfile={teacherProfile}
       />
       <RegisterSchoolModal
         isOpen={showRegisterModal}

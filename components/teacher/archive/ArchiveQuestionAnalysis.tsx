@@ -46,36 +46,41 @@ export const ArchiveQuestionAnalysis: React.FC<
   return (
     <div className="space-y-6">
       {/* Stat Widgets */}
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-6 lg:grid-cols-5 gap-3 sm:gap-4">
         <StatWidget
           label="Rata-rata Nilai"
           value={averageScore}
           color="bg-indigo-50"
           icon={ChartBarIcon}
+          className="sm:col-span-2 lg:col-span-1"
         />
         <StatWidget
           label="Tertinggi"
           value={highestScore}
           color="bg-emerald-50"
           icon={CheckCircleIcon}
+          className="sm:col-span-2 lg:col-span-1"
         />
         <StatWidget
           label="Terendah"
           value={lowestScore}
           color="bg-rose-50"
           icon={XMarkIcon}
+          className="sm:col-span-2 lg:col-span-1"
         />
         <StatWidget
           label="Partisipan"
           value={totalStudents}
           color="bg-blue-50"
           icon={UserIcon}
+          className="sm:col-span-3 lg:col-span-1"
         />
         <StatWidget
           label="Rata-rata Waktu"
           value={formatDuration(averageCompletionTime)}
           color="bg-purple-50"
           icon={ClockIcon}
+          className="sm:col-span-3 lg:col-span-1"
         />
       </div>
 

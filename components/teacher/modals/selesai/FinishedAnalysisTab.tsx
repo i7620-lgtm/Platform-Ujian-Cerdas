@@ -59,36 +59,41 @@ export const FinishedAnalysisTab: React.FC<FinishedAnalysisTabProps> = ({
 
   return (
     <div className="space-y-8 font-sans">
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-6 lg:grid-cols-5 gap-3 sm:gap-4">
         <StatWidget
           label={isOlympiad ? "Rata-rata Skor" : "Rata-rata"}
           value={isOlympiad ? `${averageScore} pt` : averageScore}
           color="bg-indigo-50"
           icon={ChartBarIcon}
+          className="sm:col-span-2 lg:col-span-1"
         />
         <StatWidget
           label={isOlympiad ? "Skor Tertinggi" : "Tertinggi"}
           value={isOlympiad ? `${highestScore} pt` : highestScore}
           color="bg-emerald-50"
           icon={CheckCircleIcon}
+          className="sm:col-span-2 lg:col-span-1"
         />
         <StatWidget
           label={isOlympiad ? "Skor Terendah" : "Terendah"}
           value={isOlympiad ? `${lowestScore} pt` : lowestScore}
           color="bg-rose-50"
           icon={XMarkIcon}
+          className="sm:col-span-2 lg:col-span-1"
         />
         <StatWidget
           label="Partisipan"
           value={totalStudents}
           color="bg-blue-50"
           icon={UserIcon}
+          className="sm:col-span-3 lg:col-span-1"
         />
         <StatWidget
           label="Rata-rata Waktu"
           value={formatDuration(averageCompletionTime)}
           color="bg-purple-50"
           icon={ClockIcon}
+          className="sm:col-span-3 lg:col-span-1"
         />
       </div>
 

@@ -14,6 +14,7 @@ import {
   normalize,
   sanitizeHtml,
 } from "./teacher/examUtils";
+import { renderMathInHtml } from "../utils/mathRenderer";
 
 interface QuestionResultDetailPopoverProps {
   question: Question;
@@ -137,16 +138,29 @@ export const QuestionResultDetailPopover: React.FC<
         </div>
 
         {/* Teks Soal */}
-        <div className="bg-slate-50/80 dark:bg-slate-800/40 p-3 rounded-xl border border-slate-100 dark:border-slate-800">
+        <div className="bg-slate-50/80 dark:bg-slate-800/40 p-3 rounded-xl border border-slate-100 dark:border-slate-800 space-y-2">
           <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-1">
             Pertanyaan:
           </p>
           <div
-            className="font-medium text-slate-800 dark:text-slate-200 prose prose-xs max-w-none dark:prose-invert"
+            className="font-medium text-slate-800 dark:text-slate-200 prose prose-xs max-w-none dark:prose-invert leading-relaxed [&_img]:max-w-full [&_img]:max-h-72 [&_img]:object-contain [&_img]:rounded-xl [&_img]:border [&_img]:border-slate-200 dark:[&_img]:border-slate-700 [&_img]:bg-white dark:[&_img]:bg-slate-900 [&_img]:p-1 [&_img]:mx-auto [&_img]:my-2 [&_svg]:max-w-full [&_svg]:max-h-72 [&_svg]:mx-auto [&_svg]:my-2 [&_table]:max-w-full [&_table]:overflow-x-auto"
             dangerouslySetInnerHTML={{
-              __html: sanitizeHtml(question.questionText || "-"),
+              __html: renderMathInHtml(sanitizeHtml(question.questionText || "-")),
             }}
           />
+          {question.imageUrl && question.imageUrl.trim() !== "" && (
+            <div className="mt-2.5 flex flex-col items-center justify-center p-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
+              <img
+                src={question.imageUrl}
+                alt={`Stimulus Soal #${questionIndex + 1}`}
+                className="max-w-full max-h-64 sm:max-h-72 object-contain rounded-lg shadow-2xs cursor-pointer hover:opacity-95"
+                loading="lazy"
+                referrerPolicy="no-referrer"
+                onClick={() => window.open(question.imageUrl, "_blank")}
+              />
+              <span className="text-[10px] text-slate-400 mt-1">Klik gambar untuk membuka ukuran penuh</span>
+            </div>
+          )}
         </div>
 
         {/* Opsi & Jawaban: Pilihan Ganda Biasa */}
@@ -209,10 +223,25 @@ export const QuestionResultDetailPopover: React.FC<
                     <span className="w-5 h-5 rounded-lg bg-black/5 dark:bg-white/10 flex items-center justify-center font-bold text-[10px] shrink-0 mt-0.5">
                       {optLetter}
                     </span>
-                    <span
-                      className="flex-1 min-w-0"
-                      dangerouslySetInnerHTML={{ __html: opt }}
-                    />
+                    <div className="flex-1 min-w-0 flex flex-col gap-1">
+                      <span
+                        className="[&_img]:max-h-20 [&_img]:max-w-full [&_img]:object-contain"
+                        dangerouslySetInnerHTML={{ __html: renderMathInHtml(opt) }}
+                      />
+                      {question.optionImages?.[oIdx] && (
+                        <img
+                          src={question.optionImages[oIdx]!}
+                          alt={`Gambar Opsi ${optLetter}`}
+                          className="max-h-20 sm:max-h-24 max-w-full object-contain rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-0.5 mt-0.5 cursor-pointer hover:opacity-95"
+                          loading="lazy"
+                          referrerPolicy="no-referrer"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            window.open(question.optionImages![oIdx]!, "_blank");
+                          }}
+                        />
+                      )}
+                    </div>
                     {badgeNode}
                   </div>
                 );
@@ -260,10 +289,25 @@ export const QuestionResultDetailPopover: React.FC<
                           <CheckIcon className="w-3 h-3 text-indigo-600 dark:text-indigo-400" />
                         )}
                       </div>
-                      <span
-                        className="flex-1"
-                        dangerouslySetInnerHTML={{ __html: opt }}
-                      />
+                      <div className="flex-1 min-w-0 flex flex-col gap-1">
+                        <span
+                          className="[&_img]:max-h-20 [&_img]:max-w-full [&_img]:object-contain"
+                          dangerouslySetInnerHTML={{ __html: renderMathInHtml(opt) }}
+                        />
+                        {question.optionImages?.[oIdx] && (
+                          <img
+                            src={question.optionImages[oIdx]!}
+                            alt={`Gambar Opsi ${String.fromCharCode(65 + oIdx)}`}
+                            className="max-h-20 sm:max-h-24 max-w-full object-contain rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-0.5 mt-0.5 cursor-pointer hover:opacity-95"
+                            loading="lazy"
+                            referrerPolicy="no-referrer"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              window.open(question.optionImages![oIdx]!, "_blank");
+                            }}
+                          />
+                        )}
+                      </div>
                       <div className="flex gap-1 shrink-0">
                         {isSelected && (
                           <span

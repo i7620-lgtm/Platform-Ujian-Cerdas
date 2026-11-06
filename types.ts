@@ -263,6 +263,7 @@ export interface Result {
 }
 
 export type AccountType = 'super_admin' | 'admin_sekolah' | 'guru' | 'collaborator';
+export type NipType = 'NIP' | 'NIPPPK';
 
 export interface TeacherProfile {
     id: string; 
@@ -270,6 +271,11 @@ export interface TeacherProfile {
     accountType: AccountType;
     school: string;
     regency?: string; // Added for Kabupaten/Kota
+    nip?: string; // Nomor NIP / NIPPPK Guru
+    nipType?: NipType; // Pilihan label: 'NIP' atau 'NIPPPK'
+    headmasterName?: string; // Nama Kepala Sekolah untuk tanda tangan dokumen
+    headmasterNip?: string; // Nomor NIP / NIPPPK Kepala Sekolah
+    headmasterNipType?: NipType; // Pilihan label: 'NIP' atau 'NIPPPK'
     avatarUrl?: string;
     email?: string; // Added for user management display
     isPremium?: boolean; // Added for Premium Tier
