@@ -63,7 +63,7 @@ class StorageService {
       await authService.signOut();
   }
 
-  async updateTeacherProfile(id: string, updates: Partial<TeacherProfile>): Promise<void> {
+  async updateTeacherProfile(id: string, updates: Partial<TeacherProfile> & { password?: string }): Promise<void> {
       await authService.updateTeacherProfile(id, updates);
   }
 
