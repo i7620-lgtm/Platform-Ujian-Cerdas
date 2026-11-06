@@ -249,6 +249,34 @@
       border: 1px solid #cbd5e1 !important;
       background: #f8fafc !important;
     }
+    
+    /* Strict Print & PDF Boundaries: Ensure images, SVGs, charts, and tables do not overflow A4 paper */
+    .wysiwyg-content img,
+    .prose img,
+    .option-content img,
+    .wysiwyg-content svg:not(.katex *):not(.lucide),
+    .prose svg:not(.katex *):not(.lucide),
+    .option-content svg:not(.katex *):not(.lucide) {
+      max-width: 100% !important;
+      width: auto !important;
+      max-height: 240px !important;
+      height: auto !important;
+      object-fit: contain !important;
+      display: block !important;
+      margin: 0.35rem auto !important;
+      break-inside: avoid !important;
+      page-break-inside: avoid !important;
+    }
+    .wysiwyg-content table,
+    .prose table,
+    .option-content table {
+      width: 100% !important;
+      max-width: 100% !important;
+      table-layout: auto !important;
+      word-break: break-word !important;
+      overflow-x: auto !important;
+      margin: 0.4rem auto !important;
+    }
   }
 
   /* Fix Image Alignment: Ensure images respect parent text-align (e.g. Center, Right) */
@@ -299,19 +327,25 @@
     text-align: center;
   }
 
-  /* Compact & Non-Intrusive Geometry Diagram Styling */
-  .geometry-shape {
+  /* Compact & Non-Intrusive Geometry Diagram Styling (Applies to Student Exam, Modal Previews & Printouts) */
+  .geometry-shape,
+  .print-soal-content .geometry-shape,
+  .print-kunci-content .geometry-shape,
+  .print-container .geometry-shape {
     display: block !important;
     text-align: center;
     margin: 0.25rem auto !important;
     max-width: 250px !important;
-    width: auto;
+    width: auto !important;
     line-height: 1;
     user-select: none;
     cursor: zoom-in;
   }
 
-  .geometry-shape svg {
+  .geometry-shape svg,
+  .print-soal-content .geometry-shape svg,
+  .print-kunci-content .geometry-shape svg,
+  .print-container .geometry-shape svg {
     display: block !important;
     margin: 0 auto !important;
     max-width: 250px !important;
@@ -324,7 +358,9 @@
   /* Compact paragraph margin when paragraph holds a geometry diagram */
   .wysiwyg-content p:has(> .geometry-shape),
   .prose p:has(> .geometry-shape),
-  .option-content p:has(> .geometry-shape) {
+  .option-content p:has(> .geometry-shape),
+  .print-soal-content p:has(> .geometry-shape),
+  .print-kunci-content p:has(> .geometry-shape) {
     margin-top: 0.25rem !important;
     margin-bottom: 0.25rem !important;
     text-align: center;
@@ -650,28 +686,35 @@
 .option-content .math-visual,
 .option-content .katex {
   white-space: nowrap;
+  font-size: 1.15em;
 }
 
 .option-content .math-visual {
   display: inline-block;
   max-width: 100%;
-  vertical-align: baseline;
+  vertical-align: -0.05em;
 }
 
 .student-question-text .math-visual,
 .wysiwyg-content .math-visual,
 .prose .math-visual {
-  vertical-align: baseline;
+  vertical-align: -0.05em;
+}
+
+.katex {
+  font-size: 1.18em;
+  line-height: inherit;
+  text-indent: 0;
 }
 
 .math-visual .katex {
-  font-size: 1.02em;
+  font-size: 1.18em;
   line-height: inherit;
 }
 
 .math-visual .katex-display {
   display: block;
-  margin: 0.35rem 0;
+  margin: 0.5rem 0;
 }
 
 /* --- Student Exam Margins & Line Normalization --- */
@@ -752,7 +795,7 @@
 
 /* Ensure math formulas (KaTeX) scale proportionally with base font without breaking sub/superscripts */
 .exam-content-scalable .katex {
-  font-size: 1.05em !important;
+  font-size: 1.18em !important;
 }
 .exam-content-scalable .katex-display {
   overflow-x: auto;

@@ -24,7 +24,7 @@ export const PrintQuestionBank: React.FC<PrintQuestionBankProps> = ({ exam }) =>
               </span>
             </div>
             
-            <div dangerouslySetInnerHTML={{ __html: q.questionText }} className="prose prose-sm max-w-none text-slate-800 mb-4" />
+            <div dangerouslySetInnerHTML={{ __html: q.questionText }} className="print-soal-content prose prose-sm max-w-none text-slate-800 mb-4" />
             
             {(q.questionType === "MULTIPLE_CHOICE" || q.questionType === "COMPLEX_MULTIPLE_CHOICE") && q.options && (
               <div className="space-y-2">
