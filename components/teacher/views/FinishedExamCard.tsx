@@ -86,28 +86,33 @@ export const FinishedExamCard: React.FC<FinishedExamCardProps> = ({
         </div>
       </div>
 
-      <div className="flex items-center gap-3 self-end md:self-center w-full md:w-auto">
+      <div className="flex items-center gap-1.5 sm:gap-3 self-end md:self-center w-full md:w-auto">
         <button
           onClick={() => onArchive(exam)}
-          className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 px-4 py-2.5 text-sm rounded-xl hover:bg-indigo-100 dark:hover:bg-indigo-900/40 hover:text-indigo-800 dark:hover:text-indigo-300 transition-colors font-bold shadow-sm border border-indigo-100 dark:border-indigo-800"
+          className="flex-1 md:flex-none flex items-center justify-center gap-1.5 sm:gap-2 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 px-2.5 sm:px-4 py-2.5 text-xs sm:text-sm rounded-xl hover:bg-indigo-100 dark:hover:bg-indigo-900/40 hover:text-indigo-800 dark:hover:text-indigo-300 transition-colors font-bold shadow-sm border border-indigo-100 dark:border-indigo-800 shrink-0 min-w-0"
           title="Simpan ke Cloud & Hapus SQL"
         >
-          <CloudArrowUpIcon className="w-4 h-4" />
-          <span className="md:hidden lg:inline">Finalisasi & Arsip</span>
+          <CloudArrowUpIcon className="w-4 h-4 shrink-0" />
+          <span className="inline sm:hidden whitespace-nowrap">Arsip</span>
+          <span className="hidden sm:inline whitespace-nowrap">Finalisasi & Arsip</span>
         </button>
         <button
           onClick={() => onDuplicate(exam)}
-          className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-gray-50 dark:bg-slate-700 text-gray-600 dark:text-slate-300 px-4 py-2.5 text-sm rounded-xl hover:bg-gray-100 dark:hover:bg-slate-600 hover:text-gray-900 dark:hover:text-white transition-colors font-bold shadow-sm border border-gray-200 dark:border-slate-600"
+          className="flex-1 md:flex-none flex items-center justify-center gap-1.5 sm:gap-2 bg-gray-50 dark:bg-slate-700 text-gray-600 dark:text-slate-300 px-2.5 sm:px-4 py-2.5 text-xs sm:text-sm rounded-xl hover:bg-gray-100 dark:hover:bg-slate-600 hover:text-gray-900 dark:hover:text-white transition-colors font-bold shadow-sm border border-gray-200 dark:border-slate-600 shrink-0 min-w-0"
           title="Duplikasi Soal"
         >
-          <DocumentDuplicateIcon className="w-4 h-4" />
-          <span className="md:hidden lg:inline">Duplikasi Soal</span>
+          <DocumentDuplicateIcon className="w-4 h-4 shrink-0" />
+          <span className="inline sm:hidden whitespace-nowrap">Salin</span>
+          <span className="hidden sm:inline whitespace-nowrap">Duplikasi Soal</span>
         </button>
         <button
           onClick={() => onViewResults(exam)}
-          className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-slate-900 dark:bg-indigo-600 text-white px-5 py-2.5 text-sm rounded-xl hover:bg-black dark:hover:bg-indigo-700 transition-all font-bold shadow-lg shadow-gray-200 dark:shadow-indigo-900/30 transform active:scale-95"
+          className="flex-1 md:flex-none flex items-center justify-center gap-1.5 sm:gap-2 bg-slate-900 dark:bg-indigo-600 text-white px-2.5 sm:px-5 py-2.5 text-xs sm:text-sm rounded-xl hover:bg-black dark:hover:bg-indigo-700 transition-all font-bold shadow-lg shadow-gray-200 dark:shadow-indigo-900/30 transform active:scale-95 shrink-0 min-w-0"
+          title="Lihat Hasil Ujian"
         >
-          <ChartBarIcon className="w-4 h-4" /> Lihat Hasil
+          <ChartBarIcon className="w-4 h-4 shrink-0" />
+          <span className="inline sm:hidden whitespace-nowrap">Hasil</span>
+          <span className="hidden sm:inline whitespace-nowrap">Lihat Hasil</span>
         </button>
       </div>
     </div>
