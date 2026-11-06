@@ -214,11 +214,26 @@ export const PrintKunciJawabanModal: React.FC<PrintKunciJawabanModalProps> = ({
             max-width: 100% !important;
             box-shadow: none !important;
           }
-          .print-kunci-content img,
-          .print-kunci-content svg:not(.katex *):not(.lucide) {
-            max-width: 100% !important;
+          .print-kunci-content .geometry-shape {
+            display: block !important;
+            max-width: 250px !important;
             width: auto !important;
-            max-height: 240px !important;
+            margin: 0.35rem auto !important;
+            text-align: center !important;
+          }
+          .print-kunci-content .geometry-shape svg {
+            display: block !important;
+            margin: 0 auto !important;
+            max-width: 250px !important;
+            max-height: 180px !important;
+            width: auto !important;
+            height: auto !important;
+          }
+          .print-kunci-content img,
+          .print-kunci-content svg:not(.katex *):not(.lucide):not(.geometry-shape *):not(.geometry-shape) {
+            max-width: 280px !important;
+            width: auto !important;
+            max-height: 220px !important;
             height: auto !important;
             object-fit: contain !important;
             display: block !important;
@@ -244,6 +259,33 @@ export const PrintKunciJawabanModal: React.FC<PrintKunciJawabanModalProps> = ({
           .print-border-black {
             border-color: #000 !important;
           }
+        }
+
+        /* Screen Preview Rules for Print Kunci Modal Container */
+        .print-kunci-content .geometry-shape {
+          display: block !important;
+          max-width: 250px !important;
+          width: auto !important;
+          margin: 0.35rem auto !important;
+          text-align: center !important;
+        }
+        .print-kunci-content .geometry-shape svg {
+          display: block !important;
+          margin: 0 auto !important;
+          max-width: 250px !important;
+          max-height: 180px !important;
+          width: auto !important;
+          height: auto !important;
+        }
+        .print-kunci-content img,
+        .print-kunci-content svg:not(.katex *):not(.lucide):not(.geometry-shape *):not(.geometry-shape) {
+          max-width: 280px !important;
+          width: auto !important;
+          max-height: 220px !important;
+          height: auto !important;
+          object-fit: contain !important;
+          display: block !important;
+          margin: 6px auto !important;
         }
       `;
       document.head.appendChild(style);
