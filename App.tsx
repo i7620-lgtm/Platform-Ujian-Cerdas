@@ -938,6 +938,7 @@ const App: React.FC = () => {
                     results={results}
                     isDarkMode={darkMode}
                     toggleTheme={toggleTheme}
+                    onUpdateProfile={(updated) => setTeacherProfile(updated)}
                     addExam={async (e) => { 
                         const examWithAuthor: Exam = { ...e, authorId: teacherProfile.id, authorSchool: teacherProfile.school };
                         // Optimistic UI update: immediately add to state so tabs show it with zero delay
@@ -1039,8 +1040,9 @@ const App: React.FC = () => {
                 setInvitationExam(null);
             }} 
             exam={invitationExam}
-            teacherName={invitationExam?.authorName || teacherProfile?.name}
+            teacherName={invitationExam?.authorName || teacherProfile?.fullName}
             schoolName={invitationExam?.authorSchool || teacherProfile?.school}
+            teacherProfile={teacherProfile || undefined}
             onJoin={(code) => {
                 setInvitationExam(null);
                 setIsInviteOpen(false);
