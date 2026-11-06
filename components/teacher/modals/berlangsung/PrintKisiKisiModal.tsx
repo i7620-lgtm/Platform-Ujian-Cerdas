@@ -1,6 +1,6 @@
 import React, { useRef, useEffect } from "react";
 import { createPortal } from "react-dom";
-import { Exam, Question } from "../../../../types";
+import { Exam, Question, TeacherProfile } from "../../../../types";
 import { XMarkIcon, PrinterIcon, TableCellsIcon } from "../../../Icons";
 import { sanitizeHtml } from "../../examUtils";
 import { renderMathInHtml } from "../../../../utils/mathRenderer";
@@ -9,12 +9,14 @@ interface PrintKisiKisiModalProps {
   isOpen: boolean;
   onClose: () => void;
   exam: Exam | null;
+  teacherProfile?: TeacherProfile;
 }
 
 export const PrintKisiKisiModal: React.FC<PrintKisiKisiModalProps> = ({
   isOpen,
   onClose,
   exam,
+  teacherProfile,
 }) => {
   const printContainerRef = useRef<HTMLDivElement>(null);
 
@@ -460,17 +462,30 @@ export const PrintKisiKisiModal: React.FC<PrintKisiKisiModalProps> = ({
           <div className="text-center w-64 max-w-[45%]">
             <p className="mb-1">Mengetahui,</p>
             <p className="mb-14 font-semibold">Kepala Sekolah</p>
-            <div className="print-signature-line border-b-2 border-black w-48 sm:w-56 mx-auto mb-1.5 h-6"></div>
-            <p className="text-[11px] text-black truncate">NIP/NIPPPK. .....................................</p>
+            <p className="font-bold underline text-xs sm:text-sm text-black truncate mb-1">
+              {teacherProfile?.headmasterName || "...................................................."}
+            </p>
+            <p className="text-[11px] text-black truncate">
+              {teacherProfile?.headmasterNipType || "NIP"}. {teacherProfile?.headmasterNip || "....................................."}
+            </p>
           </div>
 
           <div className="text-center w-64 max-w-[45%] overflow-hidden">
             <p className="mb-1 text-[11px] text-black truncate select-none">
-              ........................, .................... 20...
+              {teacherProfile?.regency ? `${teacherProfile.regency}, ` : "........................, "}
+              {new Date().toLocaleDateString("id-ID", {
+                day: "numeric",
+                month: "long",
+                year: "numeric",
+              })}
             </p>
             <p className="mb-14 font-semibold">Guru Pengampu / Penyusun</p>
-            <div className="print-signature-line border-b-2 border-black w-48 sm:w-56 mx-auto mb-1.5 h-6"></div>
-            <p className="text-[11px] text-black truncate">NIP/NIPPPK. .....................................</p>
+            <p className="font-bold underline text-xs sm:text-sm text-black truncate mb-1">
+              {teacherProfile?.fullName || exam?.authorName || "...................................................."}
+            </p>
+            <p className="text-[11px] text-black truncate">
+              {teacherProfile?.nipType || "NIP"}. {teacherProfile?.nip || "....................................."}
+            </p>
           </div>
         </div>
       </div>
