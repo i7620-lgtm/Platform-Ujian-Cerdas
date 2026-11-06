@@ -457,20 +457,20 @@ export const PrintKisiKisiModal: React.FC<PrintKisiKisiModalProps> = ({
 
         {/* Official Approval / Signature Block (Kolom Pengesahan) */}
         <div className="print-signature-section mt-8 pt-4 flex justify-between items-start text-xs text-black">
-          <div className="text-center w-64">
+          <div className="text-center w-64 max-w-[45%]">
             <p className="mb-1">Mengetahui,</p>
             <p className="mb-14 font-semibold">Kepala Sekolah</p>
-            <div className="print-signature-line border-b-2 border-black w-52 sm:w-60 mx-auto mb-1.5 h-6"></div>
-            <p className="text-[11px] text-black">NIP/NIPPPK. .....................................................</p>
+            <div className="print-signature-line border-b-2 border-black w-48 sm:w-56 mx-auto mb-1.5 h-6"></div>
+            <p className="text-[11px] text-black truncate">NIP/NIPPPK. .....................................</p>
           </div>
 
-          <div className="text-center w-64">
-            <p className="mb-1 font-mono text-[11px] tracking-widest text-black select-none">
-              .................................................................
+          <div className="text-center w-64 max-w-[45%] overflow-hidden">
+            <p className="mb-1 text-[11px] text-black truncate select-none">
+              ........................, .................... 20...
             </p>
             <p className="mb-14 font-semibold">Guru Pengampu / Penyusun</p>
-            <div className="print-signature-line border-b-2 border-black w-52 sm:w-60 mx-auto mb-1.5 h-6"></div>
-            <p className="text-[11px] text-black">NIP/NIPPPK. .....................................................</p>
+            <div className="print-signature-line border-b-2 border-black w-48 sm:w-56 mx-auto mb-1.5 h-6"></div>
+            <p className="text-[11px] text-black truncate">NIP/NIPPPK. .....................................</p>
           </div>
         </div>
       </div>
