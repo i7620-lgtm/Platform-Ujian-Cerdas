@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo } from "react";
 import {
   Sparkles,
   Copy,
@@ -7,7 +7,6 @@ import {
   ClipboardPaste,
   FileText,
   ArrowRight,
-  Code2,
   CheckCircle2,
   AlertCircle,
   PlusCircle,
@@ -45,47 +44,63 @@ const GRADE_OPTIONS = [
 ];
 
 const QUESTION_TYPES_LIST = [
-  { id: "Pilihan Ganda", label: "Pilihan Ganda (PG)" },
-  { id: "Pilihan Ganda Kompleks", label: "Pilihan Ganda Kompleks (PGK MCMA)" },
-  { id: "Benar/Salah", label: "Benar / Salah (PGK Kategori)" },
-  { id: "Menjodohkan", label: "Menjodohkan (Matching)" },
+  { id: "Pilihan Ganda", label: "PG (Pilihan Ganda)" },
+  { id: "Pilihan Ganda Kompleks", label: "PGK (MCMA)" },
+  { id: "Benar/Salah", label: "PGK (Kategori / Benar-Salah)" },
+  { id: "Menjodohkan", label: "Matching (Menjodohkan)" },
   { id: "Isian Singkat", label: "Isian Singkat" },
   { id: "Esai", label: "Esai / Uraian" },
 ];
 
 const TKA_LEVELS = [
-  { id: "Level 1 - Pemahaman", label: "Level 1 - Pemahaman & Prosedur", desc: "LOTS: Membaca data, menghitung rumus dasar, mengingat fakta" },
-  { id: "Level 2 - Penerapan", label: "Level 2 - Penerapan & Aplikasi", desc: "MOTS: Memodelkan kalimat matematika, menerapkan konsep rutin" },
-  { id: "Level 3 - Penalaran", label: "Level 3 - Penalaran & Analisis", desc: "HOTS: Memecahkan masalah non-rutin, analisis multi-konsep" },
+  { id: "Level 1 - Pemahaman", label: "L1 Pemahaman", desc: "LOTS" },
+  { id: "Level 2 - Penerapan", label: "L2 Penerapan", desc: "MOTS" },
+  { id: "Level 3 - Penalaran", label: "L3 Penalaran", desc: "HOTS" },
 ];
 
 const BLOOM_LEVELS = [
-  { id: "C1 - Mengingat", label: "C1 Mengingat", desc: "Mengenali atau mengingat kembali fakta dan definisi" },
-  { id: "C2 - Memahami", label: "C2 Memahami", desc: "Menjelaskan ide, konsep, dan menerjemahkan informasi" },
-  { id: "C3 - Mengaplikasikan", label: "C3 Mengaplikasikan", desc: "Menggunakan konsep dalam situasi atau persoalan baru" },
-  { id: "C4 - Menganalisis", label: "C4 Menganalisis", desc: "Membedakan bagian, menstrukturkan hubungan dan sebab-akibat" },
-  { id: "C5 - Mengevaluasi", label: "C5 Mengevaluasi", desc: "Menilai kelayakan, strategi optimal, dan validitas kesimpulan" },
-  { id: "C6 - Mencipta", label: "C6 Mencipta", desc: "Merancang solusi atau memadukan elemen menjadi bentuk baru" },
+  { id: "C1 - Mengingat", label: "C1 Mengingat", desc: "Fakta" },
+  { id: "C2 - Memahami", label: "C2 Memahami", desc: "Konsep" },
+  { id: "C3 - Mengaplikasikan", label: "C3 Aplikasi", desc: "Penerapan" },
+  { id: "C4 - Menganalisis", label: "C4 Analisis", desc: "Struktur" },
+  { id: "C5 - Mengevaluasi", label: "C5 Evaluasi", desc: "Penilaian" },
+  { id: "C6 - Mencipta", label: "C6 Kreasi", desc: "Solusi" },
 ];
 
-/**
- * Returns allowed subjects dynamically filtered by assessment standard and grade level (A-Z sorted, with "Umum / Lainnya" at bottom).
- */
+const AI_LAUNCHERS = [
+  {
+    name: "Gemini",
+    url: "https://gemini.google.com",
+    bg: "bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-600",
+  },
+  {
+    name: "ChatGPT",
+    url: "https://chatgpt.com",
+    bg: "bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-700 dark:hover:bg-emerald-600",
+  },
+  {
+    name: "Claude",
+    url: "https://claude.ai",
+    bg: "bg-amber-600 hover:bg-amber-700 dark:bg-amber-700 dark:hover:bg-amber-600",
+  },
+  {
+    name: "DeepSeek",
+    url: "https://chat.deepseek.com",
+    bg: "bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-700 dark:hover:bg-indigo-600",
+  },
+];
+
 const getSubjectsForStandardAndGrade = (standard: AssessmentStandard, grade: string): string[] => {
   if (standard === "tka_bskap") {
-    // TKA Kemendikdasmen (BSKAP No. 047/H/AN/2025) official subjects
     if (grade.includes("SMA") || grade.includes("SMK") || grade.includes("Fase E") || grade.includes("Fase F")) {
       return ["Bahasa Indonesia", "Bahasa Inggris", "Matematika", "Umum / Lainnya"];
     }
-    // SD (Fase A, B, C) and SMP (Fase D) official TKA tests
     return ["Bahasa Indonesia", "Matematika", "Umum / Lainnya"];
   }
 
-  // Kurikulum Merdeka official subjects per phase
   let subjects: string[] = [];
 
   if (grade.includes("Fase A")) {
-    // SD Kelas 1-2
     subjects = [
       "Bahasa Indonesia",
       "Bahasa Inggris",
@@ -97,7 +112,6 @@ const getSubjectsForStandardAndGrade = (standard: AssessmentStandard, grade: str
       "Seni Budaya",
     ];
   } else if (grade.includes("Fase B") || grade.includes("Fase C")) {
-    // SD Kelas 3-6 (IPAS integrates science & social studies)
     subjects = [
       "Bahasa Indonesia",
       "Bahasa Inggris",
@@ -110,7 +124,6 @@ const getSubjectsForStandardAndGrade = (standard: AssessmentStandard, grade: str
       "Seni Budaya",
     ];
   } else if (grade.includes("Fase D")) {
-    // SMP Kelas 7-9
     subjects = [
       "Bahasa Indonesia",
       "Bahasa Inggris",
@@ -125,7 +138,6 @@ const getSubjectsForStandardAndGrade = (standard: AssessmentStandard, grade: str
       "Seni Budaya",
     ];
   } else if (grade.includes("Fase E")) {
-    // SMA Kelas 10
     subjects = [
       "Bahasa Indonesia",
       "Bahasa Inggris",
@@ -145,7 +157,6 @@ const getSubjectsForStandardAndGrade = (standard: AssessmentStandard, grade: str
       "Sosiologi",
     ];
   } else {
-    // SMA/SMK Kelas 11-12 (Fase F)
     subjects = [
       "Antropologi",
       "Bahasa Indonesia",
@@ -171,38 +182,29 @@ const getSubjectsForStandardAndGrade = (standard: AssessmentStandard, grade: str
     ];
   }
 
-  // Sort A to Z, then ensure "Umum / Lainnya" is at the bottom
   const sorted = [...subjects].sort((a, b) => a.localeCompare(b, "id"));
   return [...sorted, "Umum / Lainnya"];
 };
 
 export const ExternalAiPromptPanel: React.FC<ExternalAiPromptPanelProps> = ({
   onQuestionsGenerated,
-  onCancel,
 }) => {
   const [activeStep, setActiveStep] = useState<"builder" | "importer">("builder");
 
-  // Standard: Kurikulum Merdeka or TKA BSKAP
   const [standard, setStandard] = useState<AssessmentStandard>("kurikulum_merdeka");
-
-  // Grade/Jenjang first (with Phase notation)
   const [gradeClass, setGradeClass] = useState("Kelas 6 SD (Fase C)");
 
-  // Compute available subjects dynamically
   const availableSubjects = useMemo(() => {
     return getSubjectsForStandardAndGrade(standard, gradeClass);
   }, [standard, gradeClass]);
 
-  // Subject state
   const [subjectState, setSubjectState] = useState("");
   const [customSubject, setCustomSubject] = useState("");
 
-  // Determine active subject (fallback to first available if current state is not valid)
   const activeSubject = availableSubjects.includes(subjectState)
     ? subjectState
     : availableSubjects[0] || "Matematika";
 
-  // Cognitive framework tab & multi-select states
   const [cognitiveFramework, setCognitiveFramework] = useState<CognitiveFramework>("TKA");
   const [selectedTkaLevels, setSelectedTkaLevels] = useState<string[]>([
     "Level 2 - Penerapan",
@@ -213,7 +215,6 @@ export const ExternalAiPromptPanel: React.FC<ExternalAiPromptPanelProps> = ({
     "C4 - Menganalisis",
   ]);
 
-  // Generator Config State
   const [topic, setTopic] = useState("");
   const [count, setCount] = useState(5);
   const [selectedTypes, setSelectedTypes] = useState<string[]>([
@@ -224,18 +225,15 @@ export const ExternalAiPromptPanel: React.FC<ExternalAiPromptPanelProps> = ({
   const [kisiKisi, setKisiKisi] = useState("");
   const [includeVisuals, setIncludeVisuals] = useState(true);
 
-  // Copy state
   const [copied, setCopied] = useState(false);
+  const [launchNotice, setLaunchNotice] = useState<string | null>(null);
 
-  // Importer State
   const [pastedText, setPastedText] = useState("");
   const [parseResult, setParseResult] = useState<ParseResult | null>(null);
 
-  // Active cognitive levels based on selected tab
   const activeCognitiveLevels =
     cognitiveFramework === "TKA" ? selectedTkaLevels : selectedBloomLevels;
 
-  // Toggle multi-select cognitive level
   const toggleCognitiveLevel = (levelId: string) => {
     if (cognitiveFramework === "TKA") {
       if (selectedTkaLevels.includes(levelId)) {
@@ -256,13 +254,11 @@ export const ExternalAiPromptPanel: React.FC<ExternalAiPromptPanelProps> = ({
     }
   };
 
-  // Resolved final subject name for prompt
   const effectiveSubjectName =
     activeSubject === "Umum / Lainnya"
       ? customSubject.trim() || "Mata Pelajaran Umum"
       : activeSubject;
 
-  // Generate current prompt string live
   const generatedPrompt = buildExternalAiPrompt({
     standard,
     subject: effectiveSubjectName,
@@ -284,6 +280,17 @@ export const ExternalAiPromptPanel: React.FC<ExternalAiPromptPanelProps> = ({
     } catch (e) {
       console.error("Gagal menyalin prompt:", e);
     }
+  };
+
+  const handleLaunchAi = async (aiName: string, url: string) => {
+    try {
+      await navigator.clipboard.writeText(generatedPrompt);
+      setLaunchNotice(`Prompt disalin! Membuka ${aiName}...`);
+      setTimeout(() => setLaunchNotice(null), 3000);
+    } catch (e) {
+      console.error("Gagal menyalin prompt:", e);
+    }
+    window.open(url, "_blank");
   };
 
   const toggleType = (typeId: string) => {
@@ -324,50 +331,45 @@ export const ExternalAiPromptPanel: React.FC<ExternalAiPromptPanelProps> = ({
   };
 
   return (
-    <div className="bg-white dark:bg-slate-900 border-2 border-indigo-100 dark:border-slate-800 rounded-3xl shadow-xl overflow-hidden transition-all duration-300">
-      {/* Header Banner */}
-      <div className="bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-700 p-6 text-white relative">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="space-y-1">
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="bg-white/20 backdrop-blur-md px-3 py-1 rounded-full text-xs font-bold tracking-wide uppercase flex items-center gap-1.5">
-                <Sparkles className="w-3.5 h-3.5 text-yellow-300 fill-yellow-300" />
-                Prompt & Impor Soal
-              </span>
-            </div>
-            <h3 className="text-xl md:text-2xl font-black text-white">
+    <div className="bg-white dark:bg-slate-900 border-2 border-indigo-100 dark:border-slate-800 rounded-2xl shadow-xl overflow-hidden transition-all duration-300 max-w-7xl mx-auto">
+      {/* Header Banner Ultra-Kompak */}
+      <div className="bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-700 px-4 py-3 text-white">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <span className="bg-white/20 backdrop-blur-md px-2.5 py-0.5 rounded-full text-[10px] font-bold tracking-wide uppercase flex items-center gap-1 shrink-0">
+              <Sparkles className="w-3 h-3 text-yellow-300 fill-yellow-300" />
               Prompt & Impor Soal
+            </span>
+            <h3 className="text-base font-black text-white tracking-tight truncate">
+              Rancang & Impor Soal AI
             </h3>
-            <p className="text-xs md:text-sm text-indigo-100 max-w-2xl">
-              Pilih standar Kurikulum Merdeka atau TKA Kemendikdasmen, atur jenjang dan mata pelajaran, salin prompt AI, lalu tempelkan balasan hasilnya untuk dideploy langsung ke Editor Soal.
-            </p>
           </div>
 
           {/* Step Nav Toggle */}
-          <div className="flex items-center bg-black/20 p-1 rounded-2xl border border-white/10 shrink-0">
+          <div className="flex items-center bg-black/20 p-0.5 rounded-xl border border-white/10 shrink-0 self-start sm:self-auto">
             <button
               onClick={() => setActiveStep("builder")}
-              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
+              className={`px-3 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
                 activeStep === "builder"
-                  ? "bg-white text-indigo-700 shadow-md"
-                  : "text-white/80 hover:text-white hover:bg-white/10"
+                  ? "bg-white text-indigo-700 shadow-sm"
+                  : "text-white/80 hover:text-white"
               }`}
             >
-              <FileText className="w-4 h-4" />
+              <FileText className="w-3.5 h-3.5" />
               1. Rancang Prompt
             </button>
             <button
               onClick={() => setActiveStep("importer")}
-              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
+              className={`px-3 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
                 activeStep === "importer"
-                  ? "bg-white text-indigo-700 shadow-md"
-                  : "text-white/80 hover:text-white hover:bg-white/10"
+                  ? "bg-white text-indigo-700 shadow-sm"
+                  : "text-white/80 hover:text-white"
               }`}
             >
-              <ClipboardPaste className="w-4 h-4" />
+              <ClipboardPaste className="w-3.5 h-3.5" />
               2. Impor & Deploy
               {parseResult?.success && (
-                <span className="bg-emerald-500 text-white text-[10px] px-1.5 py-0.5 rounded-full font-extrabold">
+                <span className="bg-emerald-500 text-white text-[9px] px-1.5 py-0.2 rounded-full font-extrabold">
                   {parseResult.questions.length}
                 </span>
               )}
@@ -376,58 +378,61 @@ export const ExternalAiPromptPanel: React.FC<ExternalAiPromptPanelProps> = ({
         </div>
       </div>
 
-      {/* Main Content Body */}
-      <div className="p-6 md:p-8">
+      {/* Main Content Body - Ultra Kompak */}
+      <div className="p-3.5 sm:p-4 md:p-5">
         {activeStep === "builder" ? (
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-            {/* Form Settings (Left) */}
-            <div className="lg:col-span-6 space-y-6">
-              {/* Standar Acuan Soal (Simplified, compact buttons without extra descriptions) */}
-              <div>
-                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-2">
-                  Standar Acuan Soal
-                </label>
-                <div className="grid grid-cols-2 gap-3">
-                  <button
-                    type="button"
-                    onClick={() => setStandard("kurikulum_merdeka")}
-                    className={`py-3 px-4 rounded-xl border-2 text-center transition-all flex items-center justify-center gap-2 font-bold text-xs ${
-                      standard === "kurikulum_merdeka"
-                        ? "border-indigo-600 bg-indigo-50/80 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300 shadow-sm"
-                        : "border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:border-slate-300"
-                    }`}
-                  >
-                    <BookOpen className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
-                    <span>Kurikulum Merdeka</span>
-                  </button>
+          /* STEP 1: ULTRA-KOMPAK 1-VIEWPORT LAYOUT */
+          <div className="space-y-3">
+            
+            {/* GRID 2-KOLOM ATAS (DESKTOP & TABLET) */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+              
+              {/* KIRI ATAS: PARAMETER DASAR */}
+              <div className="bg-slate-50 dark:bg-slate-800/60 p-3.5 rounded-xl border border-slate-200 dark:border-slate-700/80 space-y-3">
+                {/* 1. Standar Acuan Soal */}
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1">
+                    Standar Acuan Soal
+                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setStandard("kurikulum_merdeka")}
+                      className={`py-1.5 px-3 rounded-lg border text-center transition-all flex items-center justify-center gap-1.5 font-bold text-xs ${
+                        standard === "kurikulum_merdeka"
+                          ? "border-indigo-600 bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 shadow-sm"
+                          : "border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:border-slate-300"
+                      }`}
+                    >
+                      <BookOpen className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+                      <span>Kurikulum Merdeka</span>
+                    </button>
 
-                  <button
-                    type="button"
-                    onClick={() => setStandard("tka_bskap")}
-                    className={`py-3 px-4 rounded-xl border-2 text-center transition-all flex items-center justify-center gap-2 font-bold text-xs ${
-                      standard === "tka_bskap"
-                        ? "border-indigo-600 bg-indigo-50/80 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300 shadow-sm"
-                        : "border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:border-slate-300"
-                    }`}
-                  >
-                    <GraduationCap className="w-4 h-4 text-purple-600 dark:text-purple-400" />
-                    <span>TKA Kemendikdasmen</span>
-                  </button>
+                    <button
+                      type="button"
+                      onClick={() => setStandard("tka_bskap")}
+                      className={`py-1.5 px-3 rounded-lg border text-center transition-all flex items-center justify-center gap-1.5 font-bold text-xs ${
+                        standard === "tka_bskap"
+                          ? "border-indigo-600 bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 shadow-sm"
+                          : "border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:border-slate-300"
+                      }`}
+                    >
+                      <GraduationCap className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
+                      <span>TKA Kemendikdasmen</span>
+                    </button>
+                  </div>
                 </div>
-              </div>
 
-              {/* Order changed: Jenjang/Kelas FIRST, Mata Pelajaran SECOND */}
-              <div className="space-y-3">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {/* Column 1: Jenjang / Kelas */}
+                {/* 2. Jenjang & Mata Pelajaran (Inline Grid 2 Kolom) */}
+                <div className="grid grid-cols-2 gap-2">
                   <div>
-                    <label className="block text-xs font-bold text-slate-600 dark:text-slate-300 mb-1.5">
+                    <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
                       Jenjang / Kelas
                     </label>
                     <select
                       value={gradeClass}
                       onChange={(e) => setGradeClass(e.target.value)}
-                      className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-sm font-semibold text-slate-800 dark:text-slate-100 focus:ring-2 focus:ring-indigo-500 outline-none"
+                      className="w-full bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-slate-800 dark:text-slate-100 focus:ring-2 focus:ring-indigo-500 outline-none shadow-sm"
                     >
                       {GRADE_OPTIONS.map((grd) => (
                         <option key={grd} value={grd}>
@@ -437,15 +442,14 @@ export const ExternalAiPromptPanel: React.FC<ExternalAiPromptPanelProps> = ({
                     </select>
                   </div>
 
-                  {/* Column 2: Mata Pelajaran (Filtered dynamically by Standard & Grade) */}
                   <div>
-                    <label className="block text-xs font-bold text-slate-600 dark:text-slate-300 mb-1.5">
+                    <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
                       Mata Pelajaran
                     </label>
                     <select
                       value={activeSubject}
                       onChange={(e) => setSubjectState(e.target.value)}
-                      className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-sm font-semibold text-slate-800 dark:text-slate-100 focus:ring-2 focus:ring-indigo-500 outline-none"
+                      className="w-full bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-slate-800 dark:text-slate-100 focus:ring-2 focus:ring-indigo-500 outline-none shadow-sm"
                     >
                       {availableSubjects.map((sub) => (
                         <option key={sub} value={sub}>
@@ -454,447 +458,410 @@ export const ExternalAiPromptPanel: React.FC<ExternalAiPromptPanelProps> = ({
                       ))}
                     </select>
                   </div>
-                </div>
 
-                {/* Custom Subject Text Input if "Umum / Lainnya" is selected */}
-                {activeSubject === "Umum / Lainnya" && (
-                  <div className="animate-fade-in pt-1">
-                    <label className="block text-xs font-bold text-slate-600 dark:text-slate-300 mb-1">
-                      Tuliskan Nama Mata Pelajaran:
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="Misal: Bahasa Sunda, Koding & Robotik, Seni Musik..."
-                      value={customSubject}
-                      onChange={(e) => setCustomSubject(e.target.value)}
-                      className="w-full bg-slate-50 dark:bg-slate-800 border border-indigo-300 dark:border-indigo-700 rounded-xl px-4 py-2 text-sm font-semibold text-slate-800 dark:text-slate-100 placeholder:text-slate-400 focus:ring-2 focus:ring-indigo-500 outline-none"
-                    />
-                  </div>
-                )}
-              </div>
-
-              {/* Topic */}
-              <div>
-                <label className="block text-xs font-bold text-slate-600 dark:text-slate-300 mb-1.5">
-                  Materi Pokok / Topik Utama
-                </label>
-                <input
-                  type="text"
-                  placeholder="Misal: Luas & Keliling Bangun Gabungan, Cerita Fabel, Sistem Pencernaan..."
-                  value={topic}
-                  onChange={(e) => setTopic(e.target.value)}
-                  className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-800 dark:text-slate-100 placeholder:text-slate-400 focus:ring-2 focus:ring-indigo-500 outline-none"
-                />
-              </div>
-
-              {/* Count */}
-              <div>
-                <label className="block text-xs font-bold text-slate-600 dark:text-slate-300 mb-1.5">
-                  Jumlah Butir Soal
-                </label>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="number"
-                    min={1}
-                    max={50}
-                    value={count}
-                    onChange={(e) => setCount(Math.max(1, parseInt(e.target.value) || 1))}
-                    className="w-24 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-sm font-bold text-slate-800 dark:text-slate-100 text-center outline-none focus:ring-2 focus:ring-indigo-500"
-                  />
-                  <div className="flex gap-1">
-                    {[3, 5, 10, 15].map((n) => (
-                      <button
-                        key={n}
-                        type="button"
-                        onClick={() => setCount(n)}
-                        className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                          count === n
-                            ? "bg-indigo-600 text-white shadow-sm"
-                            : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200"
-                        }`}
-                      >
-                        {n}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-              {/* Tingkat Kognitif (Tabs renamed to TKA (Level 1-3) & Bloom (C1-C6)) */}
-              <div className="space-y-2.5">
-                <div className="flex items-center justify-between">
-                  <label className="block text-xs font-bold text-slate-600 dark:text-slate-300">
-                    Tingkat Kognitif (Bisa Pilih Beberapa)
-                  </label>
-                  <span className="text-[11px] text-indigo-600 dark:text-indigo-400 font-bold">
-                    {activeCognitiveLevels.length} level dipilih
-                  </span>
-                </div>
-
-                {/* Tab Switcher */}
-                <div className="flex rounded-xl bg-slate-100 dark:bg-slate-800 p-1 border border-slate-200 dark:border-slate-700">
-                  <button
-                    type="button"
-                    onClick={() => setCognitiveFramework("TKA")}
-                    className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                      cognitiveFramework === "TKA"
-                        ? "bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-sm"
-                        : "text-slate-600 dark:text-slate-400 hover:text-slate-800"
-                    }`}
-                  >
-                    TKA (Level 1-3)
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setCognitiveFramework("BLOOM")}
-                    className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                      cognitiveFramework === "BLOOM"
-                        ? "bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-sm"
-                        : "text-slate-600 dark:text-slate-400 hover:text-slate-800"
-                    }`}
-                  >
-                    Bloom (C1-C6)
-                  </button>
-                </div>
-
-                {/* Multi-select Checklist */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
-                  {(cognitiveFramework === "TKA" ? TKA_LEVELS : BLOOM_LEVELS).map((lvl) => {
-                    const isChecked = activeCognitiveLevels.includes(lvl.id);
-                    return (
-                      <button
-                        key={lvl.id}
-                        type="button"
-                        onClick={() => toggleCognitiveLevel(lvl.id)}
-                        className={`p-2.5 rounded-xl border text-left transition-all flex items-start justify-between gap-2 text-xs ${
-                          isChecked
-                            ? "border-indigo-500 bg-indigo-50/70 dark:bg-indigo-950/40 text-indigo-900 dark:text-indigo-200 font-bold shadow-sm"
-                            : "border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:border-slate-300"
-                        }`}
-                      >
-                        <div>
-                          <span className="block font-bold">{lvl.label}</span>
-                          <span className="text-[10px] opacity-75 font-normal block leading-tight mt-0.5">
-                            {lvl.desc}
-                          </span>
-                        </div>
-                        <div
-                          className={`w-4 h-4 rounded shrink-0 mt-0.5 flex items-center justify-center transition-colors ${
-                            isChecked ? "bg-indigo-600 text-white" : "border border-slate-300 dark:border-slate-600"
-                          }`}
-                        >
-                          {isChecked && <Check className="w-3 h-3 stroke-[3]" />}
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Question Types Checkboxes */}
-              <div>
-                <label className="block text-xs font-bold text-slate-600 dark:text-slate-300 mb-2">
-                  Bentuk Soal yang Dihasilkan
-                </label>
-                <div className="grid grid-cols-2 gap-2">
-                  {QUESTION_TYPES_LIST.map((qt) => {
-                    const isChecked = selectedTypes.includes(qt.id);
-                    return (
-                      <button
-                        key={qt.id}
-                        type="button"
-                        onClick={() => toggleType(qt.id)}
-                        className={`p-2.5 rounded-xl border text-left transition-all flex items-center justify-between text-xs font-semibold ${
-                          isChecked
-                            ? "border-indigo-500 bg-indigo-50/70 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 font-bold shadow-sm"
-                            : "border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:border-slate-300"
-                        }`}
-                      >
-                        <span>{qt.label}</span>
-                        <div
-                          className={`w-4 h-4 rounded flex items-center justify-center transition-colors ${
-                            isChecked ? "bg-indigo-600 text-white" : "border border-slate-300 dark:border-slate-600"
-                          }`}
-                        >
-                          {isChecked && <Check className="w-3 h-3 stroke-[3]" />}
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Kisi-Kisi / Indikator */}
-              <div>
-                <label className="block text-xs font-bold text-slate-600 dark:text-slate-300 mb-1.5">
-                  Kisi-Kisi / Indikator Spesifik (Opsional)
-                </label>
-                <textarea
-                  rows={2}
-                  placeholder="Misal: Diberikan stimulus cerita kontekstual, siswa dapat menentukan keliling bangun gabungan..."
-                  value={kisiKisi}
-                  onChange={(e) => setKisiKisi(e.target.value)}
-                  className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-3 text-xs font-medium text-slate-800 dark:text-slate-100 placeholder:text-slate-400 focus:ring-2 focus:ring-indigo-500 outline-none"
-                />
-              </div>
-
-              {/* Visual Switch */}
-              <div className="p-3.5 bg-slate-50 dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700 rounded-xl space-y-2">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Eye className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
-                    <span className="text-xs font-bold text-slate-800 dark:text-slate-100">
-                      Stimulus Visual, Diagram & Geometri SVG
-                    </span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setIncludeVisuals(!includeVisuals)}
-                    className={`w-11 h-6 rounded-full transition-colors relative p-0.5 shrink-0 ${
-                      includeVisuals ? "bg-indigo-600" : "bg-slate-300 dark:bg-slate-700"
-                    }`}
-                  >
-                    <div
-                      className={`w-5 h-5 rounded-full bg-white transition-transform ${
-                        includeVisuals ? "translate-x-5" : "translate-x-0"
-                      }`}
-                    />
-                  </button>
-                </div>
-                <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
-                  {includeVisuals
-                    ? "✓ AI diwajibkan menyertakan kode <svg> mandiri atau tabel HTML terstruktur jika butir soal membutuhkan representasi visual/geometri."
-                    : "Stimulus visual dinonaktifkan, soal akan menggunakan teks naratif biasa."}
-                </p>
-              </div>
-
-              {/* Explanation Guarantee Notice */}
-              <div className="p-3 bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800/60 rounded-xl flex items-center gap-2.5 text-xs text-emerald-800 dark:text-emerald-300">
-                <CheckSquare className="w-4 h-4 text-emerald-600 shrink-0" />
-                <span className="font-semibold">
-                  Prompt mewajibkan AI menyertakan pembahasan jawaban lengkap dan langkah pengerjaan untuk setiap butir soal.
-                </span>
-              </div>
-            </div>
-
-            {/* Prompt Preview & Quick Actions (Right) */}
-            <div className="lg:col-span-6 space-y-4 flex flex-col justify-between">
-              <div className="space-y-3">
-                <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
-                  <div className="flex items-center gap-2">
-                    <div className="w-7 h-7 rounded-lg bg-indigo-100 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400 font-bold flex items-center justify-center text-sm">
-                      2
-                    </div>
-                    <h4 className="font-bold text-slate-800 dark:text-slate-100">
-                      Hasil Prompt AI Siap Copas
-                    </h4>
-                  </div>
-                  <span className="text-[11px] font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/50 px-2.5 py-1 rounded-full border border-indigo-200 dark:border-indigo-800">
-                    {standard === "kurikulum_merdeka" ? "Kurikulum Merdeka" : "TKA Kemendikdasmen"}
-                  </span>
-                </div>
-
-                {/* Prompt Box */}
-                <div className="relative group">
-                  <pre className="w-full h-[360px] bg-slate-900 text-slate-200 text-xs font-mono p-4 rounded-2xl overflow-y-auto whitespace-pre-wrap leading-relaxed border border-slate-800 shadow-inner">
-                    {generatedPrompt}
-                  </pre>
-                  <button
-                    type="button"
-                    onClick={handleCopyPrompt}
-                    className={`absolute top-3 right-3 px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-lg ${
-                      copied
-                        ? "bg-emerald-500 text-white"
-                        : "bg-indigo-600 text-white hover:bg-indigo-500 active:scale-95"
-                    }`}
-                  >
-                    {copied ? (
-                      <>
-                        <Check className="w-4 h-4" />
-                        Tersalin!
-                      </>
-                    ) : (
-                      <>
-                        <Copy className="w-4 h-4" />
-                        Salin Prompt
-                      </>
-                    )}
-                  </button>
-                </div>
-              </div>
-
-              {/* Next Step */}
-              <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
-                <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">
-                  Sudah menyalin & mendapat balasan dari AI?
-                </span>
-                <button
-                  type="button"
-                  onClick={() => setActiveStep("importer")}
-                  className="bg-indigo-600 text-white font-bold px-5 py-2.5 rounded-xl hover:bg-indigo-700 text-xs transition-all flex items-center gap-2 shadow-md active:scale-95"
-                >
-                  <span>Lanjut ke Langkah 2: Impor Soal</span>
-                  <ArrowRight className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
-          </div>
-        ) : (
-          /* IMPORTER STEP */
-          <div className="space-y-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100 dark:border-slate-800">
-              <div>
-                <h4 className="font-bold text-slate-800 dark:text-slate-100 text-base">
-                  Kotak Penerima & Parser Soal
-                </h4>
-                <p className="text-xs text-slate-500 dark:text-slate-400">
-                  Tempelkan (*paste*) seluruh jawaban atau blok kode JSON yang diberikan oleh AI.
-                </p>
-              </div>
-
-              <button
-                type="button"
-                onClick={handlePasteFromClipboard}
-                className="bg-indigo-50 dark:bg-indigo-950/50 hover:bg-indigo-100 text-indigo-600 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 shrink-0 self-start sm:self-auto shadow-sm"
-              >
-                <ClipboardPaste className="w-4 h-4" />
-                Tempel dari Clipboard
-              </button>
-            </div>
-
-            {/* Input Textarea & Result Feedback */}
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-              <div className="lg:col-span-7 space-y-3">
-                <textarea
-                  rows={14}
-                  placeholder={`Tempelkan hasil teks atau format JSON dari AI di sini...
-
-Contoh format JSON dari AI:
-\`\`\`json
-[
-  {
-    "questionText": "Berapakah hasil dari 2 + 2?",
-    "questionType": "MULTIPLE_CHOICE",
-    "options": ["2", "3", "4", "5"],
-    "correctAnswer": "C",
-    "explanation": "2 + 2 = 4 sehingga pilihan C benar.",
-    "solutionSteps": "Langkah 1: Jumlahkan kedua bilangan."
-  }
-]
-\`\`\``}
-                  value={pastedText}
-                  onChange={(e) => handleTextChange(e.target.value)}
-                  className="w-full bg-slate-900 text-slate-100 text-xs font-mono p-4 rounded-2xl border border-slate-700 placeholder:text-slate-500 focus:ring-2 focus:ring-indigo-500 outline-none leading-relaxed"
-                />
-
-                {parseResult && !parseResult.success && (
-                  <div className="p-4 rounded-2xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 text-rose-700 dark:text-rose-300 text-xs flex items-start gap-3 animate-fade-in">
-                    <AlertCircle className="w-5 h-5 text-rose-500 shrink-0 mt-0.5" />
-                    <div>
-                      <span className="font-bold block mb-0.5">Format belum dikenali:</span>
-                      <p>{parseResult.error}</p>
-                      <span className="text-[11px] opacity-80 mt-1 block">
-                        Petunjuk: Pastikan Anda menyalin teks balasan AI secara utuh termasuk tanda kurung siku `[` dan `]`.
-                      </span>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Parsed Questions Preview & Deploy Action */}
-              <div className="lg:col-span-5 space-y-4 flex flex-col justify-between">
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
-                      Hasil Identifikasi Soal
-                    </span>
-                    {parseResult?.success && (
-                      <span className="bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800 text-xs font-extrabold px-3 py-1 rounded-full flex items-center gap-1.5">
-                        <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-                        {parseResult.totalParsed} Butir Soal Terdeteksi
-                      </span>
-                    )}
-                  </div>
-
-                  {parseResult?.success && parseResult.questions.length > 0 ? (
-                    <div className="max-h-[350px] overflow-y-auto space-y-2.5 pr-1">
-                      {parseResult.questions.map((q, idx) => (
-                        <div
-                          key={q.id || idx}
-                          className="p-3.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-xs space-y-2"
-                        >
-                          <div className="flex items-center justify-between font-bold text-slate-800 dark:text-slate-200">
-                            <span className="truncate max-w-[200px]">
-                              {idx + 1}. {q.questionText.replace(/<[^>]*>?/gm, "").substring(0, 45)}...
-                            </span>
-                            <span className="text-[10px] font-extrabold px-2 py-0.5 rounded bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 shrink-0">
-                              {q.questionType}
-                            </span>
-                          </div>
-                          {q.options && q.options.length > 0 && (
-                            <div className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">
-                              {q.options.length} Pilihan • Kunci: {q.correctAnswer || "Belum diatur"}
-                            </div>
-                          )}
-                          <div className="flex items-center gap-2 pt-1 border-t border-slate-200/60 dark:border-slate-700/60 flex-wrap">
-                            {q.explanation && (
-                              <span className="text-[10px] bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 px-2 py-0.5 rounded font-bold">
-                                ✓ Pembahasan Ada
-                              </span>
-                            )}
-                            {q.questionText.includes("<svg") && (
-                              <span className="text-[10px] bg-purple-100 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 px-2 py-0.5 rounded font-bold">
-                                🖼️ Geometri SVG
-                              </span>
-                            )}
-                            {q.level && (
-                              <span className="text-[10px] bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 px-2 py-0.5 rounded">
-                                {q.level}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="h-[280px] border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-2xl flex flex-col items-center justify-center p-6 text-center text-slate-400 space-y-2">
-                      <Code2 className="w-10 h-10 stroke-[1.5] text-slate-300 dark:text-slate-700" />
-                      <span className="text-xs font-bold text-slate-600 dark:text-slate-400">
-                        Belum ada soal terdeteksi
-                      </span>
-                      <p className="text-[11px] text-slate-400 max-w-xs">
-                        Tempelkan balasan teks JSON dari AI di kotak sebelah kiri untuk melihat pratinjau butir soal.
-                      </p>
+                  {activeSubject === "Umum / Lainnya" && (
+                    <div className="col-span-2 pt-0.5">
+                      <input
+                        type="text"
+                        placeholder="Tuliskan nama mata pelajaran..."
+                        value={customSubject}
+                        onChange={(e) => setCustomSubject(e.target.value)}
+                        className="w-full bg-white dark:bg-slate-800 border border-indigo-300 dark:border-indigo-700 rounded-lg px-3 py-1 text-xs font-semibold text-slate-800 dark:text-slate-100 placeholder:text-slate-400 focus:ring-2 focus:ring-indigo-500 outline-none shadow-sm"
+                      />
                     </div>
                   )}
                 </div>
 
-                {/* Deploy Action Button */}
-                <div className="pt-4 border-t border-slate-100 dark:border-slate-800 space-y-2">
-                  <button
-                    type="button"
-                    disabled={!parseResult?.success || parseResult.questions.length === 0}
-                    onClick={handleDeployQuestions}
-                    className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-200 disabled:dark:bg-slate-800 disabled:text-slate-400 text-white font-bold py-3.5 px-6 rounded-2xl shadow-lg transition-all flex items-center justify-center gap-2 active:scale-95 text-sm"
-                  >
-                    <PlusCircle className="w-5 h-5" />
-                    <span>
-                      {parseResult?.success && parseResult.questions.length > 0
-                        ? `Deploy ${parseResult.questions.length} Soal ke Editor (+Nomor Akhir)`
-                        : "Deploy ke Editor Soal"}
-                    </span>
-                  </button>
+                {/* 3. Materi Pokok / Topik Utama */}
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+                    Materi Pokok / Topik Utama
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Misal: Luas & Keliling Bangun Gabungan, Cerita Fabel..."
+                    value={topic}
+                    onChange={(e) => setTopic(e.target.value)}
+                    className="w-full bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-1.5 text-xs font-semibold text-slate-800 dark:text-slate-100 placeholder:text-slate-400 focus:ring-2 focus:ring-indigo-500 outline-none shadow-sm"
+                  />
+                </div>
 
-                  <button
-                    type="button"
-                    onClick={() => setActiveStep("builder")}
-                    className="w-full text-center text-xs text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 py-1 font-semibold"
-                  >
-                    ← Kembali Edit Parameter Prompt
-                  </button>
+                {/* 4. Jumlah Butir Soal & Sakelar Visual (Gabungan Baris Kompak) */}
+                <div className="flex flex-wrap items-center justify-between gap-2 pt-0.5 border-t border-slate-200 dark:border-slate-700/60">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[11px] font-bold text-slate-700 dark:text-slate-300">
+                      Jumlah Soal:
+                    </span>
+                    <input
+                      type="number"
+                      min={1}
+                      max={50}
+                      value={count}
+                      onChange={(e) => setCount(Math.max(1, parseInt(e.target.value) || 1))}
+                      className="w-14 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-1.5 py-1 text-xs font-bold text-slate-800 dark:text-slate-100 text-center outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm"
+                    />
+                    <div className="flex gap-1">
+                      {[3, 5, 10, 15].map((n) => (
+                        <button
+                          key={n}
+                          type="button"
+                          onClick={() => setCount(n)}
+                          className={`px-2 py-0.5 rounded text-[11px] font-bold transition-all ${
+                            count === n
+                              ? "bg-indigo-600 text-white shadow-sm"
+                              : "bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100"
+                          }`}
+                        >
+                          {n}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Sakelar Visual SVG Kompak */}
+                  <div className="flex items-center gap-1.5 bg-white dark:bg-slate-800 px-2 py-1 rounded-lg border border-slate-200 dark:border-slate-700">
+                    <Eye className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400 shrink-0" />
+                    <span className="text-[11px] font-bold text-slate-700 dark:text-slate-300 shrink-0">
+                      Visual SVG
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setIncludeVisuals(!includeVisuals)}
+                      className={`w-8 h-4.5 rounded-full transition-colors relative p-0.5 shrink-0 ${
+                        includeVisuals ? "bg-indigo-600" : "bg-slate-300 dark:bg-slate-700"
+                      }`}
+                    >
+                      <div
+                        className={`w-3.5 h-3.5 rounded-full bg-white transition-transform ${
+                          includeVisuals ? "translate-x-3.5" : "translate-x-0"
+                        }`}
+                      />
+                    </button>
+                  </div>
                 </div>
               </div>
+
+              {/* KANAN ATAS: KOGNITIF & BENTUK SOAL (CHIP TOMBOL RAPAT) */}
+              <div className="bg-slate-50 dark:bg-slate-800/60 p-3.5 rounded-xl border border-slate-200 dark:border-slate-700/80 space-y-3 flex flex-col justify-between">
+                
+                {/* 1. Tingkat Kognitif (Tabs + Chips Rapat) */}
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
+                      Tingkat Kognitif
+                    </label>
+                    <span className="text-[10px] text-indigo-600 dark:text-indigo-400 font-bold bg-indigo-50 dark:bg-indigo-950 px-2 py-0.2 rounded-full border border-indigo-200 dark:border-indigo-800">
+                      {activeCognitiveLevels.length} dipilih
+                    </span>
+                  </div>
+
+                  {/* Mini Tab Switcher */}
+                  <div className="flex rounded-lg bg-slate-200 dark:bg-slate-700/60 p-0.5 border border-slate-300 dark:border-slate-600">
+                    <button
+                      type="button"
+                      onClick={() => setCognitiveFramework("TKA")}
+                      className={`flex-1 py-1 rounded-md text-[11px] font-bold transition-all ${
+                        cognitiveFramework === "TKA"
+                          ? "bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-sm"
+                          : "text-slate-600 dark:text-slate-300 hover:text-slate-900"
+                      }`}
+                    >
+                      TKA (Level 1-3)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setCognitiveFramework("BLOOM")}
+                      className={`flex-1 py-1 rounded-md text-[11px] font-bold transition-all ${
+                        cognitiveFramework === "BLOOM"
+                          ? "bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-sm"
+                          : "text-slate-600 dark:text-slate-300 hover:text-slate-900"
+                      }`}
+                    >
+                      Bloom (C1-C6)
+                    </button>
+                  </div>
+
+                  {/* Chip Tombol Rapat Flex Wrap */}
+                  <div className="flex flex-wrap gap-1.5 pt-1">
+                    {(cognitiveFramework === "TKA" ? TKA_LEVELS : BLOOM_LEVELS).map((lvl) => {
+                      const isChecked = activeCognitiveLevels.includes(lvl.id);
+                      return (
+                        <button
+                          key={lvl.id}
+                          type="button"
+                          onClick={() => toggleCognitiveLevel(lvl.id)}
+                          className={`px-2.5 py-1 rounded-lg border text-xs font-semibold transition-all flex items-center gap-1.5 ${
+                            isChecked
+                              ? "border-indigo-500 bg-indigo-600 text-white font-bold shadow-sm"
+                              : "border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:border-slate-300"
+                          }`}
+                        >
+                          <span>{lvl.label}</span>
+                          {isChecked && <Check className="w-3 h-3 stroke-[3]" />}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* 2. Bentuk Soal yang Dihasilkan (Chips Rapat) */}
+                <div className="space-y-1.5 pt-2 border-t border-slate-200 dark:border-slate-700/60">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
+                      Bentuk Soal yang Dihasilkan
+                    </label>
+                    <span className="text-[10px] text-indigo-600 dark:text-indigo-400 font-bold bg-indigo-50 dark:bg-indigo-950 px-2 py-0.2 rounded-full border border-indigo-200 dark:border-indigo-800">
+                      {selectedTypes.length} tipe
+                    </span>
+                  </div>
+
+                  {/* Chip Tombol Rapat Flex Wrap */}
+                  <div className="flex flex-wrap gap-1.5">
+                    {QUESTION_TYPES_LIST.map((qt) => {
+                      const isChecked = selectedTypes.includes(qt.id);
+                      return (
+                        <button
+                          key={qt.id}
+                          type="button"
+                          onClick={() => toggleType(qt.id)}
+                          className={`px-2.5 py-1 rounded-lg border text-xs font-semibold transition-all flex items-center gap-1.5 ${
+                            isChecked
+                              ? "border-indigo-500 bg-indigo-600 text-white font-bold shadow-sm"
+                              : "border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:border-slate-300"
+                          }`}
+                        >
+                          <span>{qt.label}</span>
+                          {isChecked && <Check className="w-3 h-3 stroke-[3]" />}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+              </div>
+
             </div>
+
+            {/* GRID 2-KOLOM BAWAH */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 pt-1">
+              
+              {/* KIRI BAWAH: INDIKATOR SPESIFIK */}
+              <div className="bg-slate-50 dark:bg-slate-800/60 p-3 rounded-xl border border-slate-200 dark:border-slate-700/80">
+                <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+                  Kisi-kisi / Indikator Spesifik (Opsional)
+                </label>
+                <textarea
+                  rows={2}
+                  placeholder="Diberikan stimulus cerita kontekstual, siswa dapat menentukan keliling bangun..."
+                  value={kisiKisi}
+                  onChange={(e) => setKisiKisi(e.target.value)}
+                  className="w-full bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg p-2 text-xs font-medium text-slate-800 dark:text-slate-100 placeholder:text-slate-400 focus:ring-2 focus:ring-indigo-500 outline-none shadow-sm"
+                />
+              </div>
+
+              {/* KANAN BAWAH: TOMBOL LANJUTKAN & JAMINAN PEMBAHASAN */}
+              <div className="bg-slate-50 dark:bg-slate-800/60 p-3 rounded-xl border border-slate-200 dark:border-slate-700/80 flex flex-col justify-between space-y-2">
+                <div className="flex items-center gap-2 text-xs text-emerald-800 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/40 p-2 rounded-lg border border-emerald-200 dark:border-emerald-800/60">
+                  <CheckSquare className="w-4 h-4 text-emerald-600 shrink-0" />
+                  <span className="font-semibold text-[11px] leading-tight">
+                    Prompt mewajibkan AI menyertakan kunci & pembahasan jawaban lengkap untuk tiap soal.
+                  </span>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setActiveStep("importer")}
+                  className="w-full bg-indigo-600 text-white font-bold py-2.5 px-4 rounded-xl hover:bg-indigo-700 text-xs transition-all flex items-center justify-center gap-2 shadow-md active:scale-95"
+                >
+                  <span>Lanjut ke Langkah 2: Salin Prompt & Impor Soal</span>
+                  <ArrowRight className="w-4 h-4" />
+                </button>
+              </div>
+
+            </div>
+
+          </div>
+        ) : (
+          /* STEP 2: ULTRA-KOMPAK 3-KOLOM WORKFLOW & IMPOR AI */
+          <div className="space-y-3">
+            
+            {/* Notification Toast */}
+            {launchNotice && (
+              <div className="p-2.5 rounded-lg bg-emerald-500 text-white text-xs font-bold flex items-center gap-2 animate-fade-in shadow-sm">
+                <CheckCircle2 className="w-4 h-4" />
+                <span>{launchNotice}</span>
+              </div>
+            )}
+
+            {/* 3-COLUMN WORKFLOW GRID */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
+              
+              {/* KOLOM 1: SALIN PROMPT */}
+              <div className="bg-slate-50 dark:bg-slate-800/60 p-3 rounded-xl border border-slate-200 dark:border-slate-700/80 flex flex-col justify-between space-y-2">
+                <div className="space-y-1.5">
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-5 h-5 rounded-md bg-indigo-600 text-white font-extrabold text-[11px] flex items-center justify-center shrink-0">
+                      1
+                    </span>
+                    <h4 className="font-bold text-slate-800 dark:text-slate-100 text-xs">
+                      Salin Prompt Aplikasi
+                    </h4>
+                  </div>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-snug">
+                    Aplikasi membantu pembuatan soal otomatis sesuai standar.
+                  </p>
+
+                  <div className="relative group">
+                    <pre className="w-full h-[200px] bg-slate-900 text-slate-200 text-[10px] font-mono p-3 rounded-lg overflow-y-auto whitespace-pre-wrap leading-relaxed border border-slate-800 shadow-inner">
+                      {generatedPrompt}
+                    </pre>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleCopyPrompt}
+                  className={`w-full py-2 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 shadow-sm ${
+                    copied
+                      ? "bg-emerald-600 text-white"
+                      : "bg-indigo-600 text-white hover:bg-indigo-700 active:scale-95"
+                  }`}
+                >
+                  {copied ? (
+                    <>
+                      <Check className="w-3.5 h-3.5" />
+                      Prompt Tersalin!
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="w-3.5 h-3.5" />
+                      Klik untuk Salin Prompt
+                    </>
+                  )}
+                </button>
+              </div>
+
+              {/* KOLOM 2: PILIH AI */}
+              <div className="bg-slate-50 dark:bg-slate-800/60 p-3 rounded-xl border border-slate-200 dark:border-slate-700/80 flex flex-col justify-between space-y-2">
+                <div className="space-y-1.5">
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-5 h-5 rounded-md bg-purple-600 text-white font-extrabold text-[11px] flex items-center justify-center shrink-0">
+                      2
+                    </span>
+                    <h4 className="font-bold text-slate-800 dark:text-slate-100 text-xs">
+                      Pilih AI yang Diinginkan
+                    </h4>
+                  </div>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-snug">
+                    Klik tombol untuk menyalin prompt & membuka web AI:
+                  </p>
+
+                  <div className="grid grid-cols-2 gap-2 pt-1">
+                    {AI_LAUNCHERS.map((ai) => (
+                      <button
+                        key={ai.name}
+                        type="button"
+                        onClick={() => handleLaunchAi(ai.name, ai.url)}
+                        className={`${ai.bg} text-white p-2.5 rounded-lg transition-all shadow-sm flex flex-col items-center justify-center gap-0.5 group active:scale-95`}
+                      >
+                        <div className="flex items-center gap-1 font-bold text-xs">
+                          <span>{ai.name}</span>
+                          <ExternalLink className="w-3 h-3 opacity-80 group-hover:opacity-100" />
+                        </div>
+                        <span className="text-[9px] text-white/80 font-normal">
+                          Copas & Buka
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="p-2 bg-indigo-50 dark:bg-indigo-950/40 rounded-lg border border-indigo-200 dark:border-indigo-800 text-[10px] text-indigo-700 dark:text-indigo-300 leading-tight">
+                  💡 <strong>Petunjuk:</strong> Tekan <code>Ctrl+V</code> di web AI setelah tab terbuka.
+                </div>
+              </div>
+
+              {/* KOLOM 3: TEMPEL HASIL */}
+              <div className="bg-slate-50 dark:bg-slate-800/60 p-3 rounded-xl border border-slate-200 dark:border-slate-700/80 flex flex-col justify-between space-y-2">
+                <div className="space-y-1.5">
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-5 h-5 rounded-md bg-emerald-600 text-white font-extrabold text-[11px] flex items-center justify-center shrink-0">
+                      3
+                    </span>
+                    <h4 className="font-bold text-slate-800 dark:text-slate-100 text-xs">
+                      Tempel Hasil ke Aplikasi
+                    </h4>
+                  </div>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-snug">
+                    Tempelkan balasan teks JSON dari AI di kotak ini:
+                  </p>
+
+                  <textarea
+                    rows={6}
+                    placeholder="Tempelkan balasan teks JSON dari AI di sini... Format terdeteksi otomatis!"
+                    value={pastedText}
+                    onChange={(e) => handleTextChange(e.target.value)}
+                    className="w-full bg-slate-900 text-slate-100 text-[10px] font-mono p-2.5 rounded-lg border border-slate-700 placeholder:text-slate-500 focus:ring-2 focus:ring-emerald-500 outline-none leading-relaxed h-[130px]"
+                  />
+
+                  {parseResult?.success ? (
+                    <div className="p-1.5 rounded-lg bg-emerald-100 dark:bg-emerald-950/60 border border-emerald-300 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300 text-[11px] font-bold flex items-center justify-between">
+                      <span className="flex items-center gap-1">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                        Terdeteksi:
+                      </span>
+                      <span>{parseResult.totalParsed} Butir Soal</span>
+                    </div>
+                  ) : parseResult && !parseResult.success ? (
+                    <div className="p-1.5 rounded-lg bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 text-rose-700 dark:text-rose-300 text-[10px] flex items-center gap-1">
+                      <AlertCircle className="w-3.5 h-3.5 text-rose-500 shrink-0" />
+                      <span className="truncate">{parseResult.error}</span>
+                    </div>
+                  ) : null}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handlePasteFromClipboard}
+                  className="w-full py-2 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm active:scale-95"
+                >
+                  <ClipboardPaste className="w-3.5 h-3.5" />
+                  Tempel dari Clipboard
+                </button>
+              </div>
+
+            </div>
+
+            {/* FULL-WIDTH BOTTOM BAR: DEPLOY BUTTON */}
+            <div className="pt-2 border-t border-slate-200 dark:border-slate-800 space-y-2">
+              <button
+                type="button"
+                disabled={!parseResult?.success || parseResult.questions.length === 0}
+                onClick={handleDeployQuestions}
+                className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-200 disabled:dark:bg-slate-800 disabled:text-slate-400 text-white font-black py-3 px-5 rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 active:scale-95 text-sm"
+              >
+                <PlusCircle className="w-5 h-5" />
+                <span>
+                  {parseResult?.success && parseResult.questions.length > 0
+                    ? `Deploy ${parseResult.questions.length} Soal ke Editor (+Nomor Akhir)`
+                    : "Deploy Soal ke Editor"}
+                </span>
+              </button>
+
+              <div className="flex justify-between items-center px-1">
+                <button
+                  type="button"
+                  onClick={() => setActiveStep("builder")}
+                  className="text-xs text-slate-500 hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-300 font-semibold transition-colors"
+                >
+                  ← Kembali Edit Parameter Prompt (Langkah 1)
+                </button>
+                <span className="text-[10px] text-slate-400">
+                  Aplikasi Ujian Cerdas • Generator Prompt AI
+                </span>
+              </div>
+            </div>
+
           </div>
         )}
       </div>
