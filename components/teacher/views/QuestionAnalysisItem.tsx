@@ -6,6 +6,7 @@ import {
   ChevronUpIcon,
 } from "../../Icons";
 import { parseList, normalize, isAnswerMatch } from "../examUtils";
+import { renderMathInHtml } from "../../../utils/mathRenderer";
 import { useQuestionAnalysisItemLogic } from "./useQuestionAnalysisItemLogic";
 
 const QuestionnaireAnalysisContent: React.FC<{
@@ -145,10 +146,21 @@ const QuestionnaireAnalysisContent: React.FC<{
                   <span className="w-5 h-5 flex shrink-0 items-center justify-center rounded font-bold bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 text-xs">
                     {String.fromCharCode(65 + i)}
                   </span>
-                  <div
-                    className="flex-1 min-w-0 font-medium text-slate-800 dark:text-slate-200 [&_p]:inline"
-                    dangerouslySetInnerHTML={{ __html: opt }}
-                  ></div>
+                  <div className="flex-1 min-w-0 flex flex-col gap-1">
+                    <div
+                      className="font-medium text-slate-800 dark:text-slate-200 [&_p]:inline"
+                      dangerouslySetInnerHTML={{ __html: renderMathInHtml(opt) }}
+                    ></div>
+                    {q.optionImages?.[i] && (
+                      <img
+                        src={q.optionImages[i]!}
+                        alt={`Gambar Opsi ${String.fromCharCode(65 + i)}`}
+                        className="max-h-16 max-w-full object-contain rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-0.5 mt-0.5"
+                        loading="lazy"
+                        referrerPolicy="no-referrer"
+                      />
+                    )}
+                  </div>
                   <span className="font-bold text-slate-700 dark:text-slate-200 shrink-0 ml-2">
                     {count} Siswa ({pct}%)
                   </span>
@@ -219,6 +231,13 @@ export const QuestionAnalysisItem: React.FC<{
     isCorrectAnswer,
     getInitialKey,
   } = useQuestionAnalysisItemLogic({ q, stats, examResults, onUpdateKey });
+  const hasVisualStimulus = Boolean(
+    (q.imageUrl && q.imageUrl.trim() !== "") ||
+    (q.questionText && (q.questionText.includes("<img") || q.questionText.includes("<svg"))) ||
+    (q.optionImages && q.optionImages.some((img) => !!img && img.trim() !== "")) ||
+    q.chartData
+  );
+
   return (
     <div
       className={`border rounded-2xl bg-white dark:bg-slate-800 transition-all duration-300 overflow-hidden ${isExpanded ? "shadow-md ring-1 ring-indigo-50 border-indigo-100 dark:border-indigo-900 dark:ring-indigo-900" : "border-slate-100 dark:border-slate-700 hover:border-indigo-100 dark:hover:border-indigo-900"}`}
@@ -244,8 +263,8 @@ export const QuestionAnalysisItem: React.FC<{
           )}
         </div>
 
-        {(q.category || q.level || q.scoreWeight !== undefined || q.questionType === "QUESTIONNAIRE") && (
-          <div className="flex gap-2 mb-2">
+        {(q.category || q.level || q.scoreWeight !== undefined || q.questionType === "QUESTIONNAIRE" || hasVisualStimulus) && (
+          <div className="flex flex-wrap gap-2 mb-2">
             {q.category && (
               <span className="text-[10px] font-bold bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 px-2 py-0.5 rounded border border-slate-200 dark:border-slate-600">
                 {q.category}
@@ -256,22 +275,56 @@ export const QuestionAnalysisItem: React.FC<{
                 {q.level}
               </span>
             )}
+            {hasVisualStimulus && (
+              <span className="text-[10px] font-bold bg-purple-50 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 px-2 py-0.5 rounded border border-purple-200 dark:border-purple-800 flex items-center gap-1">
+                <span>🖼️</span> Stimulus Visual
+              </span>
+            )}
             {q.questionType === "QUESTIONNAIRE" ? (
               <span className="text-[10px] font-bold bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 px-2 py-0.5 rounded border border-emerald-200 dark:border-emerald-800">
                 Non-Skor (0 Poin)
               </span>
             ) : (
-              <span className="text-[10px] font-bold bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-300 px-2 py-0.5 rounded border border-purple-100 dark:border-purple-800">
+              <span className="text-[10px] font-bold bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 px-2 py-0.5 rounded border border-slate-200 dark:border-slate-600">
                 Bobot: {q.scoreWeight || 1}
               </span>
             )}
           </div>
         )}
 
-        <div
-          className="text-sm text-slate-700 dark:text-slate-300 line-clamp-2 font-medium option-content"
-          dangerouslySetInnerHTML={{ __html: q.questionText }}
-        ></div>
+        {!isExpanded ? (
+          <div
+            className="text-sm text-slate-700 dark:text-slate-300 line-clamp-2 font-medium option-content [&_img]:hidden [&_svg]:hidden"
+            dangerouslySetInnerHTML={{ __html: renderMathInHtml(q.questionText || "-") }}
+          ></div>
+        ) : (
+          <div className="space-y-3">
+            <div
+              className="text-sm text-slate-800 dark:text-slate-200 font-medium option-content leading-relaxed [&_img]:max-w-full [&_img]:max-h-72 [&_img]:object-contain [&_img]:rounded-xl [&_img]:border [&_img]:border-slate-200 dark:[&_img]:border-slate-700 [&_img]:bg-white dark:[&_img]:bg-slate-900 [&_img]:p-1 [&_img]:mx-auto [&_img]:my-2 [&_svg]:max-w-full [&_svg]:max-h-72 [&_svg]:mx-auto [&_svg]:my-2 [&_table]:max-w-full [&_table]:overflow-x-auto"
+              dangerouslySetInnerHTML={{ __html: renderMathInHtml(q.questionText || "-") }}
+            ></div>
+
+            {/* Dedicated Stimulus Image (q.imageUrl) */}
+            {q.imageUrl && q.imageUrl.trim() !== "" && (
+              <div
+                className="my-3 flex flex-col items-center justify-center p-3 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-700"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <img
+                  src={q.imageUrl}
+                  alt={`Stimulus Soal ${index + 1}`}
+                  className="max-w-full max-h-64 sm:max-h-72 object-contain rounded-lg shadow-xs hover:opacity-95 transition-opacity cursor-pointer border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800"
+                  loading="lazy"
+                  referrerPolicy="no-referrer"
+                  onClick={() => window.open(q.imageUrl, "_blank")}
+                />
+                <span className="text-[10px] text-slate-400 mt-1.5 flex items-center gap-1">
+                  🔍 Klik gambar untuk membuka ukuran penuh di tab baru
+                </span>
+              </div>
+            )}
+          </div>
+        )}
 
         <div className="w-full bg-slate-100 dark:bg-slate-700 h-1.5 rounded-full overflow-hidden mt-1">
           {q.questionType === "QUESTIONNAIRE" ? (
@@ -369,10 +422,21 @@ export const QuestionAnalysisItem: React.FC<{
                                 onChange={(e) => setTempKey(e.target.value)}
                                 className="text-emerald-600 focus:ring-emerald-500 w-4 h-4"
                               />
-                              <div
-                                className="flex-1 min-w-0 text-xs text-slate-700 dark:text-slate-300 option-content [&_p]:inline [&_img]:max-h-10 [&_img]:inline-block"
-                                dangerouslySetInnerHTML={{ __html: opt }}
-                              ></div>
+                              <div className="flex-1 min-w-0 flex flex-col gap-1 text-xs text-slate-700 dark:text-slate-300">
+                                <div
+                                  className="option-content [&_p]:inline [&_img]:max-h-16 [&_img]:max-w-full [&_img]:object-contain [&_img]:inline-block"
+                                  dangerouslySetInnerHTML={{ __html: renderMathInHtml(opt) }}
+                                ></div>
+                                {q.optionImages?.[i] && (
+                                  <img
+                                    src={q.optionImages[i]!}
+                                    alt={`Gambar Opsi ${String.fromCharCode(65 + i)}`}
+                                    className="max-h-16 max-w-full object-contain rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-0.5 mt-0.5"
+                                    loading="lazy"
+                                    referrerPolicy="no-referrer"
+                                  />
+                                )}
+                              </div>
                             </label>
                           );
                         })}
@@ -423,10 +487,21 @@ export const QuestionAnalysisItem: React.FC<{
                                 }}
                                 className="text-emerald-600 focus:ring-emerald-500 w-4 h-4 rounded"
                               />
-                              <div
-                                className="flex-1 min-w-0 text-xs text-slate-700 dark:text-slate-300 option-content [&_p]:inline [&_img]:max-h-10 [&_img]:inline-block"
-                                dangerouslySetInnerHTML={{ __html: opt }}
-                              ></div>
+                              <div className="flex-1 min-w-0 flex flex-col gap-1 text-xs text-slate-700 dark:text-slate-300">
+                                <div
+                                  className="option-content [&_p]:inline [&_img]:max-h-16 [&_img]:max-w-full [&_img]:object-contain [&_img]:inline-block"
+                                  dangerouslySetInnerHTML={{ __html: renderMathInHtml(opt) }}
+                                ></div>
+                                {q.optionImages?.[i] && (
+                                  <img
+                                    src={q.optionImages[i]!}
+                                    alt={`Gambar Opsi ${String.fromCharCode(65 + i)}`}
+                                    className="max-h-16 max-w-full object-contain rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-0.5 mt-0.5"
+                                    loading="lazy"
+                                    referrerPolicy="no-referrer"
+                                  />
+                                )}
+                              </div>
                             </label>
                           );
                         })}
@@ -650,18 +725,34 @@ export const QuestionAnalysisItem: React.FC<{
                       key={i}
                       className={`relative flex items-center justify-between p-2 rounded-lg text-xs ${isCorrect ? "bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-100 dark:border-emerald-800" : count > 0 ? "bg-slate-50 dark:bg-slate-700/50" : ""}`}
                     >
-                      <div className="flex items-center gap-2 z-10 w-full overflow-hidden">
+                      <div className="flex items-start gap-2.5 z-10 w-full overflow-hidden">
                         <span
-                          className={`w-5 h-5 flex shrink-0 items-center justify-center rounded font-bold ${isCorrect ? "bg-emerald-500 text-white" : "bg-slate-200 dark:bg-slate-600 text-slate-500 dark:text-slate-300"}`}
+                          className={`w-5 h-5 flex shrink-0 items-center justify-center rounded font-bold mt-0.5 ${isCorrect ? "bg-emerald-500 text-white" : "bg-slate-200 dark:bg-slate-600 text-slate-500 dark:text-slate-300"}`}
                         >
                           {String.fromCharCode(65 + i)}
                         </span>
-                        {/* FIX: Removed truncate, added max-w-full and image styling */}
-                        <div
-                          className="flex-1 min-w-0 [&_p]:inline [&_br]:hidden dark:text-slate-300 option-content [&_img]:max-h-20 [&_img]:w-auto [&_img]:inline-block"
-                          dangerouslySetInnerHTML={{ __html: opt }}
-                        ></div>
-                        <span className="font-bold text-slate-600 dark:text-slate-300 shrink-0 ml-2">
+                        <div className="flex-1 min-w-0 flex flex-col gap-1">
+                          <div
+                            className="[&_p]:inline [&_br]:hidden dark:text-slate-300 option-content [&_img]:max-h-24 [&_img]:max-w-full [&_img]:object-contain [&_img]:rounded [&_img]:inline-block"
+                            dangerouslySetInnerHTML={{ __html: renderMathInHtml(opt) }}
+                          ></div>
+                          {q.optionImages?.[i] && (
+                            <div className="mt-1">
+                              <img
+                                src={q.optionImages[i]!}
+                                alt={`Gambar Opsi ${String.fromCharCode(65 + i)}`}
+                                className="max-h-20 sm:max-h-24 max-w-full object-contain rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-0.5 cursor-pointer hover:opacity-95"
+                                loading="lazy"
+                                referrerPolicy="no-referrer"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  window.open(q.optionImages![i]!, "_blank");
+                                }}
+                              />
+                            </div>
+                          )}
+                        </div>
+                        <span className="font-bold text-slate-600 dark:text-slate-300 shrink-0 ml-2 mt-0.5">
                           {count} Siswa ({percentage}%)
                         </span>
                       </div>
