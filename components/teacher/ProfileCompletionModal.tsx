@@ -52,7 +52,7 @@ export const ProfileCompletionModal: React.FC<ProfileCompletionModalProps> = ({
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
                 className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-800 border-2 border-transparent focus:border-indigo-200 dark:focus:border-indigo-500 focus:bg-white dark:focus:bg-slate-900 rounded-xl outline-none mt-1 text-sm font-bold text-slate-700 dark:text-slate-200 transition-all placeholder:text-slate-300 dark:placeholder:text-slate-600"
-                placeholder="Contoh: Budi Santoso, S.Pd"
+                placeholder="Masukkan nama lengkap & gelar"
                 required
               />
             </div>
@@ -65,7 +65,7 @@ export const ProfileCompletionModal: React.FC<ProfileCompletionModalProps> = ({
                 value={school}
                 onChange={(e) => setSchool(e.target.value)}
                 className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-800 border-2 border-transparent focus:border-indigo-200 dark:focus:border-indigo-500 focus:bg-white dark:focus:bg-slate-900 rounded-xl outline-none mt-1 text-sm font-bold text-slate-700 dark:text-slate-200 transition-all placeholder:text-slate-300 dark:placeholder:text-slate-600"
-                placeholder="Contoh: SMA Negeri 1 Jakarta"
+                placeholder="Masukkan nama sekolah"
                 required
               />
             </div>
@@ -78,7 +78,7 @@ export const ProfileCompletionModal: React.FC<ProfileCompletionModalProps> = ({
                 value={regency}
                 onChange={(e) => setRegency(e.target.value)}
                 className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-800 border-2 border-transparent focus:border-indigo-200 dark:focus:border-indigo-500 focus:bg-white dark:focus:bg-slate-900 rounded-xl outline-none mt-1 text-sm font-bold text-slate-700 dark:text-slate-200 transition-all placeholder:text-slate-300 dark:placeholder:text-slate-600"
-                placeholder="Contoh: Jakarta Selatan"
+                placeholder="Masukkan kabupaten/kota"
                 required
               />
             </div>
