@@ -868,7 +868,7 @@ export const PrintSoalModal: React.FC<PrintSoalModalProps> = ({
 
                     {/* Fill In The Blank */}
                     {q.questionType === "FILL_IN_THE_BLANK" && (
-                      <div className="mt-2 text-xs italic text-slate-700">
+                      <div className="mt-2 text-xs italic text-slate-700 max-w-full overflow-hidden break-all">
                         Jawaban: ..........................................................................................................................................
                       </div>
                     )}
