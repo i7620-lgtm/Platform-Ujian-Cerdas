@@ -886,6 +886,7 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
         isOpen={isKisiKisiModalOpen}
         onClose={() => setIsKisiKisiModalOpen(false)}
         exam={displayExam}
+        teacherProfile={teacherProfile}
       />
 
       {confirmDialog?.isOpen && (
