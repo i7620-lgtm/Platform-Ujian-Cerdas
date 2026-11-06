@@ -1,7 +1,7 @@
 import React from "react";
 import { createPortal } from "react-dom";
 import { PrinterIcon, XMarkIcon } from "../Icons";
-import { Question } from "../../types";
+import { Question, TeacherProfile, NipType } from "../../types";
 import { renderMathInHtml } from "../../utils/mathRenderer";
 
 export const KisiKisiModal: React.FC<{
@@ -11,7 +11,28 @@ export const KisiKisiModal: React.FC<{
   subject: string;
   schoolName?: string;
   teacherName?: string;
-}> = ({ isOpen, onClose, questions, subject, schoolName, teacherName }) => {
+  teacherProfile?: TeacherProfile;
+  teacherNip?: string;
+  nipType?: NipType;
+  headmasterName?: string;
+  headmasterNip?: string;
+  headmasterNipType?: NipType;
+  regency?: string;
+}> = ({
+  isOpen,
+  onClose,
+  questions,
+  subject,
+  schoolName,
+  teacherName,
+  teacherProfile,
+  teacherNip,
+  nipType,
+  headmasterName,
+  headmasterNip,
+  headmasterNipType,
+  regency,
+}) => {
   if (!isOpen) return null;
 
   const formatType = (type: string) => {
@@ -208,13 +229,34 @@ export const KisiKisiModal: React.FC<{
           </tbody>
         </table>
 
-        <div className="mt-8 flex justify-end">
-          <div className="text-center w-64">
-            <p className="mb-16">Mengetahui,</p>
-            <p className="font-bold underline">
-              {teacherName || "Guru Mata Pelajaran"}
+        <div className="mt-8 flex justify-between items-start text-xs text-black">
+          <div className="text-center w-64 max-w-[45%]">
+            <p className="mb-1">Mengetahui,</p>
+            <p className="mb-14 font-semibold">Kepala Sekolah</p>
+            <p className="font-bold underline text-xs sm:text-sm text-black truncate mb-1">
+              {headmasterName || teacherProfile?.headmasterName || "...................................................."}
             </p>
-            <p>NIP. ..............................</p>
+            <p className="text-[11px] text-black truncate">
+              {headmasterNipType || teacherProfile?.headmasterNipType || "NIP"}. {headmasterNip || teacherProfile?.headmasterNip || "....................................."}
+            </p>
+          </div>
+
+          <div className="text-center w-64 max-w-[45%]">
+            <p className="mb-1 text-[11px] text-black truncate select-none">
+              {(regency || teacherProfile?.regency) ? `${regency || teacherProfile?.regency}, ` : "........................, "}
+              {new Date().toLocaleDateString("id-ID", {
+                day: "numeric",
+                month: "long",
+                year: "numeric",
+              })}
+            </p>
+            <p className="mb-14 font-semibold">Guru Pengampu / Penyusun</p>
+            <p className="font-bold underline text-xs sm:text-sm text-black truncate mb-1">
+              {teacherName || teacherProfile?.fullName || "Guru Mata Pelajaran"}
+            </p>
+            <p className="text-[11px] text-black truncate">
+              {nipType || teacherProfile?.nipType || "NIP"}. {teacherNip || teacherProfile?.nip || "....................................."}
+            </p>
           </div>
         </div>
       </div>
