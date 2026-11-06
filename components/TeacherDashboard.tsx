@@ -29,6 +29,7 @@ import { BarChart3 } from "lucide-react";
 import { OngoingExamModal, FinishedExamModal } from "./teacher/DashboardModals";
 import { TutorialPage } from "./TutorialPage";
 import { InvitationModal } from "./teacher/InvitationModal";
+import { TeacherProfileModal } from "./teacher/TeacherProfileModal";
 import { useTeacherDashboard } from "./teacher/useTeacherDashboard";
 
 function lazyWithRetry<T extends React.ComponentType<any>>(
@@ -82,6 +83,7 @@ interface TeacherDashboardProps {
   onRefreshResults: () => Promise<void>;
   isDarkMode: boolean;
   toggleTheme: () => void;
+  onUpdateProfile?: (updatedProfile: TeacherProfile) => void;
 }
 
 export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
@@ -96,7 +98,9 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
   onRefreshResults,
   isDarkMode,
   toggleTheme,
+  onUpdateProfile,
 }) => {
+  const [isProfileModalOpen, setIsProfileModalOpen] = React.useState(false);
   const {
     view,
     setView,
@@ -198,10 +202,18 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                 </span>
               </div>
             </div>
-            <div className="flex items-center gap-2 sm:gap-4 shrink-0">
+            <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
+              <button
+                onClick={() => setIsProfileModalOpen(true)}
+                className="p-1.5 sm:p-2 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 hover:text-indigo-600 dark:hover:text-indigo-400 transition-all shadow-sm flex items-center gap-1.5 sm:gap-2 text-xs font-bold"
+                title="Pengaturan Profil & Pejabat Sekolah"
+              >
+                <UserIcon className="w-4 h-4 sm:w-5 sm:h-5" />
+                <span className="hidden sm:inline">Profil</span>
+              </button>
               <button
                 onClick={() => setIsMainGuideModalOpen(true)}
-                className="p-1.5 sm:p-2 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 hover:text-indigo-600 dark:hover:text-indigo-400 transition-all shadow-sm flex items-center gap-2 text-xs font-bold"
+                className="p-1.5 sm:p-2 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 hover:text-indigo-600 dark:hover:text-indigo-400 transition-all shadow-sm flex items-center gap-1.5 sm:gap-2 text-xs font-bold"
                 title="Cara Penggunaan"
               >
                 <QuestionMarkCircleIcon className="w-4 h-4 sm:w-5 sm:h-5" />
@@ -465,6 +477,17 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
         onClose={() => setIsInviteOpen(false)}
         teacherName={organizerName}
         schoolName={teacherProfile.school}
+        teacherProfile={teacherProfile}
+      />
+
+      {/* Teacher Profile Modal */}
+      <TeacherProfileModal
+        isOpen={isProfileModalOpen}
+        onClose={() => setIsProfileModalOpen(false)}
+        profile={teacherProfile}
+        onComplete={(updated) => {
+          onUpdateProfile?.(updated);
+        }}
       />
     </div>
   );
