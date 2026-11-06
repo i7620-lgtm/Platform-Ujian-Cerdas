@@ -47,6 +47,7 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
   const { exam, onClose, onExamFinished, teacherProfile, isReadOnly, isProctor: isProctorProp, isPremium } = props;
   const isProctor = !!isProctorProp || teacherProfile?.accountType === "collaborator";
   const isOwner = !isReadOnly && !isProctor;
+  const isPublicAccess = isReadOnly && !isProctorProp;
   const canShowActionColumn = isOwner || isProctor;
 
   const {
@@ -214,6 +215,11 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                   <span className="text-[10px] font-mono font-black px-1.5 py-0.5 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 rounded border border-slate-200 dark:border-slate-600 tracking-wider uppercase">
                     {displayExam.code}
                   </span>
+                  {isPublicAccess && (
+                    <span className="text-[10px] font-bold px-2 py-0.5 bg-teal-50 dark:bg-teal-950/50 text-teal-700 dark:text-teal-300 rounded-full border border-teal-200 dark:border-teal-800 flex items-center gap-1 shrink-0">
+                      <span>👨‍👩‍👧‍👦</span> Pantauan Orang Tua / Publik
+                    </span>
+                  )}
                   <RemainingTime exam={displayExam} size="sm" />
                   {isRefreshing && (
                     <span className="text-[10px] font-bold text-indigo-500 dark:text-indigo-400 animate-pulse">
@@ -390,14 +396,16 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                 </button>
               )}
               
-              <button
-                id="ongoing-student-access-btn"
-                onClick={() => setIsJoinQrModalOpen(true)}
-                className="px-2.5 py-1.5 flex items-center gap-1.5 rounded-lg border border-indigo-200 dark:border-indigo-800 text-indigo-600 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-950/40 hover:bg-indigo-100 text-[10px] font-black uppercase tracking-wider transition-all shadow-xs shrink-0"
-              >
-                <QrCodeIcon className="w-3.5 h-3.5 text-indigo-500" />
-                <span>AKSES SISWA</span>
-              </button>
+              {!isPublicAccess && (
+                <button
+                  id="ongoing-student-access-btn"
+                  onClick={() => setIsJoinQrModalOpen(true)}
+                  className="px-2.5 py-1.5 flex items-center gap-1.5 rounded-lg border border-indigo-200 dark:border-indigo-800 text-indigo-600 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-950/40 hover:bg-indigo-100 text-[10px] font-black uppercase tracking-wider transition-all shadow-xs shrink-0"
+                >
+                  <QrCodeIcon className="w-3.5 h-3.5 text-indigo-500" />
+                  <span>AKSES SISWA</span>
+                </button>
+              )}
 
               {isOwner && Boolean(proctorUrl || liveUrl) && (
                 <button
@@ -411,13 +419,15 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                 </button>
               )}
 
-              <button
-                onClick={() => setIsPrintModalOpen(true)}
-                className="px-2.5 py-1.5 flex items-center gap-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-750 text-[10px] font-black uppercase tracking-wider transition-all shadow-xs shrink-0"
-              >
-                <DocumentDuplicateIcon className="w-3.5 h-3.5 text-slate-400" />
-                <span>SOAL PDF</span>
-              </button>
+              {!isPublicAccess && (
+                <button
+                  onClick={() => setIsPrintModalOpen(true)}
+                  className="px-2.5 py-1.5 flex items-center gap-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-750 text-[10px] font-black uppercase tracking-wider transition-all shadow-xs shrink-0"
+                >
+                  <DocumentDuplicateIcon className="w-3.5 h-3.5 text-slate-400" />
+                  <span>SOAL PDF</span>
+                </button>
+              )}
 
               <button
                 onClick={() => setIsKisiKisiModalOpen(true)}
