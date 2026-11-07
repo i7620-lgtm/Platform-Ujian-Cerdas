@@ -56,19 +56,47 @@ export class AuthService {
         }
 
         const meta = session.user.user_metadata || {};
+        // Local cache fallback for instant offline/speed retrieval
+        let cachedData: any = {};
+        try {
+            const raw = localStorage.getItem(`profile_extended_${session.user.id}`);
+            if (raw) cachedData = JSON.parse(raw);
+        } catch {}
+
         return {
             id: session.user.id,
             fullName: profile.full_name,
             accountType: profile.role as AccountType,
             school: profile.school,
             regency: profile.regency,
-            nip: profile.nip || meta.nip || '',
-            nipType: (profile.nip_type || meta.nipType || 'NIP') as 'NIP' | 'NIPPPK',
-            headmasterName: profile.headmaster_name || meta.headmasterName || '',
-            headmasterNip: profile.headmaster_nip || meta.headmasterNip || '',
-            headmasterNipType: (profile.headmaster_nip_type || meta.headmasterNipType || 'NIP') as 'NIP' | 'NIPPPK',
+            nip: profile.nip || meta.nip || cachedData.nip || '',
+            nipType: (profile.nip_type || meta.nipType || cachedData.nipType || 'NIP') as 'NIP' | 'NIPPPK',
+            headmasterName: profile.headmaster_name || meta.headmasterName || cachedData.headmasterName || '',
+            headmasterNip: profile.headmaster_nip || meta.headmasterNip || cachedData.headmasterNip || '',
+            headmasterNipType: (profile.headmaster_nip_type || meta.headmasterNipType || cachedData.headmasterNipType || 'NIP') as 'NIP' | 'NIPPPK',
             email: session.user.email,
-            isPremium: profile.is_premium
+            isPremium: profile.is_premium,
+
+            // Instansi & Kop Sekolah
+            dinasPendidikan: profile.dinas_pendidikan || meta.dinasPendidikan || cachedData.dinasPendidikan || 'DINAS PENDIDIKAN KEPEMUDAAN DAN OLAHRAGA',
+            npsn: profile.npsn || meta.npsn || cachedData.npsn || '',
+            alamatSekolah: profile.alamat_sekolah || meta.alamatSekolah || cachedData.alamatSekolah || '',
+            desaKelurahan: profile.desa_kelurahan || meta.desaKelurahan || cachedData.desaKelurahan || '',
+            kecamatan: profile.kecamatan || meta.kecamatan || cachedData.kecamatan || '',
+            provinsi: profile.provinsi || meta.provinsi || cachedData.provinsi || 'Bali',
+            kodePos: profile.kode_pos || meta.kodePos || cachedData.kodePos || '',
+            emailSekolah: profile.email_sekolah || meta.emailSekolah || cachedData.emailSekolah || '',
+            teleponSekolah: profile.telepon_sekolah || meta.teleponSekolah || cachedData.teleponSekolah || '',
+            websiteSekolah: profile.website_sekolah || meta.websiteSekolah || cachedData.websiteSekolah || '',
+            faksimile: profile.faksimile || meta.faksimile || cachedData.faksimile || '',
+            logoSekolahUrl: profile.logo_sekolah_url || meta.logoSekolahUrl || cachedData.logoSekolahUrl || '',
+            logoDinasUrl: profile.logo_dinas_url || meta.logoDinasUrl || cachedData.logoDinasUrl || '',
+            isAksaraBaliActive: profile.is_aksara_bali_active ?? meta.isAksaraBaliActive ?? cachedData.isAksaraBaliActive ?? true,
+            aksaraBaliPemda: profile.aksara_bali_pemda || meta.aksaraBaliPemda || cachedData.aksaraBaliPemda || '',
+            aksaraBaliDinas: profile.aksara_bali_dinas || meta.aksaraBaliDinas || cachedData.aksaraBaliDinas || '',
+            aksaraBaliSekolah: profile.aksara_bali_sekolah || meta.aksaraBaliSekolah || cachedData.aksaraBaliSekolah || '',
+            aksaraBaliAlamat: profile.aksara_bali_alamat || meta.aksaraBaliAlamat || cachedData.aksaraBaliAlamat || '',
+            kopDividerStyle: profile.kop_divider_style || meta.kopDividerStyle || cachedData.kopDividerStyle || 'double',
         };
     }
 
@@ -126,7 +154,7 @@ export class AuthService {
     }
 
     async updateTeacherProfile(id: string, updates: Partial<TeacherProfile> & { password?: string }): Promise<void> {
-        const dbUpdates: Record<string, string | undefined> = {};
+        const dbUpdates: Record<string, any> = {};
         if (updates.fullName !== undefined) dbUpdates.full_name = updates.fullName;
         if (updates.school !== undefined) dbUpdates.school = updates.school;
         if (updates.regency !== undefined) dbUpdates.regency = updates.regency;
@@ -137,6 +165,37 @@ export class AuthService {
         if (updates.headmasterNip !== undefined) dbUpdates.headmaster_nip = updates.headmasterNip;
         if (updates.headmasterNipType !== undefined) dbUpdates.headmaster_nip_type = updates.headmasterNipType;
 
+        // Custom Kop Sekolah fields for DB table (if table has these columns)
+        if (updates.dinasPendidikan !== undefined) dbUpdates.dinas_pendidikan = updates.dinasPendidikan;
+        if (updates.npsn !== undefined) dbUpdates.npsn = updates.npsn;
+        if (updates.alamatSekolah !== undefined) dbUpdates.alamat_sekolah = updates.alamatSekolah;
+        if (updates.desaKelurahan !== undefined) dbUpdates.desa_kelurahan = updates.desaKelurahan;
+        if (updates.kecamatan !== undefined) dbUpdates.kecamatan = updates.kecamatan;
+        if (updates.provinsi !== undefined) dbUpdates.provinsi = updates.provinsi;
+        if (updates.kodePos !== undefined) dbUpdates.kode_pos = updates.kodePos;
+        if (updates.emailSekolah !== undefined) dbUpdates.email_sekolah = updates.emailSekolah;
+        if (updates.teleponSekolah !== undefined) dbUpdates.telepon_sekolah = updates.teleponSekolah;
+        if (updates.websiteSekolah !== undefined) dbUpdates.website_sekolah = updates.websiteSekolah;
+        if (updates.faksimile !== undefined) dbUpdates.faksimile = updates.faksimile;
+        if (updates.logoSekolahUrl !== undefined) dbUpdates.logo_sekolah_url = updates.logoSekolahUrl;
+        if (updates.logoDinasUrl !== undefined) dbUpdates.logo_dinas_url = updates.logoDinasUrl;
+        if (updates.isAksaraBaliActive !== undefined) dbUpdates.is_aksara_bali_active = updates.isAksaraBaliActive;
+        if (updates.aksaraBaliPemda !== undefined) dbUpdates.aksara_bali_pemda = updates.aksaraBaliPemda;
+        if (updates.aksaraBaliDinas !== undefined) dbUpdates.aksara_bali_dinas = updates.aksaraBaliDinas;
+        if (updates.aksaraBaliSekolah !== undefined) dbUpdates.aksara_bali_sekolah = updates.aksaraBaliSekolah;
+        if (updates.aksaraBaliAlamat !== undefined) dbUpdates.aksara_bali_alamat = updates.aksaraBaliAlamat;
+        if (updates.kopDividerStyle !== undefined) dbUpdates.kop_divider_style = updates.kopDividerStyle;
+
+        // Save immediately to local persistent cache for zero-latency retrieval
+        try {
+            const cacheKey = `profile_extended_${id}`;
+            const existingRaw = localStorage.getItem(cacheKey);
+            const currentCache = existingRaw ? JSON.parse(existingRaw) : {};
+            localStorage.setItem(cacheKey, JSON.stringify({ ...currentCache, ...updates }));
+        } catch (e) {
+            console.warn("Local storage cache warning:", e);
+        }
+
         try {
             const { error } = await supabase
                 .from('profiles')
@@ -144,15 +203,28 @@ export class AuthService {
                 .eq('id', id);
             if (error) {
                 // If custom columns don't exist in SQL profiles table, fallback to core fields
-                const { nip, nip_type, headmaster_name, headmaster_nip, headmaster_nip_type, ...baseUpdates } = dbUpdates;
+                const { 
+                    nip, nip_type, headmaster_name, headmaster_nip, headmaster_nip_type,
+                    dinas_pendidikan, npsn, alamat_sekolah, desa_kelurahan, kecamatan,
+                    provinsi, kode_pos, email_sekolah, telepon_sekolah, website_sekolah,
+                    faksimile, logo_sekolah_url, logo_dinas_url, is_aksara_bali_active,
+                    aksara_bali_pemda, aksara_bali_dinas, aksara_bali_sekolah, aksara_bali_alamat,
+                    kop_divider_style,
+                    ...baseUpdates 
+                } = dbUpdates;
                 await supabase.from('profiles').update(baseUpdates).eq('id', id);
             }
         } catch {
-            const { nip, nip_type, headmaster_name, headmaster_nip, headmaster_nip_type, ...baseUpdates } = dbUpdates;
+            const baseUpdates: any = {
+                full_name: updates.fullName,
+                school: updates.school,
+                regency: updates.regency,
+                role: updates.accountType,
+            };
             await supabase.from('profiles').update(baseUpdates).eq('id', id).catch(() => {});
         }
 
-        // Sync metadata & credentials via Supabase Auth
+        // Sync metadata & credentials via Supabase Auth (supports nested JSON attributes flawlessly)
         const authUserUpdates: any = {
             data: {
                 full_name: updates.fullName,
@@ -163,6 +235,25 @@ export class AuthService {
                 headmasterName: updates.headmasterName,
                 headmasterNip: updates.headmasterNip,
                 headmasterNipType: updates.headmasterNipType,
+                dinasPendidikan: updates.dinasPendidikan,
+                npsn: updates.npsn,
+                alamatSekolah: updates.alamatSekolah,
+                desaKelurahan: updates.desaKelurahan,
+                kecamatan: updates.kecamatan,
+                provinsi: updates.provinsi,
+                kodePos: updates.kodePos,
+                emailSekolah: updates.emailSekolah,
+                teleponSekolah: updates.teleponSekolah,
+                websiteSekolah: updates.websiteSekolah,
+                faksimile: updates.faksimile,
+                logoSekolahUrl: updates.logoSekolahUrl,
+                logoDinasUrl: updates.logoDinasUrl,
+                isAksaraBaliActive: updates.isAksaraBaliActive,
+                aksaraBaliPemda: updates.aksaraBaliPemda,
+                aksaraBaliDinas: updates.aksaraBaliDinas,
+                aksaraBaliSekolah: updates.aksaraBaliSekolah,
+                aksaraBaliAlamat: updates.aksaraBaliAlamat,
+                kopDividerStyle: updates.kopDividerStyle,
             }
         };
 
