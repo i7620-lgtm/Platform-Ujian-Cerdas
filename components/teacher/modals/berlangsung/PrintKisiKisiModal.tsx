@@ -4,6 +4,8 @@ import { Exam, Question, TeacherProfile } from "../../../../types";
 import { XMarkIcon, PrinterIcon, TableCellsIcon } from "../../../Icons";
 import { sanitizeHtml } from "../../examUtils";
 import { renderMathInHtml } from "../../../../utils/mathRenderer";
+import { SchoolLetterhead } from "../../SchoolLetterhead";
+import { storageService } from "../../../../services/storage";
 
 interface PrintKisiKisiModalProps {
   isOpen: boolean;
@@ -19,6 +21,27 @@ export const PrintKisiKisiModal: React.FC<PrintKisiKisiModalProps> = ({
   teacherProfile,
 }) => {
   const printContainerRef = useRef<HTMLDivElement>(null);
+  const [headerMode, setHeaderMode] = useState<"default" | "kop">("default");
+  const [prevExamCode, setPrevExamCode] = useState(exam?.code);
+  if (exam?.code !== prevExamCode) {
+    setPrevExamCode(exam?.code);
+    setHeaderMode("default");
+  }
+  const [fetchedProfile, setFetchedProfile] = useState<TeacherProfile | null>(null);
+
+  useEffect(() => {
+    let isMounted = true;
+    if (isOpen && !teacherProfile) {
+      storageService.getCurrentUser().then((u) => {
+        if (isMounted && u) setFetchedProfile(u);
+      });
+    }
+    return () => {
+      isMounted = false;
+    };
+  }, [isOpen, teacherProfile]);
+
+  const profile = teacherProfile || fetchedProfile;
 
   // Helper formatting for Indonesian Question Type
   const formatQuestionType = (type?: string) => {
@@ -258,10 +281,38 @@ export const PrintKisiKisiModal: React.FC<PrintKisiKisiModalProps> = ({
         </div>
 
         <div className="flex items-center gap-2">
+          {/* Tombol Pengalihan Tampilan Kop: Default vs Kop Sekolah */}
+          <div className="flex items-center bg-slate-100 dark:bg-slate-700/60 p-0.5 rounded-lg border border-slate-200 dark:border-slate-600">
+            <button
+              type="button"
+              onClick={() => setHeaderMode("default")}
+              className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all cursor-pointer ${
+                headerMode === "default"
+                  ? "bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 shadow-xs"
+                  : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+              }`}
+              title="Tampilkan Kop Standar Bawaan"
+            >
+              Default
+            </button>
+            <button
+              type="button"
+              onClick={() => setHeaderMode("kop")}
+              className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all cursor-pointer ${
+                headerMode === "kop"
+                  ? "bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 shadow-xs"
+                  : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+              }`}
+              title="Tampilkan Kop Resmi Sekolah (Dwibahasa Aksara Bali / Latin)"
+            >
+              Kop Sekolah
+            </button>
+          </div>
+
           <button
             type="button"
             onClick={() => window.print()}
-            className="flex items-center gap-1.5 px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold transition-colors shadow-sm"
+            className="flex items-center gap-1.5 px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold transition-colors shadow-sm cursor-pointer"
             title="Cetak dokumen atau simpan sebagai file PDF"
           >
             <PrinterIcon className="w-4 h-4" />
@@ -270,7 +321,7 @@ export const PrintKisiKisiModal: React.FC<PrintKisiKisiModalProps> = ({
           <button
             type="button"
             onClick={onClose}
-            className="p-1.5 border border-slate-200 dark:border-slate-700 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-400 transition-colors"
+            className="p-1.5 border border-slate-200 dark:border-slate-700 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-400 transition-colors cursor-pointer"
             title="Tutup Pratinjau"
           >
             <XMarkIcon className="w-5 h-5" />
@@ -283,49 +334,86 @@ export const PrintKisiKisiModal: React.FC<PrintKisiKisiModalProps> = ({
         className="print-kisi-kisi-content max-w-4xl mx-auto bg-white p-6 sm:p-10 text-black"
         ref={printContainerRef}
       >
-        {/* Official Indonesian School Exam Header (Kop Dokumen Resmi) */}
-        <div className="print-kisi-kisi-header mb-5 border-b-2 border-black pb-3">
-          <div className="flex items-center justify-between border-b border-black pb-2 mb-2">
-            <div className="text-left">
-              <h2 className="text-sm font-extrabold uppercase tracking-wide text-black leading-tight">
-                {exam.authorSchool || "ASESMEN AKADEMIK / UJIAN SEKOLAH"}
-              </h2>
-              <p className="text-[11px] font-semibold text-slate-700">
+        {/* Render Kop Sekolah Resmi jika mode "kop", atau Kop Dokumen Standar jika mode "default" */}
+        {headerMode === "kop" ? (
+          <div className="print-kisi-kisi-header mb-5 pb-2">
+            <SchoolLetterhead profile={profile} />
+
+            <div className="text-center my-2">
+              <h1 className="text-base font-black uppercase tracking-wider text-black">
+                KISI-KISI PENULISAN SOAL ASESMEN {exam.config?.examType ? `- ${exam.config.examType}` : ""}
+              </h1>
+              <p className="text-xs font-semibold text-slate-700">
                 TAHUN PELAJARAN {currentYear}/{currentYear + 1}
               </p>
             </div>
-            <div className="text-right">
-              <span className="inline-block px-2.5 py-0.5 border border-black font-bold text-[11px] uppercase tracking-wider">
-                KISI-KISI ASESMEN
-              </span>
+
+            <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-left text-xs font-medium border-t border-b border-black py-2 mt-2">
+              <div>
+                <span className="font-bold">Mata Pelajaran:</span> {exam.config?.subject || "-"}
+              </div>
+              <div>
+                <span className="font-bold">Kelas / Tingkat:</span> {exam.config?.grade || exam.config?.class || "-"}
+              </div>
+              <div>
+                <span className="font-bold">Alokasi Waktu:</span> {exam.config?.durationMinutes || 90} Menit
+              </div>
+              <div>
+                <span className="font-bold">Jumlah Soal:</span> {actualQuestionsCount} Butir
+              </div>
+              <div>
+                <span className="font-bold">Guru Pengampu:</span> {exam.author || profile?.fullName || "-"}
+              </div>
+              <div>
+                <span className="font-bold">Total Bobot Skor:</span> {totalScoreWeight}
+              </div>
             </div>
           </div>
+        ) : (
+          /* Official Indonesian School Exam Header (Kop Dokumen Resmi) */
+          <div className="print-kisi-kisi-header mb-5 border-b-2 border-black pb-3">
+            <div className="flex items-center justify-between border-b border-black pb-2 mb-2">
+              <div className="text-left">
+                <h2 className="text-sm font-extrabold uppercase tracking-wide text-black leading-tight">
+                  {exam.authorSchool || profile?.school || "ASESMEN AKADEMIK / UJIAN SEKOLAH"}
+                </h2>
+                <p className="text-[11px] font-semibold text-slate-700">
+                  TAHUN PELAJARAN {currentYear}/{currentYear + 1}
+                </p>
+              </div>
+              <div className="text-right">
+                <span className="inline-block px-2.5 py-0.5 border border-black font-bold text-[11px] uppercase tracking-wider">
+                  KISI-KISI ASESMEN
+                </span>
+              </div>
+            </div>
 
-          <h1 className="text-base font-black uppercase tracking-wider text-black text-center my-1.5">
-            KISI-KISI PENULISAN SOAL ASESMEN {exam.config?.examType ? `- ${exam.config.examType}` : ""}
-          </h1>
+            <h1 className="text-base font-black uppercase tracking-wider text-black text-center my-1.5">
+              KISI-KISI PENULISAN SOAL ASESMEN {exam.config?.examType ? `- ${exam.config.examType}` : ""}
+            </h1>
 
-          <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-left text-xs font-medium border-t border-slate-300 pt-2 mt-2">
-            <div>
-              <span className="font-bold">Mata Pelajaran:</span> {exam.config?.subject || "-"}
-            </div>
-            <div>
-              <span className="font-bold">Kelas / Tingkat:</span> {exam.config?.grade || exam.config?.class || "-"}
-            </div>
-            <div>
-              <span className="font-bold">Alokasi Waktu:</span> {exam.config?.durationMinutes || 90} Menit
-            </div>
-            <div>
-              <span className="font-bold">Jumlah Soal:</span> {actualQuestionsCount} Butir
-            </div>
-            <div>
-              <span className="font-bold">Guru Pengampu:</span> {exam.author || "-"}
-            </div>
-            <div>
-              <span className="font-bold">Total Bobot Skor:</span> {totalScoreWeight}
+            <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-left text-xs font-medium border-t border-slate-300 pt-2 mt-2">
+              <div>
+                <span className="font-bold">Mata Pelajaran:</span> {exam.config?.subject || "-"}
+              </div>
+              <div>
+                <span className="font-bold">Kelas / Tingkat:</span> {exam.config?.grade || exam.config?.class || "-"}
+              </div>
+              <div>
+                <span className="font-bold">Alokasi Waktu:</span> {exam.config?.durationMinutes || 90} Menit
+              </div>
+              <div>
+                <span className="font-bold">Jumlah Soal:</span> {actualQuestionsCount} Butir
+              </div>
+              <div>
+                <span className="font-bold">Guru Pengampu:</span> {exam.author || profile?.fullName || "-"}
+              </div>
+              <div>
+                <span className="font-bold">Total Bobot Skor:</span> {totalScoreWeight}
+              </div>
             </div>
           </div>
-        </div>
+        )}
 
         {/* 6-Column Standard Kisi-Kisi Table */}
         <div className="overflow-x-auto my-3">
