@@ -102,22 +102,35 @@ export const SchoolLetterhead: React.FC<SchoolLetterheadProps> = ({
 
   const dividerStyle = merged.kopDividerStyle || "double";
 
+  // Dynamic logo container & style based on isAksaraBali active status
+  const logoContainerClass = isAksaraBali
+    ? "w-16 h-16 sm:w-20 sm:h-20 shrink-0 self-center flex items-center justify-center"
+    : "w-12 h-12 sm:w-14 sm:h-14 shrink-0 self-center flex items-center justify-center";
+
+  const logoImgClass = isAksaraBali
+    ? "school-letterhead-logo max-h-16 sm:max-h-20 max-w-full object-contain"
+    : "school-letterhead-logo max-h-12 sm:max-h-14 max-w-full object-contain";
+
+  const logoImageStyle: React.CSSProperties = isAksaraBali
+    ? { maxHeight: "72px", maxWidth: "75px", width: "auto", height: "auto", objectFit: "contain", mixBlendMode: "multiply" }
+    : { maxHeight: "54px", maxWidth: "58px", width: "auto", height: "auto", objectFit: "contain", mixBlendMode: "multiply" };
+
   return (
     <div
       className={`school-letterhead-root w-full bg-white text-black font-sans select-none ${className}`}
     >
       <div className="flex items-center justify-between gap-3 sm:gap-4 pb-2">
         {/* Left Logo (Logo Dinas Pendidikan / Pemda) */}
-        <div className="w-14 h-14 sm:w-16 sm:h-16 shrink-0 flex items-center justify-center">
+        <div className={logoContainerClass}>
           {merged.logoDinasUrl ? (
             <img
               src={merged.logoDinasUrl}
               alt="Logo Dinas"
-              className="school-letterhead-logo max-h-14 sm:max-h-16 max-w-full object-contain"
-              style={{ maxHeight: "60px", maxWidth: "65px", width: "auto", height: "auto", objectFit: "contain", mixBlendMode: "multiply" }}
+              className={logoImgClass}
+              style={logoImageStyle}
             />
           ) : (
-            <div className="w-14 h-14 sm:w-16 sm:h-16 bg-slate-100 border border-slate-300 rounded-lg flex flex-col items-center justify-center text-slate-400 text-[9px] sm:text-[10px] font-bold p-1 text-center print:border-none print:bg-transparent">
+            <div className={`${logoContainerClass} bg-slate-100 border border-slate-300 rounded-lg flex flex-col items-center justify-center text-slate-400 text-[9px] sm:text-[10px] font-bold p-1 text-center print:border-none print:bg-transparent`}>
               <span className="hidden print:inline-block"></span>
               <span className="print:hidden">Logo Dinas</span>
             </div>
@@ -187,16 +200,16 @@ export const SchoolLetterhead: React.FC<SchoolLetterheadProps> = ({
         </div>
 
         {/* Right Logo (Logo Sekolah) */}
-        <div className="w-14 h-14 sm:w-16 sm:h-16 shrink-0 flex items-center justify-center">
+        <div className={logoContainerClass}>
           {merged.logoSekolahUrl ? (
             <img
               src={merged.logoSekolahUrl}
               alt="Logo Sekolah"
-              className="school-letterhead-logo max-h-14 sm:max-h-16 max-w-full object-contain"
-              style={{ maxHeight: "60px", maxWidth: "65px", width: "auto", height: "auto", objectFit: "contain", mixBlendMode: "multiply" }}
+              className={logoImgClass}
+              style={logoImageStyle}
             />
           ) : (
-            <div className="w-14 h-14 sm:w-16 sm:h-16 bg-slate-100 border border-slate-300 rounded-lg flex flex-col items-center justify-center text-slate-400 text-[9px] sm:text-[10px] font-bold p-1 text-center print:border-none print:bg-transparent">
+            <div className={`${logoContainerClass} bg-slate-100 border border-slate-300 rounded-lg flex flex-col items-center justify-center text-slate-400 text-[9px] sm:text-[10px] font-bold p-1 text-center print:border-none print:bg-transparent`}>
               <span className="hidden print:inline-block"></span>
               <span className="print:hidden">Logo Sekolah</span>
             </div>
