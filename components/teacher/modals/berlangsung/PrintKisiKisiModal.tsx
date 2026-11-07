@@ -154,8 +154,8 @@ export const PrintKisiKisiModal: React.FC<PrintKisiKisiModalProps> = ({
 
           .school-letterhead-root img,
           .school-letterhead-logo {
-            max-width: 65px !important;
-            max-height: 65px !important;
+            max-width: 78px !important;
+            max-height: 78px !important;
             width: auto !important;
             height: auto !important;
             object-fit: contain !important;
