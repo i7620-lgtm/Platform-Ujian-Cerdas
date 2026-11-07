@@ -15,7 +15,20 @@ import {
 import type { TeacherProfile, NipType } from "../../types";
 import { storageService } from "../../services/storage";
 import { uploadToCloudinary } from "../../services/cloudinary";
+import { processImageOuterTransparency } from "../../utils/imageTransparency";
 import { SchoolLetterheadDesignerModal } from "./modals/SchoolLetterheadDesignerModal";
+
+function dataURLtoFile(dataurl: string, filename: string): File {
+  const arr = dataurl.split(",");
+  const mime = arr[0].match(/:(.*?);/)?.[1] || "image/png";
+  const bstr = atob(arr[1]);
+  let n = bstr.length;
+  const u8arr = new Uint8Array(n);
+  while (n--) {
+    u8arr[n] = bstr.charCodeAt(n);
+  }
+  return new File([u8arr], filename, { type: mime });
+}
 
 interface TeacherProfileModalProps {
   isOpen: boolean;
@@ -117,7 +130,7 @@ export const TeacherProfileModal: React.FC<TeacherProfileModalProps> = ({
 
   if (!isOpen) return null;
 
-  // Handle Cloudinary upload for logos
+  // Handle Cloudinary upload for logos with outer background transparency
   const handleUploadLogo = async (
     e: React.ChangeEvent<HTMLInputElement>,
     type: "sekolah" | "dinas",
@@ -127,19 +140,16 @@ export const TeacherProfileModal: React.FC<TeacherProfileModalProps> = ({
 
     setUploadingLogo(type);
     try {
-      const secureUrl = await uploadToCloudinary(file, `${type}_logo_${Date.now()}`);
+      const transparentDataUrl = await processImageOuterTransparency(file);
+      const transparentFile = dataURLtoFile(transparentDataUrl, `${type}_logo_${Date.now()}.png`);
+
+      const secureUrl = await uploadToCloudinary(transparentFile, `${type}_logo_${Date.now()}`);
       if (secureUrl) {
         if (type === "sekolah") setLogoSekolahUrl(secureUrl);
         else setLogoDinasUrl(secureUrl);
       } else {
-        // Fallback to local Data URL
-        const reader = new FileReader();
-        reader.onload = (event) => {
-          const result = event.target?.result as string;
-          if (type === "sekolah") setLogoSekolahUrl(result);
-          else setLogoDinasUrl(result);
-        };
-        reader.readAsDataURL(file);
+        if (type === "sekolah") setLogoSekolahUrl(transparentDataUrl);
+        else setLogoDinasUrl(transparentDataUrl);
       }
     } catch (err) {
       console.error("Gagal mengunggah logo:", err);
