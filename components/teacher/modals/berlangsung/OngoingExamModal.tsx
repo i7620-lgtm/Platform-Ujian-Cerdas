@@ -880,6 +880,7 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
         isOpen={isPrintModalOpen}
         onClose={() => setIsPrintModalOpen(false)}
         exam={displayExam}
+        teacherProfile={teacherProfile}
       />
 
       <PrintKisiKisiModal
