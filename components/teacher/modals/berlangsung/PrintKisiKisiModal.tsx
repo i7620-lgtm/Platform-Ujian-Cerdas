@@ -152,6 +152,16 @@ export const PrintKisiKisiModal: React.FC<PrintKisiKisiModalProps> = ({
             line-height: 1.4 !important;
           }
 
+          .school-letterhead-root img,
+          .school-letterhead-logo {
+            max-width: 65px !important;
+            max-height: 65px !important;
+            width: auto !important;
+            height: auto !important;
+            object-fit: contain !important;
+            margin: 0 auto !important;
+          }
+
           .print-kisi-kisi-header {
             break-after: avoid !important;
             page-break-after: avoid !important;
