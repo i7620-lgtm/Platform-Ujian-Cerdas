@@ -254,8 +254,17 @@ export const PrintKunciJawabanModal: React.FC<PrintKunciJawabanModalProps> = ({
             width: auto !important;
             height: auto !important;
           }
-          .print-kunci-content img,
-          .print-kunci-content svg:not(.katex *):not(.lucide):not(.geometry-shape *):not(.geometry-shape) {
+          .school-letterhead-root img,
+          .school-letterhead-logo {
+            max-width: 65px !important;
+            max-height: 65px !important;
+            width: auto !important;
+            height: auto !important;
+            object-fit: contain !important;
+            margin: 0 auto !important;
+          }
+          .print-kunci-content img:not(.school-letterhead-root *),
+          .print-kunci-content svg:not(.katex *):not(.lucide):not(.geometry-shape *):not(.geometry-shape):not(.school-letterhead-root *) {
             max-width: 280px !important;
             width: auto !important;
             max-height: 220px !important;
@@ -287,6 +296,16 @@ export const PrintKunciJawabanModal: React.FC<PrintKunciJawabanModalProps> = ({
         }
 
         /* Screen Preview Rules for Print Kunci Modal Container */
+        .school-letterhead-root img,
+        .school-letterhead-logo {
+          max-width: 65px !important;
+          max-height: 65px !important;
+          width: auto !important;
+          height: auto !important;
+          object-fit: contain !important;
+          margin: 0 auto !important;
+        }
+
         .print-kunci-content .geometry-shape {
           display: block !important;
           max-width: 250px !important;
@@ -302,8 +321,8 @@ export const PrintKunciJawabanModal: React.FC<PrintKunciJawabanModalProps> = ({
           width: auto !important;
           height: auto !important;
         }
-        .print-kunci-content img,
-        .print-kunci-content svg:not(.katex *):not(.lucide):not(.geometry-shape *):not(.geometry-shape) {
+        .print-kunci-content img:not(.school-letterhead-root *),
+        .print-kunci-content svg:not(.katex *):not(.lucide):not(.geometry-shape *):not(.geometry-shape):not(.school-letterhead-root *) {
           max-width: 280px !important;
           width: auto !important;
           max-height: 220px !important;
@@ -417,33 +436,23 @@ export const PrintKunciJawabanModal: React.FC<PrintKunciJawabanModalProps> = ({
               <div className="flex items-center justify-between border-b border-black pb-2 mb-2">
                 <div className="text-left">
                   <h2 className="text-sm font-extrabold uppercase tracking-wide text-black leading-tight">
-                    {exam.config?.dinasName || profile?.dinasPendidikan || "PEMERINTAH DAERAH"}
+                    {exam.authorSchool || profile?.school || "SATUAN PENDIDIKAN"}
                   </h2>
-                  <h1 className="text-base font-black uppercase text-black leading-tight">
-                    {exam.config?.schoolName || exam.authorSchool || profile?.school || "SATUAN PENDIDIKAN"}
-                  </h1>
-                  {(exam.config?.schoolAddress || profile?.alamatSekolah) && (
-                    <p className="text-[10px] text-gray-700 font-medium">
-                      {exam.config?.schoolAddress || profile?.alamatSekolah}
-                    </p>
-                  )}
+                  <p className="text-[11px] font-semibold text-slate-700">
+                    TAHUN PELAJARAN {currentYear}/{currentYear + 1}
+                  </p>
                 </div>
-                {(exam.config?.schoolLogo || profile?.logoSekolahUrl) && (
-                  <img
-                    src={exam.config?.schoolLogo || profile?.logoSekolahUrl}
-                    alt="Logo Sekolah"
-                    className="w-12 h-12 object-contain ml-3 shrink-0"
-                  />
-                )}
+                <div className="text-right">
+                  <span className="inline-block px-2.5 py-0.5 border border-black font-bold text-[11px] uppercase tracking-wider">
+                    KUNCI JAWABAN
+                  </span>
+                </div>
               </div>
 
               <div className="text-center my-3">
                 <h3 className="text-sm font-extrabold uppercase tracking-wider text-black underline underline-offset-4">
                   KUNCI JAWABAN & PEDOMAN PENILAIAN
                 </h3>
-                <p className="text-xs font-bold text-gray-800 uppercase mt-1">
-                  TAHUN PELAJARAN {currentYear}/{currentYear + 1}
-                </p>
               </div>
             </div>
           )}
