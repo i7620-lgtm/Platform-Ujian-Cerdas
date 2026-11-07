@@ -43,29 +43,51 @@ export const SchoolLetterhead: React.FC<SchoolLetterheadProps> = ({
   const schoolText =
     merged.school || "SEKOLAH DASAR NEGERI 2 PADANGSAMBIAN";
 
-  // Address formatting (2nd line from bottom - WITH Aksara Bali)
-  const addressParts: string[] = [];
-  if (merged.alamatSekolah) addressParts.push(merged.alamatSekolah);
-  if (merged.desaKelurahan) addressParts.push(`Desa/Kel. ${merged.desaKelurahan}`);
-  if (merged.kecamatan) addressParts.push(`Kec. ${merged.kecamatan}`);
-  if (merged.kodePos) addressParts.push(`Kode Pos: ${merged.kodePos}`);
+  // 1. Gather address items in order from left to right
+  const rawAddressItems: string[] = [];
+  if (merged.alamatSekolah) rawAddressItems.push(merged.alamatSekolah);
+  if (merged.desaKelurahan) rawAddressItems.push(`Desa/Kel. ${merged.desaKelurahan}`);
+  if (merged.kecamatan) rawAddressItems.push(`Kec. ${merged.kecamatan}`);
+  if (merged.kodePos) rawAddressItems.push(`Kode Pos: ${merged.kodePos}`);
+
+  // 2. Gather contact items
+  const baseContactItems: string[] = [];
+  if (merged.teleponSekolah) baseContactItems.push(`Telepon: ${merged.teleponSekolah}`);
+  if (merged.faksimile) baseContactItems.push(`Faks: ${merged.faksimile}`);
+  if (merged.emailSekolah) baseContactItems.push(`Email: ${merged.emailSekolah}`);
+  if (merged.websiteSekolah) baseContactItems.push(`Website: ${merged.websiteSekolah}`);
+  if (merged.npsn) baseContactItems.push(`NPSN: ${merged.npsn}`);
+
+  // 3. Dynamic overflow split algorithm: Ensure Balinese script line fits in a single line (~62 chars)
+  const currentAddressItems = [...rawAddressItems];
+  const overflowAddressItems: string[] = [];
+
+  const hasCustomAksaraAlamat = Boolean(merged.aksaraBaliAlamat);
+
+  if (!hasCustomAksaraAlamat && isAksaraBali && currentAddressItems.length > 1) {
+    while (currentAddressItems.length > 1) {
+      const candidateAddress = currentAddressItems.join(", ");
+      const candidateBalinese = transliterateToAksaraBali(candidateAddress);
+
+      if (candidateBalinese.length <= 62) {
+        break;
+      }
+      const popped = currentAddressItems.pop();
+      if (popped) {
+        overflowAddressItems.unshift(popped);
+      }
+    }
+  }
 
   const alamatText =
-    addressParts.length > 0
-      ? addressParts.join(", ")
+    currentAddressItems.length > 0
+      ? currentAddressItems.join(", ")
       : "Jalan Kebo Iwa Banjar Batuparas";
 
-  // Contact formatting (Bottom-most line - WITHOUT Aksara Bali)
-  const contactParts: string[] = [];
-  if (merged.teleponSekolah) contactParts.push(`Telepon: ${merged.teleponSekolah}`);
-  if (merged.faksimile) contactParts.push(`Faks: ${merged.faksimile}`);
-  if (merged.emailSekolah) contactParts.push(`Email: ${merged.emailSekolah}`);
-  if (merged.websiteSekolah) contactParts.push(`Website: ${merged.websiteSekolah}`);
-  if (merged.npsn) contactParts.push(`NPSN: ${merged.npsn}`);
-
+  const allContactItems = [...overflowAddressItems, ...baseContactItems];
   const kontakText =
-    contactParts.length > 0
-      ? contactParts.join(" | ")
+    allContactItems.length > 0
+      ? allContactItems.join(" | ")
       : "Telepon: (0361) 9093558";
 
   // Aksara Bali texts (user customized or auto-transliterated ONLY for address line)
@@ -92,7 +114,7 @@ export const SchoolLetterhead: React.FC<SchoolLetterheadProps> = ({
               src={merged.logoDinasUrl}
               alt="Logo Dinas"
               className="school-letterhead-logo max-h-14 sm:max-h-16 max-w-full object-contain"
-              style={{ maxHeight: "60px", maxWidth: "65px", width: "auto", height: "auto", objectFit: "contain" }}
+              style={{ maxHeight: "60px", maxWidth: "65px", width: "auto", height: "auto", objectFit: "contain", mixBlendMode: "multiply" }}
             />
           ) : (
             <div className="w-14 h-14 sm:w-16 sm:h-16 bg-slate-100 border border-slate-300 rounded-lg flex flex-col items-center justify-center text-slate-400 text-[9px] sm:text-[10px] font-bold p-1 text-center print:border-none print:bg-transparent">
@@ -143,7 +165,7 @@ export const SchoolLetterhead: React.FC<SchoolLetterheadProps> = ({
             {schoolText}
           </h1>
 
-          {/* Baris 4 (Kedua paling bawah): Alamat Sekolah (Dengan Aksara Bali) */}
+          {/* Baris 4 (Kedua paling bawah): Alamat Utama Sekolah (Dengan Aksara Bali 1 baris) */}
           {isAksaraBali && aksaraAlamat && (
             <p
               className="aksara-bali text-[10px] sm:text-xs text-black leading-snug font-normal tracking-tight pt-0.5"
@@ -156,7 +178,7 @@ export const SchoolLetterhead: React.FC<SchoolLetterheadProps> = ({
             {alamatText}
           </p>
 
-          {/* Baris 5 (Paling bawah): Kontak & Identitas Digital (TANPA Aksara Bali) */}
+          {/* Baris 5 (Paling bawah): Overflow Alamat + Kontak & Identitas Digital (TANPA Aksara Bali) */}
           {kontakText && (
             <p className="text-[9.5px] sm:text-[10.5px] text-slate-700 font-medium leading-tight pt-0.5">
               {kontakText}
@@ -171,7 +193,7 @@ export const SchoolLetterhead: React.FC<SchoolLetterheadProps> = ({
               src={merged.logoSekolahUrl}
               alt="Logo Sekolah"
               className="school-letterhead-logo max-h-14 sm:max-h-16 max-w-full object-contain"
-              style={{ maxHeight: "60px", maxWidth: "65px", width: "auto", height: "auto", objectFit: "contain" }}
+              style={{ maxHeight: "60px", maxWidth: "65px", width: "auto", height: "auto", objectFit: "contain", mixBlendMode: "multiply" }}
             />
           ) : (
             <div className="w-14 h-14 sm:w-16 sm:h-16 bg-slate-100 border border-slate-300 rounded-lg flex flex-col items-center justify-center text-slate-400 text-[9px] sm:text-[10px] font-bold p-1 text-center print:border-none print:bg-transparent">
