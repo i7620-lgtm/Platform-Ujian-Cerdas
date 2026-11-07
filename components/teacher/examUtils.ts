@@ -2325,7 +2325,7 @@ export const sanitizeHtml = (html: string): string => {
       return;
     }
     const wrapper = doc.createElement("div");
-    wrapper.className = "w-full overflow-x-auto custom-scrollbar";
+    wrapper.className = "max-w-full overflow-x-auto my-2 custom-scrollbar";
     table.parentNode?.insertBefore(wrapper, table);
     wrapper.appendChild(table);
   });
