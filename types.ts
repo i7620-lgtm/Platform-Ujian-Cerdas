@@ -279,6 +279,27 @@ export interface TeacherProfile {
     avatarUrl?: string;
     email?: string; // Added for user management display
     isPremium?: boolean; // Added for Premium Tier
+
+    // --- Data Instansi Pendidikan & Kop Sekolah ---
+    dinasPendidikan?: string; // Nama Dinas Pendidikan (misal: Dinas Pendidikan Kepemudaan dan Olahraga)
+    npsn?: string; // Nomor Pokok Sekolah Nasional
+    alamatSekolah?: string; // Alamat Jalan Sekolah
+    desaKelurahan?: string; // Desa atau Kelurahan
+    kecamatan?: string; // Kecamatan
+    provinsi?: string; // Provinsi
+    kodePos?: string; // Kode Pos
+    emailSekolah?: string; // Email Resmi Sekolah
+    teleponSekolah?: string; // Telepon Sekolah
+    websiteSekolah?: string; // Website Sekolah
+    faksimile?: string; // Faksimile Sekolah
+    logoSekolahUrl?: string; // URL Logo Sekolah (Cloudinary)
+    logoDinasUrl?: string; // URL Logo Dinas / Pemda (Cloudinary)
+    isAksaraBaliActive?: boolean; // Sakelar Aksara Bali Aktif / Nonaktif
+    aksaraBaliPemda?: string; // Teks Aksara Bali baris 1 (Pemda/Pemerintah Kabupaten/Kota)
+    aksaraBaliDinas?: string; // Teks Aksara Bali baris 2 (Dinas Pendidikan)
+    aksaraBaliSekolah?: string; // Teks Aksara Bali baris 3 (Nama Sekolah)
+    aksaraBaliAlamat?: string; // Teks Aksara Bali baris 4 (Alamat / Kontak)
+    kopDividerStyle?: 'double' | 'single' | 'bold'; // Gaya garis kop surat
 }
 
 export interface UserProfile extends TeacherProfile {
