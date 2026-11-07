@@ -75,19 +75,32 @@ export const CartesianChart: React.FC<{ data: ChartData; className?: string }> =
     return undefined;
   };
 
-  const svgRef = useRef<SVGSVGElement>(null);
+  const chartBoxRef = useRef<HTMLDivElement>(null);
 
   const handleOpenFullscreen = () => {
-    if (svgRef.current) {
+    if (chartBoxRef.current) {
+      const clone = chartBoxRef.current.cloneNode(true) as HTMLElement;
+      clone.querySelectorAll(".no-lightbox").forEach((el) => el.remove());
+
+      const svgEl = clone.querySelector("svg");
+      if (svgEl) {
+        if (!svgEl.getAttribute("viewBox")) {
+          svgEl.setAttribute("viewBox", `0 0 ${w} ${h}`);
+        }
+        svgEl.style.width = "100%";
+        svgEl.style.height = "auto";
+        svgEl.style.maxHeight = "60vh";
+      }
+
       openVisualLightbox({
-        svgHtml: svgRef.current.outerHTML,
+        htmlContent: clone.innerHTML,
         title: data.title || "Diagram Kartesius Soal",
       });
     }
   };
 
   return (
-    <div className={`w-full flex flex-col items-center justify-center relative select-none group my-1 ${className}`}>
+    <div ref={chartBoxRef} className={`w-full flex flex-col items-center justify-center relative select-none group my-1 ${className}`}>
       {data.title && (
         <div className="text-center font-bold text-slate-800 dark:text-slate-100 text-xs sm:text-sm mb-1 truncate max-w-full px-2">
           {data.title}
