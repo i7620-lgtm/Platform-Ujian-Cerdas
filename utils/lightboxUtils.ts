@@ -1,7 +1,10 @@
+import { ChartData } from "../types";
+
 export interface LightboxData {
   src?: string;
   svgHtml?: string;
   htmlContent?: string;
+  chartData?: ChartData;
   title?: string;
   alt?: string;
 }
