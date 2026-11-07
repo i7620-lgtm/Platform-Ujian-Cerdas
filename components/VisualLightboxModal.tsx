@@ -2,6 +2,30 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import { X, ZoomIn, ZoomOut, RotateCcw, Maximize2 } from "lucide-react";
 import { LightboxData, openVisualLightbox } from "../utils/lightboxUtils";
 
+function processSvgStringsInHtml(html: string): string {
+  if (!html || typeof window === "undefined") return html;
+  try {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(html, "text/html");
+    const svgs = doc.querySelectorAll("svg");
+    svgs.forEach((svg) => {
+      if (!svg.getAttribute("viewBox")) {
+        const bbox = svg.getBoundingClientRect();
+        const w = bbox.width || parseFloat(svg.getAttribute("width") || "500") || 500;
+        const h = bbox.height || parseFloat(svg.getAttribute("height") || "350") || 350;
+        svg.setAttribute("viewBox", `0 0 ${w} ${h}`);
+      }
+      if (!svg.getAttribute("width")) {
+        svg.setAttribute("width", "100%");
+      }
+    });
+    return doc.body.innerHTML;
+  } catch (err) {
+    console.warn("Failed to process SVG in lightbox HTML:", err);
+    return html;
+  }
+}
+
 export const VisualLightboxModal: React.FC = () => {
   const [data, setData] = useState<LightboxData | null>(null);
   const [scale, setScale] = useState<number>(1);
@@ -61,12 +85,19 @@ export const VisualLightboxModal: React.FC = () => {
       if (!target) return;
 
       // Ignore clicks on buttons, links, inputs, or inside an active modal
-      if (target.closest("button") || target.closest("a") || target.closest("input") || target.closest(".no-lightbox")) {
+      if (
+        target.closest("button") ||
+        target.closest("a") ||
+        target.closest("input") ||
+        target.closest(".no-lightbox")
+      ) {
         return;
       }
 
       // 1. Check if an <img> was clicked inside wysiwyg/prose/options
-      const img = target.closest(".wysiwyg-content img, .prose img, .option-content img, .zoomable-visual img") as HTMLImageElement | null;
+      const img = target.closest(
+        ".wysiwyg-content img, .prose img, .option-content img, .zoomable-visual img"
+      ) as HTMLImageElement | null;
       if (img && img.src && !img.closest(".print-container")) {
         e.stopPropagation();
         openVisualLightbox({
@@ -77,14 +108,26 @@ export const VisualLightboxModal: React.FC = () => {
         return;
       }
 
-      // 2. Check if an SVG diagram or cartesian chart was clicked
+      // 2. Check if geometry shape or visual container was clicked
+      const geomBox = target.closest(".geometry-shape, .zoomable-visual") as HTMLElement | null;
+      if (geomBox && !geomBox.closest(".print-container")) {
+        e.stopPropagation();
+        const clone = geomBox.cloneNode(true) as HTMLElement;
+        clone.querySelectorAll(".no-lightbox").forEach((el) => el.remove());
+        openVisualLightbox({
+          htmlContent: clone.outerHTML,
+          title: "Tampilan Visual & Geometri Soal",
+        });
+        return;
+      }
+
+      // 3. Check if an SVG diagram or cartesian chart was clicked
       const svg = target.closest(
-        ".wysiwyg-content svg:not(.katex *), .prose svg:not(.katex *), .option-content svg:not(.katex *), .geometry-shape svg, .zoomable-svg"
+        ".wysiwyg-content svg:not(.katex *), .prose svg:not(.katex *), .option-content svg:not(.katex *), .zoomable-svg"
       ) as SVGSVGElement | null;
       if (svg && !svg.closest(".katex") && !svg.closest(".lucide")) {
-        // Only open if clicked on contentful SVG
         const rect = svg.getBoundingClientRect();
-        if (rect.width > 60 && rect.height > 60) {
+        if (rect.width > 40 && rect.height > 40) {
           e.stopPropagation();
           openVisualLightbox({
             svgHtml: svg.outerHTML,
@@ -141,7 +184,7 @@ export const VisualLightboxModal: React.FC = () => {
     >
       {/* Top Header Bar */}
       <div
-        className="w-full max-w-5xl flex items-center justify-between text-white py-2 px-3 sm:px-4 bg-slate-900/80 rounded-2xl border border-white/10 backdrop-blur-md shadow-2xl z-10 shrink-0"
+        className="w-full max-w-5xl flex items-center justify-between text-white py-2 px-3 sm:px-4 bg-slate-900/90 rounded-2xl border border-white/10 backdrop-blur-md shadow-2xl z-10 shrink-0"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center gap-2.5 min-w-0 pr-2">
@@ -217,7 +260,7 @@ export const VisualLightboxModal: React.FC = () => {
             transform: `translate(${position.x}px, ${position.y}px) scale(${scale})`,
             cursor: scale > 1 ? (isDragging ? "grabbing" : "grab") : "default",
           }}
-          className="transition-transform duration-75 ease-out max-w-[92vw] max-h-[82vh] flex items-center justify-center p-2 rounded-2xl bg-white dark:bg-slate-900 border border-white/20 shadow-2xl"
+          className="transition-transform duration-75 ease-out max-w-[92vw] max-h-[82vh] flex items-center justify-center p-3 sm:p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl"
         >
           {data.src ? (
             <img
@@ -226,10 +269,15 @@ export const VisualLightboxModal: React.FC = () => {
               className="max-w-[88vw] max-h-[78vh] w-auto h-auto object-contain rounded-xl select-none"
               draggable={false}
             />
+          ) : data.htmlContent ? (
+            <div
+              className="lightbox-html-container max-w-[88vw] max-h-[78vh] w-full overflow-y-auto flex flex-col items-center justify-center p-3 sm:p-5 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 rounded-xl select-none [&_svg]:max-w-full [&_svg]:max-h-[62vh] [&_svg]:w-auto [&_svg]:h-auto [&_svg]:min-w-[280px] [&_svg]:min-h-[200px] [&_svg]:mx-auto"
+              dangerouslySetInnerHTML={{ __html: processSvgStringsInHtml(data.htmlContent) }}
+            />
           ) : data.svgHtml ? (
             <div
-              className="lightbox-svg-container max-w-[88vw] max-h-[78vh] flex items-center justify-center select-none [&_svg]:max-w-full [&_svg]:max-h-[75vh] [&_svg]:h-auto [&_svg]:w-auto"
-              dangerouslySetInnerHTML={{ __html: data.svgHtml }}
+              className="lightbox-svg-container max-w-[88vw] max-h-[78vh] flex items-center justify-center select-none p-3 sm:p-5 bg-white dark:bg-slate-900 rounded-xl [&_svg]:max-w-full [&_svg]:max-h-[72vh] [&_svg]:min-w-[280px] [&_svg]:min-h-[200px] [&_svg]:w-auto [&_svg]:h-auto [&_svg]:mx-auto"
+              dangerouslySetInnerHTML={{ __html: processSvgStringsInHtml(data.svgHtml) }}
             />
           ) : null}
         </div>
