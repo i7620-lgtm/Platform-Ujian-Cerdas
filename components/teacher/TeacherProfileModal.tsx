@@ -690,79 +690,117 @@ export const TeacherProfileModal: React.FC<TeacherProfileModalProps> = ({
               </div>
             </div>
 
-            {/* Grid 5: Upload Logo Dinas & Logo Sekolah (Cloudinary Direct) */}
+            {/* Grid 5: Upload Logo Dinas & Logo Sekolah */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1 border-t border-slate-200/60 dark:border-slate-700/60">
               {/* Logo Dinas */}
               <div className="flex items-center gap-2.5 p-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl">
-                <div className="w-10 h-10 bg-slate-100 dark:bg-slate-700 rounded-lg border border-slate-200 dark:border-slate-600 flex items-center justify-center shrink-0 overflow-hidden">
+                <label
+                  className="relative w-10 h-10 bg-slate-100 hover:bg-slate-200 dark:bg-slate-700/70 dark:hover:bg-slate-700 rounded-lg border border-dashed border-slate-300 dark:border-slate-600 flex items-center justify-center shrink-0 overflow-hidden cursor-pointer group transition-colors"
+                  title="Klik untuk memilih logo Dinas / Pemda"
+                >
                   {logoDinasUrl ? (
-                    <img src={logoDinasUrl} alt="Logo Dinas" className="w-full h-full object-contain p-0.5" />
+                    <img src={logoDinasUrl} alt="Logo Dinas" className="w-full h-full object-contain p-0.5 group-hover:opacity-75 transition-opacity" />
                   ) : (
-                    <PhotoIcon className="w-4 h-4 text-slate-400" />
+                    <PhotoIcon className="w-4 h-4 text-slate-400 group-hover:text-indigo-500 transition-colors" />
                   )}
-                </div>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => handleUploadLogo(e, "dinas")}
+                    className="hidden"
+                    disabled={uploadingLogo !== null}
+                  />
+                </label>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between">
-                    <p className="text-[10.5px] font-bold text-slate-700 dark:text-slate-300 truncate">
+                    <label
+                      className="text-[10.5px] font-bold text-slate-700 dark:text-slate-300 truncate cursor-pointer hover:text-indigo-600 dark:hover:text-indigo-400"
+                      title="Klik untuk memilih logo"
+                    >
                       Logo Dinas Pendidikan / Pemda
-                    </p>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) => handleUploadLogo(e, "dinas")}
+                        className="hidden"
+                        disabled={uploadingLogo !== null}
+                      />
+                    </label>
                     {logoDinasUrl && (
                       <button
                         type="button"
                         onClick={() => setLogoDinasUrl("")}
-                        className="text-[9.5px] text-rose-500 hover:underline cursor-pointer"
+                        className="text-[9.5px] text-rose-500 hover:underline cursor-pointer ml-1 shrink-0"
                       >
                         Hapus
                       </button>
                     )}
                   </div>
-                  <label className="inline-block mt-0.5 text-[10px] font-bold text-indigo-600 dark:text-indigo-400 hover:underline cursor-pointer">
-                    <span>{uploadingLogo === "dinas" ? "Mengunggah..." : "Upload Logo (Cloudinary)"}</span>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={(e) => handleUploadLogo(e, "dinas")}
-                      className="hidden"
-                      disabled={uploadingLogo !== null}
-                    />
-                  </label>
+                  {uploadingLogo === "dinas" ? (
+                    <span className="inline-block mt-0.5 text-[9.5px] font-bold text-indigo-600 dark:text-indigo-400 animate-pulse">
+                      Mengunggah...
+                    </span>
+                  ) : (
+                    <p className="text-[9.5px] text-slate-400 dark:text-slate-500 truncate mt-0.5">
+                      {logoDinasUrl ? "Klik logo untuk mengganti" : "Klik untuk memilih gambar"}
+                    </p>
+                  )}
                 </div>
               </div>
 
               {/* Logo Sekolah */}
               <div className="flex items-center gap-2.5 p-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl">
-                <div className="w-10 h-10 bg-slate-100 dark:bg-slate-700 rounded-lg border border-slate-200 dark:border-slate-600 flex items-center justify-center shrink-0 overflow-hidden">
+                <label
+                  className="relative w-10 h-10 bg-slate-100 hover:bg-slate-200 dark:bg-slate-700/70 dark:hover:bg-slate-700 rounded-lg border border-dashed border-slate-300 dark:border-slate-600 flex items-center justify-center shrink-0 overflow-hidden cursor-pointer group transition-colors"
+                  title="Klik untuk memilih logo Sekolah / Tut Wuri"
+                >
                   {logoSekolahUrl ? (
-                    <img src={logoSekolahUrl} alt="Logo Sekolah" className="w-full h-full object-contain p-0.5" />
+                    <img src={logoSekolahUrl} alt="Logo Sekolah" className="w-full h-full object-contain p-0.5 group-hover:opacity-75 transition-opacity" />
                   ) : (
-                    <PhotoIcon className="w-4 h-4 text-slate-400" />
+                    <PhotoIcon className="w-4 h-4 text-slate-400 group-hover:text-emerald-500 transition-colors" />
                   )}
-                </div>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => handleUploadLogo(e, "sekolah")}
+                    className="hidden"
+                    disabled={uploadingLogo !== null}
+                  />
+                </label>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between">
-                    <p className="text-[10.5px] font-bold text-slate-700 dark:text-slate-300 truncate">
+                    <label
+                      className="text-[10.5px] font-bold text-slate-700 dark:text-slate-300 truncate cursor-pointer hover:text-emerald-600 dark:hover:text-emerald-400"
+                      title="Klik untuk memilih logo"
+                    >
                       Logo Sekolah / Tut Wuri
-                    </p>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) => handleUploadLogo(e, "sekolah")}
+                        className="hidden"
+                        disabled={uploadingLogo !== null}
+                      />
+                    </label>
                     {logoSekolahUrl && (
                       <button
                         type="button"
                         onClick={() => setLogoSekolahUrl("")}
-                        className="text-[9.5px] text-rose-500 hover:underline cursor-pointer"
+                        className="text-[9.5px] text-rose-500 hover:underline cursor-pointer ml-1 shrink-0"
                       >
                         Hapus
                       </button>
                     )}
                   </div>
-                  <label className="inline-block mt-0.5 text-[10px] font-bold text-emerald-600 dark:text-emerald-400 hover:underline cursor-pointer">
-                    <span>{uploadingLogo === "sekolah" ? "Mengunggah..." : "Upload Logo (Cloudinary)"}</span>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={(e) => handleUploadLogo(e, "sekolah")}
-                      className="hidden"
-                      disabled={uploadingLogo !== null}
-                    />
-                  </label>
+                  {uploadingLogo === "sekolah" ? (
+                    <span className="inline-block mt-0.5 text-[9.5px] font-bold text-emerald-600 dark:text-emerald-400 animate-pulse">
+                      Mengunggah...
+                    </span>
+                  ) : (
+                    <p className="text-[9.5px] text-slate-400 dark:text-slate-500 truncate mt-0.5">
+                      {logoSekolahUrl ? "Klik logo untuk mengganti" : "Klik untuk memilih gambar"}
+                    </p>
+                  )}
                 </div>
               </div>
             </div>
