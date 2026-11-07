@@ -1,6 +1,7 @@
 export interface LightboxData {
   src?: string;
   svgHtml?: string;
+  htmlContent?: string;
   title?: string;
   alt?: string;
 }
