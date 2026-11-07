@@ -1,22 +1,47 @@
 import React, { useRef, useEffect } from "react";
 import { createPortal } from "react-dom";
-import { Exam, Question } from "../../../../types";
+import { Exam, Question, TeacherProfile } from "../../../../types";
 import { XMarkIcon, PrinterIcon, CheckCircleIcon } from "../../../Icons";
 import { sanitizeHtml, parseList, isAnswerMatch } from "../../examUtils";
 import { renderMathInHtml } from "../../../../utils/mathRenderer";
+import { SchoolLetterhead } from "../../SchoolLetterhead";
+import { storageService } from "../../../../services/storage";
 
 interface PrintKunciJawabanModalProps {
   isOpen: boolean;
   onClose: () => void;
   exam: Exam | null;
+  teacherProfile?: TeacherProfile;
 }
 
 export const PrintKunciJawabanModal: React.FC<PrintKunciJawabanModalProps> = ({
   isOpen,
   onClose,
   exam,
+  teacherProfile,
 }) => {
   const printContainerRef = useRef<HTMLDivElement>(null);
+  const [headerMode, setHeaderMode] = useState<"default" | "kop">("default");
+  const [prevExamCode, setPrevExamCode] = useState(exam?.code);
+  if (exam?.code !== prevExamCode) {
+    setPrevExamCode(exam?.code);
+    setHeaderMode("default");
+  }
+  const [fetchedProfile, setFetchedProfile] = useState<TeacherProfile | null>(null);
+
+  useEffect(() => {
+    let isMounted = true;
+    if (isOpen && !teacherProfile) {
+      storageService.getCurrentUser().then((u) => {
+        if (isMounted && u) setFetchedProfile(u);
+      });
+    }
+    return () => {
+      isMounted = false;
+    };
+  }, [isOpen, teacherProfile]);
+
+  const profile = teacherProfile || fetchedProfile;
 
   const formatQuestionType = (type?: string) => {
     switch (type) {
@@ -320,6 +345,34 @@ export const PrintKunciJawabanModal: React.FC<PrintKunciJawabanModalProps> = ({
         </div>
 
         <div className="flex items-center gap-2">
+          {/* Tombol Pengalihan Tampilan Kop: Default vs Kop Sekolah */}
+          <div className="flex items-center bg-slate-100 dark:bg-slate-700/60 p-0.5 rounded-lg border border-slate-200 dark:border-slate-600">
+            <button
+              type="button"
+              onClick={() => setHeaderMode("default")}
+              className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all cursor-pointer ${
+                headerMode === "default"
+                  ? "bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 shadow-xs"
+                  : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+              }`}
+              title="Tampilkan Kop Standar Bawaan"
+            >
+              Default
+            </button>
+            <button
+              type="button"
+              onClick={() => setHeaderMode("kop")}
+              className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all cursor-pointer ${
+                headerMode === "kop"
+                  ? "bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 shadow-xs"
+                  : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+              }`}
+              title="Tampilkan Kop Resmi Sekolah (Dwibahasa Aksara Bali / Latin)"
+            >
+              Kop Sekolah
+            </button>
+          </div>
+
           <button
             type="button"
             onClick={() => window.print()}
@@ -344,39 +397,56 @@ export const PrintKunciJawabanModal: React.FC<PrintKunciJawabanModalProps> = ({
         className="print-kunci-content max-w-4xl mx-auto bg-white p-6 sm:p-10 text-black"
         ref={printContainerRef}
       >
-        {/* Kop Resmi Standar */}
+        {/* Render Kop Sekolah Resmi jika mode "kop", atau Kop Resmi Standar jika mode "default" */}
         <div className="print-kunci-header mb-5 border-b-2 border-black pb-3">
-          <div className="flex items-center justify-between border-b border-black pb-2 mb-2">
-            <div className="text-left">
-              <h2 className="text-sm font-extrabold uppercase tracking-wide text-black leading-tight">
-                {exam.config?.dinasName || "PEMERINTAH DAERAH"}
-              </h2>
-              <h1 className="text-base font-black uppercase text-black leading-tight">
-                {exam.config?.schoolName || exam.authorSchool || "SATUAN PENDIDIKAN"}
-              </h1>
-              {exam.config?.schoolAddress && (
-                <p className="text-[10px] text-gray-700 font-medium">
-                  {exam.config.schoolAddress}
-                </p>
-              )}
-            </div>
-            {exam.config?.schoolLogo && (
-              <img
-                src={exam.config.schoolLogo}
-                alt="Logo Sekolah"
-                className="w-12 h-12 object-contain ml-3 shrink-0"
-              />
-            )}
-          </div>
+          {headerMode === "kop" ? (
+            <div className="mb-2">
+              <SchoolLetterhead profile={profile} />
 
-          <div className="text-center my-3">
-            <h3 className="text-sm font-extrabold uppercase tracking-wider text-black underline underline-offset-4">
-              KUNCI JAWABAN & PEDOMAN PENILAIAN
-            </h3>
-            <p className="text-xs font-bold text-gray-800 uppercase mt-1">
-              TAHUN PELAJARAN {currentYear}/{currentYear + 1}
-            </p>
-          </div>
+              <div className="text-center my-2">
+                <h3 className="text-sm font-extrabold uppercase tracking-wider text-black underline underline-offset-4">
+                  KUNCI JAWABAN & PEDOMAN PENILAIAN
+                </h3>
+                <p className="text-xs font-bold text-gray-800 uppercase mt-1">
+                  TAHUN PELAJARAN {currentYear}/{currentYear + 1}
+                </p>
+              </div>
+            </div>
+          ) : (
+            <div className="mb-2">
+              <div className="flex items-center justify-between border-b border-black pb-2 mb-2">
+                <div className="text-left">
+                  <h2 className="text-sm font-extrabold uppercase tracking-wide text-black leading-tight">
+                    {exam.config?.dinasName || profile?.dinasPendidikan || "PEMERINTAH DAERAH"}
+                  </h2>
+                  <h1 className="text-base font-black uppercase text-black leading-tight">
+                    {exam.config?.schoolName || exam.authorSchool || profile?.school || "SATUAN PENDIDIKAN"}
+                  </h1>
+                  {(exam.config?.schoolAddress || profile?.alamatSekolah) && (
+                    <p className="text-[10px] text-gray-700 font-medium">
+                      {exam.config?.schoolAddress || profile?.alamatSekolah}
+                    </p>
+                  )}
+                </div>
+                {(exam.config?.schoolLogo || profile?.logoSekolahUrl) && (
+                  <img
+                    src={exam.config?.schoolLogo || profile?.logoSekolahUrl}
+                    alt="Logo Sekolah"
+                    className="w-12 h-12 object-contain ml-3 shrink-0"
+                  />
+                )}
+              </div>
+
+              <div className="text-center my-3">
+                <h3 className="text-sm font-extrabold uppercase tracking-wider text-black underline underline-offset-4">
+                  KUNCI JAWABAN & PEDOMAN PENILAIAN
+                </h3>
+                <p className="text-xs font-bold text-gray-800 uppercase mt-1">
+                  TAHUN PELAJARAN {currentYear}/{currentYear + 1}
+                </p>
+              </div>
+            </div>
+          )}
 
           <table className="w-full text-xs font-semibold mt-2 border-t border-black pt-2">
             <tbody>
