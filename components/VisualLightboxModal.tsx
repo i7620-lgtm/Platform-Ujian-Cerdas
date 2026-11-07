@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { X, ZoomIn, ZoomOut, RotateCcw, Maximize2 } from "lucide-react";
 import { LightboxData, openVisualLightbox } from "../utils/lightboxUtils";
+import { ChartRenderer } from "./ChartRenderer";
 
 function processSvgStringsInHtml(html: string): string {
   if (!html || typeof window === "undefined") return html;
@@ -262,7 +263,11 @@ export const VisualLightboxModal: React.FC = () => {
           }}
           className="transition-transform duration-75 ease-out max-w-[92vw] max-h-[82vh] flex items-center justify-center p-3 sm:p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl"
         >
-          {data.src ? (
+          {data.chartData ? (
+            <div className="lightbox-chart-container w-[88vw] max-w-[780px] h-[360px] sm:h-[480px] max-h-[75vh] p-3 sm:p-5 bg-white dark:bg-slate-900 rounded-xl flex flex-col justify-center items-center overflow-hidden">
+              <ChartRenderer data={data.chartData} isLightbox={true} />
+            </div>
+          ) : data.src ? (
             <img
               src={data.src}
               alt={data.alt || "Visual Soal"}
