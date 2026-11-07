@@ -14,9 +14,10 @@ const COLORS = [
   "#475569", // slate-600
 ];
 
-export const CartesianChart: React.FC<{ data: ChartData; className?: string }> = ({
+export const CartesianChart: React.FC<{ data: ChartData; className?: string; isLightbox?: boolean }> = ({
   data,
   className = "",
+  isLightbox = false,
 }) => {
   const { datasets } = data;
 
@@ -77,7 +78,10 @@ export const CartesianChart: React.FC<{ data: ChartData; className?: string }> =
 
   const chartBoxRef = useRef<HTMLDivElement>(null);
 
-  const handleOpenFullscreen = () => {
+  const handleOpenFullscreen = (e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    if (isLightbox) return;
+
     if (chartBoxRef.current) {
       const clone = chartBoxRef.current.cloneNode(true) as HTMLElement;
       clone.querySelectorAll(".no-lightbox").forEach((el) => el.remove());
@@ -100,26 +104,20 @@ export const CartesianChart: React.FC<{ data: ChartData; className?: string }> =
   };
 
   return (
-    <div ref={chartBoxRef} className={`w-full flex flex-col items-center justify-center relative select-none group my-1 ${className}`}>
+    <div
+      ref={chartBoxRef}
+      onClick={!isLightbox ? handleOpenFullscreen : undefined}
+      className={`w-full flex flex-col items-center justify-center relative select-none group my-1 ${!isLightbox ? "cursor-pointer" : ""} ${className}`}
+    >
       {data.title && (
         <div className="text-center font-bold text-slate-800 dark:text-slate-100 text-xs sm:text-sm mb-1 truncate max-w-full px-2">
           {data.title}
         </div>
       )}
       <div className="relative inline-block max-w-[320px] sm:max-w-[350px] w-full">
-        <button
-          type="button"
-          onClick={handleOpenFullscreen}
-          title="Perbesar Kartesius Layar Penuh"
-          className="absolute top-1.5 right-1.5 p-1 rounded-lg bg-slate-100/90 hover:bg-indigo-50 dark:bg-slate-800/90 dark:hover:bg-slate-700 text-slate-500 hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-400 transition-all opacity-70 group-hover:opacity-100 z-10 shadow-xs no-lightbox"
-        >
-          <Maximize2 className="w-3.5 h-3.5" />
-        </button>
         <svg
-          ref={svgRef}
-          onClick={handleOpenFullscreen}
           viewBox={`0 0 ${w} ${h}`}
-          className="w-full max-w-[320px] sm:max-w-[350px] max-h-[35vh] h-auto bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xs cursor-zoom-in zoomable-svg transition-transform hover:scale-[1.01]"
+          className="w-full max-w-[320px] sm:max-w-[350px] max-h-[35vh] h-auto bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xs zoomable-svg transition-transform hover:scale-[1.01]"
         >
         <defs>
           <marker
