@@ -521,8 +521,18 @@ export const PrintSoalModal: React.FC<PrintSoalModalProps> = ({
             height: auto !important;
           }
 
-          .print-soal-content img,
-          .print-soal-content svg:not(.katex *):not(.lucide):not(.geometry-shape *):not(.geometry-shape) {
+          .school-letterhead-root img,
+          .school-letterhead-logo {
+            max-width: 65px !important;
+            max-height: 65px !important;
+            width: auto !important;
+            height: auto !important;
+            object-fit: contain !important;
+            margin: 0 auto !important;
+          }
+
+          .print-soal-content img:not(.school-letterhead-root *),
+          .print-soal-content svg:not(.katex *):not(.lucide):not(.geometry-shape *):not(.geometry-shape):not(.school-letterhead-root *) {
             max-width: 280px !important;
             width: auto !important;
             max-height: 220px !important;
@@ -554,6 +564,16 @@ export const PrintSoalModal: React.FC<PrintSoalModalProps> = ({
         }
 
         /* Screen Preview Rules for Print Soal Modal Container */
+        .school-letterhead-root img,
+        .school-letterhead-logo {
+          max-width: 65px !important;
+          max-height: 65px !important;
+          width: auto !important;
+          height: auto !important;
+          object-fit: contain !important;
+          margin: 0 auto !important;
+        }
+
         .print-soal-content .geometry-shape {
           display: block !important;
           max-width: 250px !important;
@@ -570,8 +590,8 @@ export const PrintSoalModal: React.FC<PrintSoalModalProps> = ({
           height: auto !important;
         }
 
-        .print-soal-content img,
-        .print-soal-content svg:not(.katex *):not(.lucide):not(.geometry-shape *):not(.geometry-shape) {
+        .print-soal-content img:not(.school-letterhead-root *),
+        .print-soal-content svg:not(.katex *):not(.lucide):not(.geometry-shape *):not(.geometry-shape):not(.school-letterhead-root *) {
           max-width: 280px !important;
           width: auto !important;
           max-height: 220px !important;
