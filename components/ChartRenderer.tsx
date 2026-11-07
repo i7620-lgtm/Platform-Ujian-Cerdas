@@ -401,13 +401,29 @@ export const ChartRenderer: React.FC<ChartRendererProps> = ({ data }) => {
 
   const handleOpenFullscreen = () => {
     if (chartBoxRef.current) {
-      const svgEl = chartBoxRef.current.querySelector("svg");
+      const clone = chartBoxRef.current.cloneNode(true) as HTMLElement;
+      // Remove fullscreen trigger buttons from clone
+      clone.querySelectorAll(".no-lightbox").forEach((el) => el.remove());
+
+      // Ensure SVG elements inside clone have valid viewBox and responsive styling
+      const svgEl = clone.querySelector("svg");
       if (svgEl) {
-        openVisualLightbox({
-          svgHtml: svgEl.outerHTML,
-          title: title || "Grafik Data Soal",
-        });
+        if (!svgEl.getAttribute("viewBox")) {
+          const w = svgEl.getAttribute("width") || svgEl.getBoundingClientRect().width || 400;
+          const h = svgEl.getAttribute("height") || svgEl.getBoundingClientRect().height || 250;
+          const cleanW = parseInt(w.toString(), 10) || 400;
+          const cleanH = parseInt(h.toString(), 10) || 250;
+          svgEl.setAttribute("viewBox", `0 0 ${cleanW} ${cleanH}`);
+        }
+        svgEl.style.width = "100%";
+        svgEl.style.height = "auto";
+        svgEl.style.maxHeight = "58vh";
       }
+
+      openVisualLightbox({
+        htmlContent: clone.innerHTML,
+        title: title || "Grafik Data Soal",
+      });
     }
   };
 
