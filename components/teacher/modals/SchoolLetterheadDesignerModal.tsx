@@ -269,7 +269,7 @@ export const SchoolLetterheadDesignerModal: React.FC<
                 <div className="flex-1">
                   <label className="inline-block px-3 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-800 dark:text-slate-200 rounded-lg text-xs font-bold cursor-pointer transition-colors border border-slate-300 dark:border-slate-600">
                     <span>
-                      {uploadingLogo === "dinas" ? "Mengunggah ke Cloudinary..." : "Pilih Logo Dinas..."}
+                      {uploadingLogo === "dinas" ? "Mengunggah..." : "Pilih Logo Dinas..."}
                     </span>
                     <input
                       type="file"
@@ -312,7 +312,7 @@ export const SchoolLetterheadDesignerModal: React.FC<
                 <div className="flex-1">
                   <label className="inline-block px-3 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-800 dark:text-slate-200 rounded-lg text-xs font-bold cursor-pointer transition-colors border border-slate-300 dark:border-slate-600">
                     <span>
-                      {uploadingLogo === "sekolah" ? "Mengunggah ke Cloudinary..." : "Pilih Logo Sekolah..."}
+                      {uploadingLogo === "sekolah" ? "Mengunggah..." : "Pilih Logo Sekolah..."}
                     </span>
                     <input
                       type="file"
