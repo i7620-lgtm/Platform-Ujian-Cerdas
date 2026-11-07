@@ -43,27 +43,32 @@ export const SchoolLetterhead: React.FC<SchoolLetterheadProps> = ({
   const schoolText =
     merged.school || "SEKOLAH DASAR NEGERI 2 PADANGSAMBIAN";
 
-  // Address and contact formatting
+  // Address formatting (2nd line from bottom - WITH Aksara Bali)
   const addressParts: string[] = [];
   if (merged.alamatSekolah) addressParts.push(merged.alamatSekolah);
   if (merged.desaKelurahan) addressParts.push(`Desa/Kel. ${merged.desaKelurahan}`);
   if (merged.kecamatan) addressParts.push(`Kec. ${merged.kecamatan}`);
   if (merged.kodePos) addressParts.push(`Kode Pos: ${merged.kodePos}`);
 
+  const alamatText =
+    addressParts.length > 0
+      ? addressParts.join(", ")
+      : "Jalan Kebo Iwa Banjar Batuparas";
+
+  // Contact formatting (Bottom-most line - WITHOUT Aksara Bali)
   const contactParts: string[] = [];
   if (merged.teleponSekolah) contactParts.push(`Telepon: ${merged.teleponSekolah}`);
+  if (merged.faksimile) contactParts.push(`Faks: ${merged.faksimile}`);
   if (merged.emailSekolah) contactParts.push(`Email: ${merged.emailSekolah}`);
   if (merged.websiteSekolah) contactParts.push(`Website: ${merged.websiteSekolah}`);
   if (merged.npsn) contactParts.push(`NPSN: ${merged.npsn}`);
 
-  const defaultAlamatDanKontak =
-    addressParts.length > 0 || contactParts.length > 0
-      ? [addressParts.join(", "), contactParts.join(" | ")]
-          .filter(Boolean)
-          .join(", ")
-      : "Jalan Kebo Iwa Banjar Batuparas, Telepon: (0361) 9093558";
+  const kontakText =
+    contactParts.length > 0
+      ? contactParts.join(" | ")
+      : "Telepon: (0361) 9093558";
 
-  // Aksara Bali texts (user customized or auto-transliterated)
+  // Aksara Bali texts (user customized or auto-transliterated ONLY for address line)
   const aksaraPemda =
     merged.aksaraBaliPemda || transliterateToAksaraBali(pemdaText);
   const aksaraDinas =
@@ -71,7 +76,7 @@ export const SchoolLetterhead: React.FC<SchoolLetterheadProps> = ({
   const aksaraSekolah =
     merged.aksaraBaliSekolah || transliterateToAksaraBali(schoolText);
   const aksaraAlamat =
-    merged.aksaraBaliAlamat || transliterateToAksaraBali(defaultAlamatDanKontak);
+    merged.aksaraBaliAlamat || transliterateToAksaraBali(alamatText);
 
   const dividerStyle = merged.kopDividerStyle || "double";
 
@@ -79,17 +84,18 @@ export const SchoolLetterhead: React.FC<SchoolLetterheadProps> = ({
     <div
       className={`school-letterhead-root w-full bg-white text-black font-sans select-none ${className}`}
     >
-      <div className="flex items-center justify-between gap-3 sm:gap-5 pb-3">
+      <div className="flex items-center justify-between gap-3 sm:gap-4 pb-2">
         {/* Left Logo (Logo Dinas Pendidikan / Pemda) */}
-        <div className="w-16 h-16 sm:w-24 sm:h-24 shrink-0 flex items-center justify-center">
+        <div className="w-14 h-14 sm:w-16 sm:h-16 shrink-0 flex items-center justify-center">
           {merged.logoDinasUrl ? (
             <img
               src={merged.logoDinasUrl}
               alt="Logo Dinas"
-              className="max-h-16 sm:max-h-24 max-w-full object-contain"
+              className="school-letterhead-logo max-h-14 sm:max-h-16 max-w-full object-contain"
+              style={{ maxHeight: "60px", maxWidth: "65px", width: "auto", height: "auto", objectFit: "contain" }}
             />
           ) : (
-            <div className="w-16 h-16 sm:w-20 sm:h-20 bg-slate-100 border border-slate-300 rounded-lg flex flex-col items-center justify-center text-slate-400 text-[10px] font-bold p-1 text-center print:border-none print:bg-transparent">
+            <div className="w-14 h-14 sm:w-16 sm:h-16 bg-slate-100 border border-slate-300 rounded-lg flex flex-col items-center justify-center text-slate-400 text-[9px] sm:text-[10px] font-bold p-1 text-center print:border-none print:bg-transparent">
               <span className="hidden print:inline-block"></span>
               <span className="print:hidden">Logo Dinas</span>
             </div>
@@ -137,7 +143,7 @@ export const SchoolLetterhead: React.FC<SchoolLetterheadProps> = ({
             {schoolText}
           </h1>
 
-          {/* Baris 4: Alamat & Kontak */}
+          {/* Baris 4 (Kedua paling bawah): Alamat Sekolah (Dengan Aksara Bali) */}
           {isAksaraBali && aksaraAlamat && (
             <p
               className="aksara-bali text-[10px] sm:text-xs text-black leading-snug font-normal tracking-tight pt-0.5"
@@ -147,20 +153,28 @@ export const SchoolLetterhead: React.FC<SchoolLetterheadProps> = ({
             </p>
           )}
           <p className="text-[10px] sm:text-[11px] text-slate-800 font-medium leading-tight pt-0.5">
-            {defaultAlamatDanKontak}
+            {alamatText}
           </p>
+
+          {/* Baris 5 (Paling bawah): Kontak & Identitas Digital (TANPA Aksara Bali) */}
+          {kontakText && (
+            <p className="text-[9.5px] sm:text-[10.5px] text-slate-700 font-medium leading-tight pt-0.5">
+              {kontakText}
+            </p>
+          )}
         </div>
 
         {/* Right Logo (Logo Sekolah) */}
-        <div className="w-16 h-16 sm:w-24 sm:h-24 shrink-0 flex items-center justify-center">
+        <div className="w-14 h-14 sm:w-16 sm:h-16 shrink-0 flex items-center justify-center">
           {merged.logoSekolahUrl ? (
             <img
               src={merged.logoSekolahUrl}
               alt="Logo Sekolah"
-              className="max-h-16 sm:max-h-24 max-w-full object-contain"
+              className="school-letterhead-logo max-h-14 sm:max-h-16 max-w-full object-contain"
+              style={{ maxHeight: "60px", maxWidth: "65px", width: "auto", height: "auto", objectFit: "contain" }}
             />
           ) : (
-            <div className="w-16 h-16 sm:w-20 sm:h-20 bg-slate-100 border border-slate-300 rounded-lg flex flex-col items-center justify-center text-slate-400 text-[10px] font-bold p-1 text-center print:border-none print:bg-transparent">
+            <div className="w-14 h-14 sm:w-16 sm:h-16 bg-slate-100 border border-slate-300 rounded-lg flex flex-col items-center justify-center text-slate-400 text-[9px] sm:text-[10px] font-bold p-1 text-center print:border-none print:bg-transparent">
               <span className="hidden print:inline-block"></span>
               <span className="print:hidden">Logo Sekolah</span>
             </div>
