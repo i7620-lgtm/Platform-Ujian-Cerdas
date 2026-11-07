@@ -256,8 +256,8 @@ export const PrintKunciJawabanModal: React.FC<PrintKunciJawabanModalProps> = ({
           }
           .school-letterhead-root img,
           .school-letterhead-logo {
-            max-width: 65px !important;
-            max-height: 65px !important;
+            max-width: 78px !important;
+            max-height: 78px !important;
             width: auto !important;
             height: auto !important;
             object-fit: contain !important;
@@ -298,8 +298,8 @@ export const PrintKunciJawabanModal: React.FC<PrintKunciJawabanModalProps> = ({
         /* Screen Preview Rules for Print Kunci Modal Container */
         .school-letterhead-root img,
         .school-letterhead-logo {
-          max-width: 65px !important;
-          max-height: 65px !important;
+          max-width: 78px !important;
+          max-height: 78px !important;
           width: auto !important;
           height: auto !important;
           object-fit: contain !important;
