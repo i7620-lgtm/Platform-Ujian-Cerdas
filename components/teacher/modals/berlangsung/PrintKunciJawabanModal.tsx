@@ -629,21 +629,21 @@ export const PrintKunciJawabanModal: React.FC<PrintKunciJawabanModalProps> = ({
 
                   {/* Benar / Salah (TF) */}
                   {q.questionType === "TRUE_FALSE" && tfRows.length > 0 && (
-                    <table className="w-full border-collapse border border-slate-300 text-xs mt-1">
+                    <table className="w-full border-collapse border border-black text-[11px] mt-1 table-fixed">
                       <thead>
                         <tr className="bg-slate-100">
-                          <th className="border border-slate-300 px-2 py-1 text-left font-bold">Pernyataan</th>
-                          <th className="border border-slate-300 px-2 py-1 text-center w-28 font-bold">Kunci</th>
+                          <th className="border border-black px-2 py-1 text-left font-bold">Pernyataan</th>
+                          <th className="border border-black px-2 py-1 text-center w-[100px] font-bold">Kunci</th>
                         </tr>
                       </thead>
                       <tbody>
                         {tfRows.map((row, rIdx) => (
                           <tr key={rIdx}>
                             <td
-                              className="border border-slate-300 px-2 py-1"
+                              className="border border-black px-2 py-1 leading-snug"
                               dangerouslySetInnerHTML={{ __html: renderFormattedHtml(row.text) }}
                             />
-                            <td className="border border-slate-300 px-2 py-1 text-center font-bold text-emerald-800 bg-emerald-50/50">
+                            <td className="border border-black px-2 py-1 text-center font-bold text-emerald-800 bg-emerald-50/50 w-[100px]">
                               {row.answer
                                 ? (q.categoryLabels && q.categoryLabels[0]) || "Benar"
                                 : (q.categoryLabels && q.categoryLabels[1]) || "Salah"}
