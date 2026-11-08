@@ -1946,6 +1946,88 @@ export const calculateExamScore = (
     const weight = q.scoreWeight || 1;
     const studentAnswer = answers[q.id];
     const empty = isAnswerEmpty(studentAnswer, q);
+    const useCustomWeights = !!q.useCustomWeights;
+
+    if (useCustomWeights) {
+      if (q.questionType === "MULTIPLE_CHOICE") {
+        const weights = q.optionWeights || [];
+        const maxQScore = weights.length > 0 ? Math.max(...weights) : weight;
+        maxPossibleScore += maxQScore;
+        
+        if (!empty && q.options) {
+          const selectedIdx = q.options.findIndex(opt => isAnswerMatch(opt, studentAnswer, q.questionType, q.options));
+          if (selectedIdx !== -1) {
+            totalScore += (weights[selectedIdx] || 0);
+            if (weights[selectedIdx] === maxQScore && maxQScore > 0) correctCount++;
+            else if (weights[selectedIdx] > 0) correctCount += (weights[selectedIdx] / maxQScore);
+          }
+        }
+      } else if (q.questionType === "COMPLEX_MULTIPLE_CHOICE") {
+        const weights = q.optionWeights || [];
+        const maxQScore = weights.reduce((sum, w) => sum + (w > 0 ? w : 0), 0) || weight;
+        maxPossibleScore += maxQScore;
+
+        if (!empty && q.options) {
+          const studentList = parseList(studentAnswer, q.options);
+          let qScore = 0;
+          q.options.forEach((opt, idx) => {
+            const isSelected = studentList.some(s => isAnswerMatch(s, opt, q.questionType, q.options));
+            if (isSelected) {
+              qScore += (weights[idx] || 0);
+            }
+          });
+          totalScore += qScore;
+          if (qScore === maxQScore && maxQScore > 0) correctCount++;
+          else if (qScore > 0) correctCount += (qScore / maxQScore);
+        }
+      } else if (q.questionType === "TRUE_FALSE") {
+        const rows = q.trueFalseRows || [];
+        const maxQScore = rows.reduce((sum, r) => sum + Math.max(r.trueWeight || 0, r.falseWeight || 0), 0) || weight;
+        maxPossibleScore += maxQScore;
+
+        if (!empty) {
+          try {
+            const ansObj = JSON.parse(studentAnswer);
+            let qScore = 0;
+            rows.forEach((row, idx) => {
+              const val = ansObj[idx];
+              if (val === true) qScore += (row.trueWeight || 0);
+              else if (val === false) qScore += (row.falseWeight || 0);
+            });
+            totalScore += qScore;
+            if (qScore === maxQScore && maxQScore > 0) correctCount++;
+            else if (qScore > 0) correctCount += (qScore / maxQScore);
+          } catch { /* ignore */ }
+        }
+      } else if (q.questionType === "MATCHING") {
+        const pairs = q.matchingPairs || [];
+        const maxQScore = pairs.reduce((sum, p) => sum + (p.weight || 0), 0) || weight;
+        maxPossibleScore += maxQScore;
+
+        if (!empty) {
+          try {
+            const ansObj = JSON.parse(studentAnswer);
+            let qScore = 0;
+            pairs.forEach((pair, idx) => {
+              if (isAnswerMatch(pair.right, ansObj[idx], q.questionType)) {
+                qScore += (pair.weight || 0);
+              }
+            });
+            totalScore += qScore;
+            if (qScore === maxQScore && maxQScore > 0) correctCount++;
+            else if (qScore > 0) correctCount += (qScore / maxQScore);
+          } catch { /* ignore */ }
+        }
+      } else {
+        // Fallback for other types if useCustomWeights enabled but not specifically handled
+        maxPossibleScore += weight;
+        if (!empty && q.correctAnswer && isAnswerMatch(q.correctAnswer, studentAnswer, q.questionType, q.options)) {
+          totalScore += weight;
+          correctCount++;
+        }
+      }
+      return;
+    }
 
     if (isOlympiad) {
       maxPossibleScore += (correctMult * weight);
