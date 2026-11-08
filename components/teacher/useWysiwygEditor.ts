@@ -1,6 +1,7 @@
 import { useRef, useEffect, useState } from "react";
 import { compressImage, sanitizeHtml } from "./examUtils";
 import { renderLatexToString } from "../../utils/mathRenderer";
+import { convertLlmFormattingToHtml } from "../../utils/llmTextFormatter";
 import {
   isEditorActive,
   getCaretCharacterOffsetWithin,
@@ -506,12 +507,21 @@ export const useWysiwygEditor = ({
     const text = e.clipboardData.getData("text/plain");
     const html = e.clipboardData.getData("text/html");
 
-    let content = text;
-    if (html) {
-      content = sanitizeHtml(html);
+    let content = "";
+    if (html && (html.includes("<table") || html.includes("<ul") || html.includes("<ol") || html.includes("<blockquote") || html.includes("<img"))) {
+      // Rich HTML content containing structured blocks: sanitize and convert any embedded LLM markers
+      content = convertLlmFormattingToHtml(sanitizeHtml(html));
+    } else if (text) {
+      // Plain text (common from LLM chat codeblocks or responses): convert markers and preserve line breaks
+      content = convertLlmFormattingToHtml(text, { convertNewlines: true });
+    } else if (html) {
+      content = convertLlmFormattingToHtml(sanitizeHtml(html));
     }
-    document.execCommand("insertHTML", false, content);
-    handleInput();
+
+    if (content) {
+      document.execCommand("insertHTML", false, content);
+      handleInput();
+    }
   };
 
   const handleImageFileChange = async (
