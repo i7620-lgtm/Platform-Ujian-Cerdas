@@ -85,12 +85,14 @@ export const VisualLightboxModal: React.FC = () => {
       const target = e.target as HTMLElement | null;
       if (!target) return;
 
-      // Ignore clicks on buttons, links, inputs, or inside an active modal
+      // Ignore clicks on buttons, links, inputs, no-lightbox, or inside a ChartRenderer container
       if (
         target.closest("button") ||
         target.closest("a") ||
         target.closest("input") ||
-        target.closest(".no-lightbox")
+        target.closest(".no-lightbox") ||
+        target.closest("[data-chart-renderer]") ||
+        target.closest(".chart-renderer-container")
       ) {
         return;
       }
@@ -122,11 +124,17 @@ export const VisualLightboxModal: React.FC = () => {
         return;
       }
 
-      // 3. Check if an SVG diagram or cartesian chart was clicked
+      // 3. Check if an SVG diagram or cartesian chart was clicked (outside ChartRenderer)
       const svg = target.closest(
         ".wysiwyg-content svg:not(.katex *), .prose svg:not(.katex *), .option-content svg:not(.katex *), .zoomable-svg"
       ) as SVGSVGElement | null;
-      if (svg && !svg.closest(".katex") && !svg.closest(".lucide")) {
+      if (
+        svg &&
+        !svg.closest(".katex") &&
+        !svg.closest(".lucide") &&
+        !svg.closest("[data-chart-renderer]") &&
+        !svg.closest(".chart-renderer-container")
+      ) {
         const rect = svg.getBoundingClientRect();
         if (rect.width > 40 && rect.height > 40) {
           e.stopPropagation();
