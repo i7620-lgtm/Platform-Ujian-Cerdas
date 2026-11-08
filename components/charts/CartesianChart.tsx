@@ -106,8 +106,9 @@ export const CartesianChart: React.FC<{ data: ChartData; className?: string; isL
   return (
     <div
       ref={chartBoxRef}
+      data-chart-renderer="true"
       onClick={!isLightbox ? handleOpenFullscreen : undefined}
-      className={`w-full flex flex-col items-center justify-center relative select-none group my-1 ${!isLightbox ? "cursor-pointer" : ""} ${className}`}
+      className={`chart-renderer-container w-full flex flex-col items-center justify-center relative select-none group my-1 ${!isLightbox ? "cursor-pointer" : ""} ${className}`}
     >
       {data.title && (
         <div className="text-center font-bold text-slate-800 dark:text-slate-100 text-xs sm:text-sm mb-1 truncate max-w-full px-2">
