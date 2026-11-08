@@ -14,7 +14,7 @@ import { TermsPage, PrivacyPage } from './components/LegalPages';
 import { TutorialPage } from './components/TutorialPage';
 import { CollaboratorView } from './components/CollaboratorView';
 import { VisualLightboxModal } from './components/VisualLightboxModal';
-import { Analytics } from '@vercel/analytics/react';
+import { VercelAnalytics } from './components/VercelAnalytics';
 import { supabase } from './lib/supabase';
 import { hydrateMathInContainer } from './utils/mathRenderer';
 import { calculateStudentAccess } from './utils/scheduleUtils';
@@ -1081,7 +1081,7 @@ const App: React.FC = () => {
         <VisualLightboxModal />
 
         {/* Vercel Analytics Tracker */}
-        <Analytics />
+        <VercelAnalytics />
     </div>
   );
 };
