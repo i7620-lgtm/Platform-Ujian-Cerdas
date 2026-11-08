@@ -1,4 +1,5 @@
 import type { Question, QuestionType } from "../../../types";
+import { sanitizeQuestionFormatting } from "../formattingCleaner";
 
 export interface ParseResult {
   success: boolean;
@@ -39,6 +40,87 @@ export const extractJsonFromRawText = (rawText: string): string => {
   cleaned = cleaned.replace(/,\s*([\]}])/g, "$1");
 
   return cleaned;
+};
+
+/**
+ * Isolates embedded SVG/img visual elements into their own centered block paragraph
+ * so they never split or squeeze text inline horizontally.
+ */
+export const isolateVisualElementsToCenterBlock = (text: string): string => {
+  if (!text) return "";
+  let result = text;
+
+  // Isolate <svg ...>...</svg>
+  result = result.replace(
+    /(?:<p[^>]*>)?\s*(<svg[\s\S]*?<\/svg>)\s*(?:<\/p>)?/gi,
+    (_match, svgContent) => {
+      return `\n\n<p style="text-align: center; margin: 12px auto; display: block;">${svgContent}</p>\n\n`;
+    }
+  );
+
+  // Clean up excessive consecutive newlines
+  result = result.replace(/\n{3,}/g, "\n\n").trim();
+  return result;
+};
+
+/**
+ * Strips duplicate multiple-choice options (A. ... B. ...) that AI erroneously appended
+ * to the end of the questionText when options are already present.
+ */
+export const stripDuplicateOptionsFromQuestionText = (
+  qText: string,
+  options?: string[]
+): string => {
+  if (!qText || !options || options.length < 2) return qText;
+  const text = qText.trim();
+
+  // Find where option list starts (e.g., "A." or "A)" or "[A]")
+  const matchA = text.search(/(?:^|[\n\s])(?:A\.|A\)|\[A\]|\(A\))\s+/i);
+  if (matchA !== -1) {
+    const substringFromA = text.substring(matchA);
+    // Confirm presence of "B." / "B)" as well
+    const hasB = /(?:^|[\n\s])(?:B\.|B\)|\[B\]|\(B\))\s+/i.test(substringFromA);
+    if (hasB) {
+      const firstOptClean = options[0].replace(/^(?:[A-E]\.|\([A-E]\)|[A-E]\))\s*/i, "").trim().toLowerCase();
+      const firstWord = firstOptClean.split(/\s+/)[0] || "";
+      if (firstWord.length > 1 && substringFromA.toLowerCase().includes(firstWord)) {
+        return text.substring(0, matchA).trim();
+      } else if (firstOptClean.length <= 12) {
+        return text.substring(0, matchA).trim();
+      }
+    }
+  }
+
+  return text;
+};
+
+/**
+ * Strips numbered statement lists (1. ... 2. ...) that AI erroneously appended
+ * to the end of true/false questionText when statements are already in trueFalseRows.
+ */
+export const stripDuplicateStatementsFromQuestionText = (
+  qText: string,
+  tfRows?: { text: string }[]
+): string => {
+  if (!qText || !tfRows || tfRows.length < 2) return qText;
+  const text = qText.trim();
+
+  // Find where numbered statements start (e.g., "1." or "1)" or "[1]")
+  const match1 = text.search(/(?:^|[\n\s])(?:1\.|1\)|\[1\]|\(1\))\s+/);
+  if (match1 !== -1) {
+    const substringFrom1 = text.substring(match1);
+    // Confirm presence of "2." as well
+    const has2 = /(?:^|[\n\s])(?:2\.|2\)|\[2\]|\(2\))\s+/.test(substringFrom1);
+    if (has2) {
+      const firstRowClean = (tfRows[0].text || "").trim().toLowerCase();
+      const firstWord = firstRowClean.split(/\s+/)[0] || "";
+      if (firstWord.length > 1 && substringFrom1.toLowerCase().includes(firstWord)) {
+        return text.substring(0, match1).trim();
+      }
+    }
+  }
+
+  return text;
 };
 
 /**
@@ -170,24 +252,36 @@ export const parseExternalAiOutput = (
       // Clean up question text
       const qText = item.questionText || item.soal || item.pertanyaan || item.stimulus || `Soal Nomor ${index + 1}`;
 
-      // Options
+      // Options (clean any leading A., B., etc.)
       let opts: string[] | undefined = undefined;
       if (Array.isArray(item.options)) {
-        opts = item.options.map((o: any) => String(o || "").trim());
+        opts = item.options.map((o: any) =>
+          String(o || "")
+            .replace(/^(?:[A-E]\.|\([A-E]\)|[A-E]\))\s*/i, "")
+            .trim()
+        );
       } else if (Array.isArray(item.pilihan)) {
-        opts = item.pilihan.map((o: any) => String(o || "").trim());
+        opts = item.pilihan.map((o: any) =>
+          String(o || "")
+            .replace(/^(?:[A-E]\.|\([A-E]\)|[A-E]\))\s*/i, "")
+            .trim()
+        );
       }
 
-      // Kategori / True-False rows
+      // Kategori / True-False rows (clean any leading 1., 2., etc.)
       let tfRows: { text: string; answer: boolean }[] | undefined = undefined;
       if (Array.isArray(item.trueFalseRows)) {
         tfRows = item.trueFalseRows.map((r: any) => ({
-          text: String(r.text || r.pernyataan || "").trim(),
+          text: String(r.text || r.pernyataan || "")
+            .replace(/^(?:\d+\.|\(\d+\)|\d+\))\s*/, "")
+            .trim(),
           answer: r.answer !== undefined ? Boolean(r.answer) : (r.kunci === "Benar" || r.kunci === true),
         }));
       } else if (Array.isArray(item.pernyataanKategori)) {
         tfRows = item.pernyataanKategori.map((r: any) => ({
-          text: String(r.teks || r.text || r.pernyataan || "").trim(),
+          text: String(r.teks || r.text || r.pernyataan || "")
+            .replace(/^(?:\d+\.|\(\d+\)|\d+\))\s*/, "")
+            .trim(),
           answer: String(r.kunci || "").toLowerCase().includes("benar") || String(r.kunci || "").toLowerCase().includes("sesuai") || r.kunci === true,
         }));
       }
@@ -225,9 +319,16 @@ export const parseExternalAiOutput = (
       if (rawSvg && typeof rawSvg === "string" && !finalQuestionText.includes("<svg")) {
         const cleanedSvg = rawSvg.trim();
         if (cleanedSvg.startsWith("<svg") || cleanedSvg.includes("</svg>")) {
-          finalQuestionText = `${finalQuestionText}\n\n<div class="my-3 flex justify-center">${cleanedSvg}</div>`;
+          finalQuestionText = `${finalQuestionText}\n\n<p style="text-align: center; margin: 12px auto; display: block;">${cleanedSvg}</p>\n\n`;
         }
       }
+
+      // Ensure all embedded SVG and image elements are isolated into centered block paragraphs
+      finalQuestionText = isolateVisualElementsToCenterBlock(finalQuestionText);
+
+      // Strip redundant options or statements mistakenly included in questionText
+      finalQuestionText = stripDuplicateOptionsFromQuestionText(finalQuestionText, opts);
+      finalQuestionText = stripDuplicateStatementsFromQuestionText(finalQuestionText, tfRows);
 
       // Comprehensive explanations & steps
       const fullExplanation =
@@ -244,7 +345,7 @@ export const parseExternalAiOutput = (
         item.caraPengerjaan ||
         "";
 
-      return {
+      return sanitizeQuestionFormatting({
         id: uniqueId,
         questionText: finalQuestionText,
         questionType: qType,
@@ -260,7 +361,7 @@ export const parseExternalAiOutput = (
         explanation: String(fullExplanation).trim(),
         solutionSteps: String(fullSteps).trim(),
         scoreWeight: item.scoreWeight || item.bobot || 1,
-      };
+      });
     });
 
     return {

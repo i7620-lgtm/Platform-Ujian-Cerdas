@@ -1,6 +1,7 @@
 import { useRef, useEffect, useState } from "react";
 import { compressImage, sanitizeHtml } from "./examUtils";
 import { renderLatexToString } from "../../utils/mathRenderer";
+import { convertLlmFormattingToHtml } from "../../utils/llmTextFormatter";
 import {
   isEditorActive,
   getCaretCharacterOffsetWithin,
@@ -489,7 +490,7 @@ export const useWysiwygEditor = ({
             const rawDataUrl = ev.target?.result as string;
             try {
               const dataUrl = await compressImage(rawDataUrl, 0.7);
-              const imgTag = `<img src="${dataUrl}" alt="Inserted Image" style="max-width: 100%; max-height: 50vh; width: auto; height: auto; object-fit: contain; border-radius: 8px; margin: 8px 0;" />&nbsp;`;
+              const imgTag = `<p style="text-align: center; margin: 8px auto;"><img src="${dataUrl}" alt="Gambar Soal" style="max-width: 280px; max-height: 220px; width: auto; height: auto; object-fit: contain; border-radius: 8px; border: 1px solid #e2e8f0; display: inline-block; cursor: zoom-in;" /></p>&nbsp;`;
               document.execCommand("insertHTML", false, imgTag);
               handleInput();
             } catch (error) {
@@ -506,12 +507,21 @@ export const useWysiwygEditor = ({
     const text = e.clipboardData.getData("text/plain");
     const html = e.clipboardData.getData("text/html");
 
-    let content = text;
-    if (html) {
-      content = sanitizeHtml(html);
+    let content = "";
+    if (html && (html.includes("<table") || html.includes("<ul") || html.includes("<ol") || html.includes("<blockquote") || html.includes("<img"))) {
+      // Rich HTML content containing structured blocks: sanitize and convert any embedded LLM markers
+      content = convertLlmFormattingToHtml(sanitizeHtml(html));
+    } else if (text) {
+      // Plain text (common from LLM chat codeblocks or responses): convert markers and preserve line breaks
+      content = convertLlmFormattingToHtml(text, { convertNewlines: true });
+    } else if (html) {
+      content = convertLlmFormattingToHtml(sanitizeHtml(html));
     }
-    document.execCommand("insertHTML", false, content);
-    handleInput();
+
+    if (content) {
+      document.execCommand("insertHTML", false, content);
+      handleInput();
+    }
   };
 
   const handleImageFileChange = async (
@@ -524,7 +534,7 @@ export const useWysiwygEditor = ({
         const rawDataUrl = ev.target?.result as string;
         try {
           const dataUrl = await compressImage(rawDataUrl, 0.7);
-          const imgTag = `<img src="${dataUrl}" alt="Inserted Image" style="max-width: 100%; max-height: 50vh; width: auto; height: auto; object-fit: contain; border-radius: 8px; margin: 8px 0;" />&nbsp;`;
+          const imgTag = `<p style="text-align: center; margin: 8px auto;"><img src="${dataUrl}" alt="Gambar Soal" style="max-width: 280px; max-height: 220px; width: auto; height: auto; object-fit: contain; border-radius: 8px; border: 1px solid #e2e8f0; display: inline-block; cursor: zoom-in;" /></p>&nbsp;`;
           runCmd("insertHTML", imgTag);
           handleInput();
         } catch (error) {
@@ -557,7 +567,7 @@ export const useWysiwygEditor = ({
 
   const insertAiImage = (imageUrl: string, caption?: string) => {
     const cleanCaption = caption ? caption.replace(/"/g, "&quot;") : "Stimulus Visual AI";
-    const imgTag = `<p style="text-align: center; margin: 12px auto;"><img src="${imageUrl}" alt="${cleanCaption}" loading="lazy" style="max-width: 100%; max-height: 400px; width: auto; height: auto; object-fit: contain; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); display: inline-block; margin: 0 auto; border: 1px solid #e2e8f0;" /><br/><span style="font-size: 11px; color: #64748b; margin-top: 4px; display: inline-block;">🎨 Stimulus Visual AI (${cleanCaption})</span></p>&nbsp;`;
+    const imgTag = `<p style="text-align: center; margin: 8px auto;"><img src="${imageUrl}" alt="${cleanCaption}" loading="lazy" style="max-width: 280px; max-height: 220px; width: auto; height: auto; object-fit: contain; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); display: inline-block; margin: 0 auto; border: 1px solid #e2e8f0; cursor: zoom-in;" /><br/><span style="font-size: 11px; color: #64748b; margin-top: 4px; display: inline-block;">🎨 Stimulus Visual AI (${cleanCaption})</span></p>&nbsp;`;
     runCmd("insertHTML", imgTag);
     handleInput();
   };

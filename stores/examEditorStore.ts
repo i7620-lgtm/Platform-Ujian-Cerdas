@@ -77,6 +77,11 @@ interface ExamEditorState {
     handleAddMatchingPair: (qId: string) => void;
     handleDeleteMatchingPair: (qId: string, idx: number) => void;
     handleDeleteChart: () => void;
+
+    // Custom Weights Actions
+    handleOptionWeightChange: (qId: string, idx: number, weight: number) => void;
+    handleTrueFalseWeightChange: (qId: string, idx: number, field: 'trueWeight' | 'falseWeight', weight: number) => void;
+    handleMatchingWeightChange: (qId: string, idx: number, weight: number) => void;
 }
 
 const checkAndCascade = (state: any) => {
@@ -634,6 +639,30 @@ export const useExamEditorStore = create<ExamEditorState>()(
                     return q;
                 });
                 checkAndCascade(state);
+            }
+        }),
+
+        handleOptionWeightChange: (qId, idx, weight) => set((state) => {
+            const q = state.questions.find(item => item.id === qId);
+            if (q) {
+                if (!q.optionWeights) {
+                    q.optionWeights = (q.options || []).map(() => 0);
+                }
+                q.optionWeights[idx] = weight;
+            }
+        }),
+
+        handleTrueFalseWeightChange: (qId, idx, field, weight) => set((state) => {
+            const q = state.questions.find(item => item.id === qId);
+            if (q && q.trueFalseRows && q.trueFalseRows[idx]) {
+                q.trueFalseRows[idx][field] = weight;
+            }
+        }),
+
+        handleMatchingWeightChange: (qId, idx, weight) => set((state) => {
+            const q = state.questions.find(item => item.id === qId);
+            if (q && q.matchingPairs && q.matchingPairs[idx]) {
+                q.matchingPairs[idx].weight = weight;
             }
         })
     }))

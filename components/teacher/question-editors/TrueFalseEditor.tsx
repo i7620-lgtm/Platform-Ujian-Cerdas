@@ -195,35 +195,61 @@ export const TrueFalseEditor: React.FC<TrueFalseEditorProps> = ({ q }) => {
 
             {/* KHUSUS HP (Di Bawah Pernyataan): Benar, Salah, Hapus Berdampingan */}
             <div className="flex md:hidden items-center gap-2 mt-1.5 w-full">
-              <button
-                type="button"
-                onClick={() => handleTrueFalseRowAnswerChange(q.id, rIndex, true)}
-                className={`flex-1 py-2 px-3 rounded-xl border flex items-center justify-center gap-1.5 font-bold text-xs transition-all cursor-pointer ${
-                  row.answer === true
-                    ? "border-emerald-500 bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 ring-2 ring-emerald-500/20 shadow-2xs"
-                    : "border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:border-emerald-300"
-                }`}
-              >
-                <span className={`w-3.5 h-3.5 rounded-full border-2 flex items-center justify-center shrink-0 ${row.answer === true ? "border-emerald-500 bg-emerald-500" : "border-slate-300 dark:border-slate-600"}`}>
-                  {row.answer === true && <span className="w-1.5 h-1.5 rounded-full bg-white"></span>}
-                </span>
-                <span className="truncate">{trueLabel}</span>
-              </button>
+              <div className="flex-1 flex flex-col gap-1">
+                <button
+                  type="button"
+                  onClick={() => handleTrueFalseRowAnswerChange(q.id, rIndex, true)}
+                  className={`w-full py-2 px-3 rounded-xl border flex items-center justify-center gap-1.5 font-bold text-xs transition-all cursor-pointer ${
+                    row.answer === true
+                      ? "border-emerald-500 bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 ring-2 ring-emerald-500/20 shadow-2xs"
+                      : "border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:border-emerald-300"
+                  }`}
+                >
+                  <span className={`w-3.5 h-3.5 rounded-full border-2 flex items-center justify-center shrink-0 ${row.answer === true ? "border-emerald-500 bg-emerald-500" : "border-slate-300 dark:border-slate-600"}`}>
+                    {row.answer === true && <span className="w-1.5 h-1.5 rounded-full bg-white"></span>}
+                  </span>
+                  <span className="truncate">{trueLabel}</span>
+                </button>
+                {q.useCustomWeights && (
+                  <div className="flex items-center justify-center gap-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg py-1">
+                    <span className="text-[9px] font-black text-slate-400 uppercase">W</span>
+                    <input
+                      type="number"
+                      value={row.trueWeight ?? 0}
+                      onChange={(e) => useExamEditorStore.getState().handleTrueFalseWeightChange(q.id, rIndex, 'trueWeight', parseInt(e.target.value) || 0)}
+                      className="w-8 bg-transparent text-[10px] font-bold text-center outline-none"
+                    />
+                  </div>
+                )}
+              </div>
 
-              <button
-                type="button"
-                onClick={() => handleTrueFalseRowAnswerChange(q.id, rIndex, false)}
-                className={`flex-1 py-2 px-3 rounded-xl border flex items-center justify-center gap-1.5 font-bold text-xs transition-all cursor-pointer ${
-                  row.answer === false
-                    ? "border-rose-500 bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 ring-2 ring-rose-500/20 shadow-2xs"
-                    : "border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:border-rose-300"
-                }`}
-              >
-                <span className={`w-3.5 h-3.5 rounded-full border-2 flex items-center justify-center shrink-0 ${row.answer === false ? "border-rose-500 bg-rose-500" : "border-slate-300 dark:border-slate-600"}`}>
-                  {row.answer === false && <span className="w-1.5 h-1.5 rounded-full bg-white"></span>}
-                </span>
-                <span className="truncate">{falseLabel}</span>
-              </button>
+              <div className="flex-1 flex flex-col gap-1">
+                <button
+                  type="button"
+                  onClick={() => handleTrueFalseRowAnswerChange(q.id, rIndex, false)}
+                  className={`w-full py-2 px-3 rounded-xl border flex items-center justify-center gap-1.5 font-bold text-xs transition-all cursor-pointer ${
+                    row.answer === false
+                      ? "border-rose-500 bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 ring-2 ring-rose-500/20 shadow-2xs"
+                      : "border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:border-rose-300"
+                  }`}
+                >
+                  <span className={`w-3.5 h-3.5 rounded-full border-2 flex items-center justify-center shrink-0 ${row.answer === false ? "border-rose-500 bg-rose-500" : "border-slate-300 dark:border-slate-600"}`}>
+                    {row.answer === false && <span className="w-1.5 h-1.5 rounded-full bg-white"></span>}
+                  </span>
+                  <span className="truncate">{falseLabel}</span>
+                </button>
+                {q.useCustomWeights && (
+                  <div className="flex items-center justify-center gap-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg py-1">
+                    <span className="text-[9px] font-black text-slate-400 uppercase">W</span>
+                    <input
+                      type="number"
+                      value={row.falseWeight ?? 0}
+                      onChange={(e) => useExamEditorStore.getState().handleTrueFalseWeightChange(q.id, rIndex, 'falseWeight', parseInt(e.target.value) || 0)}
+                      className="w-8 bg-transparent text-[10px] font-bold text-center outline-none"
+                    />
+                  </div>
+                )}
+              </div>
 
               {activeRows.length > 1 && (
                 <button
@@ -233,7 +259,7 @@ export const TrueFalseEditor: React.FC<TrueFalseEditorProps> = ({ q }) => {
                       handleDeleteTrueFalseRow(q.id, rIndex);
                     }
                   }}
-                  className="w-9 h-9 rounded-xl border border-red-200 dark:border-red-800/60 bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/50 flex items-center justify-center shrink-0 shadow-2xs transition-all cursor-pointer"
+                  className="w-9 h-9 rounded-xl border border-red-200 dark:border-red-800/60 bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/50 flex items-center justify-center shrink-0 shadow-2xs transition-all cursor-pointer self-start mt-0"
                   title="Hapus pernyataan"
                 >
                   <TrashIcon className="w-4 h-4" />
@@ -242,41 +268,64 @@ export const TrueFalseEditor: React.FC<TrueFalseEditorProps> = ({ q }) => {
             </div>
 
             {/* TABLET & DESKTOP (Di Sisi Kanan Pernyataan): Radio Benar, Radio Salah, dan Hapus */}
-            <div className="hidden md:flex flex-shrink-0 gap-4 mt-8 px-4">
-              <label 
-                className="relative flex items-center justify-center cursor-pointer w-16"
-                title={`Pilih jika pernyataan bernilai ${trueLabel}`}
-              >
-                <input
-                  type="radio"
-                  name={`tf-${q.id}-${rIndex}`}
-                  checked={row.answer === true}
-                  onChange={() => handleTrueFalseRowAnswerChange(q.id, rIndex, true)}
-                  className="w-5 h-5 border-2 border-gray-300 dark:border-slate-600 appearance-none rounded-full cursor-pointer checked:border-emerald-500 checked:bg-emerald-500 transition-colors focus:ring-2 focus:ring-emerald-500 focus:ring-offset-1"
-                />
-                <div
-                  className={`absolute w-2 h-2 rounded-full bg-white opacity-0 transition-opacity ${
-                    row.answer === true ? "opacity-100" : ""
-                  }`}
-                ></div>
-              </label>
-              <label 
-                className="relative flex items-center justify-center cursor-pointer w-16"
-                title={`Pilih jika pernyataan bernilai ${falseLabel}`}
-              >
-                <input
-                  type="radio"
-                  name={`tf-${q.id}-${rIndex}`}
-                  checked={row.answer === false}
-                  onChange={() => handleTrueFalseRowAnswerChange(q.id, rIndex, false)}
-                  className="w-5 h-5 border-2 border-gray-300 dark:border-slate-600 appearance-none rounded-full cursor-pointer checked:border-red-500 checked:bg-red-500 transition-colors focus:ring-2 focus:ring-red-500 focus:ring-offset-1"
-                />
-                <div
-                  className={`absolute w-2 h-2 rounded-full bg-white opacity-0 transition-opacity ${
-                    row.answer === false ? "opacity-100" : ""
-                  }`}
-                ></div>
-              </label>
+            <div className="hidden md:flex flex-shrink-0 gap-4 mt-8 px-4 items-center">
+              <div className="flex flex-col items-center gap-1.5">
+                <label 
+                  className="relative flex items-center justify-center cursor-pointer w-16"
+                  title={`Pilih jika pernyataan bernilai ${trueLabel}`}
+                >
+                  <input
+                    type="radio"
+                    name={`tf-${q.id}-${rIndex}`}
+                    checked={row.answer === true}
+                    onChange={() => handleTrueFalseRowAnswerChange(q.id, rIndex, true)}
+                    className="w-5 h-5 border-2 border-gray-300 dark:border-slate-600 appearance-none rounded-full cursor-pointer checked:border-emerald-500 checked:bg-emerald-500 transition-colors focus:ring-2 focus:ring-emerald-500 focus:ring-offset-1"
+                  />
+                  <div
+                    className={`absolute w-2 h-2 rounded-full bg-white opacity-0 transition-opacity ${
+                      row.answer === true ? "opacity-100" : ""
+                    }`}
+                  ></div>
+                </label>
+                {q.useCustomWeights && (
+                  <input
+                    type="number"
+                    value={row.trueWeight ?? 0}
+                    onChange={(e) => useExamEditorStore.getState().handleTrueFalseWeightChange(q.id, rIndex, 'trueWeight', parseInt(e.target.value) || 0)}
+                    className="w-10 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-[10px] font-bold text-center py-0.5 focus:ring-1 focus:ring-primary outline-none"
+                    placeholder="W"
+                  />
+                )}
+              </div>
+
+              <div className="flex flex-col items-center gap-1.5">
+                <label 
+                  className="relative flex items-center justify-center cursor-pointer w-16"
+                  title={`Pilih jika pernyataan bernilai ${falseLabel}`}
+                >
+                  <input
+                    type="radio"
+                    name={`tf-${q.id}-${rIndex}`}
+                    checked={row.answer === false}
+                    onChange={() => handleTrueFalseRowAnswerChange(q.id, rIndex, false)}
+                    className="w-5 h-5 border-2 border-gray-300 dark:border-slate-600 appearance-none rounded-full cursor-pointer checked:border-red-500 checked:bg-red-500 transition-colors focus:ring-2 focus:ring-red-500 focus:ring-offset-1"
+                  />
+                  <div
+                    className={`absolute w-2 h-2 rounded-full bg-white opacity-0 transition-opacity ${
+                      row.answer === false ? "opacity-100" : ""
+                    }`}
+                  ></div>
+                </label>
+                {q.useCustomWeights && (
+                  <input
+                    type="number"
+                    value={row.falseWeight ?? 0}
+                    onChange={(e) => useExamEditorStore.getState().handleTrueFalseWeightChange(q.id, rIndex, 'falseWeight', parseInt(e.target.value) || 0)}
+                    className="w-10 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-[10px] font-bold text-center py-0.5 focus:ring-1 focus:ring-primary outline-none"
+                    placeholder="W"
+                  />
+                )}
+              </div>
             </div>
             {activeRows.length > 1 && (
               <button

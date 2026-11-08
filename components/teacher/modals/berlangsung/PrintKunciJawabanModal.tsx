@@ -1,11 +1,288 @@
 import React, { useRef, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { Exam, Question, TeacherProfile } from "../../../../types";
+import { Exam, Question, TeacherProfile, ChartData } from "../../../../types";
 import { XMarkIcon, PrinterIcon, CheckCircleIcon } from "../../../Icons";
 import { sanitizeHtml, parseList, isAnswerMatch } from "../../examUtils";
 import { renderMathInHtml } from "../../../../utils/mathRenderer";
 import { SchoolLetterhead } from "../../SchoolLetterhead";
 import { storageService } from "../../../../services/storage";
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  LineChart,
+  Line,
+  PieChart,
+  Pie,
+  Cell,
+  LabelList,
+} from "recharts";
+import { CartesianChart } from "../../../charts/CartesianChart";
+import { VennChart } from "../../../charts/VennChart";
+import { RelationChart } from "../../../charts/RelationChart";
+
+const CHART_COLORS = [
+  "#2563eb", // blue-600
+  "#059669", // emerald-600
+  "#d97706", // amber-600
+  "#dc2626", // red-600
+  "#7c3aed", // violet-600
+  "#0891b2", // cyan-600
+];
+
+interface PrintChartRendererProps {
+  data: ChartData;
+}
+
+const PrintChartRenderer: React.FC<PrintChartRendererProps> = ({ data }) => {
+  const { type, title, labels = [], datasets = [] } = data;
+
+  const chartData = React.useMemo(() => {
+    return labels.map((label, index) => {
+      const entry: Record<string, any> = { name: label };
+      datasets.forEach((dataset) => {
+        entry[dataset.label || "Data"] = Number(dataset.data[index]) || 0;
+      });
+      return entry;
+    });
+  }, [labels, datasets]);
+
+  const pieData = React.useMemo(() => {
+    if (type !== "pie") return [];
+    return labels.map((label, index) => ({
+      name: label,
+      value: Number(datasets[0]?.data[index]) || 0,
+    }));
+  }, [type, labels, datasets]);
+
+  const { yTicks, yDomain } = React.useMemo(() => {
+    let max = 0;
+    datasets.forEach((d) => {
+      d.data.forEach((v) => {
+        const num = Number(v);
+        if (!isNaN(num) && num > max) max = num;
+      });
+    });
+    if (max === 0) return { yTicks: undefined, yDomain: undefined };
+
+    let interval = 5;
+    if (max > 50 && max <= 100) interval = 10;
+    else if (max > 100 && max <= 500) interval = 50;
+    else if (max > 500) interval = 100;
+
+    const ticks: number[] = [];
+    const maxTick = Math.ceil(max / interval) * interval;
+    for (let i = 0; i <= maxTick; i += interval) {
+      ticks.push(i);
+    }
+    return { yTicks: ticks, yDomain: [0, maxTick] as [number, number] };
+  }, [datasets]);
+
+  const legendItems = React.useMemo(() => {
+    if (type === "venn" || type === "relation" || type === "cartesian") {
+      return [];
+    }
+    if (type === "pie") {
+      return labels.map((label, index) => {
+        const val = datasets[0]?.data[index] ?? 0;
+        return {
+          value: `${label} (${val})`,
+          color: CHART_COLORS[index % CHART_COLORS.length],
+        };
+      });
+    } else {
+      return datasets.map((dataset, index) => ({
+        value: dataset.label || "Data",
+        color:
+          dataset.backgroundColor?.[0] ||
+          dataset.borderColor?.[0] ||
+          CHART_COLORS[index % CHART_COLORS.length],
+      }));
+    }
+  }, [type, labels, datasets]);
+
+  const renderContent = () => {
+    switch (type) {
+      case "bar":
+        return (
+          <BarChart
+            width={400}
+            height={190}
+            data={chartData}
+            margin={{ top: 10, right: 15, left: -15, bottom: 20 }}
+            barCategoryGap="20%"
+          >
+            <CartesianGrid strokeDasharray="3 3" stroke="#cbd5e1" opacity={0.7} />
+            <XAxis
+              dataKey="name"
+              tick={{ fontSize: 10, fill: "#334155", fontWeight: 700 }}
+              axisLine={{ stroke: "#64748b", strokeWidth: 1.2 }}
+              tickLine={{ stroke: "#64748b" }}
+              interval={0}
+              angle={chartData.some(d => String(d.name).length > 6) ? -35 : 0}
+              textAnchor={chartData.some(d => String(d.name).length > 6) ? "end" : "middle"}
+              height={chartData.some(d => String(d.name).length > 6) ? 45 : 30}
+              tickMargin={5}
+            />
+            <YAxis
+              tick={{ fontSize: 10, fill: "#334155", fontWeight: 600 }}
+              axisLine={{ stroke: "#64748b", strokeWidth: 1.2 }}
+              tickLine={{ stroke: "#64748b" }}
+              ticks={yTicks}
+              domain={yDomain}
+              width={35}
+              tickMargin={4}
+            />
+            {datasets.map((dataset, index) => (
+              <Bar
+                key={dataset.label || index}
+                dataKey={dataset.label || "Data"}
+                fill={
+                  dataset.backgroundColor?.[0] ||
+                  CHART_COLORS[index % CHART_COLORS.length]
+                }
+                maxBarSize={45}
+                isAnimationActive={false}
+              >
+                <LabelList
+                  dataKey={dataset.label || "Data"}
+                  position="top"
+                  fill="#1e293b"
+                  fontSize={10}
+                  fontWeight={800}
+                  offset={5}
+                />
+              </Bar>
+            ))}
+          </BarChart>
+        );
+
+      case "line":
+        return (
+          <LineChart
+            width={400}
+            height={190}
+            data={chartData}
+            margin={{ top: 10, right: 15, left: -15, bottom: 20 }}
+          >
+            <CartesianGrid strokeDasharray="3 3" stroke="#cbd5e1" opacity={0.7} />
+            <XAxis
+              dataKey="name"
+              tick={{ fontSize: 10, fill: "#334155", fontWeight: 700 }}
+              axisLine={{ stroke: "#64748b", strokeWidth: 1.2 }}
+              tickLine={{ stroke: "#64748b" }}
+              interval={0}
+              angle={chartData.some(d => String(d.name).length > 6) ? -35 : 0}
+              textAnchor={chartData.some(d => String(d.name).length > 6) ? "end" : "middle"}
+              height={chartData.some(d => String(d.name).length > 6) ? 45 : 30}
+              tickMargin={5}
+            />
+            <YAxis
+              tick={{ fontSize: 10, fill: "#334155", fontWeight: 600 }}
+              axisLine={{ stroke: "#64748b", strokeWidth: 1.2 }}
+              tickLine={{ stroke: "#64748b" }}
+              ticks={yTicks}
+              domain={yDomain}
+              width={35}
+              tickMargin={4}
+            />
+            {datasets.map((dataset, index) => (
+              <Line
+                key={dataset.label || index}
+                type="monotone"
+                dataKey={dataset.label || "Data"}
+                stroke={
+                  dataset.borderColor?.[0] ||
+                  CHART_COLORS[index % CHART_COLORS.length]
+                }
+                strokeWidth={3}
+                dot={{ r: 4, strokeWidth: 1.5, fill: "#fff" }}
+                isAnimationActive={false}
+              >
+                <LabelList
+                  dataKey={dataset.label || "Data"}
+                  position="top"
+                  fill="#1e293b"
+                  fontSize={10}
+                  fontWeight={800}
+                  offset={8}
+                />
+              </Line>
+            ))}
+          </LineChart>
+        );
+
+      case "pie":
+        return (
+          <PieChart width={400} height={190} margin={{ top: 5, right: 5, left: 5, bottom: 5 }}>
+            <Pie
+              data={pieData}
+              cx="50%"
+              cy="50%"
+              outerRadius={65}
+              innerRadius={25}
+              paddingAngle={3}
+              fill="#8884d8"
+              dataKey="value"
+              isAnimationActive={false}
+              label={({ name, percent }: any) =>
+                percent && percent > 0 ? `${name} (${(percent * 100).toFixed(0)}%)` : ""
+              }
+            >
+              {pieData.map((_, index) => (
+                <Cell
+                  key={`cell-${index}`}
+                  fill={CHART_COLORS[index % CHART_COLORS.length]}
+                  stroke="#fff"
+                  strokeWidth={1}
+                />
+              ))}
+            </Pie>
+          </PieChart>
+        );
+
+      case "cartesian":
+        return <CartesianChart data={data} className="w-full max-w-[360px] mx-auto" isLightbox={true} />;
+
+      case "venn":
+        return <VennChart data={data} />;
+
+      case "relation":
+        return <RelationChart data={data} />;
+
+      default:
+        return null;
+    }
+  };
+
+  return (
+    <div className="print-chart-container my-3 mx-auto w-full max-w-[420px] p-2.5 bg-white border border-slate-300 rounded-lg shadow-none flex flex-col items-center break-inside-avoid">
+      {title && (
+        <h4 className="text-center font-bold text-xs sm:text-sm text-slate-800 mb-1 leading-tight">
+          {title}
+        </h4>
+      )}
+      <div className="w-full flex justify-center items-center overflow-hidden">
+        {renderContent()}
+      </div>
+      {legendItems.length > 0 && (
+        <div className="mt-1 flex flex-wrap justify-center items-center gap-x-3 gap-y-1 text-[10px] font-semibold text-slate-700">
+          {legendItems.map((item, index) => (
+            <div key={index} className="flex items-center gap-1">
+              <span
+                className="w-2.5 h-2.5 rounded-full inline-block"
+                style={{ backgroundColor: item.color }}
+              />
+              <span>{item.value}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
 
 interface PrintKunciJawabanModalProps {
   isOpen: boolean;
@@ -274,6 +551,31 @@ export const PrintKunciJawabanModal: React.FC<PrintKunciJawabanModalProps> = ({
             margin: 6px auto !important;
             break-inside: avoid !important;
             page-break-inside: avoid !important;
+          }
+          .print-chart-container {
+            width: 100% !important;
+            max-width: 400px !important;
+            max-height: 230px !important;
+            margin: 6px auto !important;
+            padding: 4px 6px !important;
+            border: 1px solid #94a3b8 !important;
+            border-radius: 6px !important;
+            background: #ffffff !important;
+            display: flex !important;
+            flex-direction: column !important;
+            align-items: center !important;
+            break-inside: avoid !important;
+            page-break-inside: avoid !important;
+            box-shadow: none !important;
+            overflow: hidden !important;
+          }
+          .print-chart-container svg {
+            display: block !important;
+            margin: 0 auto !important;
+            max-width: 100% !important;
+            height: auto !important;
+            max-height: 190px !important;
+            overflow: hidden !important;
           }
           .print-kunci-content table {
             width: 100% !important;
@@ -567,6 +869,25 @@ export const PrintKunciJawabanModal: React.FC<PrintKunciJawabanModalProps> = ({
                     dangerouslySetInnerHTML={{ __html: renderFormattedHtml(q.questionText) }}
                   />
 
+                  {/* Chart Visual Stimulus */}
+                  {q.chartData && (
+                    <PrintChartRenderer data={q.chartData} />
+                  )}
+
+                  {/* Image Stimulus */}
+                  {q.imageUrl && q.imageUrl.trim() !== "" && (
+                    <div className="my-2 text-center">
+                      <img 
+                        src={q.imageUrl} 
+                        alt="Gambar Soal" 
+                        className="max-w-[280px] max-h-[220px] object-contain rounded border border-slate-200 mx-auto" 
+                        onError={(e) => {
+                          (e.currentTarget as HTMLElement).style.display = "none";
+                        }}
+                      />
+                    </div>
+                  )}
+
                   {/* Pilihan Ganda (MC) */}
                   {q.questionType === "MULTIPLE_CHOICE" && q.options && (
                     <div className="space-y-1.5 pl-2">
@@ -584,8 +905,19 @@ export const PrintKunciJawabanModal: React.FC<PrintKunciJawabanModalProps> = ({
                             <span className="w-4 font-bold">{String.fromCharCode(65 + oIdx)}.</span>
                             <div
                               className="flex-1"
-                              dangerouslySetInnerHTML={{ __html: renderFormattedHtml(opt) }}
-                            />
+                            >
+                              <div dangerouslySetInnerHTML={{ __html: renderFormattedHtml(opt) }} />
+                              {q.optionImages?.[oIdx] && (
+                                <img 
+                                  src={q.optionImages[oIdx]!} 
+                                  alt={`Opsi ${String.fromCharCode(65 + oIdx)}`} 
+                                  className="max-w-[120px] max-h-[120px] object-contain mt-1 rounded border border-slate-200" 
+                                  onError={(e) => {
+                                    (e.currentTarget as HTMLElement).style.display = "none";
+                                  }}
+                                />
+                              )}
+                            </div>
                             {isCorrect && (
                               <span className="text-[9px] font-bold text-emerald-700 uppercase tracking-wider shrink-0 bg-emerald-100 px-1.5 py-0.5 rounded border border-emerald-200">
                                 Kunci Benar
@@ -614,8 +946,19 @@ export const PrintKunciJawabanModal: React.FC<PrintKunciJawabanModalProps> = ({
                             <span className="w-4 font-bold">{String.fromCharCode(65 + oIdx)}.</span>
                             <div
                               className="flex-1"
-                              dangerouslySetInnerHTML={{ __html: renderFormattedHtml(opt) }}
-                            />
+                            >
+                              <div dangerouslySetInnerHTML={{ __html: renderFormattedHtml(opt) }} />
+                              {q.optionImages?.[oIdx] && (
+                                <img 
+                                  src={q.optionImages[oIdx]!} 
+                                  alt="Opsi" 
+                                  className="max-w-[120px] max-h-[120px] object-contain mt-1 rounded border border-slate-200" 
+                                  onError={(e) => {
+                                    (e.currentTarget as HTMLElement).style.display = "none";
+                                  }}
+                                />
+                              )}
+                            </div>
                             {isSelected && (
                               <span className="text-[9px] font-bold text-emerald-700 uppercase tracking-wider shrink-0 bg-emerald-100 px-1.5 py-0.5 rounded border border-emerald-200">
                                 Kunci Benar
@@ -629,21 +972,21 @@ export const PrintKunciJawabanModal: React.FC<PrintKunciJawabanModalProps> = ({
 
                   {/* Benar / Salah (TF) */}
                   {q.questionType === "TRUE_FALSE" && tfRows.length > 0 && (
-                    <table className="w-full border-collapse border border-slate-300 text-xs mt-1">
+                    <table className="w-full border-collapse border border-black text-[11px] mt-1 table-fixed">
                       <thead>
                         <tr className="bg-slate-100">
-                          <th className="border border-slate-300 px-2 py-1 text-left font-bold">Pernyataan</th>
-                          <th className="border border-slate-300 px-2 py-1 text-center w-28 font-bold">Kunci</th>
+                          <th className="border border-black px-2 py-1 text-left font-bold">Pernyataan</th>
+                          <th className="border border-black px-2 py-1 text-center w-[100px] font-bold">Kunci</th>
                         </tr>
                       </thead>
                       <tbody>
                         {tfRows.map((row, rIdx) => (
                           <tr key={rIdx}>
                             <td
-                              className="border border-slate-300 px-2 py-1"
+                              className="border border-black px-2 py-1 leading-snug"
                               dangerouslySetInnerHTML={{ __html: renderFormattedHtml(row.text) }}
                             />
-                            <td className="border border-slate-300 px-2 py-1 text-center font-bold text-emerald-800 bg-emerald-50/50">
+                            <td className="border border-black px-2 py-1 text-center font-bold text-emerald-800 bg-emerald-50/50 w-[100px]">
                               {row.answer
                                 ? (q.categoryLabels && q.categoryLabels[0]) || "Benar"
                                 : (q.categoryLabels && q.categoryLabels[1]) || "Salah"}

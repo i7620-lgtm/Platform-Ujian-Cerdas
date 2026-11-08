@@ -56,11 +56,45 @@ export const buildExternalAiPrompt = (config: ExternalAiPromptConfig): string =>
 
   const visualInstruction = includeVisuals
     ? `### 🖼️ ATURAN WAJIB STIMULUS VISUAL & GEOMETRI (AKTIF):
-Karena opsi stimulus visual diaktifkan, **JIKA butir soal melibatkan geometri (sudut, segitiga, persegi, lingkaran, balok, bangun gabungan, koordinat), perbandingan data, atau diagram alir**, Anda **WAJIB MENYERTAKAN** stimulus visual representatif berupa:
-- **Kode SVG mandiri yang bersih:** Sisipkan tag \`<svg viewBox="0 0 200 150" xmlns="http://www.w3.org/2000/svg" ...>...</svg>\` langsung di dalam teks soal (\`questionText\`) atau properti \`svgContent\`. Pastikan bentuk proporsional, stroke kontras, dan teks label titik/sudut jelas terbaca.
-- **Tabel HTML terstruktur:** Untuk penyajian data atau informasi komparatif, gunakan tag tabel \`<table border="1" class="soal-table">...</table>\` yang rapi.
-- Soal yang tidak memerlukan geometri dapat menggunakan stimulus cerita atau teks narasi autentik.`
+Karena opsi stimulus visual diaktifkan, **JIKA butir soal melibatkan geometri (sudut, segitiga, persegi, lingkaran, balok, bangun ruang, denah, koordinat), perbandingan data, atau diagram alir**, Anda **WAJIB MENYERTAKAN** stimulus visual representatif berupa:
+- **Kode SVG mandiri yang bersih (WAJIB BARIS TERSENDIRI / BLOCK):**
+  - Simpan kode SVG ke properti \`svgContent\` ATAU letakkan di dalam \`questionText\` dengan baris kosong terpisah di atas dan di bawahnya (\`\\n\\n<svg viewBox="0 0 200 150" xmlns="http://www.w3.org/2000/svg" ...>...</svg>\\n\\n\`).
+  - **DILARANG KERAS menyisipkan tag SVG di tengah kalimat atau inline**, yang menyebabkan teks kalimat terbelah atau terjepit di sisi kiri dan kanan gambar!
+  - Pastikan bentuk proporsional, garis/stroke kontras, dan teks label titik/sudut/ukuran jelas terbaca.
+- **Tabel HTML terstruktur:** Untuk penyajian data atau informasi komparatif, gunakan tag tabel \`<table border="1" class="soal-table">...</table>\` yang rapi pada baris tersendiri.
+- Soal yang tidak memerlukan geometri dapat menggunakan stimulus narasi autentik.`
     : `- Stimulus visual: Menggunakan narasi teks kontekstual yang jelas.`;
+
+  const structureAndAntiDuplicationRules = `### 🚫 ATURAN KETAT STRUKTUR TEKS SOAL & ANTI-DUPLIKASI (SANGAT PENTING):
+1. **DILARANG KERAS MENULISKAN OPSI JAWABAN (A, B, C, D) DI DALAM questionText:**
+   - Pada soal Pilihan Ganda & Pilihan Ganda Kompleks: Kolom \`questionText\` HANYA berisi narasi stimulus, gambar/tabel, dan kalimat pertanyaan penutup.
+   - **DILARANG KERAS** menuliskan daftar opsi \`A. ... B. ... C. ... D. ...\` di dalam \`questionText\`! Seluruh teks opsi HANYA dimasukkan ke dalam array \`options\`.
+2. **DILARANG KERAS MENULISKAN BUTIR PERNYATAAN (1, 2, 3...) DI DALAM questionText UNTUK SOAL BENAR/SALAH:**
+   - Pada soal Benar/Salah (\`TRUE_FALSE\`): Kolom \`questionText\` HANYA berisi stimulus dan kalimat perintah umum (misalnya: *"Tentukan Benar atau Salah untuk setiap pernyataan berikut berdasarkan informasi di atas!"*).
+   - **DILARANG KERAS** mencantumkan daftar pernyataan \`1. ... 2. ... 3. ...\` di dalam \`questionText\`! Seluruh butir pernyataan HANYA dimasukkan ke dalam array \`trueFalseRows\`.
+3. **KONSISTENSI NOTASI MATEMATIKA & SATUAN:**
+   - Gunakan format KaTeX yang konsisten antara badan soal dan opsi jawaban (misal jika menggunakan $\\frac{5}{8}$ atau $cm^3$, tuliskan secara seragam).`;
+
+  const formattingRules = `### 🔤 ATURAN WAJIB FORMAT TEKS & TIPOGRAFI (DILARANG MENGGUNAKAN SIMBOL MARKDOWN!):
+1. **DILARANG KERAS** menggunakan simbol-simbol markdown seperti tanda bintang (misal: *kata*, **kata**, ***kata***) atau garis bawah (misal: _kata_, __kata__) untuk memformat tebal, miring, atau garis bawah teks.
+2. **WAJIB MENGGUNAKAN TAG HTML BAKU:**
+   - Huruf Tebal (Bold): Gunakan tag <b>teks</b> (DILARANG menggunakan **teks**).
+   - Huruf Miring (Italic): Gunakan tag <i>teks</i> (DILARANG menggunakan *teks*).
+   - Garis Bawah (Underline): Gunakan tag <u>teks</u> (DILARANG menggunakan __teks__).
+3. Rumus Matematika/KaTeX: Gunakan pasangan tanda dollar $...$ untuk inline math dan $$...$$ untuk baris rumus mandiri (Block Math).`;
+
+  const diversityRules = `### 🌟 ATURAN KEUNIKAN, VARIASI LENGKAP & ANTI-DUPLIKASI SOAL (SANGAT KETAT):
+1. **Variasi Stimulus & Skenario Riil (Setiap Soal Wajib Unik):**
+   - Setiap butir soal WAJIB menghadirkan konteks/skenario kehidupan nyata yang berbeda (latar tempat, objek pengamatan, profesi tokoh, studi kasus alam/sosial).
+   - DILARANG menggunakan cerita atau objek yang sama berulang kali di seluruh butir soal.
+2. **Variasi Angka, Besaran & Data Hitung:**
+   - DILARANG menggunakan angka atau kelipatan yang mirip/identik antar butir soal. Variasikan nilai numerik, rasio, satuan, atau penyajian data komparatif.
+3. **Variasi Kalimat Pembuka & Batang Tubuh Soal (Anti-Monoton):**
+   - DILARANG mengulang pembuka klise seperti "Berdasarkan stimulus di atas...", "Perhatikan pernyataan berikut...", atau "Perhatikan tabel di atas..." pada setiap soal!
+   - Variasikan bentuk pemantik: gunakan dialog interaktif, kutipan catatan ilmiah, tabel perbandingan dua kondisi, analisis masalah praktis, atau narasi situasi faktual.
+4. **Variasi Sudut Pandang Kognitif & Penalaran:**
+   - Setiap butir soal harus menguji aspek kognitif yang berbeda (komparasi efisiensi, penalaran sebab-akibat, identifikasi anomali/kesalahan konsep, evaluasi data grafik, dan pemecahan masalah non-rutin).
+5. **Bebas Kloning:** Seluruh butir soal harus orisinal, berdiri sendiri, dan tidak boleh menyerupai template kloning dari butir soal sebelumnya.`;
 
   // Flags for selected question types
   const hasPgTunggal = validTypes.includes("Pilihan Ganda");
@@ -90,7 +124,7 @@ Karena opsi stimulus visual diaktifkan, **JIKA butir soal melibatkan geometri (s
 
   if (hasPgTunggal) {
     jsonExamples.push(`  {
-    "questionText": "Tuliskan stimulus & pertanyaan di sini. Sisipkan <svg>...</svg> jika ada gambar geometri/diagram. Gunakan $rumus$ untuk KaTeX.",
+    "questionText": "Tuliskan stimulus narasi & pertanyaan penutup di sini (DILARANG menuliskan pilihan A, B, C, D di sini!). Jika menyertakan <svg>, letakkan pada baris baru terpisah (block).",
     "questionType": "MULTIPLE_CHOICE",
     "options": [
       "Pilihan A",
@@ -110,7 +144,7 @@ Karena opsi stimulus visual diaktifkan, **JIKA butir soal melibatkan geometri (s
 
   if (hasPgKompleks) {
     jsonExamples.push(`  {
-    "questionText": "Pilihlah jawaban yang benar! (Jawaban benar lebih dari satu)",
+    "questionText": "Sajikan stimulus narasi & pertanyaan di sini (DILARANG menuliskan pilihan A, B, C, D di sini!). Pilihlah semua pernyataan yang benar!",
     "questionType": "COMPLEX_MULTIPLE_CHOICE",
     "options": [
       "Pernyataan 1 (Benar)",
@@ -184,7 +218,13 @@ ${kisiKisi ? `- **Kisi-kisi / Indikator Capaian:** ${kisiKisi}` : ""}
 
 ${strictTypeRules}
 
+${structureAndAntiDuplicationRules}
+
 ${standardPrinciples}
+
+${formattingRules}
+
+${diversityRules}
 
 ${visualInstruction}
 

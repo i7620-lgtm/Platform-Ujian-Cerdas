@@ -108,22 +108,36 @@ export const MultipleChoiceEditor: React.FC<MultipleChoiceEditorProps> = ({ q })
               </div>
 
               {/* Editor Opsi: Di HP Menempati Baris Bawah Penuh, Di Tablet/Desktop Di Kolom Kanan */}
-              <div className="w-full sm:flex-1 min-w-0">
-                <WysiwygEditor
-                  value={opt}
-                  onChange={(val) => handleOptionTextChange(q.id, optIndex, val)}
-                  placeholder={`Pilihan ${letter}`}
-                  minHeight="50px"
-                  onChartClick={(chartType) =>
-                    setEditingChartTarget({
-                      qId: q.id,
-                      type: "option",
-                      index: optIndex,
-                      preferredType: chartType,
-                    })
-                  }
-                  chartData={q.optionCharts?.[optIndex]}
-                />
+              <div className="w-full sm:flex-1 min-w-0 flex flex-col sm:flex-row gap-2">
+                <div className="flex-1 min-w-0">
+                  <WysiwygEditor
+                    value={opt}
+                    onChange={(val) => handleOptionTextChange(q.id, optIndex, val)}
+                    placeholder={`Pilihan ${letter}`}
+                    minHeight="50px"
+                    onChartClick={(chartType) =>
+                      setEditingChartTarget({
+                        qId: q.id,
+                        type: "option",
+                        index: optIndex,
+                        preferredType: chartType,
+                      })
+                    }
+                    chartData={q.optionCharts?.[optIndex]}
+                  />
+                </div>
+                
+                {q.useCustomWeights && (
+                  <div className="shrink-0 flex items-center gap-1.5 bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 px-2.5 py-1.5 rounded-xl self-start sm:self-stretch justify-center">
+                    <span className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase">Bobot</span>
+                    <input
+                      type="number"
+                      value={q.optionWeights?.[optIndex] ?? 0}
+                      onChange={(e) => useExamEditorStore.getState().handleOptionWeightChange(q.id, optIndex, parseInt(e.target.value) || 0)}
+                      className="w-12 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-bold text-center py-1 focus:ring-1 focus:ring-primary outline-none text-slate-800 dark:text-slate-200"
+                    />
+                  </div>
+                )}
               </div>
             </div>
           );

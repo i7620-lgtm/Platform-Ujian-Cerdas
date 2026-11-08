@@ -7,6 +7,7 @@ import { generateContextualEducationalSvg } from "./smartSvgTemplates";
 import { repairQuestionCharts, normalizeChartPlaceholdersInHtml } from "./chartRepairService";
 import { generateSingleQuestionClientSide } from "./clientQuestionGenerator";
 import { resolveExpertPersona, buildAIMDirectives, validateAndReflectQuestions } from "./aiPersonaAimEngine";
+import { isolateVisualElementsToCenterBlock, stripDuplicateOptionsFromQuestionText, stripDuplicateStatementsFromQuestionText } from "../components/teacher/views/externalAiParser";
 
 export class PartialGenerationError extends Error {
   public partialQuestions: Question[];
@@ -1444,6 +1445,10 @@ export async function generateQuestions(
             const cleaned = cleanGeneratedMathUnits(text || '');
             return replaceGeometryPlaceholders(replaceChartPlaceholders(markdownToHtml(cleaned), hasChart));
         };
+
+        workingQuestionText = stripDuplicateOptionsFromQuestionText(workingQuestionText, q.options);
+        workingQuestionText = stripDuplicateStatementsFromQuestionText(workingQuestionText, q.trueFalseRows);
+        workingQuestionText = isolateVisualElementsToCenterBlock(workingQuestionText);
 
         const hasMainChart = !!q.chartData;
         const questionText = formatContent(workingQuestionText, hasMainChart);

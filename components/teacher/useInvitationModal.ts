@@ -46,6 +46,8 @@ export const useInvitationModal = ({
   const [isStarted, setIsStarted] = useState(false);
   const [showKisiKisi, setShowKisiKisi] = useState(false);
   const [showRegisterModal, setShowRegisterModal] = useState(false);
+  const [showSchoolsModal, setShowSchoolsModal] = useState(false);
+  const [liveExam, setLiveExam] = useState<Exam | null>(exam || null);
   const [students, setStudents] = useState<Student[]>([]);
   const [parsedSchoolName, setParsedSchoolName] = useState("");
   const [parsedClasses, setParsedClasses] = useState<string[]>([]);
@@ -54,6 +56,11 @@ export const useInvitationModal = ({
   const [classSessionAssignments, setClassSessionAssignments] = useState<
     Record<string, ClassSessionAssignment>
   >({});
+
+  // Sync liveExam when exam prop updates
+  useEffect(() => {
+    setLiveExam(exam || null);
+  }, [exam]);
 
   const updateClassSessionAssignment = useCallback(
     (className: string, update: Partial<ClassSessionAssignment>) => {
@@ -73,6 +80,7 @@ export const useInvitationModal = ({
     setIsStarted(false);
     setShowKisiKisi(false);
     setShowRegisterModal(false);
+    setShowSchoolsModal(false);
     setStudents([]);
     setParsedSchoolName("");
     setParsedClasses([]);
@@ -457,6 +465,9 @@ export const useInvitationModal = ({
 
       if (updateError) throw updateError;
 
+      // Instantly update liveExam state for immediate UI reflection
+      setLiveExam((prev) => (prev ? { ...prev, config: updatedConfig } : prev));
+
       alert("Pendaftaran sekolah dan pengaturan sesi berhasil disimpan!");
       setShowRegisterModal(false);
     } catch (error: any) {
@@ -480,6 +491,8 @@ export const useInvitationModal = ({
     isStarted,
     showKisiKisi,
     showRegisterModal,
+    showSchoolsModal,
+    liveExam,
     students,
     parsedSchoolName,
     parsedClasses,
@@ -491,6 +504,7 @@ export const useInvitationModal = ({
     setIsStarted,
     setShowKisiKisi,
     setShowRegisterModal,
+    setShowSchoolsModal,
     setStudents,
     setParsedSchoolName,
     setParsedClasses,

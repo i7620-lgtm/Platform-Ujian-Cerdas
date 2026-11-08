@@ -17,6 +17,7 @@ import {
   PieChart,
   Pie,
   Cell,
+  LabelList,
 } from "recharts";
 import { CartesianChart } from "../../../charts/CartesianChart";
 import { VennChart } from "../../../charts/VennChart";
@@ -118,21 +119,23 @@ const PrintChartRenderer: React.FC<PrintChartRendererProps> = ({ data }) => {
             <CartesianGrid strokeDasharray="3 3" stroke="#cbd5e1" opacity={0.7} />
             <XAxis
               dataKey="name"
-              tick={{ fontSize: 11, fill: "#334155", fontWeight: 600 }}
+              tick={{ fontSize: 10, fill: "#334155", fontWeight: 700 }}
               axisLine={{ stroke: "#64748b", strokeWidth: 1.2 }}
               tickLine={{ stroke: "#64748b" }}
               interval={0}
-              angle={-25}
-              textAnchor="end"
-              height={36}
+              angle={chartData.some(d => String(d.name).length > 6) ? -35 : 0}
+              textAnchor={chartData.some(d => String(d.name).length > 6) ? "end" : "middle"}
+              height={chartData.some(d => String(d.name).length > 6) ? 45 : 30}
+              tickMargin={5}
             />
             <YAxis
-              tick={{ fontSize: 11, fill: "#334155", fontWeight: 600 }}
+              tick={{ fontSize: 10, fill: "#334155", fontWeight: 600 }}
               axisLine={{ stroke: "#64748b", strokeWidth: 1.2 }}
               tickLine={{ stroke: "#64748b" }}
               ticks={yTicks}
               domain={yDomain}
-              width={40}
+              width={35}
+              tickMargin={4}
             />
             {datasets.map((dataset, index) => (
               <Bar
@@ -144,7 +147,16 @@ const PrintChartRenderer: React.FC<PrintChartRendererProps> = ({ data }) => {
                 }
                 maxBarSize={45}
                 isAnimationActive={false}
-              />
+              >
+                <LabelList
+                  dataKey={dataset.label || "Data"}
+                  position="top"
+                  fill="#1e293b"
+                  fontSize={10}
+                  fontWeight={800}
+                  offset={5}
+                />
+              </Bar>
             ))}
           </BarChart>
         );
@@ -160,21 +172,23 @@ const PrintChartRenderer: React.FC<PrintChartRendererProps> = ({ data }) => {
             <CartesianGrid strokeDasharray="3 3" stroke="#cbd5e1" opacity={0.7} />
             <XAxis
               dataKey="name"
-              tick={{ fontSize: 11, fill: "#334155", fontWeight: 600 }}
+              tick={{ fontSize: 10, fill: "#334155", fontWeight: 700 }}
               axisLine={{ stroke: "#64748b", strokeWidth: 1.2 }}
               tickLine={{ stroke: "#64748b" }}
               interval={0}
-              angle={-25}
-              textAnchor="end"
-              height={36}
+              angle={chartData.some(d => String(d.name).length > 6) ? -35 : 0}
+              textAnchor={chartData.some(d => String(d.name).length > 6) ? "end" : "middle"}
+              height={chartData.some(d => String(d.name).length > 6) ? 45 : 30}
+              tickMargin={5}
             />
             <YAxis
-              tick={{ fontSize: 11, fill: "#334155", fontWeight: 600 }}
+              tick={{ fontSize: 10, fill: "#334155", fontWeight: 600 }}
               axisLine={{ stroke: "#64748b", strokeWidth: 1.2 }}
               tickLine={{ stroke: "#64748b" }}
               ticks={yTicks}
               domain={yDomain}
-              width={40}
+              width={35}
+              tickMargin={4}
             />
             {datasets.map((dataset, index) => (
               <Line
@@ -188,7 +202,16 @@ const PrintChartRenderer: React.FC<PrintChartRendererProps> = ({ data }) => {
                 strokeWidth={3}
                 dot={{ r: 4, strokeWidth: 1.5, fill: "#fff" }}
                 isAnimationActive={false}
-              />
+              >
+                <LabelList
+                  dataKey={dataset.label || "Data"}
+                  position="top"
+                  fill="#1e293b"
+                  fontSize={10}
+                  fontWeight={800}
+                  offset={8}
+                />
+              </Line>
             ))}
           </LineChart>
         );
@@ -989,14 +1012,14 @@ export const PrintSoalModal: React.FC<PrintSoalModalProps> = ({
                     {/* True / False Table */}
                     {q.questionType === "TRUE_FALSE" && q.trueFalseRows && (
                       <div className="mt-2 pl-6">
-                        <table className="w-full border-collapse border border-black text-xs">
+                        <table className="w-full border-collapse border border-black text-[11px] table-fixed">
                           <thead>
                             <tr className="bg-slate-100">
-                              <th className="border border-black px-3 py-1.5 text-left font-bold w-full">Pernyataan</th>
-                              <th className="border border-black px-2 py-1.5 w-20 text-center font-bold">
+                              <th className="border border-black px-2 py-1.5 text-left font-bold">Pernyataan</th>
+                              <th className="border border-black px-1 py-1.5 w-[75px] text-center font-bold">
                                 {(q.categoryLabels && q.categoryLabels[0]) || "Benar"}
                               </th>
-                              <th className="border border-black px-2 py-1.5 w-20 text-center font-bold">
+                              <th className="border border-black px-1 py-1.5 w-[75px] text-center font-bold">
                                 {(q.categoryLabels && q.categoryLabels[1]) || "Salah"}
                               </th>
                             </tr>
@@ -1005,13 +1028,13 @@ export const PrintSoalModal: React.FC<PrintSoalModalProps> = ({
                             {q.trueFalseRows.map((row, rIdx) => (
                               <tr key={rIdx}>
                                 <td 
-                                  className="border border-black px-3 py-1.5" 
+                                  className="border border-black px-2 py-1.5 leading-snug" 
                                   dangerouslySetInnerHTML={{ __html: renderFormattedHtml(row.text) }}
                                 />
-                                <td className="border border-black px-2 py-1.5 text-center">
+                                <td className="border border-black px-1 py-1.5 text-center w-[75px]">
                                   <div className="w-3.5 h-3.5 border border-black rounded-full mx-auto"></div>
                                 </td>
-                                <td className="border border-black px-2 py-1.5 text-center">
+                                <td className="border border-black px-1 py-1.5 text-center w-[75px]">
                                   <div className="w-3.5 h-3.5 border border-black rounded-full mx-auto"></div>
                                 </td>
                               </tr>

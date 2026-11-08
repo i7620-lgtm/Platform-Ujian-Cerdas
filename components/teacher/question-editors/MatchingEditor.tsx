@@ -105,21 +105,48 @@ export const MatchingEditor: React.FC<MatchingEditorProps> = ({ q }) => {
             )}
 
             {/* DESKTOP LEBAR (>= 1024px): Tombol Hapus di Sebelah Kanan Pasangan (Kolom ke-4) */}
-            {q.matchingPairs!.length > 2 ? (
-              <button
-                type="button"
-                onClick={() => {
-                  if (window.confirm("Hapus pasangan menjodohkan ini?")) {
-                    handleDeleteMatchingPair(q.id, pIndex);
-                  }
-                }}
-                className="hidden lg:flex p-2 text-gray-400 dark:text-slate-500 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg transition-colors justify-self-center cursor-pointer"
-                title="Hapus pasangan"
-              >
-                <TrashIcon className="w-4 h-4" />
-              </button>
-            ) : (
-              <div className="hidden lg:block w-8"></div>
+            <div className="hidden lg:flex items-center gap-3">
+              {q.useCustomWeights && (
+                <div className="flex flex-col items-center gap-1">
+                  <span className="text-[9px] font-black text-slate-400 uppercase">Bobot</span>
+                  <input
+                    type="number"
+                    value={pair.weight ?? 0}
+                    onChange={(e) => useExamEditorStore.getState().handleMatchingWeightChange(q.id, pIndex, parseInt(e.target.value) || 0)}
+                    className="w-10 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded text-[10px] font-bold text-center py-0.5 focus:ring-1 focus:ring-primary outline-none"
+                  />
+                </div>
+              )}
+
+              {q.matchingPairs!.length > 2 ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (window.confirm("Hapus pasangan menjodohkan ini?")) {
+                      handleDeleteMatchingPair(q.id, pIndex);
+                    }
+                  }}
+                  className="p-2 text-gray-400 dark:text-slate-500 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg transition-colors cursor-pointer"
+                  title="Hapus pasangan"
+                >
+                  <TrashIcon className="w-4 h-4" />
+                </button>
+              ) : (
+                <div className="w-8"></div>
+              )}
+            </div>
+            
+            {/* KHUSUS HP/TABLET: Bobot Skor */}
+            {q.useCustomWeights && (
+               <div className="lg:hidden flex items-center justify-between bg-slate-50 dark:bg-slate-900/50 p-2 rounded-lg border border-slate-100 dark:border-slate-700 mt-1">
+                 <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400">Bobot Skor Pasangan:</span>
+                 <input
+                    type="number"
+                    value={pair.weight ?? 0}
+                    onChange={(e) => useExamEditorStore.getState().handleMatchingWeightChange(q.id, pIndex, parseInt(e.target.value) || 0)}
+                    className="w-12 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-xs font-bold text-center py-1"
+                  />
+               </div>
             )}
           </div>
         ))}

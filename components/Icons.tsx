@@ -1285,3 +1285,37 @@ export const StarIcon: React.FC<React.SVGProps<SVGSVGElement> & { filled?: boole
   </svg>
 );
 
+export const BuildingOfficeIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
+  <svg
+    {...props}
+    xmlns="http://www.w3.org/2000/svg"
+    fill="none"
+    viewBox="0 0 24 24"
+    strokeWidth={1.5}
+    stroke="currentColor"
+  >
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      d="M3.75 21h16.5M4.5 3h15M5.25 3v18m13.5-18v18M9 6.75h1.5m-1.5 3h1.5m-1.5 3h1.5m3-6h1.5m-1.5 3h1.5m-1.5 3h1.5M9 21v-3.375c0-.621.504-1.125 1.125-1.125h3.75c.621 0 1.125.504 1.125 1.125V21"
+    />
+  </svg>
+);
+
+export const UserGroupIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
+  <svg
+    {...props}
+    xmlns="http://www.w3.org/2000/svg"
+    fill="none"
+    viewBox="0 0 24 24"
+    strokeWidth={1.5}
+    stroke="currentColor"
+  >
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      d="M18 18.72a9.094 9.094 0 00-3.741-.479 3 3 0 00-4.518 0A9.094 9.094 0 006 18.719m12 0a5.971 5.971 0 00-.941-3.197m0 0A5.995 5.995 0 0012 12.75a5.995 5.995 0 00-5.058 2.772m0 0A5.97 5.97 0 006 18.72M12 12.75a3 3 0 100-6 3 3 0 000 6z"
+    />
+  </svg>
+);
+

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import { createPortal } from "react-dom";
 import {
   XMarkIcon,
@@ -11,11 +11,14 @@ import {
   ShareIcon,
   BookOpenIcon,
   CheckCircleIcon,
+  BuildingOfficeIcon,
 } from "../Icons";
 import type { Exam } from "../../types";
 import { KisiKisiModal } from "./KisiKisiModal";
 import { RegisterSchoolModal } from "./RegisterSchoolModal";
+import { ParticipatingSchoolsModal } from "./ParticipatingSchoolsModal";
 import { useInvitationModal } from "./useInvitationModal";
+import { getParticipatingSchoolsWithSessions } from "./schoolSessionUtils";
 
 interface InvitationModalProps {
   isOpen: boolean;
@@ -42,10 +45,19 @@ export const InvitationModal: React.FC<InvitationModalProps> = ({
     isStarted,
     showKisiKisi,
     showRegisterModal,
+    showSchoolsModal,
+    liveExam,
     setShowKisiKisi,
     setShowRegisterModal,
+    setShowSchoolsModal,
     getFormattedStartDate,
   } = hook;
+
+  const effectiveExam = liveExam || exam;
+
+  const participatingSchools = useMemo(() => {
+    return getParticipatingSchoolsWithSessions(effectiveExam, schoolName);
+  }, [effectiveExam, schoolName]);
 
   const [copiedCode, setCopiedCode] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
@@ -242,19 +254,30 @@ export const InvitationModal: React.FC<InvitationModalProps> = ({
               {/* Title & Badges: Full Subject Name on Top, Exam Type & Target Classes on Next Row */}
               <div className="mb-2 pb-1.5 border-b border-slate-100 dark:border-slate-800">
                 <h2 className="text-sm sm:text-base font-black text-slate-900 dark:text-white tracking-tight leading-snug break-words">
-                  {exam ? exam.config.subject : "Evaluasi Belajar"}
+                  {effectiveExam ? effectiveExam.config.subject : "Evaluasi Belajar"}
                 </h2>
-                {/* Baris Berikutnya: TKA / Jenis Ujian + Target Kelas / Sekolah */}
+                {/* Baris Berikutnya: TKA / Jenis Ujian + Sekolah Mengikuti + Target Kelas */}
                 <div className="flex flex-wrap items-center gap-1 mt-1.5">
-                  {exam && (
+                  {effectiveExam && (
                     <span
-                      className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider shrink-0 ${getExamTypeBadge(exam.config.examType)}`}
+                      className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider shrink-0 ${getExamTypeBadge(effectiveExam.config.examType)}`}
                     >
-                      {exam.config.examType}
+                      {effectiveExam.config.examType}
                     </span>
                   )}
-                  {exam?.config.targetClasses && exam.config.targetClasses.length > 0 ? (
-                    exam.config.targetClasses.map((cls, idx) => {
+                  {participatingSchools.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setShowSchoolsModal(true)}
+                      className="px-1.5 py-0.5 bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/60 dark:hover:bg-indigo-900/60 text-indigo-600 dark:text-indigo-400 font-black rounded border border-indigo-200 dark:border-indigo-900/60 text-[8px] uppercase tracking-wider inline-flex items-center gap-1 active:scale-95 transition-all shadow-2xs shrink-0 cursor-pointer"
+                      title="Klik untuk melihat daftar sekolah dan sesi ujian"
+                    >
+                      <BuildingOfficeIcon className="w-2.5 h-2.5" />
+                      <span>{participatingSchools.length} Sekolah Mengikuti</span>
+                    </button>
+                  )}
+                  {effectiveExam?.config.targetClasses && effectiveExam.config.targetClasses.length > 0 ? (
+                    effectiveExam.config.targetClasses.map((cls, idx) => {
                       const isVeryLong = cls.length > 18;
                       const isLong = cls.length > 12;
                       return (
@@ -561,18 +584,29 @@ export const InvitationModal: React.FC<InvitationModalProps> = ({
                 {/* Subject Title & Badges */}
                 <div className="my-2.5">
                   <h2 className="text-xl lg:text-2xl font-black text-slate-900 dark:text-white tracking-tight leading-snug line-clamp-2">
-                    {exam ? exam.config.subject : "Evaluasi Belajar"}
+                    {effectiveExam ? effectiveExam.config.subject : "Evaluasi Belajar"}
                   </h2>
                   <div className="flex flex-wrap items-center gap-1.5 mt-1">
-                    {exam && (
+                    {effectiveExam && (
                       <span
-                        className={`px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-widest shadow-2xs ${getExamTypeBadge(exam.config.examType)}`}
+                        className={`px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-widest shadow-2xs ${getExamTypeBadge(effectiveExam.config.examType)}`}
                       >
-                        {exam.config.examType}
+                        {effectiveExam.config.examType}
                       </span>
                     )}
-                    {exam?.config.targetClasses &&
-                      exam.config.targetClasses.map((c) => (
+                    {participatingSchools.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setShowSchoolsModal(true)}
+                        className="px-2 py-0.5 bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/60 dark:hover:bg-indigo-900/60 text-indigo-600 dark:text-indigo-400 font-black rounded border border-indigo-200 dark:border-indigo-900/60 text-[8px] uppercase tracking-wider inline-flex items-center gap-1 active:scale-95 transition-all shadow-2xs cursor-pointer"
+                        title="Klik untuk melihat daftar sekolah dan sesi ujian"
+                      >
+                        <BuildingOfficeIcon className="w-3 h-3" />
+                        <span>{participatingSchools.length} Sekolah Mengikuti</span>
+                      </button>
+                    )}
+                    {effectiveExam?.config.targetClasses &&
+                      effectiveExam.config.targetClasses.map((c) => (
                         <span
                           key={c}
                           className="px-2 py-0.5 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-[8px] font-black rounded border border-slate-200 dark:border-slate-700 uppercase"
@@ -685,9 +719,15 @@ export const InvitationModal: React.FC<InvitationModalProps> = ({
         isOpen={showRegisterModal}
         onClose={() => setShowRegisterModal(false)}
         schoolName={schoolName}
-        examType={exam?.config.examType}
-        exam={exam}
+        examType={effectiveExam?.config.examType}
+        exam={effectiveExam}
         hook={hook}
+      />
+      <ParticipatingSchoolsModal
+        isOpen={showSchoolsModal}
+        onClose={() => setShowSchoolsModal(false)}
+        schools={participatingSchools}
+        examSubject={effectiveExam?.config.subject}
       />
     </>,
     document.body

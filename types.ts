@@ -97,13 +97,19 @@ export interface Question {
     right: string; 
     leftChart?: ChartData;
     rightChart?: ChartData;
+    weight?: number; // Bobot skor khusus per pasangan
   }[];
 
   trueFalseRows?: {
     text: string;
     answer: boolean; 
     chartData?: ChartData;
+    trueWeight?: number; // Bobot skor jika pilih Benar
+    falseWeight?: number; // Bobot skor jika pilih Salah
   }[];
+
+  useCustomWeights?: boolean; // Aktifkan pembobotan skor per jawaban
+  optionWeights?: number[]; // Bobot skor per opsi (untuk MC / CMC)
 
   categoryLabels?: [string, string] | string[]; // Label pilihan untuk soal kategori (misal: ["Benar", "Salah"], ["Sesuai", "Tidak Sesuai"]), default: ["Benar", "Salah"]
 
