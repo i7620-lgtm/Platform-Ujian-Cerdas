@@ -62,6 +62,27 @@ Karena opsi stimulus visual diaktifkan, **JIKA butir soal melibatkan geometri (s
 - Soal yang tidak memerlukan geometri dapat menggunakan stimulus cerita atau teks narasi autentik.`
     : `- Stimulus visual: Menggunakan narasi teks kontekstual yang jelas.`;
 
+  const formattingRules = `### 🔤 ATURAN WAJIB FORMAT TEKS & TIPOGRAFI (DILARANG MENGGUNAKAN SIMBOL MARKDOWN!):
+1. **DILARANG KERAS** menggunakan simbol-simbol markdown seperti tanda bintang (misal: *kata*, **kata**, ***kata***) atau garis bawah (misal: _kata_, __kata__) untuk memformat tebal, miring, atau garis bawah teks.
+2. **WAJIB MENGGUNAKAN TAG HTML BAKU:**
+   - Huruf Tebal (Bold): Gunakan tag <b>teks</b> (DILARANG menggunakan **teks**).
+   - Huruf Miring (Italic): Gunakan tag <i>teks</i> (DILARANG menggunakan *teks*).
+   - Garis Bawah (Underline): Gunakan tag <u>teks</u> (DILARANG menggunakan __teks__).
+3. Rumus Matematika/KaTeX: Gunakan pasangan tanda dollar $...$ untuk inline math dan $$...$$ untuk baris rumus mandiri (Block Math).`;
+
+  const diversityRules = `### 🌟 ATURAN KEUNIKAN, VARIASI LENGKAP & ANTI-DUPLIKASI SOAL (SANGAT KETAT):
+1. **Variasi Stimulus & Skenario Riil (Setiap Soal Wajib Unik):**
+   - Setiap butir soal WAJIB menghadirkan konteks/skenario kehidupan nyata yang berbeda (latar tempat, objek pengamatan, profesi tokoh, studi kasus alam/sosial).
+   - DILARANG menggunakan cerita atau objek yang sama berulang kali di seluruh butir soal.
+2. **Variasi Angka, Besaran & Data Hitung:**
+   - DILARANG menggunakan angka atau kelipatan yang mirip/identik antar butir soal. Variasikan nilai numerik, rasio, satuan, atau penyajian data komparatif.
+3. **Variasi Kalimat Pembuka & Batang Tubuh Soal (Anti-Monoton):**
+   - DILARANG mengulang pembuka klise seperti "Berdasarkan stimulus di atas...", "Perhatikan pernyataan berikut...", atau "Perhatikan tabel di atas..." pada setiap soal!
+   - Variasikan bentuk pemantik: gunakan dialog interaktif, kutipan catatan ilmiah, tabel perbandingan dua kondisi, analisis masalah praktis, atau narasi situasi faktual.
+4. **Variasi Sudut Pandang Kognitif & Penalaran:**
+   - Setiap butir soal harus menguji aspek kognitif yang berbeda (komparasi efisiensi, penalaran sebab-akibat, identifikasi anomali/kesalahan konsep, evaluasi data grafik, dan pemecahan masalah non-rutin).
+5. **Bebas Kloning:** Seluruh butir soal harus orisinal, berdiri sendiri, dan tidak boleh menyerupai template kloning dari butir soal sebelumnya.`;
+
   // Flags for selected question types
   const hasPgTunggal = validTypes.includes("Pilihan Ganda");
   const hasPgKompleks = validTypes.includes("Pilihan Ganda Kompleks");
@@ -90,7 +111,7 @@ Karena opsi stimulus visual diaktifkan, **JIKA butir soal melibatkan geometri (s
 
   if (hasPgTunggal) {
     jsonExamples.push(`  {
-    "questionText": "Tuliskan stimulus & pertanyaan di sini. Sisipkan <svg>...</svg> jika ada gambar geometri/diagram. Gunakan $rumus$ untuk KaTeX.",
+    "questionText": "Tuliskan stimulus & pertanyaan di sini. Gunakan <b>tebal</b>, <i>miring</i>, dan <u>garis bawah</u> (DILARANG simbol asteris *). Sisipkan <svg>...</svg> jika ada gambar geometri/diagram. Gunakan $rumus$ untuk KaTeX.",
     "questionType": "MULTIPLE_CHOICE",
     "options": [
       "Pilihan A",
@@ -185,6 +206,10 @@ ${kisiKisi ? `- **Kisi-kisi / Indikator Capaian:** ${kisiKisi}` : ""}
 ${strictTypeRules}
 
 ${standardPrinciples}
+
+${formattingRules}
+
+${diversityRules}
 
 ${visualInstruction}
 
