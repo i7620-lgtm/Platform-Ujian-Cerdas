@@ -53,9 +53,6 @@ export default defineConfig(({ mode }) => {
       'process.env.API_KEY': JSON.stringify(env.API_KEY || process.env.API_KEY || ''),
       'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY || process.env.GEMINI_API_KEY || env.API_KEY || process.env.API_KEY || '')
     },
-    optimizeDeps: {
-      include: ['@vercel/analytics/react']
-    },
     resolve: {
       dedupe: ['react', 'react-dom']
     },
@@ -75,9 +72,6 @@ export default defineConfig(({ mode }) => {
         output: {
           manualChunks(id) {
             if (id.includes('node_modules')) {
-              if (id.includes('@vercel/analytics')) {
-                return 'vendor-analytics';
-              }
               if (id.includes('katex') || id.includes('marked') || id.includes('react-markdown')) {
                 return 'vendor-math-markdown';
               }
