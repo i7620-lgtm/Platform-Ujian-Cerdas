@@ -1,6 +1,9 @@
 import type { Question, QuestionType, Exam, Result, ChartData } from "../../types";
 import { generateGeometrySVG, parseGeometryLabels } from "./geometryUtils";
 import { renderLatexToString, renderMathInHtml, normalizeLatex } from "../../utils/mathRenderer";
+import { convertLlmFormattingToHtml } from "../../utils/llmTextFormatter";
+
+export { convertLlmFormattingToHtml };
 
 // --- INTERFACES ---
 interface VisualLine {
@@ -2613,7 +2616,8 @@ export const markdownToHtml = (markdown: string): string => {
   }
   processedMarkdown = lines.join("\n");
 
-  // 3. Parse with marked
+  // 3. Convert LLM formatting (**bold**, *italic*, _underline_) and parse with marked
+  processedMarkdown = convertLlmFormattingToHtml(processedMarkdown);
   let html = marked.parse(processedMarkdown) as string;
 
   // 4. Restore Audio
