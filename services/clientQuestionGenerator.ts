@@ -142,15 +142,6 @@ PEDOMAN FORMAT RUMUS MATEMATIKA & SAINS (KATEX / LATEX BAKU):
    - Kata/label deskriptif lebih dari 1 huruf di dalam rumus WAJIB dibungkus \\text{...} (Contoh: \\text{Kecepatan} = \\frac{\\text{Jarak}}{\\text{Waktu}}).
 4. PENTING (ESCAPE BACKSLASH): Karena Anda membalas dalam string JSON, selalu gunakan tanda garis miring ganda (double-backslash) untuk perintah LaTeX, contoh: "\\frac{1}{2}" bukan "\frac{1}{2}".
 
-ATURAN WAJIB FORMAT TEKS & TIPOGRAFI (DILARANG MENGGUNAKAN SIMBOL MARKDOWN!):
-- DILARANG KERAS menggunakan simbol markdown seperti tanda bintang (*kata*, **kata**) atau garis bawah (_kata_, __kata__) untuk memformat teks.
-- WAJIB menggunakan tag HTML: <b>tebal</b> untuk kata kunci, <i>miring</i> untuk istilah asing/ilmiah, dan <u>garis bawah</u> untuk penegasan.
-- Rumus matematika/KaTeX tetap menggunakan sintaks LaTeX berpasangan $...$ atau $$...$$.
-
-ATURAN KEUNIKAN & ANTI-REPETISI SOAL (SOAL #${questionNumber}):
-- Buat butir soal #${questionNumber} ini dengan stimulus kontekstual, data angka, dan skenario yang sepenuhnya unik dan segar.
-- DILARANG mengulang kalimat pembuka klise seperti "Berdasarkan stimulus di atas...", "Perhatikan pernyataan berikut...", dsb. Variasikan pemantik soal.
-
 ATURAN STRUKTUR PILIHAN & KUNCI JAWABAN (SESUAI BENTUK SOAL):
 1. Jika "${assignedType}" adalah "Pilihan Ganda":
    - Buatlah ${targetOptionCount} opsi pilihan yang semuanya unik, bermakna substantif nyata, dan realistis (DILARANG opsi kembar).
