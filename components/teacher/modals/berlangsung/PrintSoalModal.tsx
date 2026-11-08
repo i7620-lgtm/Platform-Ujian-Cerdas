@@ -1,9 +1,11 @@
 import React, { useRef, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { Exam, ChartData } from "../../../../types";
+import { Exam, ChartData, TeacherProfile } from "../../../../types";
 import { XMarkIcon, PrinterIcon } from "../../../Icons";
 import { sanitizeHtml } from "../../examUtils";
 import { renderMathInHtml } from "../../../../utils/mathRenderer";
+import { SchoolLetterhead } from "../../SchoolLetterhead";
+import { storageService } from "../../../../services/storage";
 import {
   BarChart,
   Bar,
@@ -265,15 +267,38 @@ interface PrintSoalModalProps {
   isOpen: boolean;
   onClose: () => void;
   exam: Exam | null;
+  teacherProfile?: TeacherProfile;
 }
 
 export const PrintSoalModal: React.FC<PrintSoalModalProps> = ({
   isOpen,
   onClose,
   exam,
+  teacherProfile,
 }) => {
   const printContainerRef = useRef<HTMLDivElement>(null);
   const [isTwoColOptions, setIsTwoColOptions] = useState(true);
+  const [headerMode, setHeaderMode] = useState<"default" | "kop">("default");
+  const [prevExamCode, setPrevExamCode] = useState(exam?.code);
+  if (exam?.code !== prevExamCode) {
+    setPrevExamCode(exam?.code);
+    setHeaderMode("default");
+  }
+  const [fetchedProfile, setFetchedProfile] = useState<TeacherProfile | null>(null);
+
+  useEffect(() => {
+    let isMounted = true;
+    if (isOpen && !teacherProfile) {
+      storageService.getCurrentUser().then((u) => {
+        if (isMounted && u) setFetchedProfile(u);
+      });
+    }
+    return () => {
+      isMounted = false;
+    };
+  }, [isOpen, teacherProfile]);
+
+  const profile = teacherProfile || fetchedProfile;
 
   useEffect(() => {
     if (isOpen) {
@@ -496,8 +521,18 @@ export const PrintSoalModal: React.FC<PrintSoalModalProps> = ({
             height: auto !important;
           }
 
-          .print-soal-content img,
-          .print-soal-content svg:not(.katex *):not(.lucide):not(.geometry-shape *):not(.geometry-shape) {
+          .school-letterhead-root img,
+          .school-letterhead-logo {
+            max-width: 78px !important;
+            max-height: 78px !important;
+            width: auto !important;
+            height: auto !important;
+            object-fit: contain !important;
+            margin: 0 auto !important;
+          }
+
+          .print-soal-content img:not(.school-letterhead-root *),
+          .print-soal-content svg:not(.katex *):not(.lucide):not(.geometry-shape *):not(.geometry-shape):not(.school-letterhead-root *) {
             max-width: 280px !important;
             width: auto !important;
             max-height: 220px !important;
@@ -529,6 +564,16 @@ export const PrintSoalModal: React.FC<PrintSoalModalProps> = ({
         }
 
         /* Screen Preview Rules for Print Soal Modal Container */
+        .school-letterhead-root img,
+        .school-letterhead-logo {
+          max-width: 78px !important;
+          max-height: 78px !important;
+          width: auto !important;
+          height: auto !important;
+          object-fit: contain !important;
+          margin: 0 auto !important;
+        }
+
         .print-soal-content .geometry-shape {
           display: block !important;
           max-width: 250px !important;
@@ -545,8 +590,8 @@ export const PrintSoalModal: React.FC<PrintSoalModalProps> = ({
           height: auto !important;
         }
 
-        .print-soal-content img,
-        .print-soal-content svg:not(.katex *):not(.lucide):not(.geometry-shape *):not(.geometry-shape) {
+        .print-soal-content img:not(.school-letterhead-root *),
+        .print-soal-content svg:not(.katex *):not(.lucide):not(.geometry-shape *):not(.geometry-shape):not(.school-letterhead-root *) {
           max-width: 280px !important;
           width: auto !important;
           max-height: 220px !important;
@@ -634,6 +679,34 @@ export const PrintSoalModal: React.FC<PrintSoalModalProps> = ({
         </div>
 
         <div className="flex items-center gap-2">
+          {/* Tombol Pengalihan Tampilan Kop: Default vs Kop Sekolah */}
+          <div className="flex items-center bg-slate-100 dark:bg-slate-700/60 p-0.5 rounded-lg border border-slate-200 dark:border-slate-600">
+            <button
+              type="button"
+              onClick={() => setHeaderMode("default")}
+              className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all cursor-pointer ${
+                headerMode === "default"
+                  ? "bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 shadow-xs"
+                  : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+              }`}
+              title="Tampilkan Kop Standar Bawaan"
+            >
+              Default
+            </button>
+            <button
+              type="button"
+              onClick={() => setHeaderMode("kop")}
+              className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all cursor-pointer ${
+                headerMode === "kop"
+                  ? "bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 shadow-xs"
+                  : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+              }`}
+              title="Tampilkan Kop Resmi Sekolah (Dwibahasa Aksara Bali / Latin)"
+            >
+              Kop Sekolah
+            </button>
+          </div>
+
           <button
             type="button"
             onClick={() => setIsTwoColOptions(!isTwoColOptions)}
@@ -649,7 +722,7 @@ export const PrintSoalModal: React.FC<PrintSoalModalProps> = ({
           <button
             type="button"
             onClick={() => window.print()}
-            className="flex items-center gap-1.5 px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold transition-colors shadow-sm"
+            className="flex items-center gap-1.5 px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold transition-colors shadow-sm cursor-pointer"
           >
             <PrinterIcon className="w-4 h-4" />
             <span>Cetak (PDF)</span>
@@ -657,7 +730,7 @@ export const PrintSoalModal: React.FC<PrintSoalModalProps> = ({
           <button
             type="button"
             onClick={onClose}
-            className="p-1.5 border border-slate-200 dark:border-slate-700 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-400 transition-colors"
+            className="p-1.5 border border-slate-200 dark:border-slate-700 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-400 transition-colors cursor-pointer"
             title="Tutup Pratinjau"
           >
             <XMarkIcon className="w-5 h-5" />
@@ -670,43 +743,74 @@ export const PrintSoalModal: React.FC<PrintSoalModalProps> = ({
         className="print-soal-content max-w-4xl mx-auto bg-white p-6 sm:p-10 text-black"
         ref={printContainerRef}
       >
-        {/* Official Indonesian School Exam Header (Kop Soal Standar) */}
-        <div className="print-soal-header mb-5 border-b-2 border-black pb-3">
-          <div className="flex items-center justify-between border-b border-black pb-2 mb-2">
-            <div className="text-left">
-              <h2 className="text-sm font-extrabold uppercase tracking-wide text-black leading-tight">
-                {exam.authorSchool || "UJIAN SEKOLAH / ASESMEN AKADEMIK"}
-              </h2>
-              <p className="text-[11px] font-semibold text-slate-700">
+        {/* Render Kop Sekolah Resmi jika mode "kop", atau Kop Soal Standar jika mode "default" */}
+        {headerMode === "kop" ? (
+          <div className="print-soal-header mb-5 pb-2">
+            <SchoolLetterhead profile={profile} />
+
+            <div className="text-center my-2">
+              <h1 className="text-base font-black uppercase tracking-wider text-black">
+                {exam.config?.examType || "PENILAIAN AKHIR SEMESTER"} - {exam.config?.subject || ""}
+              </h1>
+              <p className="text-xs font-semibold text-slate-700">
                 TAHUN PELAJARAN {currentYear}/{currentYear + 1}
               </p>
             </div>
-            <div className="text-right">
-              <span className="inline-block px-2.5 py-0.5 border border-black font-bold text-[11px] uppercase tracking-wider">
-                NASKAH SOAL
-              </span>
+
+            <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-left text-xs font-medium border-t border-b border-black py-2 mt-2">
+              <div>
+                <span className="font-bold">Mata Pelajaran:</span> {exam.config?.subject || "-"}
+              </div>
+              <div>
+                <span className="font-bold">Alokasi Waktu:</span> {exam.config?.timeLimit ? `${exam.config.timeLimit} Menit` : "Sesuai Jadwal"}
+              </div>
+              <div>
+                <span className="font-bold">Kelas / Jenjang:</span> {exam.config?.classLevel || "-"}
+              </div>
+              <div>
+                <span className="font-bold">Jumlah Soal:</span> {actualQuestionsCount} Butir ({exam.code})
+              </div>
             </div>
           </div>
+        ) : (
+          /* Official Indonesian School Exam Header (Kop Soal Standar) */
+          <div className="print-soal-header mb-5 border-b-2 border-black pb-3">
+            <div className="flex items-center justify-between border-b border-black pb-2 mb-2">
+              <div className="text-left">
+                <h2 className="text-sm font-extrabold uppercase tracking-wide text-black leading-tight">
+                  {exam.authorSchool || profile?.school || "UJIAN SEKOLAH / ASESMEN AKADEMIK"}
+                </h2>
+                <p className="text-[11px] font-semibold text-slate-700">
+                  TAHUN PELAJARAN {currentYear}/{currentYear + 1}
+                </p>
+              </div>
+              <div className="text-right">
+                <span className="inline-block px-2.5 py-0.5 border border-black font-bold text-[11px] uppercase tracking-wider">
+                  NASKAH SOAL
+                </span>
+              </div>
+            </div>
 
-          <h1 className="text-base font-black uppercase tracking-wider text-black text-center my-1.5">
-            {exam.config?.examType || "PENILAIAN AKHIR SEMESTER"} - {exam.config?.subject || ""}
-          </h1>
+            <h1 className="text-base font-black uppercase tracking-wider text-black text-center my-1.5">
+              {exam.config?.examType || "PENILAIAN AKHIR SEMESTER"} - {exam.config?.subject || ""}
+            </h1>
 
-          <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-left text-xs font-medium border-t border-slate-300 pt-2 mt-2">
-            <div>
-              <span className="font-bold">Mata Pelajaran:</span> {exam.config?.subject || "-"}
-            </div>
-            <div>
-              <span className="font-bold">Alokasi Waktu:</span> {exam.config?.timeLimit ? `${exam.config.timeLimit} Menit` : "Sesuai Jadwal"}
-            </div>
-            <div>
-              <span className="font-bold">Kelas / Jenjang:</span> {exam.config?.classLevel || "-"}
-            </div>
-            <div>
-              <span className="font-bold">Jumlah Soal:</span> {actualQuestionsCount} Butir ({exam.code})
+            <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-left text-xs font-medium border-t border-slate-300 pt-2 mt-2">
+              <div>
+                <span className="font-bold">Mata Pelajaran:</span> {exam.config?.subject || "-"}
+              </div>
+              <div>
+                <span className="font-bold">Alokasi Waktu:</span> {exam.config?.timeLimit ? `${exam.config.timeLimit} Menit` : "Sesuai Jadwal"}
+              </div>
+              <div>
+                <span className="font-bold">Kelas / Jenjang:</span> {exam.config?.classLevel || "-"}
+              </div>
+              <div>
+                <span className="font-bold">Jumlah Soal:</span> {actualQuestionsCount} Butir ({exam.code})
+              </div>
             </div>
           </div>
-        </div>
+        )}
 
         {/* General Instruction */}
         <div className="mb-4 p-2 bg-slate-50 border border-slate-300 rounded text-[11px] leading-tight text-slate-800">

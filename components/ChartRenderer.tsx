@@ -23,6 +23,7 @@ import { ChartData } from "../types";
 
 interface ChartRendererProps {
   data: ChartData;
+  isLightbox?: boolean;
 }
 
 const COLORS = [
@@ -77,7 +78,7 @@ const CustomTooltip = ({ active, payload, label }: CustomTooltipProps) => {
 
 const BAR_CHART_MARGIN = { top: 30, right: 25, left: -10, bottom: 5 };
 
-export const ChartRenderer: React.FC<ChartRendererProps> = ({ data }) => {
+export const ChartRenderer: React.FC<ChartRendererProps> = ({ data, isLightbox = false }) => {
   const { type, title, labels, datasets } = data;
 
   const [isMobile, setIsMobile] = React.useState(false);
@@ -192,7 +193,6 @@ export const ChartRenderer: React.FC<ChartRendererProps> = ({ data }) => {
 
     const ticks = [];
     const maxTick = Math.ceil(max / interval) * interval;
-    // Berikan ruang/headroom di atas bar tertinggi agar LabelList di atas bar tidak terpotong
     const upperLimit = maxTick === max ? maxTick + interval : maxTick;
     for (let i = 0; i <= upperLimit; i += interval) {
       ticks.push(i);
@@ -211,7 +211,7 @@ export const ChartRenderer: React.FC<ChartRendererProps> = ({ data }) => {
             width="100%"
             height="100%"
             minWidth={100}
-            minHeight={220}
+            minHeight={isLightbox ? 280 : 220}
           >
             <BarChart
               data={chartData}
@@ -243,7 +243,7 @@ export const ChartRenderer: React.FC<ChartRendererProps> = ({ data }) => {
                 ticks={yTicks}
                 domain={yDomain}
               />
-              {data.showTooltip !== false && (
+              {isLightbox && data.showTooltip !== false && (
                 <Tooltip
                   content={<CustomTooltip />}
                   cursor={{ fill: "rgba(99, 102, 241, 0.08)" }}
@@ -282,7 +282,7 @@ export const ChartRenderer: React.FC<ChartRendererProps> = ({ data }) => {
             width="100%"
             height="100%"
             minWidth={100}
-            minHeight={220}
+            minHeight={isLightbox ? 280 : 220}
           >
             <LineChart data={chartData} margin={BAR_CHART_MARGIN}>
               <CartesianGrid
@@ -310,7 +310,7 @@ export const ChartRenderer: React.FC<ChartRendererProps> = ({ data }) => {
                 ticks={yTicks}
                 domain={yDomain}
               />
-              {data.showTooltip !== false && (
+              {isLightbox && data.showTooltip !== false && (
                 <Tooltip
                   content={<CustomTooltip />}
                   cursor={{ stroke: "rgba(99, 102, 241, 0.2)", strokeWidth: 2 }}
@@ -350,14 +350,14 @@ export const ChartRenderer: React.FC<ChartRendererProps> = ({ data }) => {
       case "relation":
         return <RelationChart data={data} />;
       case "cartesian":
-        return <CartesianChart data={data} />;
+        return <CartesianChart data={data} isLightbox={isLightbox} />;
       case "pie": {
         return (
           <ResponsiveContainer
             width="100%"
             height="100%"
             minWidth={100}
-            minHeight={220}
+            minHeight={isLightbox ? 280 : 220}
           >
             <PieChart margin={pieChartMargin}>
               <Pie
@@ -381,7 +381,7 @@ export const ChartRenderer: React.FC<ChartRendererProps> = ({ data }) => {
                   />
                 ))}
               </Pie>
-              {data.showTooltip !== false && (
+              {isLightbox && data.showTooltip !== false && (
                 <Tooltip
                   content={<CustomTooltip />}
                   wrapperStyle={{ zIndex: 1000, pointerEvents: "none" }}
@@ -393,41 +393,36 @@ export const ChartRenderer: React.FC<ChartRendererProps> = ({ data }) => {
           </ResponsiveContainer>
         );
       }
-        return null;
     }
   };
 
   const chartBoxRef = useRef<HTMLDivElement>(null);
 
-  const handleOpenFullscreen = () => {
-    if (chartBoxRef.current) {
-      const svgEl = chartBoxRef.current.querySelector("svg");
-      if (svgEl) {
-        openVisualLightbox({
-          svgHtml: svgEl.outerHTML,
-          title: title || "Grafik Data Soal",
-        });
-      }
-    }
+  const handleOpenFullscreen = (e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    if (isLightbox) return;
+
+    openVisualLightbox({
+      chartData: data,
+      title: title || "Grafik Data Soal",
+    });
   };
 
   return (
     <div
       ref={chartBoxRef}
-      className={`w-full ${["venn", "relation", "cartesian"].includes(type) ? "h-auto max-w-[380px] mx-auto flex" : "min-h-[190px] h-[230px] sm:h-[260px] max-h-[35vh] max-w-[460px] mx-auto flex"} flex-col bg-white dark:bg-slate-900/50 p-2.5 sm:p-3.5 my-1.5 rounded-2xl border border-dashed border-slate-300 dark:border-slate-700 shadow-sm transition-all relative group select-none`}
+      data-chart-renderer="true"
+      onClick={!isLightbox ? handleOpenFullscreen : undefined}
+      className={`chart-renderer-container w-full ${
+        isLightbox
+          ? "h-full min-h-[320px] flex"
+          : ["venn", "relation", "cartesian"].includes(type)
+          ? "h-auto max-w-[380px] mx-auto flex cursor-pointer hover:border-indigo-400 hover:shadow-md"
+          : "min-h-[190px] h-[230px] sm:h-[260px] max-h-[35vh] max-w-[460px] mx-auto flex cursor-pointer hover:border-indigo-400 hover:shadow-md"
+      } flex-col bg-white dark:bg-slate-900/50 p-2.5 sm:p-3.5 my-1.5 rounded-2xl border border-dashed border-slate-300 dark:border-slate-700 shadow-sm transition-all relative group select-none`}
     >
-      {/* Fullscreen Zoom Button */}
-      <button
-        type="button"
-        onClick={handleOpenFullscreen}
-        title="Perbesar Grafik Layar Penuh"
-        className="absolute top-2 right-2 p-1.5 rounded-lg bg-slate-100 hover:bg-indigo-50 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-500 hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-400 transition-all opacity-70 group-hover:opacity-100 z-10 no-lightbox"
-      >
-        <Maximize2 className="w-3.5 h-3.5" />
-      </button>
-
       {title && (
-        <h3 className="text-center font-bold mb-1 text-slate-800 dark:text-white tracking-tight text-sm sm:text-base shrink-0 pr-6 pl-6 truncate">
+        <h3 className="text-center font-bold mb-1 text-slate-800 dark:text-white tracking-tight text-sm sm:text-base shrink-0 px-2 truncate">
           {title}
         </h3>
       )}

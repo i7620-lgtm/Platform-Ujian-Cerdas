@@ -143,7 +143,7 @@ export const QuestionResultDetailPopover: React.FC<
             Pertanyaan:
           </p>
           <div
-            className="font-medium text-slate-800 dark:text-slate-200 prose prose-xs max-w-none dark:prose-invert leading-relaxed [&_img]:max-w-full [&_img]:max-h-72 [&_img]:object-contain [&_img]:rounded-xl [&_img]:border [&_img]:border-slate-200 dark:[&_img]:border-slate-700 [&_img]:bg-white dark:[&_img]:bg-slate-900 [&_img]:p-1 [&_img]:mx-auto [&_img]:my-2 [&_svg]:max-w-full [&_svg]:max-h-72 [&_svg]:mx-auto [&_svg]:my-2 [&_table]:max-w-full [&_table]:overflow-x-auto"
+            className="font-medium text-slate-800 dark:text-slate-200 prose prose-xs max-w-none dark:prose-invert leading-relaxed [&_img]:max-w-full [&_img]:max-h-72 [&_img]:object-contain [&_img]:rounded-xl [&_img]:border [&_img]:border-slate-200 dark:[&_img]:border-slate-700 [&_img]:bg-white dark:[&_img]:bg-slate-900 [&_img]:p-1 [&_img]:mx-auto [&_img]:my-2 [&_svg]:max-w-full [&_svg]:max-h-72 [&_svg]:mx-auto [&_svg]:my-2 [&_table]:w-auto [&_table]:max-w-full [&_table]:overflow-x-auto"
             dangerouslySetInnerHTML={{
               __html: renderMathInHtml(sanitizeHtml(question.questionText || "-")),
             }}

@@ -338,6 +338,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
         {view === "DRAFTS" && (
           <DraftsView
             exams={draftExams}
+            teacherProfile={teacherProfile}
             onDeleteDraft={handleDeleteExam}
             onContinueDraft={handleContinueDraft}
           />

@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { PrinterIcon, XMarkIcon } from "../Icons";
 import { Question, TeacherProfile, NipType } from "../../types";
 import { renderMathInHtml } from "../../utils/mathRenderer";
+import { SchoolLetterhead } from "./SchoolLetterhead";
 
 export const KisiKisiModal: React.FC<{
   isOpen: boolean;
@@ -33,6 +34,14 @@ export const KisiKisiModal: React.FC<{
   headmasterNipType,
   regency,
 }) => {
+  const [headerMode, setHeaderMode] = React.useState<"default" | "kop">("default");
+
+  React.useEffect(() => {
+    if (isOpen) {
+      setHeaderMode("default");
+    }
+  }, [isOpen]);
+
   if (!isOpen) return null;
 
   const formatType = (type: string) => {
@@ -149,36 +158,89 @@ export const KisiKisiModal: React.FC<{
             </table>
           </div>
         </div>
-        <div className="p-4 border-t border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 flex justify-end gap-2">
-          <button
-            onClick={() => window.print()}
-            className="px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 text-xs font-bold rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors flex items-center gap-2 shadow-sm"
-          >
-            <PrinterIcon className="w-4 h-4" /> Cetak
-          </button>
-          <button
-            onClick={onClose}
-            className="px-4 py-2 bg-indigo-600 text-white text-xs font-bold rounded-lg hover:bg-indigo-700 transition-colors shadow-sm"
-          >
-            Tutup
-          </button>
+        <div className="p-4 border-t border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 flex flex-wrap justify-between items-center gap-2">
+          {/* Tombol Pengalihan Tampilan Kop: Default vs Kop Sekolah */}
+          <div className="flex items-center bg-white dark:bg-slate-800 p-0.5 rounded-lg border border-slate-200 dark:border-slate-700">
+            <button
+              type="button"
+              onClick={() => setHeaderMode("default")}
+              className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all cursor-pointer ${
+                headerMode === "default"
+                  ? "bg-indigo-600 text-white shadow-xs"
+                  : "text-slate-600 dark:text-slate-400 hover:text-slate-900"
+              }`}
+              title="Tampilkan Kop Standar Bawaan"
+            >
+              Default
+            </button>
+            <button
+              type="button"
+              onClick={() => setHeaderMode("kop")}
+              className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all cursor-pointer ${
+                headerMode === "kop"
+                  ? "bg-indigo-600 text-white shadow-xs"
+                  : "text-slate-600 dark:text-slate-400 hover:text-slate-900"
+              }`}
+              title="Tampilkan Kop Resmi Sekolah (Dwibahasa Aksara Bali / Latin)"
+            >
+              Kop Sekolah
+            </button>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => window.print()}
+              className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-lg transition-colors flex items-center gap-2 shadow-sm cursor-pointer"
+            >
+              <PrinterIcon className="w-4 h-4" /> Cetak (PDF)
+            </button>
+            <button
+              onClick={onClose}
+              className="px-4 py-2 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 text-xs font-bold rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors shadow-sm cursor-pointer"
+            >
+              Tutup
+            </button>
+          </div>
         </div>
       </div>
 
       {/* Print Document - Visible ONLY on Print */}
       <div className="print-only-document hidden">
-        <div className="text-center mb-6 border-b-2 border-black pb-4">
-          <h2 className="text-xl font-bold uppercase tracking-wide mb-1">
-            {schoolName || "Sekolah"}
-          </h2>
-          <p className="text-sm mb-4">
-            {teacherName ? `Guru Pengampu: ${teacherName}` : ""}
-          </p>
-          <h1 className="text-2xl font-bold uppercase underline">
-            KISI-KISI SOAL
-          </h1>
-          <p className="text-lg font-bold mt-2">{subject}</p>
-        </div>
+        {headerMode === "kop" ? (
+          <div className="mb-4">
+            <SchoolLetterhead
+              profile={teacherProfile}
+              overrideData={{
+                school: schoolName || teacherProfile?.school,
+                regency: regency || teacherProfile?.regency,
+              }}
+            />
+            <div className="text-center my-2">
+              <h1 className="text-xl font-bold uppercase underline">
+                KISI-KISI PENULISAN SOAL ASESMEN
+              </h1>
+              <p className="text-sm font-bold mt-1">{subject}</p>
+              {teacherName && (
+                <p className="text-xs text-slate-700 mt-0.5">
+                  Guru Pengampu: {teacherName}
+                </p>
+              )}
+            </div>
+          </div>
+        ) : (
+          <div className="text-center mb-6 border-b-2 border-black pb-4">
+            <h2 className="text-xl font-bold uppercase tracking-wide mb-1">
+              {schoolName || teacherProfile?.school || "Sekolah"}
+            </h2>
+            <p className="text-sm mb-4">
+              {teacherName || teacherProfile?.fullName ? `Guru Pengampu: ${teacherName || teacherProfile?.fullName}` : ""}
+            </p>
+            <h1 className="text-2xl font-bold uppercase underline">
+              KISI-KISI SOAL
+            </h1>
+            <p className="text-lg font-bold mt-2">{subject}</p>
+          </div>
+        )}
 
         <table className="w-full border-collapse border border-black text-sm">
           <thead>

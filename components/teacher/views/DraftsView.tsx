@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import type { Exam } from "../../../types";
+import type { Exam, TeacherProfile } from "../../../types";
 import { PencilIcon } from "../../Icons";
 import { useDraftsView } from "../useDraftsView";
 import { PreviewModal } from "./PreviewModal";
@@ -10,9 +10,10 @@ import { PrintKunciJawabanModal } from "../modals/berlangsung/PrintKunciJawabanM
 
 export const DraftsView: React.FC<{
   exams: Exam[];
+  teacherProfile?: TeacherProfile;
   onDeleteDraft: (exam: Exam) => void;
   onContinueDraft: (exam: Exam) => void;
-}> = ({ exams, onDeleteDraft, onContinueDraft }) => {
+}> = ({ exams, teacherProfile, onDeleteDraft, onContinueDraft }) => {
   const { previewExam, setPreviewExam, handleCopyPreviewLink } =
     useDraftsView();
 
@@ -77,6 +78,7 @@ export const DraftsView: React.FC<{
         <PrintSoalModal
           isOpen={true}
           exam={printSoalExam}
+          teacherProfile={teacherProfile}
           onClose={() => setPrintSoalExam(null)}
         />
       )}
@@ -85,6 +87,7 @@ export const DraftsView: React.FC<{
         <PrintKisiKisiModal
           isOpen={true}
           exam={printKisiKisiExam}
+          teacherProfile={teacherProfile}
           onClose={() => setPrintKisiKisiExam(null)}
         />
       )}
@@ -93,6 +96,7 @@ export const DraftsView: React.FC<{
         <PrintKunciJawabanModal
           isOpen={true}
           exam={printKunciExam}
+          teacherProfile={teacherProfile}
           onClose={() => setPrintKunciExam(null)}
         />
       )}

@@ -541,6 +541,7 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({
         isOpen={isPrintModalOpen}
         onClose={() => setIsPrintModalOpen(false)}
         exam={exam || null}
+        teacherProfile={teacherProfile}
       />
 
       {exam && (

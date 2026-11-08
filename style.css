@@ -42,10 +42,11 @@
   /* Target both the Editor (.wysiwyg-content), Tailwind Typography (.prose), and Options (.option-content) */
   .wysiwyg-content table, 
   .prose table { 
-    min-width: 100%;
+    width: auto;
+    max-width: 100%;
     border-collapse: separate; 
     border-spacing: 0;
-    margin: 1rem 0; 
+    margin: 0.75rem 0; 
     border: 1px solid #e2e8f0;
     border-radius: 8px;
     overflow: hidden;
@@ -53,7 +54,8 @@
 
   /* Specific styles for tables inside options to prevent overflow and look better */
   .option-content table {
-    min-width: 100%;
+    width: auto;
+    max-width: 100%;
     border-collapse: separate; 
     border-spacing: 0;
     margin: 0.5rem 0; 
@@ -366,17 +368,18 @@
     text-align: center;
   }
   
-  /* Responsive Tables: Otomatis scroll horizontal dengan scrollbar halus tanpa merusak tata letak */
+  /* Responsive Tables: Ukuran ringkas presisi (compact width) dengan scroll horizontal jika melebihi kontainer */
   .wysiwyg-content table,
   .prose table,
   .option-content table {
-    display: block;
-    width: max-content;
+    display: table;
+    width: auto;
     max-width: 100%;
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
-    margin: 0.4rem auto;
-    border-collapse: collapse;
+    margin: 0.5rem 0;
+    border-collapse: separate;
+    border-spacing: 0;
     scrollbar-width: thin;
     scrollbar-color: rgba(148, 163, 184, 0.5) transparent;
   }
