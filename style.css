@@ -297,16 +297,23 @@
   .prose img,
   .prose svg:not(.katex *):not(.math-visual *):not(.geometry-shape *):not(.geometry-shape),
   .prose canvas {
-    max-width: 100%;
+    max-width: min(100%, 280px);
     width: auto;
-    max-height: min(35vh, 320px);
+    max-height: 220px;
     height: auto;
     object-fit: contain;
-    display: block;
+    display: inline-block;
     margin: 0.35rem auto;
-    border-radius: 0.625rem;
+    border-radius: 0.5rem;
+    border: 1px solid #e2e8f0;
     cursor: zoom-in;
     transition: transform 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+  }
+
+  .dark .option-content img,
+  .dark .wysiwyg-content img,
+  .dark .prose img {
+    border-color: #334155;
   }
 
   .wysiwyg-content img:hover,
