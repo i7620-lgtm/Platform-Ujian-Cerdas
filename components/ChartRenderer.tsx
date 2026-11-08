@@ -411,8 +411,9 @@ export const ChartRenderer: React.FC<ChartRendererProps> = ({ data, isLightbox =
   return (
     <div
       ref={chartBoxRef}
+      data-chart-renderer="true"
       onClick={!isLightbox ? handleOpenFullscreen : undefined}
-      className={`w-full ${
+      className={`chart-renderer-container w-full ${
         isLightbox
           ? "h-full min-h-[320px] flex"
           : ["venn", "relation", "cartesian"].includes(type)
