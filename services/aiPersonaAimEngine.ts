@@ -12,7 +12,6 @@
  */
 
 import type { Question, QuizConfig } from "../types.ts";
-import { sanitizeQuestionFormatting } from "../components/teacher/formattingCleaner";
 
 export interface EducationalProfile {
   phase: "Fase A" | "Fase B" | "Fase C" | "Fase D" | "Fase E" | "Fase F" | "Umum";
@@ -153,9 +152,8 @@ ${isMathOrScience ? `- LATEX PERSAMAAN & SIMBOL MATEMATIKA:
   * Gunakan sintaks LaTeX baku berpasangan $...$ untuk inline dan $$...$$ untuk persamaan blok.
   * Karena output berupa JSON, gunakan double backslash ganda untuk perintah LaTeX (contoh: $\\\\frac{a}{b}$, $\\\\sqrt{x}$, $\\\\int$, $\\\\lim$, $x^2$).
   * DILARANG menggunakan karakter akar unicode (√) secara langsung; WAJIB $\\\\sqrt{...}$.
-  * DILARANG menggunakan format LaTeX untuk: mata uang (tulis TEKS BIASA: "Rp 50.000"), derajat suhu (tulis "35°C"), dan satuan baku murni tanpa pangkat (tulis "8 cm", "15 km", "250 gram").` : `- TEKS FORMATTING & TIPOGRAFI BAKU (HTML TAGS):
-  * DILARANG KERAS menggunakan simbol-simbol markdown seperti tanda bintang (*kata*, **kata**) atau garis bawah (_kata_, __kata__) untuk memformat teks.
-  * WAJIB menggunakan tag HTML: <b>tebal</b> untuk istilah kunci/penekanan, <i>miring</i> untuk istilah asing/ilmiah, dan <u>garis bawah</u> untuk poin penegasan.`}
+  * DILARANG menggunakan format LaTeX untuk: mata uang (tulis TEKS BIASA: "Rp 50.000"), derajat suhu (tulis "35°C"), dan satuan baku murni tanpa pangkat (tulis "8 cm", "15 km", "250 gram").` : `- TEKS FORMATTING & TIPOGRAFI:
+  * Gunakan Markdown rapi: **tebal** untuk istilah kunci, *miring* untuk kata asing, dan tabel Markdown untuk perbandingan.`}
 - REPRESENTASI VISUAL EDUKATIF & DETEKSI CERDAS (SPEKTRUM VISUAL LENGKAP):
   * Pengguna dapat mengaktifkan opsi visual ("Sertakan Gambar, Diagram & Geometri") atau membiarkannya tidak dicentang (Auto-Deteksi Konteks).
   * DETEKSI OTOMATIS: Jika topik/materi atau butir soal secara hakiki membutuhkan atau sangat dibantu oleh ilustrasi visual (misalnya: Geometri Bangun Datar/Ruang, Koordinat Kartesius & Grafik Fungsi, Organ Tubuh/Siklus Sains, Diagram Statistika, Piktogram Data, Peta/Monumen), Anda WAJIB menyertakan visual representatif yang tepat.
@@ -170,17 +168,7 @@ ${isMathOrScience ? `- LATEX PERSAMAAN & SIMBOL MATEMATIKA:
   * Field 'hint' (Petunjuk Pengerjaan): WAJIB diisi panduan konsep dasar atau arahan strategi berpikir TANPA membocorkan pilihan atau kunci jawaban.
   * Field 'solutionSteps' (Langkah Pengerjaan): WAJIB diisi alur deduksi atau tahapan matematis lengkap tahap demi tahap hingga tuntas.
 
-#### 3. CREATIVE (KREATIVITAS STIMULUS, VARIASI TOTAL & ANTI-DUPLIKASI):
-- Keunikan & Variasi Skenario (Zero-Cloning):
-  * Setiap butir soal WAJIB memiliki stimulus atau skenario yang sepenuhnya berbeda (latar tempat, objek observasi, konteks cerita, nama tokoh, bidang terapan, data kasus).
-  * DILARANG mengulang satu skenario atau objek yang sama pada beberapa butir soal.
-- Variasi Angka, Besaran & Data Hitung:
-  * DILARANG menggunakan angka, kelipatan, atau besaran yang identik atau hanya berbeda sedikit antar butir soal. Gunakan variasi bilangan bulat, pecahan, desimal kontekstual, atau data komparatif yang segar.
-- Variasi Kalimat Pembuka & Batang Tubuh Soal (Anti-Monoton):
-  * DILARANG mengulang pembuka klise seperti "Berdasarkan stimulus di atas...", "Perhatikan pernyataan berikut...", atau "Perhatikan tabel di atas..." pada setiap soal!
-  * Variasikan teknik pemantik: gunakan studi kasus riil, dialog singkat, kutipan data hasil eksperimen, perbandingan dua kondisi, evaluasi keputusan, atau analisis situasi nyata.
-- Variasi Sudut Pandang Kognitif & Penalaran:
-  * Variasikan sudut pandang: sebab-akibat, perbandingan efisiensi, evaluasi kesalahan konsep, prediksi kelanjutan fenomena, rekonstruksi solusi alternatif, dan pemecahan masalah non-rutin.
+#### 3. CREATIVE (KREATIVITAS STIMULUS BERKONTEKS NYATA INDONESIA)
 - Hadirkan konteks riil kehidupan siswa Indonesia:
   * Gunakan nama tokoh lokal yang wajar dan santun (Pak Joko, Bu Siti, Danu, Caca, Made, Butet, Antok, Tika, dsb.).
   * Angkat skenario otentik: keanekaragaman flora-fauna nusantara, data sensus kependudukan, penghematan energi listrik rumah tangga, pembagian hasil panen, UMKM lokal, sistem tata surya, atau cerita fabel/cerpen inspiratif.
@@ -344,6 +332,6 @@ export function validateAndReflectQuestions(questions: Question[]): Question[] {
       copy.level = "Level 3 - Penalaran";
     }
 
-    return sanitizeQuestionFormatting(copy);
+    return copy;
   });
 }
