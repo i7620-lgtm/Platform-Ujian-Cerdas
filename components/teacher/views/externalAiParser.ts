@@ -1,4 +1,5 @@
 import type { Question, QuestionType } from "../../../types";
+import { sanitizeQuestionFormatting } from "../formattingCleaner";
 
 export interface ParseResult {
   success: boolean;
@@ -244,7 +245,7 @@ export const parseExternalAiOutput = (
         item.caraPengerjaan ||
         "";
 
-      return {
+      return sanitizeQuestionFormatting({
         id: uniqueId,
         questionText: finalQuestionText,
         questionType: qType,
@@ -260,7 +261,7 @@ export const parseExternalAiOutput = (
         explanation: String(fullExplanation).trim(),
         solutionSteps: String(fullSteps).trim(),
         scoreWeight: item.scoreWeight || item.bobot || 1,
-      };
+      });
     });
 
     return {
