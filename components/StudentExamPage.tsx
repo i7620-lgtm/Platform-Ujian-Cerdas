@@ -56,7 +56,7 @@ const renderQuestionTextWithChart = (
   }
 
   if (!chartData) {
-    return <div dangerouslySetInnerHTML={{ __html: optimized }}></div>;
+    return <div className="question-content min-w-0" dangerouslySetInnerHTML={{ __html: optimized }}></div>;
   }
 
   const parser = new DOMParser();
@@ -66,7 +66,7 @@ const renderQuestionTextWithChart = (
   if (!chartNode) {
     return (
       <>
-        <div dangerouslySetInnerHTML={{ __html: optimized }}></div>
+        <div className="question-content min-w-0" dangerouslySetInnerHTML={{ __html: optimized }}></div>
         <div className="mb-8 w-full max-w-3xl mx-auto">
           <ChartRenderer data={chartData} />
         </div>
@@ -85,7 +85,7 @@ const renderQuestionTextWithChart = (
     <>
       {parts.map((part, index) => (
         <React.Fragment key={index}>
-          <div dangerouslySetInnerHTML={{ __html: part }}></div>
+          <div className="question-content min-w-0" dangerouslySetInnerHTML={{ __html: part }}></div>
           {index < parts.length - 1 && (
             <div className="my-6 w-full max-w-3xl mx-auto">
               <ChartRenderer data={chartData} />
