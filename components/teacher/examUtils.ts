@@ -2386,12 +2386,17 @@ export const sanitizeHtml = (html: string): string => {
         if (el.getAttribute("style") === "") el.removeAttribute("style");
         if (el.getAttribute("class") === "") el.removeAttribute("class");
 
-        // Aggressively clean up table elements to rely on style.css
+        // Clean up table elements to rely on style.css and prevent distorted vertical text
         if (
           ["TABLE", "THEAD", "TBODY", "TR", "TH", "TD"].includes(el.tagName)
         ) {
           el.removeAttribute("class");
-          el.removeAttribute("style");
+          if (el instanceof HTMLElement) {
+            el.style.writingMode = "";
+            el.style.textOrientation = "";
+            el.style.letterSpacing = "";
+            el.style.wordBreak = "";
+          }
         }
       }
       // Remove legacy attributes
@@ -2400,17 +2405,18 @@ export const sanitizeHtml = (html: string): string => {
     }
   });
 
-  // Wrap tables in a responsive container to prevent overflow
+  // Wrap tables in a responsive container to prevent overflow and squeezed vertical text
   doc.body.querySelectorAll("table").forEach((table) => {
     // Check if it's already wrapped
     if (
       table.parentElement &&
-      table.parentElement.classList.contains("overflow-x-auto")
+      (table.parentElement.classList.contains("overflow-x-auto") ||
+        table.parentElement.classList.contains("table-responsive-wrapper"))
     ) {
       return;
     }
     const wrapper = doc.createElement("div");
-    wrapper.className = "max-w-full overflow-x-auto my-2 custom-scrollbar";
+    wrapper.className = "table-responsive-wrapper max-w-full overflow-x-auto my-3 rounded-xl border border-slate-200 dark:border-slate-700 shadow-2xs custom-scrollbar";
     table.parentNode?.insertBefore(wrapper, table);
     wrapper.appendChild(table);
   });
