@@ -1777,6 +1777,12 @@ export const parseQuestionsFromPlainText = (text: string): Question[] => {
         questionText = questionText.replace(/\[(?:kuisioner|angket|survei|survey|refleksi)\]/gi, "").trim();
       }
 
+      // Detect Benar/Salah tag in questionText e.g. [BENAR_SALAH] or [BENAR/SALAH]
+      if (/\[(?:benar_salah|benar\/salah|true_false|true\/false)\]/i.test(questionText)) {
+        questionType = "TRUE_FALSE";
+        questionText = questionText.replace(/\[(?:benar_salah|benar\/salah|true_false|true\/false)\]/gi, "").trim();
+      }
+
       // Process options & weights
       const trimmedOptions: string[] = [];
       const parsedOptionWeights: number[] = [];
@@ -1830,6 +1836,38 @@ export const parseQuestionsFromPlainText = (text: string): Question[] => {
           scoreWeight,
           useCustomWeights: hasCustomWeights,
           optionWeights: hasCustomWeights ? parsedOptionWeights : undefined,
+          imageUrl: undefined,
+          optionImages: undefined,
+          category: "",
+          level: "",
+        });
+      } else if (questionType === "TRUE_FALSE") {
+        const rows = (trimmedOptions.length > 0 ? trimmedOptions : ["Pernyataan 1", "Pernyataan 2"]).map((opt, idx) => {
+          let isTrue = true;
+          let rowText = opt;
+          if (/\((?:benar|b|true|t)\)$/i.test(rowText)) {
+            isTrue = true;
+            rowText = rowText.replace(/\((?:benar|b|true|t)\)$/i, "").trim();
+          } else if (/\((?:salah|s|false|f)\)$/i.test(rowText)) {
+            isTrue = false;
+            rowText = rowText.replace(/\((?:salah|s|false|f)\)$/i, "").trim();
+          }
+          return {
+            text: rowText,
+            answer: isTrue,
+            trueWeight: hasCustomWeights ? (parsedOptionWeights[idx] || (isTrue ? 1 : 0)) : (isTrue ? 1 : 0),
+            falseWeight: hasCustomWeights ? (isTrue ? 0 : 1) : 0,
+          };
+        });
+
+        questions.push({
+          id: `q${questions.length + 1}-${Date.now()}`,
+          questionText,
+          questionType: "TRUE_FALSE",
+          trueFalseRows: rows,
+          categoryLabels: ["Benar", "Salah"],
+          scoreWeight,
+          useCustomWeights: hasCustomWeights,
           imageUrl: undefined,
           optionImages: undefined,
           category: "",
