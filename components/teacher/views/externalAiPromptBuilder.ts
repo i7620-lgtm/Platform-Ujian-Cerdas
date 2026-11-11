@@ -131,13 +131,24 @@ Karena opsi stimulus visual diaktifkan, **JIKA butir soal melibatkan geometri (s
   }
 
   // Weighting instruction block
-  const weightingRules = config.enableScoreWeighting || (config.defaultScoreWeight && config.defaultScoreWeight > 1)
-    ? `### ⚖️ ATURAN PEMBOBOTAN SKOR SOAL & JAWABAN (AKTIF - BOBOT BASE: ${config.defaultScoreWeight || 1}x):
-1. **Bobot Soal Dasar:** Sertakan properti \`"scoreWeight": ${config.defaultScoreWeight || 1}\` pada setiap butir soal.
-2. **Pembobotan Per Jawaban / Diferensial (Jika Relevan):**
-   - Pada Pilihan Ganda dengan bobot per opsi: sertakan \`"useCustomWeights": true\` dan \`"optionWeights": [4, 3, 2, 1]\` (urutan skor untuk opsi A, B, C, D).
-   - Pada Benar/Salah berbobot: pada setiap baris di \`trueFalseRows\`, sertakan \`"trueWeight": X\` dan \`"falseWeight": Y\`.
-   - Pada Menjodohkan berbobot: pada setiap pasangan di \`matchingPairs\`, sertakan \`"weight": Z\`.\n`
+  const weightingRules = config.enableScoreWeighting
+    ? `### ⚖️ ATURAN WAJIB PEMBOBOTAN PER OPSI JAWABAN (AKTIF):
+Karena fitur pembobotan per opsi diaktifkan, Anda **WAJIB MENYERTAKAN** skema pembobotan diferensial per opsi/jawaban pada setiap butir soal sesuai jenisnya (DILARANG hanya menaikkan bobot total soal!):
+1. **Pilihan Ganda (MULTIPLE_CHOICE):**
+   - WAJIB menyertakan \`"useCustomWeights": true\`.
+   - WAJIB menyertakan array \`"optionWeights": [4, 3, 2, 1]\` (atau 5 angka jika 5 opsi, misal \`[4, 3, 2, 1, 0]\`).
+   - Berikan nilai bertingkat bergradasi sesuai kedalaman penalaran: opsi paling tepat/ideal berbobot 4, opsi mendekati benar berbobot 3, opsi konsep dasar berbobot 2, opsi dengan miskonsepsi/keliru berbobot 1 atau 0.
+2. **Pilihan Ganda Kompleks (COMPLEX_MULTIPLE_CHOICE):**
+   - WAJIB menyertakan \`"useCustomWeights": true\`.
+   - WAJIB menyertakan array \`"optionWeights"\` untuk masing-masing opsi pernyataan (misal \`[2, 1, 2, 0]\` sesuai bobot kebenaran tiap pernyataan).
+3. **Benar/Salah (TRUE_FALSE):**
+   - Pada setiap baris di \`trueFalseRows\`, WAJIB menyertakan poin mandiri: \`"trueWeight": 1\` (jika siswa memilih Benar) dan \`"falseWeight": 0\` (atau sebaliknya sesuai kunci kebenaran baris tersebut).
+4. **Menjodohkan (MATCHING):**
+   - Pada setiap pasangan di \`matchingPairs\`, WAJIB menyertakan bobot poin spesifik: \`"weight": 1\` (atau poin proporsional per pasangan yang berhasil dijodohkan dengan tepat).
+5. **Kuisioner / Angket (QUESTIONNAIRE):**
+   - WAJIB menyertakan \`"useCustomWeights": true\` dan \`"optionWeights": [1, 2, 3, 4, 5]\` untuk merefleksikan gradasi skala Likert (1=Sangat Tidak Setuju s.d. 5=Sangat Setuju).
+6. **Bobot Dasar Butir Soal (\`scoreWeight\`):**
+   - Tetapkan \`"scoreWeight": 1\` (standar). Penilaian siswa akan dihitung secara presisi berdasarkan akumulasi bobot per opsi yang dipilih siswa.\n`
     : "";
 
   // Build dynamic few-shot JSON example ONLY containing selected types
@@ -147,12 +158,12 @@ Karena opsi stimulus visual diaktifkan, **JIKA butir soal melibatkan geometri (s
     jsonExamples.push(`  {
     "questionText": "Tuliskan stimulus narasi & pertanyaan penutup di sini (DILARANG menuliskan pilihan A, B, C, D di sini!). Jika menyertakan <svg>, letakkan pada baris baru terpisah (block).",
     "questionType": "MULTIPLE_CHOICE",
-    "scoreWeight": ${config.defaultScoreWeight || 1},
+    "scoreWeight": 1,
     "options": [
-      "Pilihan A",
-      "Pilihan B",
-      "Pilihan C",
-      "Pilihan D"
+      "Pilihan A (Paling Tepat)",
+      "Pilihan B (Mendekati Benar)",
+      "Pilihan C (Konsep Dasar)",
+      "Pilihan D (Keliru)"
     ],
     "correctAnswer": "A",
     "useCustomWeights": ${config.enableScoreWeighting ? "true" : "false"},
@@ -170,14 +181,16 @@ Karena opsi stimulus visual diaktifkan, **JIKA butir soal melibatkan geometri (s
     jsonExamples.push(`  {
     "questionText": "Sajikan stimulus narasi & pertanyaan di sini (DILARANG menuliskan pilihan A, B, C, D di sini!). Pilihlah semua pernyataan yang benar!",
     "questionType": "COMPLEX_MULTIPLE_CHOICE",
-    "scoreWeight": ${config.defaultScoreWeight || 1},
+    "scoreWeight": 1,
     "options": [
-      "Pernyataan 1 (Benar)",
-      "Pernyataan 2 (Salah)",
+      "Pernyataan 1 (Benar Penuh)",
+      "Pernyataan 2 (Parsial)",
       "Pernyataan 3 (Benar)",
       "Pernyataan 4 (Salah)"
     ],
     "correctAnswer": "A,C",
+    "useCustomWeights": ${config.enableScoreWeighting ? "true" : "false"},
+    "optionWeights": [2, 1, 2, 0],
     "explanation": "Pembahasan rinci untuk masing-masing opsi pernyataan...",
     "solutionSteps": "Analisis opsi 1... Analisis opsi 3..."
   }`);
@@ -187,12 +200,12 @@ Karena opsi stimulus visual diaktifkan, **JIKA butir soal melibatkan geometri (s
     jsonExamples.push(`  {
     "questionText": "Tentukan Benar atau Salah untuk setiap pernyataan berikut!",
     "questionType": "TRUE_FALSE",
-    "scoreWeight": ${config.defaultScoreWeight || 1},
+    "scoreWeight": 1,
     "categoryLabels": ["Benar", "Salah"],
     "trueFalseRows": [
-      { "text": "Pernyataan 1", "answer": true, "trueWeight": 2, "falseWeight": 0 },
-      { "text": "Pernyataan 2", "answer": false, "trueWeight": 0, "falseWeight": 2 },
-      { "text": "Pernyataan 3", "answer": true, "trueWeight": 2, "falseWeight": 0 }
+      { "text": "Pernyataan 1", "answer": true, "trueWeight": 1, "falseWeight": 0 },
+      { "text": "Pernyataan 2", "answer": false, "trueWeight": 0, "falseWeight": 1 },
+      { "text": "Pernyataan 3", "answer": true, "trueWeight": 1, "falseWeight": 0 }
     ],
     "explanation": "Pembahasan lengkap per baris pernyataan: Pernyataan 1 benar karena... Pernyataan 2 salah karena..."
   }`);
@@ -202,10 +215,10 @@ Karena opsi stimulus visual diaktifkan, **JIKA butir soal melibatkan geometri (s
     jsonExamples.push(`  {
     "questionText": "Jodohkanlah item di sebelah kiri dengan pasangan yang tepat di sebelah kanan!",
     "questionType": "MATCHING",
-    "scoreWeight": ${config.defaultScoreWeight || 1},
+    "scoreWeight": 1,
     "matchingPairs": [
-      { "left": "Istilah / Konsep 1", "right": "Pasangan Jawaban 1", "weight": 2 },
-      { "left": "Istilah / Konsep 2", "right": "Pasangan Jawaban 2", "weight": 2 }
+      { "left": "Istilah / Konsep 1", "right": "Pasangan Jawaban 1", "weight": 1 },
+      { "left": "Istilah / Konsep 2", "right": "Pasangan Jawaban 2", "weight": 1 }
     ],
     "explanation": "Penjelasan relasi pasangan yang tepat..."
   }`);
@@ -215,7 +228,7 @@ Karena opsi stimulus visual diaktifkan, **JIKA butir soal melibatkan geometri (s
     jsonExamples.push(`  {
     "questionText": "Pertanyaan isian singkat yang membutuhkan jawaban eksak atau angka pasti...",
     "questionType": "FILL_IN_THE_BLANK",
-    "scoreWeight": ${config.defaultScoreWeight || 1},
+    "scoreWeight": 1,
     "correctAnswer": "Jawaban Singkat",
     "explanation": "Pembahasan konseptual dan perhitungan eksak..."
   }`);
@@ -225,7 +238,7 @@ Karena opsi stimulus visual diaktifkan, **JIKA butir soal melibatkan geometri (s
     jsonExamples.push(`  {
     "questionText": "Pertanyaan uraian terbuka yang menguji daya nalar dan analisis mendalam...",
     "questionType": "ESSAY",
-    "scoreWeight": ${config.defaultScoreWeight || 1},
+    "scoreWeight": 1,
     "explanation": "Rubrik penilaian lengkap, kata kunci utama, dan jawaban ideal siswa..."
   }`);
   }
@@ -247,7 +260,7 @@ Karena opsi stimulus visual diaktifkan, **JIKA butir soal melibatkan geometri (s
     ],
     "correctAnswer": "",
     "isReflective": true,
-    "scoreWeight": ${config.defaultScoreWeight || 1},
+    "scoreWeight": 1,
     "useCustomWeights": true,
     "optionWeights": [1, 2, 3, 4, 5],
     "explanation": "Instrumen evaluasi diri dan refleksi pemahaman siswa mengenai konsep materi terkait."
