@@ -142,8 +142,10 @@ Karena fitur pembobotan per opsi diaktifkan, Anda **WAJIB MENYERTAKAN** skema pe
    - WAJIB menyertakan \`"useCustomWeights": true\`.
    - WAJIB menyertakan array \`"optionWeights"\` untuk masing-masing opsi pernyataan (misal \`[2, 1, 2, 0]\` sesuai bobot kebenaran tiap pernyataan).
 3. **Benar/Salah (TRUE_FALSE):**
-   - Pada setiap baris di \`trueFalseRows\`, WAJIB menyertakan poin mandiri: \`"trueWeight": 1\` (jika siswa memilih Benar) dan \`"falseWeight": 0\` (atau sebaliknya sesuai kunci kebenaran baris tersebut).
+   - WAJIB menyertakan \`"useCustomWeights": true\`.
+   - Pada setiap baris di \`trueFalseRows\`, WAJIB menyertakan poin mandiri: \`"trueWeight": 1\` dan \`"falseWeight": 0\` jika pernyataan Benar, atau \`"trueWeight": 0\` dan \`"falseWeight": 1\` jika pernyataan Salah (poin penuh jika tepat dan nol jika salah).
 4. **Menjodohkan (MATCHING):**
+   - WAJIB menyertakan \`"useCustomWeights": true\`.
    - Pada setiap pasangan di \`matchingPairs\`, WAJIB menyertakan bobot poin spesifik: \`"weight": 1\` (atau poin proporsional per pasangan yang berhasil dijodohkan dengan tepat).
 5. **Kuisioner / Angket (QUESTIONNAIRE):**
    - WAJIB menyertakan \`"useCustomWeights": true\` dan \`"optionWeights": [1, 2, 3, 4, 5]\` untuk merefleksikan gradasi skala Likert (1=Sangat Tidak Setuju s.d. 5=Sangat Setuju).
@@ -201,6 +203,7 @@ Karena fitur pembobotan per opsi diaktifkan, Anda **WAJIB MENYERTAKAN** skema pe
     "questionText": "Tentukan Benar atau Salah untuk setiap pernyataan berikut!",
     "questionType": "TRUE_FALSE",
     "scoreWeight": 1,
+    "useCustomWeights": ${config.enableScoreWeighting ? "true" : "false"},
     "categoryLabels": ["Benar", "Salah"],
     "trueFalseRows": [
       { "text": "Pernyataan 1", "answer": true, "trueWeight": 1, "falseWeight": 0 },
@@ -216,6 +219,7 @@ Karena fitur pembobotan per opsi diaktifkan, Anda **WAJIB MENYERTAKAN** skema pe
     "questionText": "Jodohkanlah item di sebelah kiri dengan pasangan yang tepat di sebelah kanan!",
     "questionType": "MATCHING",
     "scoreWeight": 1,
+    "useCustomWeights": ${config.enableScoreWeighting ? "true" : "false"},
     "matchingPairs": [
       { "left": "Istilah / Konsep 1", "right": "Pasangan Jawaban 1", "weight": 1 },
       { "left": "Istilah / Konsep 2", "right": "Pasangan Jawaban 2", "weight": 1 }
