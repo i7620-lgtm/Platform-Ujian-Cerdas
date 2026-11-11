@@ -12,6 +12,8 @@ export interface ExternalAiPromptConfig {
   cognitiveLevels: string[]; // Multi-selected cognitive levels
   kisiKisi: string;
   includeVisuals: boolean; // SVG / Diagram / Table request
+  enableScoreWeighting?: boolean; // Pembobotan per jawaban kustom
+  defaultScoreWeight?: number; // Nilai default bobot soal (misal 1-5)
   targetModel?: "chatgpt" | "gemini" | "claude" | "deepseek" | "general";
 }
 
@@ -103,6 +105,7 @@ Karena opsi stimulus visual diaktifkan, **JIKA butir soal melibatkan geometri (s
   const hasMenjodohkan = validTypes.includes("Menjodohkan");
   const hasIsian = validTypes.includes("Isian Singkat");
   const hasEsai = validTypes.includes("Esai");
+  const hasKuisioner = validTypes.includes("Kuisioner");
 
   // Strict constraints block
   let strictTypeRules = `### ⛔ ATURAN KETAT BENTUK SOAL (DILARANG MEMBUAT BENTUK SOAL LAIN!):\n`;
@@ -119,6 +122,37 @@ Karena opsi stimulus visual diaktifkan, **JIKA butir soal melibatkan geometri (s
     strictTypeRules += `   - Untuk Pilihan Ganda Kompleks: Tipe \`"COMPLEX_MULTIPLE_CHOICE"\` dengan multi-kunci (misal \`"A,C"\`).\n`;
   }
 
+  if (hasKuisioner) {
+    strictTypeRules += `4. **KUISIONER / ANGKET / REFLEKSI (NON-SKOR ATAU SKALA LIKERT):**\n`;
+    strictTypeRules += `   - Gunakan tipe \`"QUESTIONNAIRE"\`.\n`;
+    strictTypeRules += `   - Format dapat berupa skala Likert (\`"scale"\`), rating bintang/angka (\`"rating"\`), pilihan respon (\`"choice"\`), atau uraian terbuka (\`"text"\`).\n`;
+    strictTypeRules += `   - Sertakan properti \`"questionnaireFormat": "scale"\`, \`"scaleMin": 1\`, \`"scaleMax": 5\`, \`"scaleLabels": ["Sangat Tidak Setuju", "Sangat Setuju"]\`, serta array respon \`"options"\`.\n`;
+    strictTypeRules += `   - \`"isReflective": true\`, dan \`"correctAnswer": ""\` (karena kuisioner/refleksi tidak memiliki jawaban benar/salah mutlak).\n`;
+  }
+
+  // Weighting instruction block
+  const weightingRules = config.enableScoreWeighting
+    ? `### ⚖️ ATURAN WAJIB PEMBOBOTAN PER OPSI JAWABAN (AKTIF):
+Karena fitur pembobotan per opsi diaktifkan, Anda **WAJIB MENYERTAKAN** skema pembobotan diferensial per opsi/jawaban pada setiap butir soal sesuai jenisnya (DILARANG hanya menaikkan bobot total soal!):
+1. **Pilihan Ganda (MULTIPLE_CHOICE):**
+   - WAJIB menyertakan \`"useCustomWeights": true\`.
+   - WAJIB menyertakan array \`"optionWeights": [4, 3, 2, 1]\` (atau 5 angka jika 5 opsi, misal \`[4, 3, 2, 1, 0]\`).
+   - Berikan nilai bertingkat bergradasi sesuai kedalaman penalaran: opsi paling tepat/ideal berbobot 4, opsi mendekati benar berbobot 3, opsi konsep dasar berbobot 2, opsi dengan miskonsepsi/keliru berbobot 1 atau 0.
+2. **Pilihan Ganda Kompleks (COMPLEX_MULTIPLE_CHOICE):**
+   - WAJIB menyertakan \`"useCustomWeights": true\`.
+   - WAJIB menyertakan array \`"optionWeights"\` untuk masing-masing opsi pernyataan (misal \`[2, 1, 2, 0]\` sesuai bobot kebenaran tiap pernyataan).
+3. **Benar/Salah (TRUE_FALSE):**
+   - WAJIB menyertakan \`"useCustomWeights": true\`.
+   - Pada setiap baris di \`trueFalseRows\`, WAJIB menyertakan poin mandiri: \`"trueWeight": 1\` dan \`"falseWeight": 0\` jika pernyataan Benar, atau \`"trueWeight": 0\` dan \`"falseWeight": 1\` jika pernyataan Salah (poin penuh jika tepat dan nol jika salah).
+4. **Menjodohkan (MATCHING):**
+   - WAJIB menyertakan \`"useCustomWeights": true\`.
+   - Pada setiap pasangan di \`matchingPairs\`, WAJIB menyertakan bobot poin spesifik: \`"weight": 1\` (atau poin proporsional per pasangan yang berhasil dijodohkan dengan tepat).
+5. **Kuisioner / Angket (QUESTIONNAIRE):**
+   - WAJIB menyertakan \`"useCustomWeights": true\` dan \`"optionWeights": [1, 2, 3, 4, 5]\` untuk merefleksikan gradasi skala Likert (1=Sangat Tidak Setuju s.d. 5=Sangat Setuju).
+6. **Bobot Dasar Butir Soal (\`scoreWeight\`):**
+   - Tetapkan \`"scoreWeight": 1\` (standar). Penilaian siswa akan dihitung secara presisi berdasarkan akumulasi bobot per opsi yang dipilih siswa.\n`
+    : "";
+
   // Build dynamic few-shot JSON example ONLY containing selected types
   const jsonExamples: string[] = [];
 
@@ -126,13 +160,16 @@ Karena opsi stimulus visual diaktifkan, **JIKA butir soal melibatkan geometri (s
     jsonExamples.push(`  {
     "questionText": "Tuliskan stimulus narasi & pertanyaan penutup di sini (DILARANG menuliskan pilihan A, B, C, D di sini!). Jika menyertakan <svg>, letakkan pada baris baru terpisah (block).",
     "questionType": "MULTIPLE_CHOICE",
+    "scoreWeight": 1,
     "options": [
-      "Pilihan A",
-      "Pilihan B",
-      "Pilihan C",
-      "Pilihan D"
+      "Pilihan A (Paling Tepat)",
+      "Pilihan B (Mendekati Benar)",
+      "Pilihan C (Konsep Dasar)",
+      "Pilihan D (Keliru)"
     ],
     "correctAnswer": "A",
+    "useCustomWeights": ${config.enableScoreWeighting ? "true" : "false"},
+    "optionWeights": [4, 3, 2, 1],
     "category": "${topic}",
     "level": "${cognitiveLevels[0] || "Level 2 - Penerapan"}",
     "kisiKisi": "Indikator capaian butir soal ini",
@@ -146,13 +183,16 @@ Karena opsi stimulus visual diaktifkan, **JIKA butir soal melibatkan geometri (s
     jsonExamples.push(`  {
     "questionText": "Sajikan stimulus narasi & pertanyaan di sini (DILARANG menuliskan pilihan A, B, C, D di sini!). Pilihlah semua pernyataan yang benar!",
     "questionType": "COMPLEX_MULTIPLE_CHOICE",
+    "scoreWeight": 1,
     "options": [
-      "Pernyataan 1 (Benar)",
-      "Pernyataan 2 (Salah)",
+      "Pernyataan 1 (Benar Penuh)",
+      "Pernyataan 2 (Parsial)",
       "Pernyataan 3 (Benar)",
       "Pernyataan 4 (Salah)"
     ],
     "correctAnswer": "A,C",
+    "useCustomWeights": ${config.enableScoreWeighting ? "true" : "false"},
+    "optionWeights": [2, 1, 2, 0],
     "explanation": "Pembahasan rinci untuk masing-masing opsi pernyataan...",
     "solutionSteps": "Analisis opsi 1... Analisis opsi 3..."
   }`);
@@ -162,11 +202,13 @@ Karena opsi stimulus visual diaktifkan, **JIKA butir soal melibatkan geometri (s
     jsonExamples.push(`  {
     "questionText": "Tentukan Benar atau Salah untuk setiap pernyataan berikut!",
     "questionType": "TRUE_FALSE",
+    "scoreWeight": 1,
+    "useCustomWeights": ${config.enableScoreWeighting ? "true" : "false"},
     "categoryLabels": ["Benar", "Salah"],
     "trueFalseRows": [
-      { "text": "Pernyataan 1", "answer": true },
-      { "text": "Pernyataan 2", "answer": false },
-      { "text": "Pernyataan 3", "answer": true }
+      { "text": "Pernyataan 1", "answer": true, "trueWeight": 1, "falseWeight": 0 },
+      { "text": "Pernyataan 2", "answer": false, "trueWeight": 0, "falseWeight": 1 },
+      { "text": "Pernyataan 3", "answer": true, "trueWeight": 1, "falseWeight": 0 }
     ],
     "explanation": "Pembahasan lengkap per baris pernyataan: Pernyataan 1 benar karena... Pernyataan 2 salah karena..."
   }`);
@@ -176,9 +218,11 @@ Karena opsi stimulus visual diaktifkan, **JIKA butir soal melibatkan geometri (s
     jsonExamples.push(`  {
     "questionText": "Jodohkanlah item di sebelah kiri dengan pasangan yang tepat di sebelah kanan!",
     "questionType": "MATCHING",
+    "scoreWeight": 1,
+    "useCustomWeights": ${config.enableScoreWeighting ? "true" : "false"},
     "matchingPairs": [
-      { "left": "Istilah / Konsep 1", "right": "Pasangan Jawaban 1" },
-      { "left": "Istilah / Konsep 2", "right": "Pasangan Jawaban 2" }
+      { "left": "Istilah / Konsep 1", "right": "Pasangan Jawaban 1", "weight": 1 },
+      { "left": "Istilah / Konsep 2", "right": "Pasangan Jawaban 2", "weight": 1 }
     ],
     "explanation": "Penjelasan relasi pasangan yang tepat..."
   }`);
@@ -188,6 +232,7 @@ Karena opsi stimulus visual diaktifkan, **JIKA butir soal melibatkan geometri (s
     jsonExamples.push(`  {
     "questionText": "Pertanyaan isian singkat yang membutuhkan jawaban eksak atau angka pasti...",
     "questionType": "FILL_IN_THE_BLANK",
+    "scoreWeight": 1,
     "correctAnswer": "Jawaban Singkat",
     "explanation": "Pembahasan konseptual dan perhitungan eksak..."
   }`);
@@ -197,7 +242,32 @@ Karena opsi stimulus visual diaktifkan, **JIKA butir soal melibatkan geometri (s
     jsonExamples.push(`  {
     "questionText": "Pertanyaan uraian terbuka yang menguji daya nalar dan analisis mendalam...",
     "questionType": "ESSAY",
+    "scoreWeight": 1,
     "explanation": "Rubrik penilaian lengkap, kata kunci utama, dan jawaban ideal siswa..."
+  }`);
+  }
+
+  if (hasKuisioner) {
+    jsonExamples.push(`  {
+    "questionText": "Bagaimana pendapat atau pengalaman Anda terhadap materi pembelajaran yang telah dipelajari?",
+    "questionType": "QUESTIONNAIRE",
+    "questionnaireFormat": "scale",
+    "scaleMin": 1,
+    "scaleMax": 5,
+    "scaleLabels": ["Sangat Tidak Setuju", "Sangat Setuju"],
+    "options": [
+      "Sangat Tidak Setuju",
+      "Tidak Setuju",
+      "Ragu-ragu / Netral",
+      "Setuju",
+      "Sangat Setuju"
+    ],
+    "correctAnswer": "",
+    "isReflective": true,
+    "scoreWeight": 1,
+    "useCustomWeights": true,
+    "optionWeights": [1, 2, 3, 4, 5],
+    "explanation": "Instrumen evaluasi diri dan refleksi pemahaman siswa mengenai konsep materi terkait."
   }`);
   }
 
@@ -217,6 +287,8 @@ Tolong buatkan **TOTAL TEPAT ${count} butir soal** berkualitas tinggi dengan spe
 ${kisiKisi ? `- **Kisi-kisi / Indikator Capaian:** ${kisiKisi}` : ""}
 
 ${strictTypeRules}
+
+${weightingRules}
 
 ${structureAndAntiDuplicationRules}
 

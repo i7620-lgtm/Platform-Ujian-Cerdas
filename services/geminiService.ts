@@ -513,7 +513,7 @@ export async function generateQuestions(
     id: { type: Type.STRING, description: "ID unik untuk soal" },
     questionType: {
       type: Type.STRING,
-      enum: ["Pilihan Ganda", "Pilihan Ganda Kompleks", "Benar/Salah", "Menjodohkan", "Uraian Singkat", "Esai"],
+      enum: ["Pilihan Ganda", "Pilihan Ganda Kompleks", "Benar/Salah", "Menjodohkan", "Uraian Singkat", "Esai", "Kuisioner"],
       description: "Bentuk/jenis soal sesuai tabel distribusi wajib"
     },
     questionText: { 
@@ -1370,6 +1370,8 @@ export async function generateQuestions(
             currentQuestionType = 'FILL_IN_THE_BLANK';
         } else if (expLower.includes('esai') || expLower.includes('essay') || expLower.includes('uraian')) {
             currentQuestionType = 'ESSAY';
+        } else if (expLower.includes('kuisioner') || expLower.includes('angket') || expLower.includes('questionnaire') || expLower.includes('survei')) {
+            currentQuestionType = 'QUESTIONNAIRE';
         } else {
             currentQuestionType = 'MULTIPLE_CHOICE';
         }
@@ -1733,10 +1735,16 @@ export async function generateQuestions(
                     rowText = `Pernyataan ${rIdx + 1} terkait ${mappedQ.category}: nilai yang diperoleh dari stimulus adalah ${boolAnswer ? trueLabel : falseLabel}.`;
                 }
 
+                const hasCustomW = !!(q as any).useCustomWeights;
+                const tw = (r as any).trueWeight !== undefined ? Number((r as any).trueWeight) : (hasCustomW ? (boolAnswer ? 1 : 0) : undefined);
+                const fw = (r as any).falseWeight !== undefined ? Number((r as any).falseWeight) : (hasCustomW ? (boolAnswer ? 0 : 1) : undefined);
+
                 return {
                     text: formatContent(rowText, !!r.chartData),
                     answer: boolAnswer,
-                    chartData: r.chartData
+                    chartData: r.chartData,
+                    trueWeight: tw,
+                    falseWeight: fw,
                 };
             });
 
@@ -1777,6 +1785,31 @@ export async function generateQuestions(
                 rightChart: p.rightChart
             }));
             mappedQ.correctAnswer = mappedQ.matchingPairs.map(p => `${p.left} -> ${p.right}`).join(', ');
+        }
+
+        if (currentQuestionType === 'QUESTIONNAIRE') {
+            mappedQ.questionnaireFormat = (q as any).questionnaireFormat || 'scale';
+            mappedQ.scaleMin = (q as any).scaleMin !== undefined ? Number((q as any).scaleMin) : 1;
+            mappedQ.scaleMax = (q as any).scaleMax !== undefined ? Number((q as any).scaleMax) : 5;
+            mappedQ.scaleLabels = (q as any).scaleLabels || ['Sangat Tidak Setuju', 'Sangat Setuju'];
+            mappedQ.isReflective = true;
+            mappedQ.correctAnswer = '';
+            if (!mappedQ.options || mappedQ.options.length === 0) {
+                mappedQ.options = [
+                    'Sangat Tidak Setuju',
+                    'Tidak Setuju',
+                    'Ragu-ragu / Netral',
+                    'Setuju',
+                    'Sangat Setuju'
+                ];
+            }
+        }
+
+        const tfHasW = Array.isArray(mappedQ.trueFalseRows) && mappedQ.trueFalseRows.some(r => (r as any).trueWeight !== undefined || (r as any).falseWeight !== undefined);
+        const mHasW = Array.isArray(mappedQ.matchingPairs) && mappedQ.matchingPairs.some(p => (p as any).weight !== undefined);
+        if ((q as any).useCustomWeights || Array.isArray((q as any).optionWeights) || tfHasW || mHasW) {
+            mappedQ.useCustomWeights = true;
+            mappedQ.optionWeights = (q as any).optionWeights;
         }
         
         return mappedQ;
