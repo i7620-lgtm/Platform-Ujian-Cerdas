@@ -513,7 +513,7 @@ export async function generateQuestions(
     id: { type: Type.STRING, description: "ID unik untuk soal" },
     questionType: {
       type: Type.STRING,
-      enum: ["Pilihan Ganda", "Pilihan Ganda Kompleks", "Benar/Salah", "Menjodohkan", "Uraian Singkat", "Esai"],
+      enum: ["Pilihan Ganda", "Pilihan Ganda Kompleks", "Benar/Salah", "Menjodohkan", "Uraian Singkat", "Esai", "Kuisioner"],
       description: "Bentuk/jenis soal sesuai tabel distribusi wajib"
     },
     questionText: { 
@@ -1370,6 +1370,8 @@ export async function generateQuestions(
             currentQuestionType = 'FILL_IN_THE_BLANK';
         } else if (expLower.includes('esai') || expLower.includes('essay') || expLower.includes('uraian')) {
             currentQuestionType = 'ESSAY';
+        } else if (expLower.includes('kuisioner') || expLower.includes('angket') || expLower.includes('questionnaire') || expLower.includes('survei')) {
+            currentQuestionType = 'QUESTIONNAIRE';
         } else {
             currentQuestionType = 'MULTIPLE_CHOICE';
         }
@@ -1777,6 +1779,29 @@ export async function generateQuestions(
                 rightChart: p.rightChart
             }));
             mappedQ.correctAnswer = mappedQ.matchingPairs.map(p => `${p.left} -> ${p.right}`).join(', ');
+        }
+
+        if (currentQuestionType === 'QUESTIONNAIRE') {
+            mappedQ.questionnaireFormat = (q as any).questionnaireFormat || 'scale';
+            mappedQ.scaleMin = (q as any).scaleMin !== undefined ? Number((q as any).scaleMin) : 1;
+            mappedQ.scaleMax = (q as any).scaleMax !== undefined ? Number((q as any).scaleMax) : 5;
+            mappedQ.scaleLabels = (q as any).scaleLabels || ['Sangat Tidak Setuju', 'Sangat Setuju'];
+            mappedQ.isReflective = true;
+            mappedQ.correctAnswer = '';
+            if (!mappedQ.options || mappedQ.options.length === 0) {
+                mappedQ.options = [
+                    'Sangat Tidak Setuju',
+                    'Tidak Setuju',
+                    'Ragu-ragu / Netral',
+                    'Setuju',
+                    'Sangat Setuju'
+                ];
+            }
+        }
+
+        if ((q as any).useCustomWeights || Array.isArray((q as any).optionWeights)) {
+            mappedQ.useCustomWeights = true;
+            mappedQ.optionWeights = (q as any).optionWeights;
         }
         
         return mappedQ;
