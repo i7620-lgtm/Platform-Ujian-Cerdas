@@ -60,9 +60,17 @@ export const buildExternalAiPrompt = (config: ExternalAiPromptConfig): string =>
     ? `### 🖼️ ATURAN WAJIB STIMULUS VISUAL & GEOMETRI (AKTIF):
 Karena opsi stimulus visual diaktifkan, **JIKA butir soal melibatkan geometri (sudut, segitiga, persegi, lingkaran, balok, bangun ruang, denah, koordinat), perbandingan data, atau diagram alir**, Anda **WAJIB MENYERTAKAN** stimulus visual representatif berupa:
 - **Kode SVG mandiri yang bersih (WAJIB BARIS TERSENDIRI / BLOCK):**
-  - Simpan kode SVG ke properti \`svgContent\` ATAU letakkan di dalam \`questionText\` dengan baris kosong terpisah di atas dan di bawahnya (\`\\n\\n<svg viewBox="0 0 200 150" xmlns="http://www.w3.org/2000/svg" ...>...</svg>\\n\\n\`).
+  - Simpan kode SVG ke properti \`svgContent\` ATAU letakkan di dalam \`questionText\` dengan baris kosong terpisah di atas dan di bawahnya (\`\\n\\n<svg viewBox="0 0 400 300" xmlns="http://www.w3.org/2000/svg" style="width:100%; max-width:450px; height:auto; display:block; margin:12px auto;">...</svg>\\n\\n\`).
   - **DILARANG KERAS menyisipkan tag SVG di tengah kalimat atau inline**, yang menyebabkan teks kalimat terbelah atau terjepit di sisi kiri dan kanan gambar!
-  - Pastikan bentuk proporsional, garis/stroke kontras, dan teks label titik/sudut/ukuran jelas terbaca.
+  - **Atribut Wajib SVG:** Gunakan \`viewBox="0 0 400 300"\`, warna stroke kontras tinggi (misal \`#1E293B\` atau \`#6366F1\`), \`font-family="system-ui, sans-serif"\`, dan \`font-weight="bold"\`.
+- **TEMPLAT STRUKTUR SVG KHUSUS PER TOPIK:**
+  - **Topik Geometri:** Wajib memuat titik sudut jelas di luar objek (A, B, C), garis penolong putus-putus (\`stroke-dasharray="3,3"\`), tanda siku-siku/sudut jika relevan, dan label ukuran yang presisi sesuai narasi soal.
+  - **Topik Koordinat & Grafik:** Wajib memuat sumbu X dan Y berpanah, grid latar belakang tipis (\`stroke="#E2E8F0"\`), serta titik koordinat $(x, y)$ dengan \`<circle r="4"/>\`.
+  - **Topik Diagram Data & Venn:** Wajib memuat bidang himpunan/batang berlabel kontras dengan legenda Keterangan Data yang jelas di bagian bawah.
+- **CHECKLIST VALIDASI MANDIRI AI (VERIFIKASI MUTLAK SEBELUM MENCETAK JSON):**
+  - [ ] Apakah seluruh label angka/huruf pada SVG 100% cocok dengan narasi soal?
+  - [ ] Apakah posisi teks label tidak saling berhimpitan/tumpang tindih?
+  - [ ] Apakah seluruh tag SVG valid dan tertutup rapi (<circle />, <path />, </svg>)?
 - **Tabel HTML terstruktur:** Untuk penyajian data atau informasi komparatif, gunakan tag tabel \`<table border="1" class="soal-table">...</table>\` yang rapi pada baris tersendiri.
 - Soal yang tidak memerlukan geometri dapat menggunakan stimulus narasi autentik.`
     : `- Stimulus visual: Menggunakan narasi teks kontekstual yang jelas.`;
