@@ -1745,9 +1745,10 @@ export const parseQuestionsFromPlainText = (text: string): Question[] => {
 
   const lines = normalizedText.split("\n");
   const questions: Question[] = [];
-  let currentQuestion: (Partial<Question> & { textParts: string[] }) | null =
+  let currentQuestion: (Partial<Question> & { textParts: string[]; explicitType?: QuestionType; explicitWeight?: number }) | null =
     null;
   let currentOptions: string[] = [];
+  let currentOptionWeights: number[] = [];
   let currentAnswerKey: string | undefined = undefined;
 
   const questionStartPattern =
@@ -1758,40 +1759,105 @@ export const parseQuestionsFromPlainText = (text: string): Question[] => {
 
   const finalizeCurrentQuestion = () => {
     if (currentQuestion && currentQuestion.textParts.length > 0) {
-      const questionText = currentQuestion.textParts.join("\n").trim();
+      let questionText = currentQuestion.textParts.join("\n").trim();
       let finalCorrectAnswer: string | undefined = undefined;
-      let questionType: QuestionType = "ESSAY";
+      let questionType: QuestionType = currentQuestion.explicitType || "ESSAY";
+      let scoreWeight: number = currentQuestion.explicitWeight || 1;
 
-      const trimmedOptions = currentOptions.map((opt) => opt.trim());
-
-      if (trimmedOptions.length > 0) {
-        questionType = "MULTIPLE_CHOICE";
-        if (currentAnswerKey) {
-          const keyChar = currentAnswerKey.trim().toLowerCase();
-          const keyIndex = keyChar.charCodeAt(0) - "a".charCodeAt(0);
-          if (keyIndex >= 0 && keyIndex < trimmedOptions.length) {
-            finalCorrectAnswer = trimmedOptions[keyIndex];
-          }
-        }
-      } else if (currentAnswerKey) {
-        questionType = "FILL_IN_THE_BLANK";
-        finalCorrectAnswer = currentAnswerKey.trim();
+      // Detect question-level weight in text e.g. [Bobot: 4] or (Bobot: 4)
+      const qWeightMatch = questionText.match(/\[(?:bobot|skor|weight):\s*(\d+(?:\.\d+)?)\]|\((?:bobot|skor|weight):\s*(\d+(?:\.\d+)?)\)/i);
+      if (qWeightMatch) {
+        scoreWeight = parseFloat(qWeightMatch[1] || qWeightMatch[2]);
+        questionText = questionText.replace(qWeightMatch[0], "").trim();
       }
 
-      questions.push({
-        id: `q${questions.length + 1}-${Date.now()}`,
-        questionText,
-        questionType,
-        options: trimmedOptions.length > 0 ? trimmedOptions : undefined,
-        correctAnswer: finalCorrectAnswer,
-        imageUrl: undefined,
-        optionImages: undefined,
-        category: "",
-        level: "",
+      // Detect questionnaire tag in questionText e.g. [KUISIONER] or [ANGKET]
+      if (/\[(?:kuisioner|angket|survei|survey|refleksi)\]/i.test(questionText)) {
+        questionType = "QUESTIONNAIRE";
+        questionText = questionText.replace(/\[(?:kuisioner|angket|survei|survey|refleksi)\]/gi, "").trim();
+      }
+
+      // Process options & weights
+      const trimmedOptions: string[] = [];
+      const parsedOptionWeights: number[] = [];
+      let hasCustomWeights = false;
+
+      currentOptions.forEach((opt, idx) => {
+        let cleanOpt = opt.trim();
+        // Check for option weight tags like [bobot: 4], [4], or (skor: 4)
+        const optWeightMatch = cleanOpt.match(/(?:\[(?:bobot|skor|weight):\s*(\d+(?:\.\d+)?)\]|\((?:bobot|skor|weight):\s*(\d+(?:\.\d+)?)\)|\[(\d+)\])$/i);
+        if (optWeightMatch) {
+          const w = parseFloat(optWeightMatch[1] || optWeightMatch[2] || optWeightMatch[3]);
+          parsedOptionWeights.push(w);
+          hasCustomWeights = true;
+          cleanOpt = cleanOpt.substring(0, optWeightMatch.index).trim();
+        } else {
+          parsedOptionWeights.push(currentOptionWeights[idx] || 0);
+        }
+        trimmedOptions.push(cleanOpt);
       });
+
+      if (questionType === "QUESTIONNAIRE") {
+        questions.push({
+          id: `q${questions.length + 1}-${Date.now()}`,
+          questionText,
+          questionType: "QUESTIONNAIRE",
+          options: trimmedOptions.length > 0 ? trimmedOptions : [
+            "Sangat Tidak Setuju",
+            "Tidak Setuju",
+            "Ragu-ragu / Netral",
+            "Setuju",
+            "Sangat Setuju"
+          ],
+          correctAnswer: "",
+          isReflective: true,
+          questionnaireFormat: "scale",
+          scaleMin: 1,
+          scaleMax: 5,
+          scaleLabels: ["Sangat Tidak Setuju", "Sangat Setuju"],
+          ratingIcon: "star",
+          scoreWeight,
+          useCustomWeights: hasCustomWeights,
+          optionWeights: hasCustomWeights ? parsedOptionWeights : undefined,
+          imageUrl: undefined,
+          optionImages: undefined,
+          category: "",
+          level: "",
+        });
+      } else {
+        if (trimmedOptions.length > 0) {
+          questionType = "MULTIPLE_CHOICE";
+          if (currentAnswerKey) {
+            const keyChar = currentAnswerKey.trim().toLowerCase();
+            const keyIndex = keyChar.charCodeAt(0) - "a".charCodeAt(0);
+            if (keyIndex >= 0 && keyIndex < trimmedOptions.length) {
+              finalCorrectAnswer = trimmedOptions[keyIndex];
+            }
+          }
+        } else if (currentAnswerKey) {
+          questionType = "FILL_IN_THE_BLANK";
+          finalCorrectAnswer = currentAnswerKey.trim();
+        }
+
+        questions.push({
+          id: `q${questions.length + 1}-${Date.now()}`,
+          questionText,
+          questionType,
+          options: trimmedOptions.length > 0 ? trimmedOptions : undefined,
+          correctAnswer: finalCorrectAnswer,
+          scoreWeight,
+          useCustomWeights: hasCustomWeights,
+          optionWeights: hasCustomWeights ? parsedOptionWeights : undefined,
+          imageUrl: undefined,
+          optionImages: undefined,
+          category: "",
+          level: "",
+        });
+      }
     }
     currentQuestion = null;
     currentOptions = [];
+    currentOptionWeights = [];
     currentAnswerKey = undefined;
   };
 
