@@ -438,10 +438,31 @@ export const parseExternalAiOutput = (
         ? item.optionWeights.map((w: any) => Number(w) || 0)
         : extractedOptionWeights;
 
+      const tfHasExplicitWeights = Array.isArray(tfRows) && tfRows.some(r => r.trueWeight !== undefined || r.falseWeight !== undefined);
+      const mPairsHasExplicitWeights = Array.isArray(mPairs) && mPairs.some(p => p.weight !== undefined);
+      const optsHasExplicitWeights = Array.isArray(rawOptWeights) && rawOptWeights.length > 0;
+
       const hasCustomWeights =
         item.useCustomWeights !== undefined
           ? Boolean(item.useCustomWeights)
-          : Array.isArray(rawOptWeights) && rawOptWeights.length > 0;
+          : (optsHasExplicitWeights || tfHasExplicitWeights || mPairsHasExplicitWeights);
+
+      // Pastikan baris Benar/Salah memiliki trueWeight & falseWeight jika status bobot aktif
+      if (qType === "TRUE_FALSE" && hasCustomWeights && Array.isArray(tfRows)) {
+        tfRows = tfRows.map(r => ({
+          ...r,
+          trueWeight: r.trueWeight !== undefined ? Number(r.trueWeight) : (r.answer ? 1 : 0),
+          falseWeight: r.falseWeight !== undefined ? Number(r.falseWeight) : (r.answer ? 0 : 1),
+        }));
+      }
+
+      // Pastikan pasangan Menjodohkan memiliki weight jika status bobot aktif
+      if (qType === "MATCHING" && hasCustomWeights && Array.isArray(mPairs)) {
+        mPairs = mPairs.map(p => ({
+          ...p,
+          weight: p.weight !== undefined ? Number(p.weight) : 1,
+        }));
+      }
 
       // Base question score weight should default to 1 so option weights drive the scoring
       const finalScoreWeight =
