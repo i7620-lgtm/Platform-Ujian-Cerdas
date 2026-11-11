@@ -55,6 +55,7 @@ export function generateSmartFallbackQuestions(
 
 function mapToQuestionType(label: string): QuestionType {
   const l = (label || "").toLowerCase();
+  if (l.includes("kuisioner") || l.includes("angket") || l.includes("questionnaire") || l.includes("survei") || l.includes("survey")) return "QUESTIONNAIRE";
   if (l.includes("kompleks") || l.includes("mcma")) return "COMPLEX_MULTIPLE_CHOICE";
   if (l.includes("benar") || l.includes("salah") || l.includes("true")) return "TRUE_FALSE";
   if (l.includes("jodoh") || l.includes("matching")) return "MATCHING";
@@ -78,6 +79,36 @@ interface FallbackParams {
 
 function buildSingleFallbackQuestion(params: FallbackParams): Question {
   const { index, subject, blueprint, qType, difficulty, includeImages, failureReason, scoreWeight } = params;
+
+  if (qType === "QUESTIONNAIRE") {
+    const topicCategory = params.category || subject;
+    return {
+      id: `q_fallback_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`,
+      questionText: `Bagaimana efektivitas dan pengalaman belajar Anda dalam memahami materi ${topicCategory}?`,
+      questionType: "QUESTIONNAIRE",
+      questionnaireFormat: "scale",
+      scaleMin: 1,
+      scaleMax: 5,
+      scaleLabels: ["Sangat Tidak Setuju", "Sangat Setuju"],
+      options: [
+        "Sangat Tidak Setuju",
+        "Tidak Setuju",
+        "Ragu-ragu / Netral",
+        "Setuju",
+        "Sangat Setuju"
+      ],
+      correctAnswer: "",
+      isReflective: true,
+      category: topicCategory,
+      level: difficulty,
+      kisiKisi: params.kisiKisi || `Refleksi dan evaluasi pemahaman siswa mengenai ${topicCategory}.`,
+      explanation: "Instrumen kuisioner refleksi proses pembelajaran siswa.",
+      scoreWeight: scoreWeight && scoreWeight > 0 ? scoreWeight : 1,
+      useCustomWeights: true,
+      optionWeights: [1, 2, 3, 4, 5],
+      ratingIcon: "star",
+    };
+  }
   const specificTopic = `${subject} ${params.category || ''} ${params.kisiKisi || ''}`.toLowerCase();
   const contextStr = `${subject} ${blueprint} ${params.category || ''} ${params.kisiKisi || ''}`.toLowerCase();
 
