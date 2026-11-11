@@ -1735,10 +1735,16 @@ export async function generateQuestions(
                     rowText = `Pernyataan ${rIdx + 1} terkait ${mappedQ.category}: nilai yang diperoleh dari stimulus adalah ${boolAnswer ? trueLabel : falseLabel}.`;
                 }
 
+                const hasCustomW = !!(q as any).useCustomWeights;
+                const tw = (r as any).trueWeight !== undefined ? Number((r as any).trueWeight) : (hasCustomW ? (boolAnswer ? 1 : 0) : undefined);
+                const fw = (r as any).falseWeight !== undefined ? Number((r as any).falseWeight) : (hasCustomW ? (boolAnswer ? 0 : 1) : undefined);
+
                 return {
                     text: formatContent(rowText, !!r.chartData),
                     answer: boolAnswer,
-                    chartData: r.chartData
+                    chartData: r.chartData,
+                    trueWeight: tw,
+                    falseWeight: fw,
                 };
             });
 
@@ -1799,7 +1805,9 @@ export async function generateQuestions(
             }
         }
 
-        if ((q as any).useCustomWeights || Array.isArray((q as any).optionWeights)) {
+        const tfHasW = Array.isArray(mappedQ.trueFalseRows) && mappedQ.trueFalseRows.some(r => (r as any).trueWeight !== undefined || (r as any).falseWeight !== undefined);
+        const mHasW = Array.isArray(mappedQ.matchingPairs) && mappedQ.matchingPairs.some(p => (p as any).weight !== undefined);
+        if ((q as any).useCustomWeights || Array.isArray((q as any).optionWeights) || tfHasW || mHasW) {
             mappedQ.useCustomWeights = true;
             mappedQ.optionWeights = (q as any).optionWeights;
         }
