@@ -840,10 +840,15 @@ export const ExternalAiPromptPanel: React.FC<ExternalAiPromptPanelProps> = ({
                         </span>
                         <span>{parseResult.totalParsed} Butir Soal</span>
                       </div>
-                      {parseResult.questions.some(q => q.useCustomWeights || (q.optionWeights && q.optionWeights.length > 0)) && (
+                      {parseResult.questions.some(q =>
+                        q.useCustomWeights ||
+                        (q.optionWeights && q.optionWeights.length > 0) ||
+                        (q.trueFalseRows && q.trueFalseRows.some(r => r.trueWeight !== undefined)) ||
+                        (q.matchingPairs && q.matchingPairs.some(p => p.weight !== undefined))
+                      ) && (
                         <div className="text-[10px] font-semibold text-amber-700 dark:text-amber-400 flex items-center gap-1 pt-0.5 border-t border-emerald-200 dark:border-emerald-900/50">
                           <Sliders className="w-3 h-3 text-amber-600" />
-                          <span>Bobot Per Opsi Aktif</span>
+                          <span>Bobot Per Opsi / Baris Aktif</span>
                         </div>
                       )}
                     </div>
