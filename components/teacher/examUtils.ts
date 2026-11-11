@@ -1784,18 +1784,29 @@ export const parseQuestionsFromPlainText = (text: string): Question[] => {
 
       currentOptions.forEach((opt, idx) => {
         let cleanOpt = opt.trim();
-        // Check for option weight tags like [bobot: 4], [4], or (skor: 4)
-        const optWeightMatch = cleanOpt.match(/(?:\[(?:bobot|skor|weight):\s*(\d+(?:\.\d+)?)\]|\((?:bobot|skor|weight):\s*(\d+(?:\.\d+)?)\)|\[(\d+)\])$/i);
-        if (optWeightMatch) {
-          const w = parseFloat(optWeightMatch[1] || optWeightMatch[2] || optWeightMatch[3]);
+        const leadMatch = cleanOpt.match(/^\[(\d+)\]\s*/);
+        if (leadMatch) {
+          const w = parseFloat(leadMatch[1]);
           parsedOptionWeights.push(w);
           hasCustomWeights = true;
-          cleanOpt = cleanOpt.substring(0, optWeightMatch.index).trim();
+          cleanOpt = cleanOpt.substring(leadMatch[0].length).trim();
         } else {
-          parsedOptionWeights.push(currentOptionWeights[idx] || 0);
+          const optWeightMatch = cleanOpt.match(/(?:\[(?:bobot|skor|weight):\s*(\d+(?:\.\d+)?)\]|\((?:bobot|skor|weight):\s*(\d+(?:\.\d+)?)\)|\[(\d+)\])$/i);
+          if (optWeightMatch) {
+            const w = parseFloat(optWeightMatch[1] || optWeightMatch[2] || optWeightMatch[3]);
+            parsedOptionWeights.push(w);
+            hasCustomWeights = true;
+            cleanOpt = cleanOpt.substring(0, optWeightMatch.index).trim();
+          } else {
+            parsedOptionWeights.push(currentOptionWeights[idx] || 0);
+          }
         }
         trimmedOptions.push(cleanOpt);
       });
+
+      if (hasCustomWeights && !qWeightMatch) {
+        scoreWeight = 1;
+      }
 
       if (questionType === "QUESTIONNAIRE") {
         questions.push({
