@@ -282,26 +282,86 @@ export const parseExternalAiOutput = (
         );
       }
 
+      // Check inline weights in options if item.optionWeights is not directly provided
+      let extractedOptionWeights: number[] | undefined = undefined;
+      if (opts && opts.length > 0) {
+        const tempWeights: number[] = [];
+        let foundInlineWeight = false;
+
+        const cleanedOpts = opts.map((opt) => {
+          let clean = opt;
+          const match = clean.match(/(?:\[(?:bobot|skor|weight):\s*(\d+(?:\.\d+)?)\]|\((?:bobot|skor|weight):\s*(\d+(?:\.\d+)?)\)|\[(\d+)\])$/i);
+          if (match) {
+            foundInlineWeight = true;
+            tempWeights.push(parseFloat(match[1] || match[2] || match[3]));
+            clean = clean.substring(0, match.index).trim();
+          } else {
+            const leadMatch = clean.match(/^\[(\d+)\]\s*/);
+            if (leadMatch) {
+              foundInlineWeight = true;
+              tempWeights.push(parseFloat(leadMatch[1]));
+              clean = clean.substring(leadMatch[0].length).trim();
+            } else {
+              tempWeights.push(0);
+            }
+          }
+          return clean;
+        });
+
+        if (foundInlineWeight) {
+          opts = cleanedOpts;
+          extractedOptionWeights = tempWeights;
+        }
+      }
+
       // Kategori / True-False rows (clean any leading 1., 2., etc.)
       let tfRows: { text: string; answer: boolean; trueWeight?: number; falseWeight?: number }[] | undefined = undefined;
       if (Array.isArray(item.trueFalseRows)) {
-        tfRows = item.trueFalseRows.map((r: any) => ({
-          text: String(r.text || r.pernyataan || "")
+        tfRows = item.trueFalseRows.map((r: any) => {
+          let text = String(r.text || r.pernyataan || "")
             .replace(/^(?:\d+\.|\(\d+\)|\d+\))\s*/, "")
-            .trim(),
-          answer: r.answer !== undefined ? Boolean(r.answer) : (r.kunci === "Benar" || r.kunci === true),
-          trueWeight: r.trueWeight !== undefined ? Number(r.trueWeight) : (r.bobotBenar !== undefined ? Number(r.bobotBenar) : undefined),
-          falseWeight: r.falseWeight !== undefined ? Number(r.falseWeight) : (r.bobotSalah !== undefined ? Number(r.bobotSalah) : undefined),
-        }));
+            .trim();
+          let tw = r.trueWeight !== undefined ? Number(r.trueWeight) : (r.bobotBenar !== undefined ? Number(r.bobotBenar) : undefined);
+          let fw = r.falseWeight !== undefined ? Number(r.falseWeight) : (r.bobotSalah !== undefined ? Number(r.bobotSalah) : undefined);
+
+          const wMatch = text.match(/\[(?:bobot|skor|weight):\s*(\d+(?:\.\d+)?)\]|\((?:bobot|skor|weight):\s*(\d+(?:\.\d+)?)\)/i);
+          if (wMatch && tw === undefined) {
+            const w = parseFloat(wMatch[1] || wMatch[2]);
+            tw = w;
+            fw = 0;
+            text = text.replace(wMatch[0], "").trim();
+          }
+
+          return {
+            text,
+            answer: r.answer !== undefined ? Boolean(r.answer) : (r.kunci === "Benar" || r.kunci === true),
+            trueWeight: tw,
+            falseWeight: fw,
+          };
+        });
       } else if (Array.isArray(item.pernyataanKategori)) {
-        tfRows = item.pernyataanKategori.map((r: any) => ({
-          text: String(r.teks || r.text || r.pernyataan || "")
+        tfRows = item.pernyataanKategori.map((r: any) => {
+          let text = String(r.teks || r.text || r.pernyataan || "")
             .replace(/^(?:\d+\.|\(\d+\)|\d+\))\s*/, "")
-            .trim(),
-          answer: String(r.kunci || "").toLowerCase().includes("benar") || String(r.kunci || "").toLowerCase().includes("sesuai") || r.kunci === true,
-          trueWeight: r.trueWeight !== undefined ? Number(r.trueWeight) : (r.bobotBenar !== undefined ? Number(r.bobotBenar) : undefined),
-          falseWeight: r.falseWeight !== undefined ? Number(r.falseWeight) : (r.bobotSalah !== undefined ? Number(r.bobotSalah) : undefined),
-        }));
+            .trim();
+          let tw = r.trueWeight !== undefined ? Number(r.trueWeight) : (r.bobotBenar !== undefined ? Number(r.bobotBenar) : undefined);
+          let fw = r.falseWeight !== undefined ? Number(r.falseWeight) : (r.bobotSalah !== undefined ? Number(r.bobotSalah) : undefined);
+
+          const wMatch = text.match(/\[(?:bobot|skor|weight):\s*(\d+(?:\.\d+)?)\]|\((?:bobot|skor|weight):\s*(\d+(?:\.\d+)?)\)/i);
+          if (wMatch && tw === undefined) {
+            const w = parseFloat(wMatch[1] || wMatch[2]);
+            tw = w;
+            fw = 0;
+            text = text.replace(wMatch[0], "").trim();
+          }
+
+          return {
+            text,
+            answer: String(r.kunci || "").toLowerCase().includes("benar") || String(r.kunci || "").toLowerCase().includes("sesuai") || r.kunci === true,
+            trueWeight: tw,
+            falseWeight: fw,
+          };
+        });
       }
 
       // Matching pairs
@@ -310,13 +370,13 @@ export const parseExternalAiOutput = (
         mPairs = item.matchingPairs.map((p: any) => ({
           left: String(p.left || p.kiri || "").trim(),
           right: String(p.right || p.kanan || "").trim(),
-          weight: p.weight !== undefined ? Number(p.weight) : (p.bobot !== undefined ? Number(p.bobot) : undefined),
+          weight: p.weight !== undefined ? Number(p.weight) : (p.bobot !== undefined ? Number(p.bobot) : 1),
         }));
       } else if (Array.isArray(item.pasangan)) {
         mPairs = item.pasangan.map((p: any) => ({
           left: String(p.kiri || p.left || "").trim(),
           right: String(p.kanan || p.right || "").trim(),
-          weight: p.weight !== undefined ? Number(p.weight) : (p.bobot !== undefined ? Number(p.bobot) : undefined),
+          weight: p.weight !== undefined ? Number(p.weight) : (p.bobot !== undefined ? Number(p.bobot) : 1),
         }));
       }
 
@@ -374,14 +434,20 @@ export const parseExternalAiOutput = (
         item.caraPengerjaan ||
         "";
 
+      const rawOptWeights = Array.isArray(item.optionWeights)
+        ? item.optionWeights.map((w: any) => Number(w) || 0)
+        : extractedOptionWeights;
+
       const hasCustomWeights =
         item.useCustomWeights !== undefined
           ? Boolean(item.useCustomWeights)
-          : Array.isArray(item.optionWeights) && item.optionWeights.length > 0;
+          : Array.isArray(rawOptWeights) && rawOptWeights.length > 0;
 
-      const optWeights = Array.isArray(item.optionWeights)
-        ? item.optionWeights.map((w: any) => Number(w) || 0)
-        : undefined;
+      // Base question score weight should default to 1 so option weights drive the scoring
+      const finalScoreWeight =
+        item.scoreWeight !== undefined
+          ? Number(item.scoreWeight)
+          : (item.bobot !== undefined ? Number(item.bobot) : 1);
 
       return sanitizeQuestionFormatting({
         id: uniqueId,
@@ -398,9 +464,9 @@ export const parseExternalAiOutput = (
         hint: item.hint || item.petunjuk || "",
         explanation: String(fullExplanation).trim(),
         solutionSteps: String(fullSteps).trim(),
-        scoreWeight: item.scoreWeight !== undefined ? Number(item.scoreWeight) : (item.bobot !== undefined ? Number(item.bobot) : 1),
+        scoreWeight: finalScoreWeight,
         useCustomWeights: hasCustomWeights,
-        optionWeights: optWeights,
+        optionWeights: rawOptWeights,
         questionnaireFormat: qFormat,
         scaleMin: sMin,
         scaleMax: sMax,
