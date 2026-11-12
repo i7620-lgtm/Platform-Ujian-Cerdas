@@ -39,6 +39,8 @@ import { QuestionnaireView } from "./student/question-types/QuestionnaireView";
 const renderQuestionTextWithChart = (
   html: string,
   chartData: ChartData | undefined,
+  audioUrl: string | undefined,
+  listeningScript: string | undefined,
   optimizeHtml: (h: string) => string,
 ) => {
   let optimized = optimizeHtml(html);
@@ -55,44 +57,77 @@ const renderQuestionTextWithChart = (
     );
   }
 
-  if (!chartData) {
-    return <div className="question-content min-w-0" dangerouslySetInnerHTML={{ __html: optimized }}></div>;
+  const hasAudio = Boolean(audioUrl || listeningScript);
+  const hasInlineAudioMarker =
+    hasAudio &&
+    (/\[AUDIO_STIMULUS\]/i.test(optimized) || /data-audio="true"/i.test(optimized));
+
+  if (hasInlineAudioMarker) {
+    optimized = optimized.replace(
+      /(?:<p[^>]*>)?\s*(?:\[AUDIO_STIMULUS\]|<span[^>]*data-audio="true"[^>]*><\/span>)\s*(?:<\/p>)?/gi,
+      '<span data-audio-marker="true"></span>',
+    );
+  }
+
+  if (!chartData && !hasInlineAudioMarker) {
+    return (
+      <div
+        className="question-content min-w-0"
+        dangerouslySetInnerHTML={{ __html: optimized }}
+      ></div>
+    );
   }
 
   const parser = new DOMParser();
   const doc = parser.parseFromString(optimized, "text/html");
-  const chartNode = doc.querySelector('[data-chart="true"]');
 
-  if (!chartNode) {
-    return (
-      <>
-        <div className="question-content min-w-0" dangerouslySetInnerHTML={{ __html: optimized }}></div>
-        <div className="mb-8 w-full max-w-3xl mx-auto">
-          <ChartRenderer data={chartData} />
-        </div>
-      </>
-    );
+  const chartNode = doc.querySelector('[data-chart="true"]');
+  const audioNode = doc.querySelector('[data-audio-marker="true"]');
+
+  if (audioNode) {
+    audioNode.insertAdjacentText("beforebegin", "___AUDIO_MARKER___");
+    audioNode.remove();
   }
 
-  const marker = "___CHART_MARKER___";
-  chartNode.insertAdjacentText("beforebegin", marker);
-  chartNode.remove();
+  if (chartNode) {
+    chartNode.insertAdjacentText("beforebegin", "___CHART_MARKER___");
+    chartNode.remove();
+  }
 
   const newHtml = doc.body.innerHTML;
-  const parts = newHtml.split(marker);
+  const audioParts = newHtml.split("___AUDIO_MARKER___");
 
   return (
     <>
-      {parts.map((part, index) => (
-        <React.Fragment key={index}>
-          <div className="question-content min-w-0" dangerouslySetInnerHTML={{ __html: part }}></div>
-          {index < parts.length - 1 && (
-            <div className="my-6 w-full max-w-3xl mx-auto">
-              <ChartRenderer data={chartData} />
-            </div>
-          )}
-        </React.Fragment>
-      ))}
+      {audioParts.map((audioPart, aIdx) => {
+        const chartParts = audioPart.split("___CHART_MARKER___");
+        return (
+          <React.Fragment key={aIdx}>
+            {chartParts.map((cPart, cIdx) => (
+              <React.Fragment key={cIdx}>
+                <div
+                  className="question-content min-w-0"
+                  dangerouslySetInnerHTML={{ __html: cPart }}
+                ></div>
+                {cIdx < chartParts.length - 1 && (
+                  <div className="my-6 w-full max-w-3xl mx-auto">
+                    <ChartRenderer data={chartData} />
+                  </div>
+                )}
+              </React.Fragment>
+            ))}
+            {aIdx < audioParts.length - 1 && (
+              <div className="my-4">
+                <AudioPlayer
+                  src={audioUrl}
+                  script={listeningScript}
+                  isTeacher={false}
+                />
+              </div>
+            )}
+          </React.Fragment>
+        );
+      })}
     </>
   );
 };
@@ -1016,11 +1051,12 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({
                     </span>
                   </div>
                   <div className="flex-1 min-w-0">
-                    {(q.audioUrl || q.listeningScript) && (
-                      <div className="mb-4">
-                        <AudioPlayer src={q.audioUrl} script={q.listeningScript} isTeacher={false} />
-                      </div>
-                    )}
+                    {(q.audioUrl || q.listeningScript) &&
+                      !(/\[AUDIO_STIMULUS\]/i.test(q.questionText) || /data-audio="true"/i.test(q.questionText)) && (
+                        <div className="mb-4">
+                          <AudioPlayer src={q.audioUrl} script={q.listeningScript} isTeacher={false} />
+                        </div>
+                      )}
                     {q.videoUrl && (
                       <div className="mb-4 rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-700 bg-black aspect-video max-w-xl">
                         {q.videoUrl.includes("youtube.com") || q.videoUrl.includes("youtu.be") ? (
@@ -1044,6 +1080,8 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({
                       {renderQuestionTextWithChart(
                         q.questionText,
                         q.chartData,
+                        q.audioUrl,
+                        q.listeningScript,
                         optimizeHtml,
                       )}
                     </div>
