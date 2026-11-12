@@ -76,6 +76,8 @@ export interface Question {
   correctAnswer?: string; 
   imageUrl?: string; 
   audioUrl?: string; // URL Audio
+  listeningScript?: string; // Naskah percakapan / narasi listening audio (Text-to-Speech)
+  videoUrl?: string; // URL Video stimulus jika tersedia
   optionImages?: (string | null)[];
   chartData?: ChartData; 
   optionCharts?: (ChartData | null)[];
