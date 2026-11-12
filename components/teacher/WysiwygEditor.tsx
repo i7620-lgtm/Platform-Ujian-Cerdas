@@ -398,6 +398,7 @@ export const WysiwygEditor: React.FC<{
   minHeight?: string;
   showTabs?: boolean;
   onChartClick?: (chartType?: "cartesian") => void;
+  onAudioClick?: () => void;
   chartData?: ChartData;
 }> = ({
   value,
@@ -406,6 +407,7 @@ export const WysiwygEditor: React.FC<{
   minHeight = "120px",
   showTabs = true,
   onChartClick,
+  onAudioClick,
   chartData,
 }) => {
   const {
@@ -617,7 +619,7 @@ export const WysiwygEditor: React.FC<{
             activeTab={activeTab}
             activeCmds={activeCmds}
             runCmd={runCmd}
-            onAudioClick={() => audioInputRef.current?.click()}
+            onAudioClick={onAudioClick || (() => audioInputRef.current?.click())}
             onImageClick={() => fileInputRef.current?.click()}
             onAiImageClick={() => setEditorSubState({ showAiImage: true })}
             onTableClick={() => setEditorSubState({ showTable: true })}
