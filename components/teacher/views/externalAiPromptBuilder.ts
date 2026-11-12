@@ -97,17 +97,19 @@ Karena opsi stimulus visual diaktifkan, **JIKA butir soal membahas materi yang m
   const audioVideoInstruction = (includeAudioVideo || isLanguageOrArts)
     ? `### 🎧 ATURAN KETAT SOAL MENYIMAK (AUDIO LISTENING COMPREHENSION):
 Karena opsi audio/listening aktif atau materi pelajaran berkaitan dengan keterampilan menyimak/bahasa:
-1. **DILARANG KERAS MENULISKAN NASKAH DI questionText (SANGAT KRUSIAL):**
+1. **PENENTUAN POSISI AUDIO DI BARIS SOAL (\`[AUDIO_STIMULUS]\`):**
+   - Anda dapat menentukan letak penyematan pemutar audio pada baris soal tertentu di dalam \`questionText\` menggunakan penanda \`[AUDIO_STIMULUS]\`.
+   - Contoh isi \`questionText\`:
+     *"Dengarkan audio percakapan berikut secara seksama!\\n\\n[AUDIO_STIMULUS]\\n\\nWhat is the main topic discussed by the speakers?"*
+2. **DILARANG KERAS MENULISKAN NASKAH DI questionText (SANGAT KRUSIAL):**
    - **DILARANG KERAS** menuliskan teks naskah percakapan, transkrip dialog (seperti "Speaker A: ... Speaker B: ...", "Man: ... Woman: ..."), monolog, atau bacaan listening di dalam kolom \`questionText\`!
-   - Kolom \`questionText\` HANYA berisi kalimat perintah ramah dan pertanyaan penutup, contoh:
-     *"Dengarkan audio percakapan berikut secara seksama, lalu jawablah pertanyaan di bawah ini!\\n\\nWhat is the main topic discussed by the speakers?"*
    - **Alasan Pedagogis:** Jika Anda menuliskan naskah dialog di dalam \`questionText\`, siswa akan langsung membaca teksnya dengan mata dan ini merusak tujuan ujian listening!
-2. **NASKAH AUDIO WAJIB DISIMPAN EKSKLUSIF DI listeningScript:**
+3. **NASKAH AUDIO WAJIB DISIMPAN EKSKLUSIF DI listeningScript:**
    - Seluruh teks percakapan, dialog antar-tokoh, naskah pidato, atau monolog narasi **WAJIB dimasukkan ke dalam properti \`"listeningScript"\`**.
    - Contoh isi \`listeningScript\`:
      \`"Speaker A: Good morning, can I help you?\\nSpeaker B: Yes please, I would like to order two coffees and a donut.\\nSpeaker A: Sure, that will be five dollars."\`
    - Naskah pada properti ini akan secara otomatis disintesis menjadi suara audio oleh aplikasi ujian, sedangkan teks naskahnya **disembunyikan 100% dari siswa** agar kemampuan menyimak murid teruji murni melalui pendengaran.
-3. **Tautan Media Opsional (\`audioUrl\` / \`videoUrl\`):**
+4. **Tautan Media Opsional (\`audioUrl\` / \`videoUrl\`):**
    - Jika Anda memiliki tautan langsung berkas audio publik (.mp3) atau video edukasi (.mp4 / embed YouTube), sertakan pada properti \`"audioUrl"\` atau \`"videoUrl"\`. Jika tidak ada berkas eksternal langsung, isi dengan string kosong \`""\` (aplikasi akan memutar \`listeningScript\` melalui pemutar suara terintegrasi).\n`
     : "";
 
