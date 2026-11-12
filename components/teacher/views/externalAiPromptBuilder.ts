@@ -95,15 +95,20 @@ Karena opsi stimulus visual diaktifkan, **JIKA butir soal membahas materi yang m
 
   const isLanguageOrArts = /bahasa|inggris|indonesia|seni|listening|menyimak/i.test(subject + " " + topic);
   const audioVideoInstruction = (includeAudioVideo || isLanguageOrArts)
-    ? `### 🎧 ATURAN KHUSUS SOAL MENYIMAK (AUDIO LISTENING & VIDEO):
-Karena opsi media menyimak aktif atau mata pelajaran berkaitan dengan keterampilan berbahasa/seni:
-1. **Naskah Dialog / Monolog Audio Wajib (\`listeningScript\`):**
-   - JIKA butir soal menguji pemahaman menyimak (Listening Comprehension Bahasa Inggris, Menyimak Pidato/Cerita/Dialog Bahasa Indonesia, atau Apresiasi Musik), Anda **WAJIB MENYERTAKAN** naskah percakapan/monolog lengkap pada properti \`"listeningScript"\` (misal: \`"Man: Excuse me, where is the library?\\nWoman: Go straight ahead and turn right at the traffic light..."\`).
-   - Naskah ini akan diputar otomatis oleh pemutar audio Text-to-Speech terintegrasi di aplikasi ujian siswa.
-2. **Tautan Media Opsional (\`audioUrl\` / \`videoUrl\`):**
-   - Jika tersedia tautan audio publik langsung (.mp3) atau video edukasi (.mp4/YouTube embed), sertakan pada properti \`"audioUrl"\` atau \`"videoUrl"\`. Jika tidak ada file langsung, kosongkan dengan string \`""\` (aplikasi akan memutar \`listeningScript\` melalui pemutar suara otomatis).
-3. **Petunjuk Pengerjaan di \`questionText\`:**
-   - Gunakan instruksi pembuka yang jelas, misalnya: *"Dengarkan audio percakapan berikut secara seksama, lalu jawablah pertanyaan di bawah ini!"*. DILARANG membocorkan jawaban di dalam badan \`questionText\` sebelum audio didengarkan siswa.\n`
+    ? `### 🎧 ATURAN KETAT SOAL MENYIMAK (AUDIO LISTENING COMPREHENSION):
+Karena opsi audio/listening aktif atau materi pelajaran berkaitan dengan keterampilan menyimak/bahasa:
+1. **DILARANG KERAS MENULISKAN NASKAH DI questionText (SANGAT KRUSIAL):**
+   - **DILARANG KERAS** menuliskan teks naskah percakapan, transkrip dialog (seperti "Speaker A: ... Speaker B: ...", "Man: ... Woman: ..."), monolog, atau bacaan listening di dalam kolom \`questionText\`!
+   - Kolom \`questionText\` HANYA berisi kalimat perintah ramah dan pertanyaan penutup, contoh:
+     *"Dengarkan audio percakapan berikut secara seksama, lalu jawablah pertanyaan di bawah ini!\\n\\nWhat is the main topic discussed by the speakers?"*
+   - **Alasan Pedagogis:** Jika Anda menuliskan naskah dialog di dalam \`questionText\`, siswa akan langsung membaca teksnya dengan mata dan ini merusak tujuan ujian listening!
+2. **NASKAH AUDIO WAJIB DISIMPAN EKSKLUSIF DI listeningScript:**
+   - Seluruh teks percakapan, dialog antar-tokoh, naskah pidato, atau monolog narasi **WAJIB dimasukkan ke dalam properti \`"listeningScript"\`**.
+   - Contoh isi \`listeningScript\`:
+     \`"Speaker A: Good morning, can I help you?\\nSpeaker B: Yes please, I would like to order two coffees and a donut.\\nSpeaker A: Sure, that will be five dollars."\`
+   - Naskah pada properti ini akan secara otomatis disintesis menjadi suara audio oleh aplikasi ujian, sedangkan teks naskahnya **disembunyikan 100% dari siswa** agar kemampuan menyimak murid teruji murni melalui pendengaran.
+3. **Tautan Media Opsional (\`audioUrl\` / \`videoUrl\`):**
+   - Jika Anda memiliki tautan langsung berkas audio publik (.mp3) atau video edukasi (.mp4 / embed YouTube), sertakan pada properti \`"audioUrl"\` atau \`"videoUrl"\`. Jika tidak ada berkas eksternal langsung, isi dengan string kosong \`""\` (aplikasi akan memutar \`listeningScript\` melalui pemutar suara terintegrasi).\n`
     : "";
 
   const structureAndAntiDuplicationRules = `### 🚫 ATURAN KETAT STRUKTUR TEKS SOAL & ANTI-DUPLIKASI (SANGAT PENTING):
@@ -113,7 +118,9 @@ Karena opsi media menyimak aktif atau mata pelajaran berkaitan dengan keterampil
 2. **DILARANG KERAS MENULISKAN BUTIR PERNYATAAN (1, 2, 3...) DI DALAM questionText UNTUK SOAL BENAR/SALAH:**
    - Pada soal Benar/Salah (\`TRUE_FALSE\`): Kolom \`questionText\` HANYA berisi stimulus dan kalimat perintah umum (misalnya: *"Tentukan Benar atau Salah untuk setiap pernyataan berikut berdasarkan informasi di atas!"*).
    - **DILARANG KERAS** mencantumkan daftar pernyataan \`1. ... 2. ... 3. ...\` di dalam \`questionText\`! Seluruh butir pernyataan HANYA dimasukkan ke dalam array \`trueFalseRows\`.
-3. **KONSISTENSI NOTASI MATEMATIKA & SATUAN:**
+3. **DILARANG KERAS MENULISKAN TEKS DIALOG LISTENING DI DALAM questionText:**
+   - Pada soal menyimak/listening: Kolom \`questionText\` TIDAK BOLEH memuat transkrip percakapan tokoh. Seluruh transkrip percakapan WAJIB disimpan di properti terpisah \`"listeningScript"\`.
+4. **KONSISTENSI NOTASI MATEMATIKA & SATUAN:**
    - Gunakan format KaTeX yang konsisten antara badan soal dan opsi jawaban (misal jika menggunakan $\\frac{5}{8}$ atau $cm^3$, tuliskan secara seragam).`;
 
   const formattingRules = `### 🔤 ATURAN WAJIB FORMAT TEKS & TIPOGRAFI (DILARANG MENGGUNAKAN SIMBOL MARKDOWN!):
