@@ -154,21 +154,6 @@ export const QuestionCard = React.memo(
                 </div>
               </div>
 
-              {/* Tombol Kelola / Tambah Audio Listening */}
-              <button
-                type="button"
-                onClick={() => setIsAudioModalOpen(true)}
-                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all border shadow-2xs ${
-                  q.audioUrl || q.listeningScript
-                    ? "bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800"
-                    : "bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-gray-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-750"
-                }`}
-                title="Kelola Audio Listening (Upload Berkas atau Suara Narasi Otomatis)"
-              >
-                <Volume2 className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
-                <span>{q.audioUrl || q.listeningScript ? "Audio Listening" : "Tambah Audio"}</span>
-              </button>
-
               <button
                 type="button"
                 onClick={(e) => {
@@ -395,6 +380,7 @@ export const QuestionCard = React.memo(
                         : "Tulis pertanyaan di sini..."
                     }
                     minHeight="80px"
+                    onAudioClick={() => setIsAudioModalOpen(true)}
                     onChartClick={(chartType) =>
                       setEditingChartTarget({
                         qId: q.id,
@@ -620,9 +606,20 @@ export const QuestionCard = React.memo(
               initialAudioUrl={q.audioUrl}
               initialScript={q.listeningScript}
               onSave={(data) => {
+                let updatedQuestionText = q.questionText || "";
+                const hasAudio = Boolean(data.audioUrl || data.listeningScript);
+                const hasMarker = /\[AUDIO_STIMULUS\]/i.test(updatedQuestionText);
+
+                if (hasAudio && !hasMarker) {
+                  updatedQuestionText = `<p>[AUDIO_STIMULUS]</p>\n` + updatedQuestionText;
+                } else if (!hasAudio && hasMarker) {
+                  updatedQuestionText = updatedQuestionText.replace(/(?:<p[^>]*>)?\s*\[AUDIO_STIMULUS\]\s*(?:<\/p>)?/gi, "").trim();
+                }
+
                 useExamEditorStore.getState().handleUpdateQuestion(q.id, {
                   audioUrl: data.audioUrl,
                   listeningScript: data.listeningScript,
+                  questionText: updatedQuestionText,
                 });
               }}
             />
