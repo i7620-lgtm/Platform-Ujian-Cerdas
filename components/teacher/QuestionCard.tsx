@@ -20,6 +20,8 @@ import { MatchingEditor } from "./question-editors/MatchingEditor";
 import { ShortAnswerEditor } from "./question-editors/ShortAnswerEditor";
 import { QuestionnaireEditor } from "./question-editors/QuestionnaireEditor";
 import { AudioPlayer } from "../AudioPlayer";
+import { Volume2 } from "lucide-react";
+import { QuestionAudioModal } from "./modals/QuestionAudioModal";
 
 interface QuestionCardProps {
   q: Question;
@@ -55,6 +57,7 @@ export const QuestionCard = React.memo(
 
     const [isHintOpen, setIsHintOpen] = useState(false);
     const [isStepsOpen, setIsStepsOpen] = useState(false);
+    const [isAudioModalOpen, setIsAudioModalOpen] = useState(false);
     const stripHtml = (html?: string) => (html ? html.replace(/<[^>]*>/g, "").trim() : "");
     const hasHint = Boolean(stripHtml(q.hint));
     const hasSteps = Boolean(stripHtml(q.solutionSteps));
@@ -150,6 +153,21 @@ export const QuestionCard = React.memo(
                   </svg>
                 </div>
               </div>
+
+              {/* Tombol Kelola / Tambah Audio Listening */}
+              <button
+                type="button"
+                onClick={() => setIsAudioModalOpen(true)}
+                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all border shadow-2xs ${
+                  q.audioUrl || q.listeningScript
+                    ? "bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800"
+                    : "bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-gray-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-750"
+                }`}
+                title="Kelola Audio Listening (Upload Berkas atau Suara Narasi Otomatis)"
+              >
+                <Volume2 className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+                <span>{q.audioUrl || q.listeningScript ? "Audio Listening" : "Tambah Audio"}</span>
+              </button>
 
               <button
                 type="button"
@@ -356,6 +374,8 @@ export const QuestionCard = React.memo(
                       <AudioPlayer
                         src={q.audioUrl}
                         script={q.listeningScript}
+                        isTeacher={true}
+                        onEdit={() => setIsAudioModalOpen(true)}
                         onDelete={() => {
                           useExamEditorStore.getState().handleUpdateQuestion(q.id, {
                             audioUrl: undefined,
@@ -591,6 +611,22 @@ export const QuestionCard = React.memo(
                 </div>
             )}
           </div>
+
+          {/* Modal Kelola Audio Listening (Upload Berkas / Suara Narasi Otomatis) */}
+          {isAudioModalOpen && (
+            <QuestionAudioModal
+              isOpen={isAudioModalOpen}
+              onClose={() => setIsAudioModalOpen(false)}
+              initialAudioUrl={q.audioUrl}
+              initialScript={q.listeningScript}
+              onSave={(data) => {
+                useExamEditorStore.getState().handleUpdateQuestion(q.id, {
+                  audioUrl: data.audioUrl,
+                  listeningScript: data.listeningScript,
+                });
+              }}
+            />
+          )}
         </div>
         <div className="relative py-2 group/insert">
           <div
