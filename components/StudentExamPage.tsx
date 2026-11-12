@@ -1018,7 +1018,7 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({
                   <div className="flex-1 min-w-0">
                     {(q.audioUrl || q.listeningScript) && (
                       <div className="mb-4">
-                        <AudioPlayer src={q.audioUrl} script={q.listeningScript} />
+                        <AudioPlayer src={q.audioUrl} script={q.listeningScript} isTeacher={false} />
                       </div>
                     )}
                     {q.videoUrl && (
