@@ -124,6 +124,57 @@ export const stripDuplicateStatementsFromQuestionText = (
 };
 
 /**
+ * Detects dialog transcripts accidentally included in questionText (e.g. "Speaker A: ... Speaker B: ..."
+ * or "Man: ... Woman: ..."), extracts them into listeningScript, and strips them from questionText
+ * so students never see the listening script text.
+ */
+export const extractAndPurgeListeningScriptFromQuestionText = (
+  qText: string,
+  existingScript?: string
+): { cleanedText: string; listeningScript?: string } => {
+  if (!qText) return { cleanedText: qText, listeningScript: existingScript };
+
+  let text = qText;
+  let extracted = existingScript ? existingScript.trim() : "";
+
+  // 1. Check for explicit wrapper tags like <div class="listening-script">...</div>
+  const scriptTagMatch = text.match(/<(?:div|p|blockquote)[^>]*(?:listening|audio|dialog|percakapan)[^>]*>([\s\S]*?)<\/(?:div|p|blockquote)>/i);
+  if (scriptTagMatch && scriptTagMatch[1]) {
+    if (!extracted) {
+      extracted = scriptTagMatch[1].replace(/<[^>]+>/g, "").trim();
+    }
+    text = text.replace(scriptTagMatch[0], "").trim();
+  }
+
+  // 2. Check for explicit headers like "Naskah Listening:" or "Conversation:" or "Dialog:"
+  const headerMatch = text.match(/(?:Naskah\s*(?:Listening|Menyimak|Audio)|Listening\s*Script|Conversation|Dialog(?:ue)?)\s*:\s*\n?([\s\S]*?)(?=\n\s*(?:Pertanyaan|Question|Soal|Pilihlah|\d+\.|$))/i);
+  if (headerMatch && headerMatch[1]) {
+    if (!extracted) {
+      extracted = headerMatch[1].trim();
+    }
+    text = text.replace(headerMatch[0], "").trim();
+  }
+
+  // 3. Check for speaker dialog patterns (e.g., lines starting with Speaker A:, Man:, Woman:, Pria:, Wanita:)
+  const speakerRegex = /(?:^|\n)(?:(?:Speaker\s*[A-Z]|Man|Woman|Boy|Girl|Pria|Wanita|Guru|Siswa|A|B)\s*:\s*.+(?:\n(?:Speaker\s*[A-Z]|Man|Woman|Boy|Girl|Pria|Wanita|Guru|Siswa|A|B)\s*:\s*.+)+)/i;
+  const speakerMatch = text.match(speakerRegex);
+  if (speakerMatch && speakerMatch[0]) {
+    if (!extracted) {
+      extracted = speakerMatch[0].trim();
+    }
+    text = text.replace(speakerMatch[0], "").trim();
+  }
+
+  // Clean excessive empty newlines
+  text = text.replace(/\n{3,}/g, "\n\n").trim();
+
+  return {
+    cleanedText: text,
+    listeningScript: extracted || undefined,
+  };
+};
+
+/**
  * Normalizes question types into internal QuestionType enum with smart auto-correction.
  * If user requested only single Pilihan Ganda but AI returned PG Kompleks with a single answer key,
  * this automatically converts it into MULTIPLE_CHOICE.
@@ -495,6 +546,9 @@ export const parseExternalAiOutput = (
         }
       }
       const finalAudioUrl = typeof rawAudioUrl === "string" ? rawAudioUrl.trim() : "";
+      if (finalAudioUrl && typeof finalQuestionText === "string") {
+        finalQuestionText = finalQuestionText.replace(/<audio[\s\S]*?<\/audio>|<audio[^>]*>/gi, "").trim();
+      }
 
       let rawVideoUrl =
         item.videoUrl ||
@@ -509,6 +563,13 @@ export const parseExternalAiOutput = (
         }
       }
       const finalVideoUrl = typeof rawVideoUrl === "string" ? rawVideoUrl.trim() : "";
+      if (finalVideoUrl && typeof finalQuestionText === "string") {
+        finalQuestionText = finalQuestionText.replace(/<(?:video|iframe)[\s\S]*?<\/(?:video|iframe)>|<(?:video|iframe)[^>]*>/gi, "").trim();
+      }
+      // Extract dialog from questionText if AI accidentally placed it there, and purge it so students don't see it
+      const listeningPurge = extractAndPurgeListeningScriptFromQuestionText(finalQuestionText, finalListeningScript);
+      finalQuestionText = listeningPurge.cleanedText;
+      const safeListeningScript = listeningPurge.listeningScript || finalListeningScript || undefined;
 
       const rawImgUrl = item.imageUrl || item.image_url || item.gambar || "";
       const finalImageUrl = typeof rawImgUrl === "string" ? rawImgUrl.trim() : "";
@@ -523,7 +584,7 @@ export const parseExternalAiOutput = (
         matchingPairs: mPairs,
         imageUrl: finalImageUrl || undefined,
         audioUrl: finalAudioUrl || undefined,
-        listeningScript: finalListeningScript || undefined,
+        listeningScript: safeListeningScript,
         videoUrl: finalVideoUrl || undefined,
         categoryLabels: item.categoryLabels || ["Benar", "Salah"],
         category: item.category || item.elemen || item.topik || "",
