@@ -12,6 +12,7 @@ export interface ExternalAiPromptConfig {
   cognitiveLevels: string[]; // Multi-selected cognitive levels
   kisiKisi: string;
   includeVisuals: boolean; // SVG / Diagram / Table request
+  includeAudioVideo?: boolean; // Naskah percakapan / narasi listening audio & tautan media
   enableScoreWeighting?: boolean; // Pembobotan per jawaban kustom
   defaultScoreWeight?: number; // Nilai default bobot soal (misal 1-5)
   targetModel?: "chatgpt" | "gemini" | "claude" | "deepseek" | "general";
@@ -29,6 +30,7 @@ export const buildExternalAiPrompt = (config: ExternalAiPromptConfig): string =>
     cognitiveLevels = ["Level 2 - Penerapan", "Level 3 - Penalaran"],
     kisiKisi = "",
     includeVisuals = true,
+    includeAudioVideo = false,
   } = config;
 
   const validTypes = questionTypes.length > 0 ? questionTypes : ["Pilihan Ganda"];
@@ -57,23 +59,52 @@ export const buildExternalAiPrompt = (config: ExternalAiPromptConfig): string =>
 3. Desimal menggunakan tanda koma (misal $0,5$ atau $4\\frac{3}{4}$), satuan baku internasional.`;
 
   const visualInstruction = includeVisuals
-    ? `### 🖼️ ATURAN WAJIB STIMULUS VISUAL & GEOMETRI (AKTIF):
-Karena opsi stimulus visual diaktifkan, **JIKA butir soal melibatkan geometri (sudut, segitiga, persegi, lingkaran, balok, bangun ruang, denah, koordinat), perbandingan data, atau diagram alir**, Anda **WAJIB MENYERTAKAN** stimulus visual representatif berupa:
+    ? `### 🖼️ ATURAN WAJIB STIMULUS VISUAL & GAMBAR REPRESENTATIF (AKTIF):
+Karena opsi stimulus visual diaktifkan, **JIKA butir soal membahas materi yang membutuhkan representasi gambar** (poster, iklan, infografis, komik dialog, peta, garis waktu sejarah, bagan alur norma, geometri, koordinat, diagram data, ornamen seni, atau denah lapangan), Anda **WAJIB MENYERTAKAN** stimulus visual representatif berupa:
 - **Kode SVG mandiri yang bersih (WAJIB BARIS TERSENDIRI / BLOCK):**
-  - Simpan kode SVG ke properti \`svgContent\` ATAU letakkan di dalam \`questionText\` dengan baris kosong terpisah di atas dan di bawahnya (\`\\n\\n<svg viewBox="0 0 400 300" xmlns="http://www.w3.org/2000/svg" style="width:100%; max-width:450px; height:auto; display:block; margin:12px auto;">...</svg>\\n\\n\`).
+  - Simpan kode SVG ke properti \`svgContent\` ATAU letakkan di dalam \`questionText\` dengan baris kosong terpisah di atas dan di bawahnya (\`\\n\\n<svg viewBox="0 0 400 300" xmlns="http://www.w3.org/2000/svg" style="width:100%; max-width:450px; height:auto; display:block; margin:14px auto;">...</svg>\\n\\n\`).
   - **DILARANG KERAS menyisipkan tag SVG di tengah kalimat atau inline**, yang menyebabkan teks kalimat terbelah atau terjepit di sisi kiri dan kanan gambar!
   - **Atribut Wajib SVG:** Gunakan \`viewBox="0 0 400 300"\`, warna stroke kontras tinggi (misal \`#1E293B\` atau \`#6366F1\`), \`font-family="system-ui, sans-serif"\`, dan \`font-weight="bold"\`.
-- **TEMPLAT STRUKTUR SVG KHUSUS PER TOPIK:**
-  - **Topik Geometri:** Wajib memuat titik sudut jelas di luar objek (A, B, C), garis penolong putus-putus (\`stroke-dasharray="3,3"\`), tanda siku-siku/sudut jika relevan, dan label ukuran yang presisi sesuai narasi soal.
-  - **Topik Koordinat & Grafik:** Wajib memuat sumbu X dan Y berpanah, grid latar belakang tipis (\`stroke="#E2E8F0"\`), serta titik koordinat $(x, y)$ dengan \`<circle r="4"/>\`.
-  - **Topik Diagram Data & Venn:** Wajib memuat bidang himpunan/batang berlabel kontras dengan legenda Keterangan Data yang jelas di bagian bawah.
+
+- **KATALOG TEMPLAT STRUKTUR SVG KHUSUS PER MATA PELAJARAN:**
+  1. **Bahasa Indonesia (Poster Iklan, Slogan, Spanduk & Undangan):**
+     - Wajib memuat bingkai kartu poster (\`<rect rx="12" fill="#F8FAFC" stroke="#0F172A" stroke-width="2"/>\`), judul/headline tebal persuasif (\`<text font-size="18" font-weight="900">\`), ikon ilustrasi vektor tematik (pohon lingkungan, buku, sabun cuci tangan, atau kemasan produk), slogan utama, dan kotak keterangan waktu/penyelenggara.
+  2. **Bahasa Inggris (Infografis, Comic Strip & Public Notices):**
+     - Untuk dialog/percakapan: Buat strip komik dengan gelembung ucapan (\`<path>\` speech bubble bertangkai) berisi teks pembicara Karakter A & Karakter B.
+     - Untuk teks fungsional: Buat rambu publik (*warning sign*), tiket perjalanan, atau kartu pengumuman (*school announcement*).
+  3. **Pendidikan Pancasila / PPKn (Bagan Regulasi & Alur):**
+     - Wajib memuat diagram hierarki piramida hukum atau bagan alur proses musyawarah mufakat dengan kotak alir berpanah (\`<marker id="arrow">\`).
+  4. **IPS / Sejarah / Geografi (Garis Waktu & Demografi):**
+     - Garis waktu sejarah (*historical timeline* horizontal berpanah) dengan penanda titik tahun dan label peristiwa penting.
+     - Diagram piramida penduduk / komparasi demografi atau sketsa peta/denah dengan simbol mata angin (*compass rose*).
+  5. **Seni Budaya (Paranada, Ornamen & Warna):**
+     - Garis paranada musik 5 garis horizontal sejajar dengan simbol Kunci G dan not balok.
+     - Ornamen motif geometris Nusantara (Kawung, Parang) berulang atau lingkaran roda warna (*color wheel*).
+  6. **PJOK (Olahraga & Kesehatan):**
+     - Denah lapangan olahraga berskala (bola basket, sepak bola, bulu tangkis, voli) lengkap dengan garis batas, area servis, dan posisi pemain.
+  7. **Matematika & IPA (Geometri, Koordinat & Diagram):**
+     - Titik sudut jelas di luar objek (A, B, C), garis penolong putus-putus, tanda siku-siku, sumbu koordinat berpanah, serta bidang data/Venn kontras.
+
 - **CHECKLIST VALIDASI MANDIRI AI (VERIFIKASI MUTLAK SEBELUM MENCETAK JSON):**
   - [ ] Apakah seluruh label angka/huruf pada SVG 100% cocok dengan narasi soal?
   - [ ] Apakah posisi teks label tidak saling berhimpitan/tumpang tindih?
   - [ ] Apakah seluruh tag SVG valid dan tertutup rapi (<circle />, <path />, </svg>)?
-- **Tabel HTML terstruktur:** Untuk penyajian data atau informasi komparatif, gunakan tag tabel \`<table border="1" class="soal-table">...</table>\` yang rapi pada baris tersendiri.
-- Soal yang tidak memerlukan geometri dapat menggunakan stimulus narasi autentik.`
+- **Tabel HTML terstruktur:** Untuk perbandingan data, gunakan tag tabel \`<table border="1" class="soal-table">...</table>\` pada baris tersendiri.
+- Soal yang murni berbasis analisis wacana dapat menggunakan stimulus narasi teks mendalam.`
     : `- Stimulus visual: Menggunakan narasi teks kontekstual yang jelas.`;
+
+  const isLanguageOrArts = /bahasa|inggris|indonesia|seni|listening|menyimak/i.test(subject + " " + topic);
+  const audioVideoInstruction = (includeAudioVideo || isLanguageOrArts)
+    ? `### 🎧 ATURAN KHUSUS SOAL MENYIMAK (AUDIO LISTENING & VIDEO):
+Karena opsi media menyimak aktif atau mata pelajaran berkaitan dengan keterampilan berbahasa/seni:
+1. **Naskah Dialog / Monolog Audio Wajib (\`listeningScript\`):**
+   - JIKA butir soal menguji pemahaman menyimak (Listening Comprehension Bahasa Inggris, Menyimak Pidato/Cerita/Dialog Bahasa Indonesia, atau Apresiasi Musik), Anda **WAJIB MENYERTAKAN** naskah percakapan/monolog lengkap pada properti \`"listeningScript"\` (misal: \`"Man: Excuse me, where is the library?\\nWoman: Go straight ahead and turn right at the traffic light..."\`).
+   - Naskah ini akan diputar otomatis oleh pemutar audio Text-to-Speech terintegrasi di aplikasi ujian siswa.
+2. **Tautan Media Opsional (\`audioUrl\` / \`videoUrl\`):**
+   - Jika tersedia tautan audio publik langsung (.mp3) atau video edukasi (.mp4/YouTube embed), sertakan pada properti \`"audioUrl"\` atau \`"videoUrl"\`. Jika tidak ada file langsung, kosongkan dengan string \`""\` (aplikasi akan memutar \`listeningScript\` melalui pemutar suara otomatis).
+3. **Petunjuk Pengerjaan di \`questionText\`:**
+   - Gunakan instruksi pembuka yang jelas, misalnya: *"Dengarkan audio percakapan berikut secara seksama, lalu jawablah pertanyaan di bawah ini!"*. DILARANG membocorkan jawaban di dalam badan \`questionText\` sebelum audio didengarkan siswa.\n`
+    : "";
 
   const structureAndAntiDuplicationRules = `### 🚫 ATURAN KETAT STRUKTUR TEKS SOAL & ANTI-DUPLIKASI (SANGAT PENTING):
 1. **DILARANG KERAS MENULISKAN OPSI JAWABAN (A, B, C, D) DI DALAM questionText:**
@@ -178,6 +209,9 @@ Karena fitur pembobotan per opsi diaktifkan, Anda **WAJIB MENYERTAKAN** skema pe
     "correctAnswer": "A",
     "useCustomWeights": ${config.enableScoreWeighting ? "true" : "false"},
     "optionWeights": [4, 3, 2, 1],
+    "listeningScript": "Speaker A: ... Speaker B: ... (HANYA jika soal menguji keterampilan menyimak/listening audio)",
+    "audioUrl": "",
+    "videoUrl": "",
     "category": "${topic}",
     "level": "${cognitiveLevels[0] || "Level 2 - Penerapan"}",
     "kisiKisi": "Indikator capaian butir soal ini",
@@ -307,6 +341,8 @@ ${formattingRules}
 ${diversityRules}
 
 ${visualInstruction}
+
+${audioVideoInstruction}
 
 ### 💡 ATURAN WAJIB PEMBAHASAN JAWABAN (SANGAT PENTING):
 1. **Setiap butir soal WAJIB menyertakan \`explanation\` (Pembahasan Lengkap)** dan \`solutionSteps\` (Langkah Pengerjaan Bertahap).
