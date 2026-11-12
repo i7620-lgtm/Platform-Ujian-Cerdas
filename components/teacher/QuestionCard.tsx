@@ -354,23 +354,6 @@ export const QuestionCard = React.memo(
                     </>
                   )}
 
-                  {(q.audioUrl || q.listeningScript) && (
-                    <div className="mb-3.5">
-                      <AudioPlayer
-                        src={q.audioUrl}
-                        script={q.listeningScript}
-                        isTeacher={true}
-                        onEdit={() => setIsAudioModalOpen(true)}
-                        onDelete={() => {
-                          useExamEditorStore.getState().handleUpdateQuestion(q.id, {
-                            audioUrl: undefined,
-                            listeningScript: undefined,
-                          });
-                        }}
-                      />
-                    </div>
-                  )}
-
                   <WysiwygEditor
                     value={q.questionText}
                     onChange={(val) => handleQuestionTextChange(q.id, val)}
@@ -381,6 +364,19 @@ export const QuestionCard = React.memo(
                     }
                     minHeight="80px"
                     onAudioClick={() => setIsAudioModalOpen(true)}
+                    onAudioDelete={() => {
+                      let updatedText = q.questionText || "";
+                      updatedText = updatedText
+                        .replace(/(?:<p[^>]*>)?\s*\[AUDIO_STIMULUS\]\s*(?:<\/p>)?/gi, "")
+                        .trim();
+                      useExamEditorStore.getState().handleUpdateQuestion(q.id, {
+                        audioUrl: undefined,
+                        listeningScript: undefined,
+                        questionText: updatedText,
+                      });
+                    }}
+                    audioUrl={q.audioUrl}
+                    listeningScript={q.listeningScript}
                     onChartClick={(chartType) =>
                       setEditingChartTarget({
                         qId: q.id,
