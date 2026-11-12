@@ -1016,9 +1016,28 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({
                     </span>
                   </div>
                   <div className="flex-1 min-w-0">
-                    {q.audioUrl && (
+                    {(q.audioUrl || q.listeningScript) && (
                       <div className="mb-4">
-                        <AudioPlayer src={q.audioUrl} />
+                        <AudioPlayer src={q.audioUrl} script={q.listeningScript} />
+                      </div>
+                    )}
+                    {q.videoUrl && (
+                      <div className="mb-4 rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-700 bg-black aspect-video max-w-xl">
+                        {q.videoUrl.includes("youtube.com") || q.videoUrl.includes("youtu.be") ? (
+                          <iframe
+                            src={
+                              q.videoUrl.includes("watch?v=")
+                                ? q.videoUrl.replace("watch?v=", "embed/")
+                                : q.videoUrl.replace("youtu.be/", "www.youtube.com/embed/")
+                            }
+                            className="w-full h-full"
+                            title="Video Stimulus Soal"
+                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                            allowFullScreen
+                          />
+                        ) : (
+                          <video src={q.videoUrl} controls className="w-full h-full object-contain" />
+                        )}
                       </div>
                     )}
                     <div className="student-question-text prose prose-slate dark:prose-invert max-w-none font-medium mb-6">
