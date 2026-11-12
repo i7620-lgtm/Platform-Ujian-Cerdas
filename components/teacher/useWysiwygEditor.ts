@@ -111,6 +111,12 @@ export const useWysiwygEditor = ({
       chartNodes.forEach((node) => {
         node.innerHTML = `<span class="chart-placeholder-text">📊 Diagram (Klik untuk mengedit)</span>`;
       });
+      const audioNodes = clone.querySelectorAll('[data-audio="true"]');
+      audioNodes.forEach((node) => {
+        const p = document.createElement("p");
+        p.textContent = "[AUDIO_STIMULUS]";
+        node.parentNode?.replaceChild(p, node);
+      });
       const html = clone.innerHTML;
       const sanitized = sanitizeHtml(html);
       lastEmittedValueRef.current = sanitized;
@@ -150,6 +156,12 @@ export const useWysiwygEditor = ({
       const chartNodes = clone.querySelectorAll('[data-chart="true"]');
       chartNodes.forEach((node) => {
         node.innerHTML = `<span class="chart-placeholder-text">📊 Diagram (Klik untuk mengedit)</span>`;
+      });
+      const audioNodesOnBlur = clone.querySelectorAll('[data-audio="true"]');
+      audioNodesOnBlur.forEach((node) => {
+        const p = document.createElement("p");
+        p.textContent = "[AUDIO_STIMULUS]";
+        node.parentNode?.replaceChild(p, node);
       });
       const html = clone.innerHTML;
       const sanitized = sanitizeHtml(html);
