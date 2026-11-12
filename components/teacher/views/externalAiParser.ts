@@ -470,6 +470,49 @@ export const parseExternalAiOutput = (
           ? Number(item.scoreWeight)
           : (item.bobot !== undefined ? Number(item.bobot) : 1);
 
+      // Media handling: Audio, Video, Listening Script, Image
+      const rawListening =
+        item.listeningScript ||
+        item.listening_script ||
+        item.naskahAudio ||
+        item.naskah_audio ||
+        item.audioScript ||
+        item.transcript ||
+        item.dialogueScript ||
+        "";
+      const finalListeningScript = typeof rawListening === "string" ? rawListening.trim() : "";
+
+      let rawAudioUrl =
+        item.audioUrl ||
+        item.audio_url ||
+        item.audioLink ||
+        item.audio ||
+        "";
+      if (!rawAudioUrl && typeof finalQuestionText === "string") {
+        const audioTagMatch = finalQuestionText.match(/<audio[^>]*src=["']([^"']+)["']/i);
+        if (audioTagMatch && audioTagMatch[1]) {
+          rawAudioUrl = audioTagMatch[1];
+        }
+      }
+      const finalAudioUrl = typeof rawAudioUrl === "string" ? rawAudioUrl.trim() : "";
+
+      let rawVideoUrl =
+        item.videoUrl ||
+        item.video_url ||
+        item.videoLink ||
+        item.video ||
+        "";
+      if (!rawVideoUrl && typeof finalQuestionText === "string") {
+        const videoTagMatch = finalQuestionText.match(/<(?:video|iframe)[^>]*src=["']([^"']+)["']/i);
+        if (videoTagMatch && videoTagMatch[1]) {
+          rawVideoUrl = videoTagMatch[1];
+        }
+      }
+      const finalVideoUrl = typeof rawVideoUrl === "string" ? rawVideoUrl.trim() : "";
+
+      const rawImgUrl = item.imageUrl || item.image_url || item.gambar || "";
+      const finalImageUrl = typeof rawImgUrl === "string" ? rawImgUrl.trim() : "";
+
       return sanitizeQuestionFormatting({
         id: uniqueId,
         questionText: finalQuestionText,
@@ -478,6 +521,10 @@ export const parseExternalAiOutput = (
         correctAnswer: isQuestionnaire ? (cAnswer || "") : cAnswer,
         trueFalseRows: tfRows,
         matchingPairs: mPairs,
+        imageUrl: finalImageUrl || undefined,
+        audioUrl: finalAudioUrl || undefined,
+        listeningScript: finalListeningScript || undefined,
+        videoUrl: finalVideoUrl || undefined,
         categoryLabels: item.categoryLabels || ["Benar", "Salah"],
         category: item.category || item.elemen || item.topik || "",
         level: item.level || item.levelKognitif || "",
