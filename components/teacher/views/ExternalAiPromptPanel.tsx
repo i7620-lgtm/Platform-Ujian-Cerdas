@@ -15,6 +15,7 @@ import {
   Eye,
   CheckSquare,
   Sliders,
+  Headphones,
 } from "lucide-react";
 import type { Question } from "../../../types";
 import {
@@ -227,6 +228,7 @@ export const ExternalAiPromptPanel: React.FC<ExternalAiPromptPanelProps> = ({
   ]);
   const [kisiKisi, setKisiKisi] = useState("");
   const [includeVisuals, setIncludeVisuals] = useState(true);
+  const [includeAudioVideo, setIncludeAudioVideo] = useState(false);
 
   const [copied, setCopied] = useState(false);
   const [launchNotice, setLaunchNotice] = useState<string | null>(null);
@@ -273,6 +275,7 @@ export const ExternalAiPromptPanel: React.FC<ExternalAiPromptPanelProps> = ({
     cognitiveLevels: activeCognitiveLevels,
     kisiKisi,
     includeVisuals,
+    includeAudioVideo,
     enableScoreWeighting,
     defaultScoreWeight: 1,
   });
@@ -546,7 +549,7 @@ export const ExternalAiPromptPanel: React.FC<ExternalAiPromptPanelProps> = ({
                   </div>
 
                   {/* Sakelar Visual SVG Kompak */}
-                  <div className="flex items-center gap-1.5 bg-white dark:bg-slate-800 px-2 py-1 rounded-lg border border-slate-200 dark:border-slate-700">
+                  <div className="flex items-center gap-1.5 bg-white dark:bg-slate-800 px-2 py-1 rounded-lg border border-slate-200 dark:border-slate-700" title="Aktifkan pembuatan gambar representatif (Poster, Infografis, Bagan, Geometri SVG)">
                     <Eye className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400 shrink-0" />
                     <span className="text-[11px] font-bold text-slate-700 dark:text-slate-300 shrink-0">
                       Visual SVG
@@ -561,6 +564,27 @@ export const ExternalAiPromptPanel: React.FC<ExternalAiPromptPanelProps> = ({
                       <div
                         className={`w-3.5 h-3.5 rounded-full bg-white transition-transform ${
                           includeVisuals ? "translate-x-3.5" : "translate-x-0"
+                        }`}
+                      />
+                    </button>
+                  </div>
+
+                  {/* Sakelar Audio / Listening Kompak */}
+                  <div className="flex items-center gap-1.5 bg-white dark:bg-slate-800 px-2 py-1 rounded-lg border border-slate-200 dark:border-slate-700" title="Aktifkan naskah dialog listening atau media audio/video untuk soal menyimak">
+                    <Headphones className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400 shrink-0" />
+                    <span className="text-[11px] font-bold text-slate-700 dark:text-slate-300 shrink-0">
+                      Audio / Listening
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setIncludeAudioVideo(!includeAudioVideo)}
+                      className={`w-8 h-4.5 rounded-full transition-colors relative p-0.5 shrink-0 ${
+                        includeAudioVideo ? "bg-indigo-600" : "bg-slate-300 dark:bg-slate-700"
+                      }`}
+                    >
+                      <div
+                        className={`w-3.5 h-3.5 rounded-full bg-white transition-transform ${
+                          includeAudioVideo ? "translate-x-3.5" : "translate-x-0"
                         }`}
                       />
                     </button>
