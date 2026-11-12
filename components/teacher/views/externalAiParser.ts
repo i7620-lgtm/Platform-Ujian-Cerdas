@@ -546,8 +546,10 @@ export const parseExternalAiOutput = (
         }
       }
       const finalAudioUrl = typeof rawAudioUrl === "string" ? rawAudioUrl.trim() : "";
-      if (finalAudioUrl && typeof finalQuestionText === "string") {
-        finalQuestionText = finalQuestionText.replace(/<audio[\s\S]*?<\/audio>|<audio[^>]*>/gi, "").trim();
+      if (typeof finalQuestionText === "string" && (finalAudioUrl || finalListeningScript)) {
+        if (/<audio[\s\S]*?<\/audio>|<audio[^>]*>/gi.test(finalQuestionText)) {
+          finalQuestionText = finalQuestionText.replace(/<audio[\s\S]*?<\/audio>|<audio[^>]*>/gi, "\n\n[AUDIO_STIMULUS]\n\n").trim();
+        }
       }
 
       let rawVideoUrl =
