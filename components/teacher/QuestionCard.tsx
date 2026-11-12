@@ -19,6 +19,7 @@ import { TrueFalseEditor } from "./question-editors/TrueFalseEditor";
 import { MatchingEditor } from "./question-editors/MatchingEditor";
 import { ShortAnswerEditor } from "./question-editors/ShortAnswerEditor";
 import { QuestionnaireEditor } from "./question-editors/QuestionnaireEditor";
+import { AudioPlayer } from "../AudioPlayer";
 
 interface QuestionCardProps {
   q: Question;
@@ -348,6 +349,21 @@ export const QuestionCard = React.memo(
                         />
                       </div>
                     </>
+                  )}
+
+                  {(q.audioUrl || q.listeningScript) && (
+                    <div className="mb-3.5">
+                      <AudioPlayer
+                        src={q.audioUrl}
+                        script={q.listeningScript}
+                        onDelete={() => {
+                          useExamEditorStore.getState().handleUpdateQuestion(q.id, {
+                            audioUrl: undefined,
+                            listeningScript: undefined,
+                          });
+                        }}
+                      />
+                    </div>
                   )}
 
                   <WysiwygEditor
