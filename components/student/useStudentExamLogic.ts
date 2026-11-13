@@ -531,8 +531,16 @@ export const useStudentExamLogic = ({
               }
             }
           });
+          let deviceId = localStorage.getItem("deviceId");
+          if (!deviceId) {
+            deviceId = `${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 10)}`;
+            try { localStorage.setItem("deviceId", deviceId); } catch { /* ignore */ }
+          }
           if (!loadedAnswers["_startTime"]) {
             loadedAnswers["_startTime"] = Date.now().toString();
+          }
+          if (!loadedAnswers["_deviceId"]) {
+            loadedAnswers["_deviceId"] = deviceId;
           }
           setAnswers(loadedAnswers);
           answersRef.current = loadedAnswers;
@@ -585,13 +593,26 @@ export const useStudentExamLogic = ({
               }
             }
           });
+          let deviceId = localStorage.getItem("deviceId");
+          if (!deviceId) {
+            deviceId = `${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 10)}`;
+            try { localStorage.setItem("deviceId", deviceId); } catch { /* ignore */ }
+          }
           if (!loadedAnswers["_startTime"]) {
             loadedAnswers["_startTime"] = Date.now().toString();
+          }
+          if (!loadedAnswers["_deviceId"]) {
+            loadedAnswers["_deviceId"] = deviceId;
           }
           setAnswers(loadedAnswers);
           answersRef.current = loadedAnswers;
         } else {
-          const loadedAnswers = { _startTime: Date.now().toString() };
+          let deviceId = localStorage.getItem("deviceId");
+          if (!deviceId) {
+            deviceId = `${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 10)}`;
+            try { localStorage.setItem("deviceId", deviceId); } catch { /* ignore */ }
+          }
+          const loadedAnswers = { _startTime: Date.now().toString(), _deviceId: deviceId };
           setAnswers(loadedAnswers);
           answersRef.current = loadedAnswers;
         }
