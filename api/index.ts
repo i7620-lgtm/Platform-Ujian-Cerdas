@@ -2,7 +2,6 @@ import healthHandler from "./health.ts";
 import aiConfigHandler from "./ai-config.ts";
 import generateQuestionsHandler from "./generate-questions.ts";
 import generateAnalysisHandler from "./generate-analysis.ts";
-import generateSvgHandler from "./generate-svg.ts";
 
 import examContentHandler from "./exam-content.ts";
 
@@ -30,10 +29,6 @@ export default async function handler(req: any, res: any) {
 
   if (pathname === "/api/generate-analysis" || pathname === "/generate-analysis" || pathname === "/api/ai-proxy" || pathname === "/ai-proxy") {
     return generateAnalysisHandler(req, res);
-  }
-
-  if (pathname === "/api/generate-svg" || pathname === "/generate-svg") {
-    return generateSvgHandler(req, res);
   }
 
   if (pathname.startsWith("/api/exam-content")) {
