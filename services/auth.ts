@@ -158,7 +158,6 @@ export class AuthService {
         if (updates.fullName !== undefined) dbUpdates.full_name = updates.fullName;
         if (updates.school !== undefined) dbUpdates.school = updates.school;
         if (updates.regency !== undefined) dbUpdates.regency = updates.regency;
-        if (updates.accountType !== undefined) dbUpdates.role = updates.accountType;
         if (updates.nip !== undefined) dbUpdates.nip = updates.nip;
         if (updates.nipType !== undefined) dbUpdates.nip_type = updates.nipType;
         if (updates.headmasterName !== undefined) dbUpdates.headmaster_name = updates.headmasterName;
@@ -219,7 +218,6 @@ export class AuthService {
                 full_name: updates.fullName,
                 school: updates.school,
                 regency: updates.regency,
-                role: updates.accountType,
             };
             await supabase.from('profiles').update(baseUpdates).eq('id', id).catch(() => {});
         }
