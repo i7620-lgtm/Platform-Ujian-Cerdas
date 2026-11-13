@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import type { Exam, Student, Result, ResultStatus } from '../types';
 import { storageService } from '../services/storage';
+import { normalizeDateString, toAbsoluteUtcTimestamp } from '../utils/timezoneUtils';
 
 interface UseExamAntiCheatProps {
     student: Student;
@@ -59,25 +60,17 @@ export const useExamAntiCheat = ({
             const actualStartTime = storedStartTime || initialData?.timestamp || Date.now();
             const timeLimitMs = isPR ? 0 : (exam.config.timeLimit || 0) * 60 * 1000;
 
-            const getLocalDateStr = (raw: string) => {
-                if (!raw) return '';
-                if (raw.includes('T')) {
-                    const d = new Date(raw);
-                    return isNaN(d.getTime()) ? '' : d.toLocaleDateString('en-CA');
-                }
-                return raw;
-            };
-
-            const endDateStr = getLocalDateStr(exam.config.endDate || exam.config.date);
-            const endTimeStr = isPR ? (exam.config.endTime || '23:59') : (exam.config.endTime || '23:59');
+            const examTz = exam.config.timezone || 'WIB';
+            const rawEndDate = exam.config.endDate || exam.config.date;
+            const endTimeStr = exam.config.endTime || '23:59';
 
             let absoluteExamEndTime: number;
-            if (isPR) {
-                absoluteExamEndTime = new Date(`${endDateStr}T${endTimeStr}:59`).getTime();
-            } else if (exam.config.endDate && exam.config.endDate.includes('T')) {
-                absoluteExamEndTime = new Date(exam.config.endDate).getTime();
+            if (rawEndDate && rawEndDate.includes('T')) {
+                absoluteExamEndTime = new Date(rawEndDate).getTime();
+            } else if (rawEndDate) {
+                absoluteExamEndTime = toAbsoluteUtcTimestamp(normalizeDateString(rawEndDate), endTimeStr, examTz, true);
             } else {
-                absoluteExamEndTime = new Date(`${endDateStr}T${endTimeStr}:59`).getTime();
+                absoluteExamEndTime = Infinity;
             }
 
             if (isNaN(absoluteExamEndTime)) {
