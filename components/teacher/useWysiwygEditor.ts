@@ -19,7 +19,6 @@ export interface EditorState {
   showGeometry: boolean;
   showAksara: boolean;
   showEmoji: boolean;
-  showAiImage: boolean;
   showLink: boolean;
   selectedTextForLink: string;
 }
@@ -69,7 +68,6 @@ export const useWysiwygEditor = ({
     showGeometry: false,
     showAksara: false,
     showEmoji: false,
-    showAiImage: false,
     showLink: false,
     selectedTextForLink: "",
   });
@@ -577,13 +575,6 @@ export const useWysiwygEditor = ({
     e.target.value = "";
   };
 
-  const insertAiImage = (imageUrl: string, caption?: string) => {
-    const cleanCaption = caption ? caption.replace(/"/g, "&quot;") : "Stimulus Visual AI";
-    const imgTag = `<p style="text-align: center; margin: 8px auto;"><img src="${imageUrl}" alt="${cleanCaption}" loading="lazy" style="max-width: 280px; max-height: 220px; width: auto; height: auto; object-fit: contain; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); display: inline-block; margin: 0 auto; border: 1px solid #e2e8f0; cursor: zoom-in;" /><br/><span style="font-size: 11px; color: #64748b; margin-top: 4px; display: inline-block;">🎨 Stimulus Visual AI (${cleanCaption})</span></p>&nbsp;`;
-    runCmd("insertHTML", imgTag);
-    handleInput();
-  };
-
   const openLinkModal = () => {
     saveSelection();
     const sel = window.getSelection();
@@ -710,7 +701,6 @@ export const useWysiwygEditor = ({
     cancelInlineMath,
     activeInlineLatex,
     setActiveInlineLatex,
-    insertAiImage,
     openLinkModal,
     insertLink,
     handlePaste,
