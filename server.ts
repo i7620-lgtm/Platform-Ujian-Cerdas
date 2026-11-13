@@ -1,8 +1,10 @@
 import express from "express";
 import path from "path";
 import cors from "cors";
-import { generateQuestionsOnServer, generateAIAnalysisOnServer, generateSvgOnServer } from "./server/ai.ts";
+import { generateQuestionsOnServer, generateAIAnalysisOnServer } from "./server/ai.ts";
 import { getStudentQuestionBundle, getAuthorizedExamSolutions } from "./server/examContent.ts";
+import { validateContentWithAIOnServer } from "./server/contentModeration.ts";
+import { getAI } from "./server/ai.ts";
 
 async function startServer() {
   const app = express();
@@ -17,20 +19,23 @@ async function startServer() {
     res.json({ status: "ok", port: PORT, env: process.env.NODE_ENV || "development" });
   });
 
-  app.get("/api/ai-config", (req, res) => {
-    const key = process.env.GEMINI_API_KEY || process.env.API_KEY || "";
-    res.json({ hasKey: Boolean(key), key });
+  app.post("/api/moderate-content", async (req, res) => {
+    try {
+      const { content } = req.body;
+      if (!content || typeof content !== "string") {
+        return res.json({ isSafe: true, issues: [] });
+      }
+      const result = await validateContentWithAIOnServer(content, getAI);
+      res.json(result);
+    } catch (error: any) {
+      console.error("Moderation API Error:", error.message);
+      res.json({ isSafe: true, issues: [] }); // Safe fallback
+    }
   });
 
-  app.post("/api/generate-svg", async (req, res) => {
-    try {
-      const { prompt, style } = req.body;
-      const svgCode = await generateSvgOnServer(prompt, style);
-      res.json({ success: true, svg: svgCode });
-    } catch (error: any) {
-      console.warn("API warning generating SVG:", error.message);
-      res.status(500).json({ success: false, error: error.message });
-    }
+  app.get("/api/ai-config", (req, res) => {
+    const key = process.env.GEMINI_API_KEY || process.env.API_KEY || "";
+    res.json({ hasKey: Boolean(key) });
   });
 
   app.post("/api/generate-questions", async (req, res) => {
