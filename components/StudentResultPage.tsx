@@ -126,10 +126,17 @@ export const StudentResultPage: React.FC<StudentResultPageProps> = ({
     setUnlockError("");
 
     try {
+      let deviceId = '';
+      try {
+        deviceId = localStorage.getItem("deviceId") || `${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 10)}`;
+        localStorage.setItem("deviceId", deviceId);
+      } catch { /* ignore */ }
+
       const success = await storageService.verifyUnlockToken(
         exam.code,
         result.student.studentId,
         cleanToken,
+        deviceId || undefined,
       );
       if (success) {
         if (onResume) {
@@ -206,8 +213,8 @@ export const StudentResultPage: React.FC<StudentResultPageProps> = ({
 
   // REAL-TIME CALCULATION LOGIC
   const calculatedStats = useMemo(() => {
-    const grading = calculateExamScore(exam, result.answers || {});
-    const isOlympiad = !!exam.config?.isOlympiadMode;
+    const grading = calculateExamScore(enrichedExam, result.answers || {});
+    const isOlympiad = !!enrichedExam.config?.isOlympiadMode;
     return {
       score: result.score, // Use the score from the database
       calculatedScore: grading.score, // Keep calculated score for discrepancy check
@@ -226,7 +233,7 @@ export const StudentResultPage: React.FC<StudentResultPageProps> = ({
       hasDiscrepancy: typeof result.score === "number" && grading.score !== result.score,
     };
   }, [
-    exam,
+    enrichedExam,
     result.answers,
     result.score,
     result.correctAnswers,
@@ -235,21 +242,21 @@ export const StudentResultPage: React.FC<StudentResultPageProps> = ({
 
   // NEW: Analytical Data for Diagnostic Card
   const analysisData = useMemo(
-    () => analyzeStudentPerformance(exam, result),
-    [exam, result],
+    () => analyzeStudentPerformance(enrichedExam, result),
+    [enrichedExam, result],
   );
   const questionTypeStats = useMemo(
-    () => analyzeQuestionTypePerformance(exam, result),
-    [exam, result],
+    () => analyzeQuestionTypePerformance(enrichedExam, result),
+    [enrichedExam, result],
   );
 
   // Check if we are waiting for server-side score calculation
   const hasAutoGradable = useMemo(
     () =>
-      exam.questions.some(
-        (q) => q.questionType !== "INFO" && q.questionType !== "ESSAY",
+      enrichedQuestions.some(
+        (q) => q.questionType !== "INFO" && q.questionType !== "QUESTIONNAIRE" && q.questionType !== "ESSAY",
       ),
-    [exam.questions],
+    [enrichedQuestions],
   );
   const isWaitingForServer = useMemo(() => {
     // 1. If status is not completed/force_closed, we are definitely waiting
@@ -267,8 +274,8 @@ export const StudentResultPage: React.FC<StudentResultPageProps> = ({
       return true;
 
     // 3. If totalQuestions is 0 but exam has scorable questions, it means the server hasn't processed the result yet.
-    const scorableCount = exam.questions.filter(
-      (q) => q.questionType !== "INFO",
+    const scorableCount = enrichedQuestions.filter(
+      (q) => q.questionType !== "INFO" && q.questionType !== "QUESTIONNAIRE",
     ).length;
     if (
       result.totalQuestions === 0 &&
@@ -285,7 +292,7 @@ export const StudentResultPage: React.FC<StudentResultPageProps> = ({
     result.totalQuestions,
     hasAutoGradable,
     calculatedStats?.calculatedScore,
-    exam.questions,
+    enrichedQuestions,
   ]);
 
   const isPR = (config.examMode || "").trim().toUpperCase() === "PR";
