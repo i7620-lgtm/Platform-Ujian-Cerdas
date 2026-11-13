@@ -101,9 +101,6 @@ export default defineConfig(() => {
         }
       })
     ],
-    optimizeDeps: {
-      include: ['@vercel/analytics/react']
-    },
     resolve: {
       dedupe: ['react', 'react-dom']
     },
@@ -138,9 +135,6 @@ export default defineConfig(() => {
               }
               if (id.includes('html5-qrcode') || id.includes('qrcode.react')) {
                 return 'vendor-qrcode';
-              }
-              if (id.includes('@vercel/analytics')) {
-                return 'vendor-analytics';
               }
               if (id.includes('katex') || id.includes('marked') || id.includes('react-markdown') || id.includes('remark-gfm')) {
                 return 'vendor-math-markdown';
