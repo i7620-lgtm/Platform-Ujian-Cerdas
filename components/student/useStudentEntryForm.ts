@@ -2,6 +2,7 @@ import { useState, useRef, useMemo, useEffect } from "react";
 import { Student, ExamConfig } from "../../types";
 import { storageService } from "../../services/storage";
 import { supabase } from "../../lib/supabase";
+import { normalizeDateString, toAbsoluteUtcTimestamp } from "../../utils/timezoneUtils";
 
 
 // Helper to parse "SchoolName-ClassName(Limit)" format
@@ -478,14 +479,12 @@ export const useStudentEntryForm = ({ initialCode, onLoginSuccess }: UseStudentE
     setError("");
 
     try {
-      const exists = await storageService.getExamConfig(cleanExamCode);
-      if (!exists) {
+      const config = await storageService.getExamConfig(cleanExamCode);
+      if (!config) {
         setError("Kode ujian tidak ditemukan atau tidak aktif");
         setIsLoading(false);
         return;
       }
-
-      const config = await storageService.getExamConfig(cleanExamCode);
 
       const parsedClass = parseClassConfig(studentClass);
       const cleanClassName = parsedClass.name || studentClass;
@@ -530,25 +529,18 @@ export const useStudentEntryForm = ({ initialCode, onLoginSuccess }: UseStudentE
       // --- DEADLINE CHECK ---
       const mode = (config.examMode || 'UJIAN').trim().toUpperCase();
       const isPR = mode === 'PR';
-      const getLocalDateStr = (raw) => {
-          if (!raw) return '';
-          if (raw.includes('T')) {
-              const d = new Date(raw);
-              return isNaN(d.getTime()) ? '' : d.toLocaleDateString('en-CA');
-          }
-          return raw;
-      };
-      
-      const endDateStr = getLocalDateStr(config.endDate || config.date);
-      const endTimeStr = isPR ? (config.endTime || '23:59') : (config.endTime || '23:59');
+      const examTz = config.timezone || 'WIB';
+      const rawEndDate = config.endDate || config.date;
+      const endDateStr = rawEndDate ? normalizeDateString(rawEndDate) : '';
+      const endTimeStr = config.endTime || '23:59';
 
-      let absoluteExamEndTime;
-      if (isPR) {
-          absoluteExamEndTime = new Date(`${endDateStr}T${endTimeStr}:59`).getTime();
-      } else if (config.endDate && config.endDate.includes('T')) {
-          absoluteExamEndTime = new Date(config.endDate).getTime();
+      let absoluteExamEndTime: number;
+      if (rawEndDate && rawEndDate.includes('T')) {
+          absoluteExamEndTime = new Date(rawEndDate).getTime();
+      } else if (rawEndDate) {
+          absoluteExamEndTime = toAbsoluteUtcTimestamp(endDateStr, endTimeStr, examTz, true);
       } else {
-          absoluteExamEndTime = new Date(`${endDateStr}T${endTimeStr}:59`).getTime();
+          absoluteExamEndTime = Infinity;
       }
 
       if (isNaN(absoluteExamEndTime)) {
@@ -556,7 +548,7 @@ export const useStudentEntryForm = ({ initialCode, onLoginSuccess }: UseStudentE
       }
 
       if (Date.now() > absoluteExamEndTime) {
-          setError(`Ujian ini telah ditutup karena melewati batas waktu pengerjaan (${endDateStr} ${endTimeStr}).`);
+          setError(`Ujian ini telah ditutup karena melewati batas waktu pengerjaan (${endDateStr || '-'} ${endTimeStr} ${examTz}).`);
           setIsLoading(false);
           return;
       }
@@ -575,7 +567,7 @@ export const useStudentEntryForm = ({ initialCode, onLoginSuccess }: UseStudentE
             setError(
               `Sesi ini terkunci. Hubungi pengawas untuk meminta izin melanjutkan ujian.`
             );
-            setPendingStudentData({ cleanExamCode, studentData });
+            setPendingStudentData({ cleanExamCode, studentData, config });
             setIsLocked(true);
             setIsLoading(false);
             return;
@@ -583,32 +575,18 @@ export const useStudentEntryForm = ({ initialCode, onLoginSuccess }: UseStudentE
             // Jika tidak diizinkan melanjutkan (continueWithPermission=false), biarkan masuk agar App.tsx 
             // menendang mereka ke halaman hasil (Student Result).
           }
-        }
-
-        const currentAnswers =
-          localStorage.getItem(
-            `exam_local_${cleanExamCode}_${studentData.studentId}`,
-          ) || "{}";
-        const parsedAnswers = JSON.parse(currentAnswers);
-        const hasStarted = Object.keys(parsedAnswers).length > 0;
-        const savedDuration = parsedAnswers._duration;
-
-        if (
-          hasStarted &&
-          !savedDuration &&
-          config.detectBehavior &&
-          !config.continueWithPermission &&
-          isNotPR
-        ) {
-          const deviceId =
-            localStorage.getItem("deviceId") ||
-            Math.random().toString(36).substring(2);
-          localStorage.setItem("deviceId", deviceId);
-          if ((result as any).device_id && (result as any).device_id !== deviceId) {
+        } else if (isNotPR && result.status === "in_progress" && config.detectBehavior) {
+          let deviceId = localStorage.getItem("deviceId");
+          if (!deviceId) {
+            deviceId = `${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 10)}`;
+            localStorage.setItem("deviceId", deviceId);
+          }
+          const existingDeviceId = result.device_id || result.answers?._deviceId;
+          if (existingDeviceId && existingDeviceId !== deviceId) {
             setError(
-              `Sesi ini sedang aktif di perangkat lain. Hubungi pengawas jika Anda ingin berpindah perangkat.`,
+              `Sesi ini sedang aktif di perangkat lain. Masukkan Token Pengawas untuk melanjutkan di perangkat ini.`,
             );
-            setPendingStudentData({ cleanExamCode, studentData });
+            setPendingStudentData({ cleanExamCode, studentData, config });
             setIsLocked(true);
             setIsLoading(false);
             return;
@@ -670,10 +648,16 @@ export const useStudentEntryForm = ({ initialCode, onLoginSuccess }: UseStudentE
   const handleUnlockAndResume = async (token: string) => {
     if (!pendingStudentData) return;
     try {
+      let deviceId = localStorage.getItem("deviceId");
+      if (!deviceId) {
+        deviceId = `${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 10)}`;
+        localStorage.setItem("deviceId", deviceId);
+      }
       const isValid = await storageService.verifyUnlockToken(
         pendingStudentData.cleanExamCode,
         pendingStudentData.studentData.studentId,
         token,
+        deviceId,
       );
       if (isValid) {
         setIsLocked(false);
