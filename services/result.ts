@@ -6,7 +6,7 @@ import type { Result, ResultStatus, Exam, ExamConfig } from '../types';
 import { examService } from './exam';
 
 export class ResultService {
-  private static rpcDisabled = true; // Use direct Supabase persistence to avoid 400 RPC signature errors
+  private static rpcDisabled = false; // Zero-Trust server RPC primary with graceful DB fallback
   mapRowToResult(row: Record<string, unknown>): Result {
         const studentIdStr = row.student_id as string;
         let absentNumber = '00';
@@ -83,7 +83,8 @@ export class ResultService {
             status: row.status as ResultStatus, 
             activityLog: row.activity_log as string[],
             timestamp: new Date(row.updated_at as string).getTime(), 
-            location: row.location as { lat: number; lng: number } | undefined
+            location: row.location as { lat: number; lng: number } | undefined,
+            device_id: (row.device_id as string | undefined) || answers['_deviceId'] || undefined
         };
   }
 
@@ -114,13 +115,17 @@ export class ResultService {
         return { ...resultPayload, isSynced: false, status: resultPayload.status || 'in_progress' };
     }
 
-    // 1. Try secure RPC calculation if enabled and supported
+    // 1. Try secure Zero-Trust RPC calculation if enabled and supported
     if (!ResultService.rpcDisabled) {
         try {
-            // Only send valid 36-char string UUID to avoid 22P02 uuid syntax error
-            const validUuid = typeof resultPayload.student.resultId === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(resultPayload.student.resultId)
-                ? resultPayload.student.resultId
-                : null;
+            const rawResultId = resultPayload.student.resultId ?? resultPayload.id;
+            const numericResultId =
+                typeof rawResultId === 'number' && !isNaN(rawResultId)
+                    ? rawResultId
+                    : (typeof rawResultId === 'string' && /^\d+$/.test(rawResultId)
+                        ? Number(rawResultId)
+                        : null);
+            const deviceId = resultPayload.device_id || resultPayload.answers?.['_deviceId'] || null;
 
             const { data: rpcData, error: rpcError } = await supabase.rpc('calculate_and_submit_exam', {
                 p_exam_code: resultPayload.examCode,
@@ -133,57 +138,18 @@ export class ResultService {
                 p_device_info: null,
                 p_location: resultPayload.location || null,
                 p_activity_log: resultPayload.activityLog || [],
-                p_result_id: validUuid
+                p_result_id: numericResultId,
+                p_device_id: deviceId
             });
 
             if (rpcError) {
-                // If RPC fails (missing column, type mismatch, function not deployed), disable RPC for the session
+                // If RPC fails (missing column, signature mismatch, function not deployed), disable RPC for the session
                 ResultService.rpcDisabled = true;
-                console.info("RPC calculate_and_submit_exam is unavailable or schema mismatched in Supabase. Falling back to direct database persistence.");
+                console.info("RPC calculate_and_submit_exam unavailable or schema mismatched in Supabase. Falling back to direct persistence.");
             } else if (rpcData) {
                 const durationStr = resultPayload.answers?.['_duration'];
                 const completionTime = durationStr ? parseInt(durationStr) : undefined;
                 const validCompletionTime = !isNaN(completionTime as number) ? completionTime : 0;
-
-                let finalScore = rpcData.score;
-                let finalCorrect = rpcData.correct_answers;
-                let finalTotal = resultPayload.totalQuestions || rpcData.total_questions;
-
-                // Zero-Trust Server Verification: If completed, verify score using authoritative exam data from database
-                if (resultPayload.status === 'completed' || resultPayload.status === 'force_closed') {
-                    try {
-                        const { data: examData } = await supabase.from('exams').select('*').eq('code', resultPayload.examCode).maybeSingle();
-                        if (examData) {
-                            const fullExam = examData as Exam;
-                            const isOlympiad = !!fullExam.config?.isOlympiadMode;
-                            const authoritativeGrading = calculateExamScore(fullExam, resultPayload.answers || {});
-
-                            // If Olympiad mode or if authoritative calculation corrects RPC discrepancy
-                            if (isOlympiad || authoritativeGrading.score !== finalScore) {
-                                finalScore = authoritativeGrading.score;
-                                finalCorrect = authoritativeGrading.correctAnswers;
-                                finalTotal = authoritativeGrading.totalQuestions;
-
-                                await supabase.from('results').update({
-                                    score: finalScore,
-                                    correct_answers: finalCorrect,
-                                    total_questions: finalTotal
-                                }).eq('id', rpcData.id);
-                            }
-                        }
-                    } catch (verifyErr) {
-                        console.warn("Authoritative exam score verification failed, using RPC result:", verifyErr);
-                    }
-                } else if (resultPayload.score !== undefined && resultPayload.score > finalScore) {
-                    finalScore = resultPayload.score;
-                    finalCorrect = resultPayload.correctAnswers || finalCorrect;
-
-                    await supabase.from('results').update({
-                        score: finalScore,
-                        correct_answers: finalCorrect,
-                        total_questions: resultPayload.totalQuestions
-                    }).eq('id', rpcData.id);
-                }
 
                 return {
                     ...resultPayload,
@@ -192,10 +158,16 @@ export class ResultService {
                         ...resultPayload.student,
                         resultId: rpcData.id
                     },
-                    score: finalScore,
-                    correctAnswers: finalCorrect,
-                    totalQuestions: finalTotal,
+                    score: rpcData.score,
+                    correctAnswers: rpcData.correct_answers,
+                    wrongAnswers: rpcData.wrong_answers,
+                    unansweredQuestions: rpcData.unanswered_questions,
+                    totalQuestions: rpcData.total_questions || resultPayload.totalQuestions,
+                    maxScore: rpcData.max_score,
+                    minScore: rpcData.min_score,
+                    isOlympiadMode: rpcData.is_olympiad,
                     status: rpcData.status,
+                    device_id: deviceId || undefined,
                     completionTime: validCompletionTime,
                     isSynced: true
                 };
@@ -350,10 +322,11 @@ export class ResultService {
       
       return {
         id: data.id, // Include Primary Key
-        student: { studentId: data.student_id, fullName: studentName, class: dbClassName, schoolName: dbSchoolName || undefined, absentNumber: absentNumber },
+        student: { studentId: data.student_id, fullName: studentName, class: dbClassName, schoolName: dbSchoolName || undefined, absentNumber: absentNumber, resultId: data.id },
         examCode: data.exam_code, answers: answers, score: data.score, correctAnswers: data.correct_answers,
         totalQuestions: data.total_questions, completionTime: validCompletionTime, status: data.status, activityLog: data.activity_log,
-        timestamp: new Date(data.updated_at).getTime(), location: data.location
+        timestamp: new Date(data.updated_at).getTime(), location: data.location,
+        device_id: (data.device_id as string | undefined) || answers['_deviceId'] || undefined
       };
   }
 
@@ -567,11 +540,11 @@ export class ResultService {
       return token;
   }
 
-  async verifyUnlockToken(examCode: string, studentId: string, token: string): Promise<boolean> {
+  async verifyUnlockToken(examCode: string, studentId: string, token: string, newDeviceId?: string): Promise<boolean> {
       try {
           const { data, error } = await supabase
               .from('results')
-              .select('unlock_token, activity_log')
+              .select('unlock_token, activity_log, answers')
               .eq('exam_code', examCode)
               .eq('student_id', studentId)
               .maybeSingle();
@@ -580,18 +553,32 @@ export class ResultService {
           
           if (data.unlock_token && String(data.unlock_token).trim() === token.trim()) {
               const currentLog = (typeof data.activity_log === 'string' ? JSON.parse(data.activity_log) : data.activity_log) || [];
+              const existingAnswers = (typeof data.answers === 'object' && data.answers) ? (data.answers as Record<string, string>) : {};
+              const updatedAnswers = newDeviceId
+                  ? { ...existingAnswers, _deviceId: newDeviceId }
+                  : existingAnswers;
               
               const { error: updateError } = await supabase
                   .from('results')
                   .update({ 
                       unlock_token: null, 
                       status: 'in_progress',
+                      answers: updatedAnswers,
                       activity_log: [...currentLog, `[${new Date().toLocaleTimeString()}] Akses dibuka siswa dengan token`]
                   })
                   .eq('exam_code', examCode)
                   .eq('student_id', studentId);
               
               if (updateError) throw updateError;
+
+              if (newDeviceId) {
+                  await supabase
+                      .from('results')
+                      .update({ device_id: newDeviceId })
+                      .eq('exam_code', examCode)
+                      .eq('student_id', studentId)
+                      .then(() => {}, () => {});
+              }
               return true;
           }
           return false;
