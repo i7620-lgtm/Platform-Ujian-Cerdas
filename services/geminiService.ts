@@ -1,11 +1,16 @@
-import { GoogleGenAI, Type } from "@google/genai";
+const Type = {
+  STRING: "STRING",
+  NUMBER: "NUMBER",
+  BOOLEAN: "BOOLEAN",
+  ARRAY: "ARRAY",
+  OBJECT: "OBJECT",
+} as const;
 import { Question, QuizConfig, QuestionType, ChartData } from "../types";
 import { markdownToHtml, htmlToMarkdown, normalize, parseList, isAnswerMatch, extractSmartCategory, stripPrefix, detectEducationalStage } from "../components/teacher/examUtils";
 import { generateGeometrySVG, extractNum, parseGeometryLabels } from "../components/teacher/geometryUtils";
-import { generateEducationalSvg, svgToDataUrl } from "./svgGeneratorService";
+import { svgToDataUrl } from "./svgGeneratorService";
 import { generateContextualEducationalSvg } from "./smartSvgTemplates";
 import { repairQuestionCharts, normalizeChartPlaceholdersInHtml } from "./chartRepairService";
-import { generateSingleQuestionClientSide } from "./clientQuestionGenerator";
 import { resolveExpertPersona, buildAIMDirectives, validateAndReflectQuestions } from "./aiPersonaAimEngine";
 import { isolateVisualElementsToCenterBlock, stripDuplicateOptionsFromQuestionText, stripDuplicateStatementsFromQuestionText } from "../components/teacher/views/externalAiParser";
 
@@ -799,33 +804,8 @@ export async function generateQuestions(
       imageSearchKeyword?: string;
     }[] = [];
 
-    // Eksekusi pemanggilan AI murni (Zero Fake Questions):
-    // Jalur 1: Eksekusi Mandiri di Browser Pengguna (jika API key tersedia di browser)
-    // Jalur 2: Serverless Proxy (/api/generate-questions) menggunakan variabel lingkungan Vercel
+    // Eksekusi pemanggilan AI murni via Serverless Proxy (/api/generate-questions):
     // Jika AI gagal/kuota habis: laporkan keadaan sebenarnya secara jujur tanpa menampilkan soal template palsu.
-
-    const currentAssignedType = selectedTypes[startIndex % selectedTypes.length] || "Pilihan Ganda";
-    const currentAssignedDiff = selectedDifficulties[startIndex % selectedDifficulties.length] || "Level 3 - Penalaran";
-
-    // --- JALUR 1: Eksekusi Mandiri di Browser Pengguna (Direct Client-Side) ---
-    if (batchCount === 1) {
-      try {
-        const clientQ = await generateSingleQuestionClientSide(
-          config,
-          currentAssignedType,
-          currentAssignedDiff,
-          startIndex + 1,
-          totalCount
-        );
-        if (clientQ && (clientQ.questionText || clientQ.question)) {
-          questions = [clientQ];
-        }
-      } catch (clientErr: any) {
-        console.warn("[Client-Side Question Generator] Beralih ke serverless endpoint Vercel:", clientErr?.message || clientErr);
-      }
-    }
-
-    // --- JALUR 2: Serverless Endpoint Vercel (/api/generate-questions) ---
     let lastServerError: any = null;
     if (questions.length === 0) {
       const primaryModels = ["gemini-3.8-flash", "gemini-3.1-flash-lite"];
@@ -1906,16 +1886,7 @@ export async function generateQuestions(
       if (svgTasks.length > 0) {
         for (const { q, prompt, style, hasInlineTag } of svgTasks) {
           try {
-            let svgCode = "";
-            try {
-              svgCode = await generateEducationalSvg(prompt, style);
-            } catch (apiErr) {
-              console.warn("Gagal membuat SVG via API, beralih ke template edukatif terverifikasi:", apiErr);
-            }
-
-            if (!svgCode || !svgCode.includes('<svg')) {
-              svgCode = generateContextualEducationalSvg(prompt, style);
-            }
+            const svgCode = generateContextualEducationalSvg(prompt, style);
 
             if (svgCode && svgCode.includes('<svg')) {
               const dataUrl = svgToDataUrl(svgCode);
