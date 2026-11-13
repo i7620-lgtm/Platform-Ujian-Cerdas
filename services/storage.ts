@@ -187,8 +187,8 @@ class StorageService {
       return resultService.generateUnlockToken(examCode, studentId);
   }
 
-  async verifyUnlockToken(examCode: string, studentId: string, token: string): Promise<boolean> {
-      return resultService.verifyUnlockToken(examCode, studentId, token);
+  async verifyUnlockToken(examCode: string, studentId: string, token: string, newDeviceId?: string): Promise<boolean> {
+      return resultService.verifyUnlockToken(examCode, studentId, token, newDeviceId);
   }
 
   async deleteStudentResult(examCode: string, studentId: string): Promise<void> {
