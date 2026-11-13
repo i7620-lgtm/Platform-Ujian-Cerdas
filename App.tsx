@@ -8,12 +8,14 @@ import { OngoingExamModal } from './components/teacher/DashboardModals';
 import type { Exam, Student, Result, TeacherProfile, ResultStatus } from './types';
 import { LogoIcon, NoWifiIcon, UserIcon, ArrowLeftIcon, SunIcon, MoonIcon, QrCodeIcon, BookOpenIcon } from './components/Icons';
 import { storageService } from './services/storage';
+import { ModerationError } from './services/exam';
 import { InvitationModal } from './components/teacher/InvitationModal';
 import { ProfileCompletionModal } from './components/teacher/ProfileCompletionModal';
 import { TermsPage, PrivacyPage } from './components/LegalPages';
 import { TutorialPage } from './components/TutorialPage';
 import { CollaboratorView } from './components/CollaboratorView';
 import { VisualLightboxModal } from './components/VisualLightboxModal';
+import { VercelAnalytics } from './components/VercelAnalytics';
 import { supabase } from './lib/supabase';
 import { hydrateMathInContainer } from './utils/mathRenderer';
 import { calculateStudentAccess } from './utils/scheduleUtils';
@@ -327,15 +329,22 @@ const App: React.FC = () => {
         setResumedResult(res);
         studentWithId = { ...student, resultId: res.id };
       } else if (!isPreview) {
+        let deviceId = '';
+        try {
+          deviceId = localStorage.getItem('deviceId') || `${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 10)}`;
+          localStorage.setItem('deviceId', deviceId);
+        } catch { /* ignore */ }
+
         // Initial creation
         const newRes = await storageService.submitExamResult({
           student,
           examCode,
-          answers: { _startTime: Date.now().toString() },
+          answers: { _startTime: Date.now().toString(), ...(deviceId ? { _deviceId: deviceId } : {}) },
           score: 0,
           totalQuestions: exam.questions.length,
           correctAnswers: 0,
           status: 'in_progress',
+          device_id: deviceId || undefined,
           timestamp: Date.now()
         });
         // Capture the new ID
@@ -941,23 +950,31 @@ const App: React.FC = () => {
                     onUpdateProfile={(updated) => setTeacherProfile(updated)}
                     addExam={async (e) => { 
                         const examWithAuthor: Exam = { ...e, authorId: teacherProfile.id, authorSchool: teacherProfile.school };
-                        // Optimistic UI update: immediately add to state so tabs show it with zero delay
-                        setExams((prev) => ({ ...prev, [examWithAuthor.code]: examWithAuthor }));
                         try {
                             await storageService.saveExam(examWithAuthor); 
+                            // Optimistic UI update only AFTER successful server validation
+                            setExams((prev) => ({ ...prev, [examWithAuthor.code]: examWithAuthor }));
                         } catch (err) {
-                            console.error("Gagal simpan ujian ke database, data aman di lokal:", err);
+                            if (err instanceof ModerationError) {
+                                alert(`PENYIMPANAN DIBLOKIR!\n\nSistem mendeteksi konten yang tidak pantas:\n- ${err.issues.join('\n- ')}\n\nMohon perbaiki konten ujian Anda sebelum menyimpan.`);
+                            } else {
+                                console.error("Gagal simpan ujian ke database, data aman di lokal:", err);
+                            }
                         }
                         await refreshExams(); 
                     }}
                     updateExam={async (e) => { 
                         const examWithAuthor: Exam = { ...e, authorId: teacherProfile.id, authorSchool: teacherProfile.school };
-                        // Optimistic UI update: immediately reflect changes
-                        setExams((prev) => ({ ...prev, [examWithAuthor.code]: examWithAuthor }));
                         try {
                             await storageService.saveExam(examWithAuthor); 
+                            // Optimistic UI update only AFTER successful server validation
+                            setExams((prev) => ({ ...prev, [examWithAuthor.code]: examWithAuthor }));
                         } catch (err) {
-                            console.error("Gagal perbarui ujian ke database, data aman di lokal:", err);
+                            if (err instanceof ModerationError) {
+                                alert(`PERUBAHAN DIBLOKIR!\n\nSistem mendeteksi konten yang tidak pantas:\n- ${err.issues.join('\n- ')}\n\nMohon perbaiki konten ujian Anda sebelum menyimpan.`);
+                            } else {
+                                console.error("Gagal perbarui ujian ke database, data aman di lokal:", err);
+                            }
                         }
                         await refreshExams(); 
                     }}
@@ -1078,6 +1095,9 @@ const App: React.FC = () => {
 
         {/* Global Visual Lightbox Modal for Fullscreen Zoom */}
         <VisualLightboxModal />
+
+        {/* Vercel Analytics Tracker */}
+        <VercelAnalytics />
     </div>
   );
 };
