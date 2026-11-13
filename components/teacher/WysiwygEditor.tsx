@@ -12,7 +12,6 @@ import { ChartRenderer } from "../ChartRenderer";
 import { AudioPlayer } from "../AudioPlayer";
 import EmojiPickerModal from "./EmojiPickerModal";
 import { GeometryModal } from "./GeometryModal";
-import { AiImageModal } from "./AiImageModal";
 import { ToolbarActions } from "./ToolbarActions";
 import { InlineEquationToolbar } from "./InlineEquationToolbar";
 import { InlineLatexCursorChip } from "./InlineLatexCursorChip";
@@ -441,7 +440,6 @@ export const WysiwygEditor: React.FC<{
     cancelInlineMath,
     activeInlineLatex,
     setActiveInlineLatex,
-    insertAiImage,
     openLinkModal,
     insertLink,
     handlePaste,
@@ -462,7 +460,6 @@ export const WysiwygEditor: React.FC<{
     showGeometry,
     showAksara,
     showEmoji,
-    showAiImage,
     showLink,
     selectedTextForLink,
   } = state;
@@ -654,7 +651,6 @@ export const WysiwygEditor: React.FC<{
             runCmd={runCmd}
             onAudioClick={onAudioClick || (() => audioInputRef.current?.click())}
             onImageClick={() => fileInputRef.current?.click()}
-            onAiImageClick={() => setEditorSubState({ showAiImage: true })}
             onTableClick={() => setEditorSubState({ showTable: true })}
             onGeometryClick={() => setEditorSubState({ showGeometry: true })}
             onChartClick={onChartClick}
@@ -796,12 +792,6 @@ export const WysiwygEditor: React.FC<{
           runCmd("insertHTML", emoji);
           handleInput();
         }}
-      />
-      <AiImageModal
-        key={showAiImage ? "ai-image-open" : "ai-image-closed"}
-        isOpen={showAiImage}
-        onClose={() => setEditorSubState({ showAiImage: false })}
-        onInsert={insertAiImage}
       />
       <LinkModal
         key={showLink ? `link-open-${selectedTextForLink}` : "link-closed"}
