@@ -6,7 +6,5 @@ export default function handler(_req: any, res: any) {
   const key = process.env.GEMINI_API_KEY || process.env.API_KEY || "";
   return res.status(200).json({
     hasKey: Boolean(key),
-    key: key
   });
 }
-
