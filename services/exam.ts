@@ -4,6 +4,9 @@ import type { Exam, Question, TeacherProfile, ExamConfig, ResultStatus } from '.
 import { compressImage, calculateExamScore, cleanupQuestionContent, parseList } from '../components/teacher/examUtils';
 import { uploadToCloudinary } from './cloudinary';
 import { offlineService } from './offline';
+import { ContentModerator, ModerationError } from './contentModeration';
+
+export { ModerationError };
 
 // Helper: Get file extension safely from data URI
 const getExtFromDataUrl = (dataUrl: string, defaultExt: string = 'png'): string => {
@@ -769,6 +772,12 @@ export class ExamService {
     }
 
     async saveExam(exam: Exam): Promise<void> {
+        // Content Moderation Check (SARA, Pornography, Bullying, etc.)
+        const moderation = await ContentModerator.validateExamContent(exam);
+        if (!moderation.isValid) {
+            throw new ModerationError(moderation.issues);
+        }
+
         // Immediate local cache save to prevent data loss or UI disappearance
         this.saveLocalTeacherExam(exam);
 
