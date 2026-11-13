@@ -267,6 +267,7 @@ export interface Result {
     isSynced?: boolean; 
     timestamp?: number;
     location?: { lat: number; lng: number } | string;
+    device_id?: string;
     isPlaceholder?: boolean;
 }
 
