@@ -1,5 +1,21 @@
-import { supabase } from '../lib/supabase.ts';
+import { createClient } from '@supabase/supabase-js';
+import { supabase as anonSupabase } from '../lib/supabase.ts';
 import type { Question } from '../types.ts';
+
+function getServerSupabase() {
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const supabaseUrl =
+    process.env.VITE_SUPABASE_URL ||
+    process.env.SUPABASE_URL ||
+    'https://fidxmkjpdlfawagawrrm.supabase.co';
+
+  if (serviceRoleKey && supabaseUrl) {
+    return createClient(supabaseUrl, serviceRoleKey, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
+  }
+  return anonSupabase;
+}
 
 // In-memory origin cache to shield Supabase from simultaneous origin requests
 interface CachedBundle {
@@ -67,7 +83,8 @@ export async function getStudentQuestionBundle(code: string, requestedVersion?: 
     };
   }
 
-  const { data, error } = await supabase
+  const db = getServerSupabase();
+  const { data, error } = await db
     .from('exams')
     .select('code, questions, config, status, created_at')
     .eq('code', code)
@@ -123,8 +140,10 @@ export async function getAuthorizedExamSolutions(
     return { success: false, status: 400, error: 'EXAM_CODE_REQUIRED' };
   }
 
+  const db = getServerSupabase();
+
   // 1. Fetch exam configuration & full questions
-  const { data: exam, error: examError } = await supabase
+  const { data: exam, error: examError } = await db
     .from('exams')
     .select('code, questions, config, status')
     .eq('code', code)
@@ -136,7 +155,7 @@ export async function getAuthorizedExamSolutions(
 
   const config = exam.config || {};
   const isSolutionsAllowed = Boolean(
-    config.showCorrectAnswer || config.showSolutionSteps || config.showResultToStudent
+    config.showCorrectAnswer || config.showHints || config.showSolutionSteps || config.showResultToStudent
   );
 
   // 2. Authorization check
@@ -162,7 +181,7 @@ export async function getAuthorizedExamSolutions(
       };
     }
 
-    const { data: result } = await supabase
+    const { data: result } = await db
       .from('results')
       .select('status')
       .eq('exam_code', code)
