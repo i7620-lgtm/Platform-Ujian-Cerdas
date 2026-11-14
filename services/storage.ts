@@ -141,8 +141,17 @@ class StorageService {
       return resultService.mapRowToResult(row);
   }
 
-  async getResults(examCode?: string, className?: string, schoolName?: string): Promise<Result[]> {
-      return resultService.getResults(examCode, className, schoolName);
+  async getResults(examCodeOrCodes?: string | string[], className?: string, schoolName?: string): Promise<Result[]> {
+      return resultService.getResults(examCodeOrCodes, className, schoolName);
+  }
+
+  async autoSaveStudentAnswers(params: {
+      resultId?: number;
+      examCode: string;
+      studentId: string;
+      answers: Record<string, string>;
+  }): Promise<boolean> {
+      return resultService.autoSaveStudentAnswers(params);
   }
 
   async submitExamResult(resultPayload: Result): Promise<Result> {
