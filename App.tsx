@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, Suspense } from 'react';
+import React, { useState, useCallback, useEffect, useRef, Suspense } from 'react';
 import { StudentLogin } from './components/StudentLogin';
 import { StudentExamPage } from './components/StudentExamPage';
 import { StudentResultPage } from './components/StudentResultPage';
@@ -63,6 +63,10 @@ const App: React.FC = () => {
   const [teacherProfile, setTeacherProfile] = useState<TeacherProfile | null>(null);
   const [showProfileCompletion, setShowProfileCompletion] = useState(false);
   const [exams, setExams] = useState<Record<string, Exam>>({});
+  const examsRef = useRef<Record<string, Exam>>(exams);
+  useEffect(() => {
+    examsRef.current = exams;
+  }, [exams]);
   const [results, setResults] = useState<Result[]>([]);
   const [isSyncing, setIsSyncing] = useState(false);
   const [isOnline, setIsOnline] = useState(typeof navigator !== 'undefined' && navigator.onLine !== undefined ? navigator.onLine : true);
@@ -601,6 +605,7 @@ const App: React.FC = () => {
     setIsSyncing(true);
     try {
         const examMap = await storageService.getExams(teacherProfile);
+        examsRef.current = examMap;
         setExams(examMap);
     } finally { setIsSyncing(false); }
   }, [teacherProfile]);
@@ -609,7 +614,20 @@ const App: React.FC = () => {
     if (!teacherProfile) return;
     setIsSyncing(true);
     try {
-        const data = await storageService.getResults();
+        let examCodes = Object.keys(examsRef.current);
+        if (examCodes.length === 0) {
+            const examMap = await storageService.getExams(teacherProfile);
+            examsRef.current = examMap;
+            examCodes = Object.keys(examMap);
+            if (examCodes.length > 0) {
+                setExams(examMap);
+            }
+        }
+        if (examCodes.length === 0) {
+            setResults([]);
+            return;
+        }
+        const data = await storageService.getResults(examCodes);
         setResults(data);
     } finally { setIsSyncing(false); }
   }, [teacherProfile]);
