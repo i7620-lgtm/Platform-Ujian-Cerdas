@@ -88,17 +88,50 @@ export class ResultService {
         };
   }
 
-  async getResults(examCode?: string, className?: string, schoolName?: string): Promise<Result[]> {
-    let query = supabase.from('results').select('id, exam_code, student_id, student_name, class_name, status, score, correct_answers, total_questions, answers, updated_at, location');
-    if (examCode) query = query.eq('exam_code', examCode);
-    
-    // SORTING IS CRITICAL FOR LIVE VIEW: Updated/Joined recently first
-    query = query.order('updated_at', { ascending: false });
-    
-    const { data, error } = await query;
-    if (error) return [];
-    
-    let results = data.map((row: Record<string, unknown>) => this.mapRowToResult(row));
+  async getResults(examCodeOrCodes?: string | string[], className?: string, schoolName?: string): Promise<Result[]> {
+    const PAGE_SIZE = 1000;
+    const CODE_BATCH_SIZE = 100;
+    const SELECT_COLUMNS = 'id, exam_code, student_id, student_name, class_name, status, score, correct_answers, total_questions, answers, updated_at, location';
+
+    let batches: (string | string[] | undefined)[];
+    if (Array.isArray(examCodeOrCodes)) {
+        const cleanCodes = Array.from(new Set(examCodeOrCodes.map(c => String(c || '').trim()).filter(Boolean)));
+        if (cleanCodes.length === 0) return [];
+        batches = [];
+        for (let i = 0; i < cleanCodes.length; i += CODE_BATCH_SIZE) {
+            batches.push(cleanCodes.slice(i, i + CODE_BATCH_SIZE));
+        }
+    } else {
+        batches = [examCodeOrCodes];
+    }
+
+    const allRows: Record<string, unknown>[] = [];
+
+    for (const batchFilter of batches) {
+        let from = 0;
+        while (true) {
+            let query = supabase
+                .from('results')
+                .select(SELECT_COLUMNS)
+                .order('updated_at', { ascending: false })
+                .range(from, from + PAGE_SIZE - 1);
+
+            if (Array.isArray(batchFilter)) {
+                query = query.in('exam_code', batchFilter);
+            } else if (batchFilter) {
+                query = query.eq('exam_code', batchFilter);
+            }
+
+            const { data, error } = await query;
+            if (error || !data || data.length === 0) break;
+
+            allRows.push(...(data as Record<string, unknown>[]));
+            if (data.length < PAGE_SIZE) break;
+            from += PAGE_SIZE;
+        }
+    }
+
+    let results = allRows.map((row) => this.mapRowToResult(row));
 
     if (className && className !== 'ALL') {
         results = results.filter(r => r.student.class === className);
@@ -107,6 +140,40 @@ export class ResultService {
         results = results.filter(r => r.student.schoolName === schoolName);
     }
     return results;
+  }
+
+  /**
+   * Lightweight non-realtime answers-only auto-save.
+   * Sends ONLY { answers, updated_at } over REST and guards with status = 'in_progress'.
+   */
+  async autoSaveStudentAnswers(params: {
+    resultId?: number;
+    examCode: string;
+    studentId: string;
+    answers: Record<string, string>;
+  }): Promise<boolean> {
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+        return false;
+    }
+    try {
+        let query = supabase
+            .from('results')
+            .update({
+                answers: params.answers,
+                updated_at: new Date().toISOString()
+            });
+
+        if (params.resultId) {
+            query = query.eq('id', params.resultId);
+        } else {
+            query = query.eq('exam_code', params.examCode).eq('student_id', params.studentId);
+        }
+
+        const { error } = await query.eq('status', 'in_progress');
+        return !error;
+    } catch {
+        return false;
+    }
   }
 
   async submitExamResult(resultPayload: Result): Promise<Result> {
@@ -395,7 +462,7 @@ export class ResultService {
       // 2. Update local teacher exams cache immediately to ensure UI never reverts
       let updatedExam: Exam | null = null;
       try {
-          const localTeacherExams = examService.getLocalTeacherExams();
+          const localTeacherExams = await examService.getLocalTeacherExamsAsync();
           const target = providedExam || localTeacherExams[cleanCode];
           if (target) {
               const updatedConfig: ExamConfig = {
