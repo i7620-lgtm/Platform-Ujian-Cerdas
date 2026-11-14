@@ -42,6 +42,7 @@ export const useStudentExamLogic = ({
   const [showConfigIntro, setShowConfigIntro] = useState(true);
 
   const [activeExam, setActiveExam] = useState<Exam>(exam);
+  const lastConfigJsonRef = useRef<string>(JSON.stringify(exam.config));
 
   // Session Timeout & Grace Period State
   const [isSessionTimeoutModalOpen] = useState(false);
@@ -56,6 +57,10 @@ export const useStudentExamLogic = ({
   const timeLeftRef = useRef(0);
   const lastBroadcastTimeRef = useRef<number>(0);
   const examRoomChannelRef = useRef<RealtimeChannel | null>(null);
+  const lastSyncedAnswersJsonRef = useRef<string>(
+    initialData?.answers ? JSON.stringify(initialData.answers) : ""
+  );
+  const isAutoSavingRef = useRef(false);
 
   const [matchingOptionsMap] = useState<Record<string, string[]>>(() => {
     const map: Record<string, string[]> = {};
@@ -316,7 +321,11 @@ export const useStudentExamLogic = ({
             const newConfig = payload.new.config;
             const newVersion = payload.new.version;
             if (newConfig) {
-              setActiveExam((prev) => ({ ...prev, config: newConfig }));
+              const nextConfigJson = JSON.stringify(newConfig);
+              if (nextConfigJson !== lastConfigJsonRef.current) {
+                lastConfigJsonRef.current = nextConfigJson;
+                setActiveExam((prev) => ({ ...prev, config: newConfig }));
+              }
             }
             if (typeof newVersion === "number") {
               setActiveExam((prev) => {
@@ -364,12 +373,11 @@ export const useStudentExamLogic = ({
               return;
             }
             if (data.config) {
-              setActiveExam((prev) => {
-                if (prev.config.timeLimit !== data.config.timeLimit) {
-                  return { ...prev, config: data.config };
-                }
-                return { ...prev, config: data.config };
-              });
+              const nextConfigJson = JSON.stringify(data.config);
+              if (nextConfigJson !== lastConfigJsonRef.current) {
+                lastConfigJsonRef.current = nextConfigJson;
+                setActiveExam((prev) => ({ ...prev, config: data.config }));
+              }
             }
             if (typeof data.version === "number") {
               setActiveExam((prev) => {
@@ -626,6 +634,51 @@ export const useStudentExamLogic = ({
     isSubmittingRef.current = isSubmitting;
   }, [isSubmitting]);
 
+  // Periodic Server Auto-Save (REST-only without Realtime, min 60s, dirty-checked, answers payload only)
+  useEffect(() => {
+    if (student.class === "PREVIEW") return;
+    const intervalMs = Math.max(
+      60000,
+      (Number(activeExam.config.autoSaveInterval) || 60) * 1000,
+    );
+
+    const runAutoSave = async () => {
+      if (isSubmittingRef.current || isAutoSavingRef.current) return;
+      if (typeof navigator !== "undefined" && navigator.onLine === false) return;
+      if (!student.resultId) return;
+
+      const currentAnswers = answersRef.current;
+      const currentJson = JSON.stringify(currentAnswers);
+      if (!currentJson || currentJson === lastSyncedAnswersJsonRef.current) {
+        return;
+      }
+
+      isAutoSavingRef.current = true;
+      try {
+        const ok = await storageService.autoSaveStudentAnswers({
+          resultId: student.resultId,
+          examCode: activeExam.code,
+          studentId: student.studentId,
+          answers: { ...currentAnswers },
+        });
+        if (ok) {
+          lastSyncedAnswersJsonRef.current = currentJson;
+        }
+      } finally {
+        isAutoSavingRef.current = false;
+      }
+    };
+
+    const timer = setInterval(runAutoSave, intervalMs);
+    return () => clearInterval(timer);
+  }, [
+    activeExam.code,
+    activeExam.config.autoSaveInterval,
+    student.class,
+    student.resultId,
+    student.studentId,
+  ]);
+
   useEffect(() => {
     if (
       activeExam.config.trackLocation &&
@@ -794,6 +847,23 @@ export const useStudentExamLogic = ({
         answers: answersRef.current,
         logs: logRef.current,
       });
+      const currentJson = JSON.stringify(answersRef.current);
+      if (
+        student.class !== "PREVIEW" &&
+        student.resultId &&
+        currentJson !== lastSyncedAnswersJsonRef.current &&
+        (typeof navigator === "undefined" || navigator.onLine !== false)
+      ) {
+        const ok = await storageService.autoSaveStudentAnswers({
+          resultId: student.resultId,
+          examCode: activeExam.code,
+          studentId: student.studentId,
+          answers: { ...answersRef.current },
+        });
+        if (ok) {
+          lastSyncedAnswersJsonRef.current = currentJson;
+        }
+      }
       if (onUpdate) {
         onUpdate(answersRef.current, timeLeftRef.current);
       }
