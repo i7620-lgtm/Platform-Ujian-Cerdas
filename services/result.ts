@@ -1,8 +1,7 @@
 import { supabase } from '../lib/supabase';
 import { offlineService } from './offline';
-import { calculateExamScore } from '../components/teacher/examUtils';
 import type { RealtimeChannel } from '@supabase/supabase-js';
-import type { Result, ResultStatus, Exam, ExamConfig } from '../types';
+import type { Result, ResultStatus } from '../types';
 import { examService } from './exam';
 
 export class ResultService {
@@ -144,18 +143,29 @@ export class ResultService {
 
   /**
    * Lightweight non-realtime answers-only auto-save.
-   * Sends ONLY { answers, updated_at } over REST and guards with status = 'in_progress'.
+   * Sends ONLY { answers, updated_at } over REST, guards with status = 'in_progress',
+   * and verifies via .select('id') that a database row was actually updated.
    */
   async autoSaveStudentAnswers(params: {
     resultId?: number;
     examCode: string;
     studentId: string;
+    studentName?: string;
+    className?: string;
+    schoolName?: string;
     answers: Record<string, string>;
-  }): Promise<boolean> {
+  }): Promise<{ ok: boolean; resultId?: number; lockedStatus?: ResultStatus }> {
     if (typeof navigator !== 'undefined' && navigator.onLine === false) {
-        return false;
+        return { ok: false };
     }
     try {
+        const validResultId =
+            typeof params.resultId === 'number' &&
+            params.resultId > 0 &&
+            params.resultId < 1e12
+                ? params.resultId
+                : undefined;
+
         let query = supabase
             .from('results')
             .update({
@@ -163,22 +173,90 @@ export class ResultService {
                 updated_at: new Date().toISOString()
             });
 
-        if (params.resultId) {
-            query = query.eq('id', params.resultId);
+        if (validResultId) {
+            query = query.eq('id', validResultId);
         } else {
             query = query.eq('exam_code', params.examCode).eq('student_id', params.studentId);
         }
 
-        const { error } = await query.eq('status', 'in_progress');
-        return !error;
+        const { data: updatedRow, error } = await query
+            .eq('status', 'in_progress')
+            .select('id')
+            .maybeSingle();
+
+        if (!error && updatedRow?.id) {
+            return { ok: true, resultId: Number(updatedRow.id) };
+        }
+
+        if (error) {
+            return { ok: false };
+        }
+
+        // 0 rows matched: check whether row is locked/completed or never initialized (e.g., offline start)
+        const { data: existing, error: checkErr } = await supabase
+            .from('results')
+            .select('id, status')
+            .eq('exam_code', params.examCode)
+            .eq('student_id', params.studentId)
+            .maybeSingle();
+
+        if (checkErr) {
+            return { ok: false };
+        }
+
+        if (existing) {
+            if (existing.status === 'completed' || existing.status === 'force_closed') {
+                return { ok: false, lockedStatus: existing.status as ResultStatus };
+            }
+            if (existing.status === 'in_progress' && existing.id) {
+                const { data: retried, error: retryErr } = await supabase
+                    .from('results')
+                    .update({
+                        answers: params.answers,
+                        updated_at: new Date().toISOString()
+                    })
+                    .eq('id', existing.id)
+                    .eq('status', 'in_progress')
+                    .select('id')
+                    .maybeSingle();
+                if (!retryErr && retried?.id) {
+                    return { ok: true, resultId: Number(retried.id) };
+                }
+            }
+            return { ok: false };
+        }
+
+        // Row does not exist yet on server (student likely started offline): initialize via Zero-Trust RPC
+        if (!ResultService.rpcDisabled) {
+            const deviceId = params.answers?.['_deviceId'] || null;
+            const { data: rpcData, error: rpcErr } = await supabase.rpc('calculate_and_submit_exam', {
+                p_exam_code: params.examCode,
+                p_student_id: params.studentId,
+                p_student_name: params.studentName || 'Peserta Ujian',
+                p_class_name: params.className || '-',
+                p_school_name: params.schoolName || '',
+                p_answers: params.answers,
+                p_status: 'in_progress',
+                p_device_info: null,
+                p_location: null,
+                p_activity_log: [],
+                p_result_id: null,
+                p_device_id: deviceId
+            });
+            if (!rpcErr && rpcData?.id) {
+                return { ok: true, resultId: Number(rpcData.id) };
+            }
+        }
+
+        return { ok: false };
     } catch {
-        return false;
+        return { ok: false };
     }
   }
 
   async submitExamResult(resultPayload: Result): Promise<Result> {
     if (typeof navigator !== 'undefined' && navigator.onLine === false) {
-        offlineService.addToQueue(resultPayload);
+        await offlineService.addToQueue(resultPayload);
         return { ...resultPayload, isSynced: false, status: resultPayload.status || 'in_progress' };
     }
 
@@ -187,9 +265,9 @@ export class ResultService {
         try {
             const rawResultId = resultPayload.student.resultId ?? resultPayload.id;
             const numericResultId =
-                typeof rawResultId === 'number' && !isNaN(rawResultId)
+                typeof rawResultId === 'number' && !isNaN(rawResultId) && rawResultId < 1e12
                     ? rawResultId
-                    : (typeof rawResultId === 'string' && /^\d+$/.test(rawResultId)
+                    : (typeof rawResultId === 'string' && /^\d+$/.test(rawResultId) && Number(rawResultId) < 1e12
                         ? Number(rawResultId)
                         : null);
             const deviceId = resultPayload.device_id || resultPayload.answers?.['_deviceId'] || null;
@@ -210,9 +288,18 @@ export class ResultService {
             });
 
             if (rpcError) {
-                // If RPC fails (missing column, signature mismatch, function not deployed), disable RPC for the session
-                ResultService.rpcDisabled = true;
-                console.info("RPC calculate_and_submit_exam unavailable or schema mismatched in Supabase. Falling back to direct persistence.");
+                const errCode = String(rpcError.code || '');
+                const errMsg = String(rpcError.message || '');
+                if (errCode === 'PGRST202' || errCode === '42883') {
+                    // RPC function truly absent/signature mismatched: fall back for this session
+                    ResultService.rpcDisabled = true;
+                    console.info("RPC calculate_and_submit_exam unavailable in Supabase. Falling back to direct persistence.");
+                } else if (!errCode || errMsg.includes('Failed to fetch') || errMsg.includes('NetworkError')) {
+                    await offlineService.addToQueue(resultPayload);
+                    return { ...resultPayload, isSynced: false };
+                } else {
+                    throw rpcError;
+                }
             } else if (rpcData) {
                 const durationStr = resultPayload.answers?.['_duration'];
                 const completionTime = durationStr ? parseInt(durationStr) : undefined;
@@ -240,16 +327,19 @@ export class ResultService {
                 };
             }
         } catch (rpcEx) {
-            ResultService.rpcDisabled = true;
             const errObj = rpcEx as Record<string, unknown>;
-            if (!errObj.code && errObj.message === 'Failed to fetch') {
-                offlineService.addToQueue(resultPayload);
+            const errCode = String(errObj?.code || '');
+            const errMsg = String(errObj?.message || '');
+            if (errCode === 'PGRST202' || errCode === '42883') {
+                ResultService.rpcDisabled = true;
+            } else if (!errCode || errMsg === 'Failed to fetch' || errMsg.includes('NetworkError')) {
+                await offlineService.addToQueue(resultPayload);
                 return { ...resultPayload, isSynced: false };
             }
         }
     }
 
-    // 2. Direct database persistence (client-side calculation and upsert)
+    // 2. Direct database persistence fallback ONLY when RPC function is absent (without querying exams.questions on client)
     try {
         const student = resultPayload.student;
         const classNameWithSchool = student.schoolName 
@@ -259,27 +349,11 @@ export class ResultService {
         let finalError;
         let newId = student.resultId;
 
-        // Auto-recalculate score securely from database if completed or force_closed (Zero Trust)
-        let finalScore = typeof resultPayload.score === 'number' && !isNaN(resultPayload.score) ? resultPayload.score : 0;
-        let finalCorrect = resultPayload.correctAnswers || 0;
-        let finalTotal = resultPayload.totalQuestions || 0;
+        const finalScore = typeof resultPayload.score === 'number' && !isNaN(resultPayload.score) ? resultPayload.score : 0;
+        const finalCorrect = resultPayload.correctAnswers || 0;
+        const finalTotal = resultPayload.totalQuestions || 0;
 
-        if (resultPayload.status === 'completed' || resultPayload.status === 'force_closed') {
-            try {
-                const { data: examData } = await supabase.from('exams').select('*').eq('code', resultPayload.examCode).maybeSingle();
-                if (examData) {
-                    const exam = examData as Exam;
-                    const authoritativeGrading = calculateExamScore(exam, resultPayload.answers || {});
-                    finalScore = authoritativeGrading.score;
-                    finalCorrect = authoritativeGrading.correctAnswers;
-                    finalTotal = authoritativeGrading.totalQuestions;
-                }
-            } catch (err) {
-                console.error("Failed to recalculate authoritative score on submit", err);
-            }
-        }
-
-        if (student.resultId) {
+        if (student.resultId && student.resultId < 1e12) {
             const { error: updateError } = await supabase
                 .from('results')
                 .update({ 
@@ -337,7 +411,7 @@ export class ResultService {
         console.error("Direct save failed:", saveError);
         const errObj = saveError as Record<string, unknown>;
         if (!errObj.code && errObj.message === 'Failed to fetch') {
-            offlineService.addToQueue(resultPayload);
+            await offlineService.addToQueue(resultPayload);
             return { ...resultPayload, isSynced: false };
         }
         throw new Error("Gagal menyimpan hasil ujian: " + (errObj.message || "Izin database ditolak (RLS)."));
@@ -345,56 +419,84 @@ export class ResultService {
   }
 
   async getStudentResult(examCode: string, studentId: string): Promise<Result | null> {
-      const { data, error } = await supabase.from('results').select('*').eq('exam_code', examCode).eq('student_id', studentId).maybeSingle();
-      if (error || !data) return null;
-      
-      let absentNumber = '00';
-      let dbSchoolName = '';
-      let dbClassName = data.class_name as string;
-      let studentName = data.student_name as string;
+      const { result } = await this.getStudentResultStatus(examCode, studentId);
+      return result;
+  }
 
-      // Parse Format 2 if applicable
-      if (studentId.startsWith('@') && studentId.includes('#') && studentId.includes('$') && studentId.includes('%')) {
-          const match = studentId.match(/^@(.*?)#(.*?)\$(.*?)%(.*)$/);
-          if (match) {
-              dbSchoolName = match[1];
-              studentName = match[2];
-              dbClassName = match[3];
-              absentNumber = match[4];
+  async getStudentResultStatus(examCode: string, studentId: string): Promise<{ result: Result | null; isNetworkError: boolean }> {
+      if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+          return { result: null, isNetworkError: true };
+      }
+      try {
+          const { data, error } = await supabase
+              .from('results')
+              .select('*')
+              .eq('exam_code', examCode)
+              .eq('student_id', studentId)
+              .maybeSingle();
+
+          if (error) {
+              const msg = String(error.message || '').toLowerCase();
+              const isNet = !error.code || msg.includes('failed to fetch') || msg.includes('network');
+              return { result: null, isNetworkError: isNet };
           }
-      } else {
-          // Format 1 Fallback
-          if (dbClassName && dbClassName.includes('::')) {
-              const parts = dbClassName.split('::');
-              dbSchoolName = parts[0];
-              dbClassName = parts[1];
+          if (!data) {
+              return { result: null, isNetworkError: false };
           }
-          if (typeof studentId === 'string') {
-              const parts = studentId.includes('_') ? studentId.split('_') : studentId.split('-');
-              if (parts.length >= 2) {
-                  const lastPart = parts[parts.length - 1];
-                  if (!isNaN(parseInt(lastPart))) {
-                      absentNumber = lastPart;
-                  } else if (parts.length > 2) {
-                      absentNumber = parts[parts.length - 2];
+
+          let absentNumber = '00';
+          let dbSchoolName = '';
+          let dbClassName = data.class_name as string;
+          let studentName = data.student_name as string;
+
+          // Parse Format 2 if applicable
+          if (studentId.startsWith('@') && studentId.includes('#') && studentId.includes('$') && studentId.includes('%')) {
+              const match = studentId.match(/^@(.*?)#(.*?)\$(.*?)%(.*)$/);
+              if (match) {
+                  dbSchoolName = match[1];
+                  studentName = match[2];
+                  dbClassName = match[3];
+                  absentNumber = match[4];
+              }
+          } else {
+              // Format 1 Fallback
+              if (dbClassName && dbClassName.includes('::')) {
+                  const parts = dbClassName.split('::');
+                  dbSchoolName = parts[0];
+                  dbClassName = parts[1];
+              }
+              if (typeof studentId === 'string') {
+                  const parts = studentId.includes('_') ? studentId.split('_') : studentId.split('-');
+                  if (parts.length >= 2) {
+                      const lastPart = parts[parts.length - 1];
+                      if (!isNaN(parseInt(lastPart))) {
+                          absentNumber = lastPart;
+                      } else if (parts.length > 2) {
+                          absentNumber = parts[parts.length - 2];
+                      }
                   }
               }
           }
+
+          const answers = data.answers || {};
+          const durationStr = answers['_duration'];
+          const completionTime = durationStr ? parseInt(durationStr) : undefined;
+          const validCompletionTime = !isNaN(completionTime as number) ? completionTime : 0;
+
+          return {
+              result: {
+                  id: data.id, // Include Primary Key
+                  student: { studentId: data.student_id, fullName: studentName, class: dbClassName, schoolName: dbSchoolName || undefined, absentNumber: absentNumber, resultId: data.id },
+                  examCode: data.exam_code, answers: answers, score: data.score, correctAnswers: data.correct_answers,
+                  totalQuestions: data.total_questions, completionTime: validCompletionTime, status: data.status, activityLog: data.activity_log,
+                  timestamp: new Date(data.updated_at).getTime(), location: data.location,
+                  device_id: (data.device_id as string | undefined) || answers['_deviceId'] || undefined
+              },
+              isNetworkError: false
+          };
+      } catch {
+          return { result: null, isNetworkError: true };
       }
-      
-      const answers = data.answers || {};
-      const durationStr = answers['_duration'];
-      const completionTime = durationStr ? parseInt(durationStr) : undefined;
-      const validCompletionTime = !isNaN(completionTime as number) ? completionTime : 0;
-      
-      return {
-        id: data.id, // Include Primary Key
-        student: { studentId: data.student_id, fullName: studentName, class: dbClassName, schoolName: dbSchoolName || undefined, absentNumber: absentNumber, resultId: data.id },
-        examCode: data.exam_code, answers: answers, score: data.score, correctAnswers: data.correct_answers,
-        totalQuestions: data.total_questions, completionTime: validCompletionTime, status: data.status, activityLog: data.activity_log,
-        timestamp: new Date(data.updated_at).getTime(), location: data.location,
-        device_id: (data.device_id as string | undefined) || answers['_deviceId'] || undefined
-      };
   }
 
   async unlockStudentExam(examCode: string, studentId: string): Promise<void> {
@@ -482,8 +584,12 @@ export class ResultService {
       }
 
       // 3. Update exam config to isFinished: true and adjusted end date in Supabase DB
+      let isRealtimeDisabled = Boolean(updatedExam?.config?.disableRealtime);
       try {
-          const { data } = await supabase.from('exams').select('*').eq('code', cleanCode).maybeSingle();
+          const selectCols = updatedExam
+              ? 'code, author_id, school, config, status'
+              : 'code, author_id, school, config, questions, status';
+          const { data } = await supabase.from('exams').select(selectCols).eq('code', cleanCode).maybeSingle();
           if (data) {
               const existingConfig = (data.config || {}) as ExamConfig;
               const newConfig: ExamConfig = {
@@ -492,11 +598,12 @@ export class ResultService {
                   endDate: nowIso,
                   endTime: nowTime,
               };
-              const existingVersion = typeof (data.config as any)?.version === 'number'
-                  ? (data.config as any).version
-                  : (typeof data.version === 'number' ? data.version : 1);
+              const existingVersion = typeof (existingConfig as any)?.version === 'number'
+                  ? (existingConfig as any).version
+                  : 1;
               const newVer = existingVersion + 1;
               (newConfig as any).version = newVer;
+              isRealtimeDisabled = Boolean(newConfig.disableRealtime);
               
               await supabase
                   .from('exams')
@@ -509,8 +616,15 @@ export class ResultService {
                       authorId: data.author_id,
                       authorSchool: data.school,
                       config: newConfig,
-                      questions: data.questions || [],
+                      questions: (data as any).questions || [],
                       status: data.status,
+                      version: newVer
+                  };
+                  examService.saveLocalTeacherExam(updatedExam);
+              } else {
+                  updatedExam = {
+                      ...updatedExam,
+                      config: newConfig,
                       version: newVer
                   };
                   examService.saveLocalTeacherExam(updatedExam);
@@ -520,25 +634,27 @@ export class ResultService {
           console.warn("Supabase update error during stopExamOverall:", dbErr);
       }
 
-      // 4. Safe Realtime Broadcast to notify all active students to submit immediately
-      try {
-          const channel = supabase.channel(`exam-room-${cleanCode}`);
-          channel.subscribe(async (status) => {
-              if (status === 'SUBSCRIBED') {
-                  try {
-                      await channel.send({
-                          type: 'broadcast',
-                          event: 'force_submit_exam',
-                          payload: { examCode: cleanCode, timestamp: Date.now() }
-                      });
-                  } catch { /* ignore */ }
-                  setTimeout(() => {
-                      try { supabase.removeChannel(channel); } catch { /* ignore */ }
-                  }, 1000);
-              }
-          });
-      } catch (broadcastErr) {
-          console.warn("Broadcast warning:", broadcastErr);
+      // 4. Safe Realtime Broadcast (only when Realtime is enabled) to notify active students immediately
+      if (!isRealtimeDisabled) {
+          try {
+              const channel = supabase.channel(`exam-room-${cleanCode}`);
+              channel.subscribe(async (status) => {
+                  if (status === 'SUBSCRIBED') {
+                      try {
+                          await channel.send({
+                              type: 'broadcast',
+                              event: 'force_submit_exam',
+                              payload: { examCode: cleanCode, timestamp: Date.now() }
+                          });
+                      } catch { /* ignore */ }
+                      setTimeout(() => {
+                          try { supabase.removeChannel(channel); } catch { /* ignore */ }
+                      }, 1000);
+                  }
+              });
+          } catch (broadcastErr) {
+              console.warn("Broadcast warning:", broadcastErr);
+          }
       }
 
       return updatedExam;
@@ -549,6 +665,8 @@ export class ResultService {
       if (data && data.config) {
           const oldConfig = data.config as ExamConfig;
           const newTimeLimit = (oldConfig.timeLimit || 0) + additionalMinutes;
+          const existingVersion = typeof (oldConfig as any).version === 'number' ? (oldConfig as any).version : 1;
+          const nextVersion = existingVersion + 1;
           
           let newEndDate = oldConfig.endDate;
           let newEndTime = oldConfig.endTime;
@@ -561,14 +679,11 @@ export class ResultService {
                   newEndDate = dateObj.toISOString();
                   
                   // Also update endTime string for UI consistency (HH:mm)
-                  // We use local time for the endTime string as it's usually displayed in local context
                   const hours = dateObj.getHours().toString().padStart(2, '0');
                   const mins = dateObj.getMinutes().toString().padStart(2, '0');
                   newEndTime = `${hours}:${mins}`;
               }
           } else if (oldConfig.endTime) {
-              // Fallback if only endTime is set (as HH:mm)
-              // This is less reliable but better than nothing
               const [h, m] = oldConfig.endTime.split(':').map(Number);
               if (!isNaN(h) && !isNaN(m)) {
                   const totalMins = h * 60 + m + additionalMinutes;
@@ -578,11 +693,12 @@ export class ResultService {
               }
           }
 
-          const newConfig = { 
+          const newConfig: ExamConfig = { 
               ...oldConfig, 
               timeLimit: newTimeLimit,
               endDate: newEndDate,
-              endTime: newEndTime
+              endTime: newEndTime,
+              version: nextVersion
           };
           await supabase.from('exams').update({ config: newConfig }).eq('code', examCode);
       }

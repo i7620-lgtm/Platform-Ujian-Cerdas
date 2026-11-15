@@ -34,6 +34,7 @@ export class OfflineService {
     private syncQueue: QueuedResult[] = [];
     private isProcessingQueue = false;
     private rpcUnavailable = false;
+    private pendingSaveQueuePromise: Promise<void> = Promise.resolve();
 
     constructor() {
         try {
@@ -196,25 +197,29 @@ export class OfflineService {
     }
 
     // --- QUEUE METHODS ---
-    addToQueue(payload: Result) {
+    addToQueue(payload: Result): Promise<void> {
         this.syncQueue = this.syncQueue.filter(item => !(item.examCode === payload.examCode && item.student.studentId === payload.student.studentId));
         this.syncQueue.push({ ...payload, timestamp: Date.now(), _retryCount: 0 });
-        this.saveQueue();
-        if (typeof navigator === 'undefined' || navigator.onLine !== false) this.processQueue(); 
+        const savePromise = this.saveQueue();
+        if (typeof navigator === 'undefined' || navigator.onLine !== false) this.processQueue();
+        return savePromise;
     }
 
-    private saveQueue() {
+    waitForQueueSaved(): Promise<void> {
+        return this.pendingSaveQueuePromise;
+    }
+
+    private saveQueue(): Promise<void> {
         try {
             localStorage.setItem(QUEUE_LOCAL_KEY, JSON.stringify(this.syncQueue));
         } catch {
-            // Quota fallback in IndexedDB if localStorage is full
-            this.saveLocalProgress(QUEUE_IDB_KEY, this.syncQueue).catch(() => {});
+            // Quota fallback handled in IndexedDB below
         }
-        if (this.syncQueue.length === 0) {
-            this.clearLocalProgress(QUEUE_IDB_KEY).catch(() => {});
-        } else {
-            this.saveLocalProgress(QUEUE_IDB_KEY, this.syncQueue).catch(() => {});
-        }
+        const writeOp = this.syncQueue.length === 0
+            ? this.clearLocalProgress(QUEUE_IDB_KEY).catch(() => {})
+            : this.saveLocalProgress(QUEUE_IDB_KEY, this.syncQueue).catch(() => {});
+        this.pendingSaveQueuePromise = writeOp;
+        return writeOp;
     }
 
     getSyncQueue(): Result[] {
@@ -320,22 +325,9 @@ export class OfflineService {
                 });
                 payload.answers = mergedAnswers;
 
-                let calculatedScore = payload.score || 0;
-                let calculatedCorrect = payload.correctAnswers || 0;
-                let calculatedTotal = payload.totalQuestions || 0;
-
-                try {
-                    const { data: examData } = await supabase.from('exams').select('questions, config').eq('code', payload.examCode).maybeSingle();
-                    if (examData) {
-                        const exam = examData as Exam;
-                        const { score, correctAnswers, totalQuestions } = calculateExamScore(exam, payload.answers || {});
-                        calculatedScore = score;
-                        calculatedCorrect = correctAnswers;
-                        calculatedTotal = totalQuestions;
-                    }
-                } catch (err) {
-                    console.error("Failed to recalculate score securely in queue", err);
-                }
+                const calculatedScore = payload.score || 0;
+                const calculatedCorrect = payload.correctAnswers || 0;
+                const calculatedTotal = payload.totalQuestions || 0;
 
                 const classNameWithSchool = student.schoolName 
                     ? `${student.schoolName}::${student.class}`
@@ -384,7 +376,7 @@ export class OfflineService {
             }
         }
         this.syncQueue = remainingQueue;
-        this.saveQueue();
+        await this.saveQueue();
         this.isProcessingQueue = false;
     }
 }

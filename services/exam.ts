@@ -786,7 +786,7 @@ export class ExamService {
                 console.warn("Edge CDN fetch error, checking local/DB fallback:", edgeErr);
             }
 
-            // Fallback: If edge endpoint was unreachable, check local cached questions or query database
+            // Fallback: If edge endpoint was unreachable, check local cached/teacher questions without querying exams.questions directly
             if (loadedQuestions.length === 0) {
                 const localExams = await this.getLocalTeacherExamsAsync();
                 if (localExams[cleanCode] && Array.isArray(localExams[cleanCode].questions) && localExams[cleanCode].questions.length > 0) {
@@ -794,15 +794,16 @@ export class ExamService {
                 } else if (localCached && Array.isArray(localCached.questions) && localCached.questions.length > 0) {
                     loadedQuestions = localCached.questions;
                 } else {
-                    const { data: fullData } = await supabase
-                        .from('exams')
-                        .select('questions')
-                        .eq('code', cleanCode)
-                        .maybeSingle();
-                    if (fullData && Array.isArray(fullData.questions)) {
-                        loadedQuestions = isPreview ? fullData.questions : fullData.questions.map(q => this.stripAnswersFromQuestion(q));
+                    const offlineExam = await offlineService.getLocalProgress(`offline_exam_${cleanCode}`) as Exam | null;
+                    if (offlineExam && Array.isArray(offlineExam.questions) && offlineExam.questions.length > 0) {
+                        loadedQuestions = isPreview ? offlineExam.questions : offlineExam.questions.map(q => this.stripAnswersFromQuestion(q));
                     }
                 }
+            }
+
+            if (loadedQuestions.length === 0 && !isPreview) {
+                const isOffline = typeof navigator !== 'undefined' && navigator.onLine === false;
+                throw new Error(isOffline ? 'OFFLINE_NO_LOCAL_EXAM' : 'EDGE_CONTENT_UNAVAILABLE');
             }
         }
 
@@ -829,12 +830,25 @@ export class ExamService {
     }
 
     /**
-     * Fetch solutions and explanations with server-side authorization guard
+     * Fetch solutions and explanations with server-side authorization and zero-login ownership proof
      */
-    async getExamSolutions(code: string, studentId: string, proctorToken?: string): Promise<Record<string, any> | null> {
+    async getExamSolutions(
+        code: string,
+        studentId: string,
+        proctorToken?: string,
+        proof?: { deviceId?: string; resultId?: string | number }
+    ): Promise<Record<string, any> | null> {
         const cleanCode = (code || '').trim().toUpperCase();
         try {
-            const url = `/api/exam-content/${cleanCode}/solutions?studentId=${encodeURIComponent(studentId)}&token=${encodeURIComponent(proctorToken || '')}`;
+            const params = new URLSearchParams({
+                studentId: studentId || '',
+                token: proctorToken || '',
+            });
+            if (proof?.deviceId) params.set('deviceId', String(proof.deviceId));
+            if (proof?.resultId !== undefined && proof?.resultId !== null) {
+                params.set('resultId', String(proof.resultId));
+            }
+            const url = `/api/exam-content/${cleanCode}/solutions?${params.toString()}`;
             const res = await fetch(url);
             if (!res.ok) {
                 return null;
@@ -919,6 +933,30 @@ export class ExamService {
         const { data, error } = await supabase.from('exams').select('config').eq('code', code).maybeSingle();
         if (error || !data) return null;
         return data.config;
+    }
+
+    async getExamConfigStatus(code: string): Promise<{ config: ExamConfig | null; isNetworkError: boolean }> {
+        const cleanCode = (code || '').trim().toUpperCase();
+        if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+            const offlineExam = await offlineService.getLocalProgress(`offline_exam_${cleanCode}`) as Exam | null;
+            return { config: offlineExam?.config || null, isNetworkError: true };
+        }
+        try {
+            const { data, error } = await supabase.from('exams').select('config').eq('code', cleanCode).maybeSingle();
+            if (error) {
+                const msg = String(error.message || '').toLowerCase();
+                const isNet = !error.code || msg.includes('failed to fetch') || msg.includes('network');
+                if (isNet) {
+                    const offlineExam = await offlineService.getLocalProgress(`offline_exam_${cleanCode}`) as Exam | null;
+                    return { config: offlineExam?.config || null, isNetworkError: true };
+                }
+                return { config: null, isNetworkError: false };
+            }
+            return { config: data?.config || null, isNetworkError: false };
+        } catch {
+            const offlineExam = await offlineService.getLocalProgress(`offline_exam_${cleanCode}`) as Exam | null;
+            return { config: offlineExam?.config || null, isNetworkError: true };
+        }
     }
 
     private async prepareQuestionsForSave(questions: Question[], examCode: string): Promise<Question[]> {
