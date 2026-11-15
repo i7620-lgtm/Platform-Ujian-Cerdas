@@ -19,6 +19,7 @@ import { supabase } from './lib/supabase';
 import { hydrateMathInContainer } from './utils/mathRenderer';
 import { calculateStudentAccess } from './utils/scheduleUtils';
 import { measureClientBandwidthBytes, detectClientDevice, countIntegrityViolations } from './utils/telemetryUtils';
+import { cleanupExpiredExamCaches } from './utils/cacheHygiene';
 
 function lazyWithRetry<T extends React.ComponentType<any>>(
   componentImport: () => Promise<{ default: T }>
@@ -445,6 +446,12 @@ const App: React.FC = () => {
     };
 
     checkSession();
+
+    const hygieneTimer = setTimeout(() => {
+      cleanupExpiredExamCaches().catch(() => {});
+    }, 1500);
+
+    return () => clearTimeout(hygieneTimer);
   }, [handleStudentLoginSuccess]);
 
   useEffect(() => {
