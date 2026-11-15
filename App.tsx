@@ -8,6 +8,7 @@ import { OngoingExamModal } from './components/teacher/DashboardModals';
 import type { Exam, Student, Result, TeacherProfile, ResultStatus } from './types';
 import { LogoIcon, NoWifiIcon, UserIcon, ArrowLeftIcon, SunIcon, MoonIcon, QrCodeIcon, BookOpenIcon } from './components/Icons';
 import { storageService } from './services/storage';
+import { offlineService } from './services/offline';
 import { ModerationError } from './services/exam';
 import { InvitationModal } from './components/teacher/InvitationModal';
 import { ProfileCompletionModal } from './components/teacher/ProfileCompletionModal';
@@ -299,7 +300,7 @@ const App: React.FC = () => {
           }
       }
       
-      const res = await storageService.getStudentResult(examCode, student.studentId);
+      const { result: res, isNetworkError: isResultNetErr } = await storageService.getStudentResultStatus(examCode, student.studentId);
       
       if (res && res.status === 'completed' && !isPreview) {
           if (!exam.config.allowRetakes) {
@@ -312,7 +313,7 @@ const App: React.FC = () => {
       }
 
       // Initialize with potential resultId if resuming
-      let studentWithId = { ...student, resultId: res?.id };
+      let studentWithId = { ...student, resultId: res?.id ?? student.resultId };
 
       if (res && res.status === 'force_closed' && !isPreview) {
           const isPR = (exam.config.examMode || '').trim().toUpperCase() === 'PR';
@@ -332,6 +333,55 @@ const App: React.FC = () => {
       if (res && res.status === 'in_progress' && !isPreview) {
         setResumedResult(res);
         studentWithId = { ...student, resultId: res.id };
+      } else if (!res && isResultNetErr && !isPreview) {
+        // Offline / network failure during login check: allow ONLY unlocked returning students with local exam data
+        const localProgress = (await storageService.getLocalProgress(`exam_local_${examCode}_${student.studentId}`)) as {
+          answers?: Record<string, string>;
+          logs?: string[];
+          status?: ResultStatus;
+          resultId?: number;
+          lastUpdated?: number;
+        } | null;
+        const queued = offlineService.getSyncQueue().find((q) => q.examCode === examCode && q.student.studentId === student.studentId);
+        const isPR = (exam.config.examMode || '').trim().toUpperCase() === 'PR';
+        const lockKey = `exam_lock_${examCode}_${student.studentId}`;
+        let hasLocalLock = false;
+        try {
+          hasLocalLock = localStorage.getItem(lockKey) === '1';
+        } catch {
+          /* ignore */
+        }
+
+        if (
+          !isPR &&
+          exam.config.detectBehavior &&
+          exam.config.continueWithPermission &&
+          (hasLocalLock || localProgress?.status === 'force_closed' || queued?.status === 'force_closed')
+        ) {
+          alert("Sesi ini terkunci karena terdeteksi pelanggaran. Sambungkan ke internet dan hubungi pengawas untuk membuka kunci.");
+          return;
+        }
+
+        if (!localProgress) {
+          alert("Perangkat sedang offline dan belum ada sesi ujian aktif di perangkat ini. Sambungkan ke internet untuk memulai ujian.");
+          return;
+        }
+
+        const resolvedResultId = localProgress.resultId ?? student.resultId;
+        studentWithId = { ...student, resultId: resolvedResultId };
+        const offlineResumedResult: Result = {
+          id: resolvedResultId,
+          student: studentWithId,
+          examCode,
+          answers: localProgress.answers || {},
+          score: 0,
+          correctAnswers: 0,
+          totalQuestions: exam.questions.length,
+          status: localProgress.status === 'force_closed' ? 'force_closed' : 'in_progress',
+          activityLog: localProgress.logs || [],
+          timestamp: localProgress.lastUpdated || Date.now(),
+        };
+        setResumedResult(offlineResumedResult);
       } else if (!isPreview) {
         let deviceId = '';
         try {
@@ -339,7 +389,7 @@ const App: React.FC = () => {
           localStorage.setItem('deviceId', deviceId);
         } catch { /* ignore */ }
 
-        // Initial creation
+        // Initial creation (online)
         const newRes = await storageService.submitExamResult({
           student,
           examCode,
@@ -378,6 +428,12 @@ const App: React.FC = () => {
         const error = err as Error;
         if (error.message === 'EXAM_IS_DRAFT') {
             alert("Ujian ini masih berupa draf.");
+        } else if (error.message === 'OFFLINE_NO_LOCAL_EXAM') {
+            alert("Perangkat sedang offline dan naskah soal belum tersimpan di perangkat ini. Sambungkan ke internet untuk mengunduh soal.");
+        } else if (error.message === 'EDGE_CONTENT_UNAVAILABLE') {
+            alert("Gagal mengunduh naskah soal dari server. Pastikan koneksi internet stabil dan coba lagi.");
+        } else if (error.message === 'EXAM_NOT_FOUND') {
+            alert("Kode Ujian tidak ditemukan atau belum dipublikasikan.");
         } else {
             console.error(error);
             alert("Gagal memuat ujian. Periksa koneksi internet Anda.");
@@ -719,6 +775,11 @@ const App: React.FC = () => {
 
   const handleResumeFromLock = () => {
       if (studentResult) {
+          if (currentExam && currentStudent) {
+              try {
+                  localStorage.removeItem(`exam_lock_${currentExam.code}_${currentStudent.studentId}`);
+              } catch { /* ignore */ }
+          }
           const unlockedResult = { ...studentResult, status: 'in_progress' } as Result;
           setStudentResult(unlockedResult);
           setResumedResult(unlockedResult);
