@@ -9,6 +9,7 @@ import {
   LockClosedIcon,
   SparklesIcon,
 } from "../../Icons";
+import { isOvertimeAllowedForExam } from "../../../utils/scheduleUtils";
 
 interface StudentExamIntroModalProps {
   exam: Exam;
@@ -52,6 +53,13 @@ export const StudentExamIntroModal: React.FC<StudentExamIntroModalProps> = ({
                     ? `${exam.config.timeLimit} Menit`
                     : "Tanpa Batas"}
               </p>
+              {exam.config.examMode !== "PR" && exam.config.timeLimit > 0 && (
+                <p className="text-[10px] text-slate-500 dark:text-slate-400 truncate mt-0.5">
+                  {isOvertimeAllowedForExam(exam.config)
+                    ? "Durasi utuh meski melewati jam tutup"
+                    : "Mengikuti sisa jam ujian/sesi"}
+                </p>
+              )}
             </div>
           </div>
 

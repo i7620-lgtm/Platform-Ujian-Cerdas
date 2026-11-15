@@ -100,10 +100,7 @@ export const StudentExamHeader: React.FC<StudentExamHeaderProps> = ({
           {/* Compact Monitoring Badge - Visible ONLY when Nav is Closed */}
           {isMonitoring && !isNavOpen && (
             <div className="flex items-center gap-1.5 px-2 py-1.5 bg-indigo-50 dark:bg-indigo-900/30 border border-indigo-100 dark:border-indigo-800 rounded-lg mr-0.5 animate-fade-in">
-              <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-indigo-500"></span>
-              </span>
+              <span className="inline-flex rounded-full h-2 w-2 bg-indigo-500"></span>
               <span className="hidden sm:inline text-[10px] font-black uppercase tracking-wide text-indigo-600 dark:text-indigo-400 whitespace-nowrap">
                 {monitoringLabel}
               </span>
@@ -123,7 +120,7 @@ export const StudentExamHeader: React.FC<StudentExamHeaderProps> = ({
               type="button"
               onClick={onDecreaseFontSize}
               disabled={fontStep <= minFontStep}
-              className={`h-7 px-1.5 sm:px-2 flex items-center justify-center rounded-md transition-all select-none ${
+              className={`h-8 min-w-[32px] px-1.5 sm:px-2 flex items-center justify-center rounded-md transition-all select-none ${
                 fontStep <= minFontStep
                   ? "text-slate-300 dark:text-slate-600 cursor-not-allowed opacity-40"
                   : fontStep < 0
@@ -142,7 +139,7 @@ export const StudentExamHeader: React.FC<StudentExamHeaderProps> = ({
               id="font-size-normal-btn"
               type="button"
               onClick={onResetFontSize}
-              className={`h-7 px-2 sm:px-2.5 flex items-center justify-center rounded-md transition-all select-none ${
+              className={`h-8 min-w-[32px] px-2 sm:px-2.5 flex items-center justify-center rounded-md transition-all select-none ${
                 fontStep === 0
                   ? "bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-xs font-black border border-slate-200/80 dark:border-slate-600"
                   : "text-slate-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-white/60 dark:hover:bg-slate-700/50 font-bold"
@@ -163,7 +160,7 @@ export const StudentExamHeader: React.FC<StudentExamHeaderProps> = ({
               type="button"
               onClick={onIncreaseFontSize}
               disabled={fontStep >= maxFontStep}
-              className={`h-7 px-1.5 sm:px-2 flex items-center justify-center rounded-md transition-all select-none ${
+              className={`h-8 min-w-[32px] px-1.5 sm:px-2 flex items-center justify-center rounded-md transition-all select-none ${
                 fontStep >= maxFontStep
                   ? "text-slate-300 dark:text-slate-600 cursor-not-allowed opacity-40"
                   : fontStep > 0
@@ -182,7 +179,7 @@ export const StudentExamHeader: React.FC<StudentExamHeaderProps> = ({
             <button
               type="button"
               onClick={toggleTheme}
-              className="p-2 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 hover:text-indigo-600 dark:hover:text-indigo-400 transition-all shadow-sm border border-slate-200 dark:border-slate-700"
+              className="w-9 h-9 flex items-center justify-center rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 hover:text-indigo-600 dark:hover:text-indigo-400 transition-all shadow-sm border border-slate-200 dark:border-slate-700 cursor-pointer"
               aria-label="Toggle Theme"
             >
               {isDarkMode ? (
@@ -193,10 +190,10 @@ export const StudentExamHeader: React.FC<StudentExamHeaderProps> = ({
             </button>
           )}
           <div
-            className={`flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-xl border font-mono font-bold tracking-tight transition-all shadow-sm ${timeLeft < 300 ? "bg-rose-50 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400 border-rose-100 dark:border-rose-900 animate-pulse" : "bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700"}`}
+            className={`flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-xl border font-mono font-bold tracking-tight transition-all shadow-sm ${timeLeft !== Infinity && timeLeft > 0 && timeLeft < 300 ? "bg-rose-50 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400 border-rose-200 dark:border-rose-800" : "bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700"}`}
           >
             <ClockIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-            <span className="text-xs sm:text-sm">{formatTime(timeLeft)}</span>
+            <span className="text-xs sm:text-sm tabular-nums">{formatTime(timeLeft)}</span>
           </div>
 
           {(student.class === "PREVIEW" || student.studentId.includes("PREVIEW")) && onBack && (

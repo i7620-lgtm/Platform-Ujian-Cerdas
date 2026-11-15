@@ -48,8 +48,8 @@ export const StudentExamCompletionCard: React.FC<StudentExamCompletionCardProps>
           {answeredCount === totalQuestions
             ? "Hebat! Anda telah menjawab seluruh soal ujian. Silakan periksa kembali jawaban Anda jika masih memiliki sisa waktu, atau kumpulkan ujian sekarang."
             : activeExam.config?.isOlympiadMode
-              ? `Anda menjawab ${answeredCount} dari ${totalQuestions} soal (${progress}%). Terdapat ${totalQuestions - answeredCount} soal yang dikosongkan. Dalam Mode Olimpiade, membiarkan soal kosong tidak akan mengurangi poin Anda.`
-              : `Anda telah menjawab ${answeredCount} dari total ${totalQuestions} soal (${progress}%). Masih ada ${totalQuestions - answeredCount} soal yang belum dijawab.`}
+              ? `Anda menjawab ${answeredCount} dari ${totalQuestions} soal (${Math.round(progress)}%). Terdapat ${totalQuestions - answeredCount} soal yang dikosongkan. Dalam Mode Olimpiade, membiarkan soal kosong tidak akan mengurangi poin Anda.`
+              : `Anda telah menjawab ${answeredCount} dari total ${totalQuestions} soal (${Math.round(progress)}%). Masih ada ${totalQuestions - answeredCount} soal yang belum dijawab.`}
         </p>
 
         {answeredCount < totalQuestions && (
@@ -72,7 +72,7 @@ export const StudentExamCompletionCard: React.FC<StudentExamCompletionCardProps>
                       key={q.id}
                       type="button"
                       onClick={() => scrollToQuestion(q.id)}
-                      className="px-3 py-1.5 rounded-lg bg-white dark:bg-slate-800 border border-amber-300 dark:border-amber-800 text-amber-900 dark:text-amber-200 text-xs font-bold hover:bg-amber-100 dark:hover:bg-amber-900/60 transition-all cursor-pointer shadow-xs active:scale-95"
+                      className="min-h-[40px] px-3 py-1.5 rounded-lg bg-white dark:bg-slate-800 border border-amber-300 dark:border-amber-800 text-amber-900 dark:text-amber-200 text-xs font-bold hover:bg-amber-100 dark:hover:bg-amber-900/60 transition-all cursor-pointer shadow-xs active:scale-95"
                       title={`Loncat ke soal nomor ${num}`}
                     >
                       Soal #{num}
@@ -87,7 +87,7 @@ export const StudentExamCompletionCard: React.FC<StudentExamCompletionCardProps>
           type="button"
           onClick={onSubmit}
           disabled={isSubmitting}
-          className="w-full sm:w-auto min-w-[260px] px-8 py-4 bg-slate-900 hover:bg-indigo-600 dark:bg-indigo-600 dark:hover:bg-indigo-500 text-white rounded-2xl font-black text-sm sm:text-base transition-all flex items-center justify-center gap-3 shadow-xl hover:shadow-indigo-500/25 active:scale-[0.98] disabled:opacity-70 cursor-pointer"
+          className="w-full sm:w-auto min-w-[260px] min-h-[48px] px-8 py-4 bg-slate-900 hover:bg-indigo-600 dark:bg-indigo-600 dark:hover:bg-indigo-500 text-white rounded-2xl font-black text-sm sm:text-base transition-all flex items-center justify-center gap-3 shadow-xl hover:shadow-indigo-500/25 active:scale-[0.98] disabled:opacity-70 cursor-pointer"
         >
           <CheckCircleIcon className="w-5 h-5 shrink-0" />
           <span>{isSubmitting ? "Mengirim Jawaban..." : "Selesai & Kumpulkan Jawaban"}</span>

@@ -117,11 +117,11 @@ export const StudentExamNavDrawer: React.FC<StudentExamNavDrawerProps> = ({
                     key={q.id}
                     type="button"
                     onClick={() => scrollToQuestion(q.id)}
-                    className={`w-8 h-8 sm:w-9 sm:h-9 md:w-10 md:h-10 rounded-lg border flex items-center justify-center text-xs font-bold transition-all cursor-pointer shrink-0 select-none ${
+                    className={`w-10 h-10 rounded-lg border flex items-center justify-center text-xs font-bold transition-all cursor-pointer shrink-0 select-none ${
                       answered
                         ? "bg-indigo-600 border-indigo-600 text-white shadow-xs"
                         : hasAttemptedSubmit
-                          ? "bg-rose-50 border-rose-300 text-rose-600 animate-pulse"
+                          ? "bg-rose-50 dark:bg-rose-950/40 border-rose-300 dark:border-rose-800 text-rose-600 dark:text-rose-300"
                           : "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 hover:border-indigo-300 dark:hover:border-indigo-600"
                     }`}
                     title={`Soal nomor ${num} (${answered ? "Sudah dijawab" : "Belum dijawab"})`}
@@ -152,10 +152,7 @@ export const StudentExamNavDrawer: React.FC<StudentExamNavDrawerProps> = ({
                 >
                   {isMonitoring && (
                     <div className="p-2 sm:p-2.5 rounded-xl bg-indigo-50/70 dark:bg-indigo-950/30 border border-indigo-100 dark:border-indigo-900/50 flex items-center gap-2.5 shadow-2xs text-left">
-                      <span className="relative flex h-2.5 w-2.5 shrink-0 ml-1">
-                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
-                        <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-indigo-500"></span>
-                      </span>
+                      <span className="inline-flex rounded-full h-2.5 w-2.5 bg-indigo-500 shrink-0 ml-1"></span>
                       <div className="min-w-0">
                         <span className="text-[10px] sm:text-[11px] font-black uppercase tracking-wider text-indigo-700 dark:text-indigo-300 block">
                           {monitoringLabel || "Sistem Pengawasan Aktif"}
@@ -188,10 +185,10 @@ export const StudentExamNavDrawer: React.FC<StudentExamNavDrawerProps> = ({
                       <ClockIcon className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0 ml-1" />
                       <div className="min-w-0">
                         <span className="text-[10px] sm:text-[11px] font-black uppercase tracking-wider text-amber-800 dark:text-amber-200 block">
-                          Batas Sesi: {sessionEndTime || "Selesai"}
+                          Lewat Waktu: {sessionEndTime || "Jadwal Berakhir"}
                         </span>
                         <p className="text-[10px] sm:text-[11px] text-amber-900/90 dark:text-amber-200/90 font-medium leading-snug">
-                          Selesaikan soal sebelum hitung mundur durasi habis.
+                          Tuntaskan sisa durasi sebelum hitung mundur habis.
                         </p>
                       </div>
                     </div>
@@ -207,7 +204,7 @@ export const StudentExamNavDrawer: React.FC<StudentExamNavDrawerProps> = ({
           <div className="flex flex-col sm:flex-row items-center justify-between gap-2.5 sm:gap-4 max-w-5xl mx-auto w-full">
             <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
               <span className="font-bold text-slate-700 dark:text-slate-200">{answeredCount} dari {totalQuestions}</span>
-              <span>soal terjawab ({progress}%)</span>
+              <span>soal terjawab ({Math.round(progress)}%)</span>
             </div>
             <button
               type="button"
