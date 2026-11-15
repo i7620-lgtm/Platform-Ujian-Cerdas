@@ -3,7 +3,12 @@ import { Student, ExamConfig } from "../../types";
 import { storageService } from "../../services/storage";
 import { offlineService } from "../../services/offline";
 import { supabase } from "../../lib/supabase";
-import { normalizeDateString, toAbsoluteUtcTimestamp } from "../../utils/timezoneUtils";
+import { normalizeDateString } from "../../utils/timezoneUtils";
+import {
+  isClassMatch,
+  canStudentResumeInOvertime,
+  getGlobalExamEndTimestamp,
+} from "../../utils/scheduleUtils";
 
 
 // Helper to parse "SchoolName-ClassName(Limit)" format
@@ -40,6 +45,7 @@ export const useStudentEntryForm = ({ initialCode, onLoginSuccess }: UseStudentE
     cleanExamCode: string;
     studentData: Student;
     config?: ExamConfig;
+    canResumeOvertime?: boolean;
   } | null>(null);
 
   // UI State
@@ -50,6 +56,8 @@ export const useStudentEntryForm = ({ initialCode, onLoginSuccess }: UseStudentE
   const [absentNumber, setAbsentNumber] = useState("");
   const [isCheckingCode, setIsCheckingCode] = useState(false);
   const [error, setError] = useState("");
+  const [unlockError, setUnlockError] = useState("");
+  const [isUnlocking, setIsUnlocking] = useState(false);
   const [isFocused, setIsFocused] = useState<string | null>(null);
   
   const examCodeInputRef = useRef<HTMLInputElement>(null);
@@ -518,12 +526,14 @@ export const useStudentEntryForm = ({ initialCode, onLoginSuccess }: UseStudentE
         config.targetClasses &&
         config.targetClasses.length > 0
       ) {
-        const matchesTarget = config.targetClasses.some(
-          (tc) =>
+        const matchesTarget = config.targetClasses.some((tc) => {
+          const parsedTcName = parseClassConfig(tc).name || tc;
+          return (
             tc === studentClass ||
-            parseClassConfig(tc).name === cleanClassName ||
-            tc === cleanClassName,
-        );
+            isClassMatch(parsedTcName, cleanClassName) ||
+            isClassMatch(tc, cleanClassName)
+          );
+        });
         if (!matchesTarget) {
           setError(
             `Ujian ini tidak diperuntukkan bagi kelas ${cleanClassName}. Harap periksa kembali.`,
@@ -549,31 +559,70 @@ export const useStudentEntryForm = ({ initialCode, onLoginSuccess }: UseStudentE
         await storageService.getStudentResultStatus(cleanExamCode, studentId);
       const isOfflineFlow = isBrowserOffline || isConfigNetErr || isResultNetErr;
 
-      // --- DEADLINE CHECK ---
+      const localProgressEarly =
+        isOfflineFlow && !result
+          ? ((await storageService.getLocalProgress(
+              `exam_local_${cleanExamCode}_${studentId}`,
+            )) as {
+              status?: string;
+              answers?: Record<string, string>;
+              lastUpdated?: number;
+            } | null)
+          : null;
+
+      const queuedEarly =
+        isOfflineFlow && !result
+          ? offlineService
+              .getSyncQueue()
+              .find((q) => q.examCode === cleanExamCode && q.student.studentId === studentId)
+          : undefined;
+
+      const existingStatus = result
+        ? result.status
+        : queuedEarly?.status ||
+          localProgressEarly?.status ||
+          (localProgressEarly ? "in_progress" : undefined);
+
+      const existingStartStr = result
+        ? result.answers?._startTime
+        : localProgressEarly?.answers?._startTime;
+      const parsedExistingStart = existingStartStr ? parseInt(existingStartStr, 10) : NaN;
+      const existingStartMs =
+        (!isNaN(parsedExistingStart) && parsedExistingStart > 0 ? parsedExistingStart : null) ||
+        result?.timestamp ||
+        localProgressEarly?.lastUpdated ||
+        null;
+
+      const canViewCompletedResult =
+        Boolean(result && result.status === "completed" && !config.allowRetakes);
+
+      const canResumeOvertime =
+        !config.isFinished &&
+        canStudentResumeInOvertime(config, existingStatus, existingStartMs, Date.now());
+
+      // --- DEADLINE & CLOSURE CHECK ---
       const mode = (config.examMode || 'UJIAN').trim().toUpperCase();
       const isPR = mode === 'PR';
       const examTz = config.timezone || 'WIB';
       const rawEndDate = config.endDate || config.date;
       const endDateStr = rawEndDate ? normalizeDateString(rawEndDate) : '';
       const endTimeStr = config.endTime || '23:59';
+      const absoluteExamEndTime = getGlobalExamEndTimestamp(config);
 
-      let absoluteExamEndTime: number;
-      if (rawEndDate && rawEndDate.includes('T')) {
-          absoluteExamEndTime = new Date(rawEndDate).getTime();
-      } else if (rawEndDate) {
-          absoluteExamEndTime = toAbsoluteUtcTimestamp(endDateStr, endTimeStr, examTz, true);
-      } else {
-          absoluteExamEndTime = Infinity;
+      if (config.isFinished && !canViewCompletedResult) {
+        setError(
+          "Ujian ini telah ditutup oleh guru dan tidak lagi menerima pengerjaan baru maupun lanjutan.",
+        );
+        setIsLoading(false);
+        return;
       }
 
-      if (isNaN(absoluteExamEndTime)) {
-          absoluteExamEndTime = Infinity;
-      }
-
-      if (Date.now() > absoluteExamEndTime) {
-          setError(`Ujian ini telah ditutup karena melewati batas waktu pengerjaan (${endDateStr || '-'} ${endTimeStr} ${examTz}).`);
-          setIsLoading(false);
-          return;
+      if (Date.now() > absoluteExamEndTime && !canViewCompletedResult && !canResumeOvertime) {
+        setError(
+          `Ujian ini telah ditutup karena melewati batas waktu pengerjaan (${endDateStr || "-"} ${endTimeStr} ${examTz}).`,
+        );
+        setIsLoading(false);
+        return;
       }
       // ----------------------
 
@@ -589,13 +638,8 @@ export const useStudentEntryForm = ({ initialCode, onLoginSuccess }: UseStudentE
           /* ignore */
         }
 
-        const localProgress = (await storageService.getLocalProgress(
-          `exam_local_${cleanExamCode}_${studentId}`,
-        )) as { status?: string } | null;
-
-        const queued = offlineService
-          .getSyncQueue()
-          .find((q) => q.examCode === cleanExamCode && q.student.studentId === studentId);
+        const localProgress = localProgressEarly;
+        const queued = queuedEarly;
 
         if (
           requiresLock &&
@@ -606,7 +650,7 @@ export const useStudentEntryForm = ({ initialCode, onLoginSuccess }: UseStudentE
           setError(
             "Sesi ini terkunci karena terdeteksi pelanggaran. Sambungkan ke internet dan hubungi pengawas untuk membuka kunci.",
           );
-          setPendingStudentData({ cleanExamCode, studentData, config });
+          setPendingStudentData({ cleanExamCode, studentData, config, canResumeOvertime });
           setIsLocked(true);
           setIsLoading(false);
           return;
@@ -645,7 +689,7 @@ export const useStudentEntryForm = ({ initialCode, onLoginSuccess }: UseStudentE
             setError(
               `Sesi ini terkunci. Hubungi pengawas untuk meminta izin melanjutkan ujian.`
             );
-            setPendingStudentData({ cleanExamCode, studentData, config });
+            setPendingStudentData({ cleanExamCode, studentData, config, canResumeOvertime });
             setIsLocked(true);
             setIsLoading(false);
             return;
@@ -664,7 +708,7 @@ export const useStudentEntryForm = ({ initialCode, onLoginSuccess }: UseStudentE
             setError(
               `Sesi ini sedang aktif di perangkat lain. Masukkan Token Pengawas untuk melanjutkan di perangkat ini.`,
             );
-            setPendingStudentData({ cleanExamCode, studentData, config });
+            setPendingStudentData({ cleanExamCode, studentData, config, canResumeOvertime });
             setIsLocked(true);
             setIsLoading(false);
             return;
@@ -675,19 +719,28 @@ export const useStudentEntryForm = ({ initialCode, onLoginSuccess }: UseStudentE
         try {
           const classResults = await storageService.getResults(
             cleanExamCode,
-            studentClass,
-            schoolName.trim(),
+            cleanClassName,
+            cleanSchoolName,
           );
           if (classResults && classResults.length > 0) {
-            const existingSameAbsent = classResults.find(
-              (r) =>
-                r.student.absentNumber === absentNumber &&
+            const cleanInputAbsent = absentNumber.trim();
+            const parsedInputAbsent = parseInt(cleanInputAbsent, 10);
+            const existingSameAbsent = classResults.find((r) => {
+              const rAbsent = String(r.student.absentNumber ?? "").trim();
+              const sameAbsent =
+                rAbsent === cleanInputAbsent ||
+                (!isNaN(parsedInputAbsent) &&
+                  /^\d+$/.test(rAbsent) &&
+                  parseInt(rAbsent, 10) === parsedInputAbsent);
+              return (
+                sameAbsent &&
                 r.student.fullName.trim().toLowerCase() !==
-                  fullName.trim().toLowerCase(),
-            );
+                  fullName.trim().toLowerCase()
+              );
+            });
             if (existingSameAbsent) {
               setError(
-                `Nomor urut ${absentNumber} di kelas ${studentClass} sudah terdaftar atas nama ${existingSameAbsent.student.fullName}. Hubungi pengawas.`,
+                `Nomor urut ${cleanInputAbsent} di kelas ${cleanClassName} sudah terdaftar atas nama ${existingSameAbsent.student.fullName}. Hubungi pengawas.`,
               );
               setIsLoading(false);
               return;
@@ -719,7 +772,7 @@ export const useStudentEntryForm = ({ initialCode, onLoginSuccess }: UseStudentE
         }
       }
 
-      setPendingStudentData({ cleanExamCode, studentData, config });
+      setPendingStudentData({ cleanExamCode, studentData, config, canResumeOvertime });
       setIsLoading(false);
     } catch (err) {
       console.error(err);
@@ -730,6 +783,8 @@ export const useStudentEntryForm = ({ initialCode, onLoginSuccess }: UseStudentE
 
   const handleUnlockAndResume = async (token: string) => {
     if (!pendingStudentData) return;
+    setUnlockError("");
+    setIsUnlocking(true);
     try {
       let deviceId = localStorage.getItem("deviceId");
       if (!deviceId) {
@@ -744,6 +799,7 @@ export const useStudentEntryForm = ({ initialCode, onLoginSuccess }: UseStudentE
       );
       if (isValid) {
         setIsLocked(false);
+        setUnlockError("");
         const lockKey = `exam_lock_${pendingStudentData.cleanExamCode}_${pendingStudentData.studentData.studentId}`;
         localStorage.removeItem(lockKey);
 
@@ -761,10 +817,12 @@ export const useStudentEntryForm = ({ initialCode, onLoginSuccess }: UseStudentE
           pendingStudentData.studentData,
         );
       } else {
-        alert("Token tidak valid atau sudah kadaluarsa!");
+        setUnlockError("Token tidak valid atau sudah kadaluarsa.");
       }
     } catch {
-      alert("Gagal verifikasi token.");
+      setUnlockError("Gagal verifikasi token. Periksa koneksi internet Anda.");
+    } finally {
+      setIsUnlocking(false);
     }
   };
 
@@ -787,6 +845,9 @@ export const useStudentEntryForm = ({ initialCode, onLoginSuccess }: UseStudentE
     setAbsentNumber,
     isCheckingCode,
     error,
+    unlockError,
+    setUnlockError,
+    isUnlocking,
     isFocused,
     setIsFocused,
     examCodeInputRef,

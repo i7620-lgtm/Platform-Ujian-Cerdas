@@ -3,10 +3,22 @@ import type { Exam, Student, Result, Question, ResultStatus } from "../../types"
 import { storageService } from "../../services/storage";
 import { supabase } from "../../lib/supabase";
 import type { RealtimeChannel } from "@supabase/supabase-js";
-import { calculateExamScore, sanitizeHtml, parseList } from "../teacher/examUtils";
+import { calculateExamScore, sanitizeHtml } from "../teacher/examUtils";
 import { useExamAntiCheat } from "../../hooks/useExamAntiCheat";
-import { calculateStudentAccess } from "../../utils/scheduleUtils";
+import { getOvertimeGraceStatus, isOvertimeAllowedForExam } from "../../utils/scheduleUtils";
 import { measureClientBandwidthBytes, detectClientDevice, countIntegrityViolations } from "../../utils/telemetryUtils";
+
+export interface ExamDialogState {
+  isOpen: boolean;
+  variant: "confirm" | "info" | "warning" | "error";
+  title: string;
+  message: string;
+  unansweredItems?: { id: string; num: number }[];
+  confirmLabel?: string;
+  cancelLabel?: string;
+  isLoading?: boolean;
+  closeOnBackdrop?: boolean;
+}
 
 interface UseStudentExamLogicProps {
   exam: Exam;
@@ -40,7 +52,7 @@ export const useStudentExamLogic = ({
   student,
   initialData,
   onSubmit,
-  onUpdate,
+  onUpdate: _onUpdate,
 }: UseStudentExamLogicProps) => {
   const STORAGE_KEY = `exam_local_${exam.code}_${student.studentId}`;
   const CACHED_EXAM_KEY = `exam_def_${exam.code}`;
@@ -48,6 +60,12 @@ export const useStudentExamLogic = ({
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [userLocation, setUserLocation] = useState<string>("");
+  const [examDialog, setExamDialog] = useState<ExamDialogState>({
+    isOpen: false,
+    variant: "info",
+    title: "",
+    message: "",
+  });
 
   const [isNavOpen, setIsNavOpen] = useState(false);
   const [hasAttemptedSubmit, setHasAttemptedSubmit] = useState(false);
@@ -61,12 +79,10 @@ export const useStudentExamLogic = ({
       : (typeof exam.config?.version === "number" ? exam.config.version : 1)
   );
 
-  // Session Timeout & Grace Period State
-  const [isSessionTimeoutModalOpen] = useState(false);
+  // Grace Period Banner State (ketika jam sesi berakhir tetapi siswa masih dalam ujian dengan sisa waktu)
   const [isSessionGracePeriodActive, setIsSessionGracePeriodActive] = useState(false);
   const [sessionEndTime, setSessionEndTime] = useState<string>("");
-  const [isSavingPause, setIsSavingPause] = useState(false);
-  const hasDismissedTimeoutModalRef = useRef(false);
+  const hasTriggeredTeacherStopRef = useRef(false);
 
   const answersRef = useRef<Record<string, string>>({});
   const logRef = useRef<string[]>(initialData?.activityLog || []);
@@ -143,24 +159,9 @@ export const useStudentExamLogic = ({
     return ans.trim().length > 0;
   }, []);
 
-  const handleSubmit = useCallback(
-    async (isAuto = false, status: ResultStatus = "completed") => {
+  const executeSubmit = useCallback(
+    async (status: ResultStatus = "completed") => {
       if (isSubmittingRef.current) return;
-
-      if (!isAuto) {
-        setHasAttemptedSubmit(true);
-        const unansweredCount = activeExam.questions.filter(
-          (q) =>
-            q.questionType !== "INFO" && !isAnswered(q, answersRef.current),
-        ).length;
-
-        let confirmMsg = "Yakin ingin mengumpulkan jawaban sekarang?";
-        if (unansweredCount > 0) {
-          confirmMsg = `Masih ada ${unansweredCount} soal yang belum dijawab atau belum lengkap. Yakin ingin mengumpulkan sekarang?`;
-        }
-
-        if (!window.confirm(confirmMsg)) return;
-      }
 
       setIsSubmitting(true);
       isSubmittingRef.current = true;
@@ -247,15 +248,107 @@ export const useStudentExamLogic = ({
         } catch {
           // ignore
         }
+
+        setExamDialog((prev) => ({ ...prev, isOpen: false }));
       } catch (error) {
         console.error("Submit error:", error);
-        alert("Gagal mengirim jawaban. Silakan coba lagi.");
+        hasTriggeredTeacherStopRef.current = false;
         setIsSubmitting(false);
         isSubmittingRef.current = false;
+        setExamDialog({
+          isOpen: true,
+          variant: "error",
+          title: "Gagal Mengirim Jawaban",
+          message:
+            "Terjadi kendala saat mengirim jawaban ke server. Jawaban Anda masih tersimpan aman di perangkat. Pastikan internet stabil lalu coba lagi.",
+          confirmLabel: "Mengerti",
+          closeOnBackdrop: true,
+        });
       }
     },
-    [activeExam, onSubmit, userLocation, STORAGE_KEY, student.studentId, isAnswered],
+    [activeExam, onSubmit, userLocation, STORAGE_KEY, student.studentId],
   );
+
+  const handleSubmit = useCallback(
+    async (isAuto = false, status: ResultStatus = "completed") => {
+      if (isSubmittingRef.current) return;
+
+      if (!isAuto) {
+        setHasAttemptedSubmit(true);
+        const unansweredItems: { id: string; num: number }[] = [];
+        let displayNum = 0;
+        activeExam.questions.forEach((q) => {
+          if (q.questionType === "INFO") return;
+          displayNum++;
+          if (!isAnswered(q, answersRef.current)) {
+            unansweredItems.push({ id: q.id, num: displayNum });
+          }
+        });
+
+        const unansweredCount = unansweredItems.length;
+        const isOlympiadMode = Boolean(activeExam.config?.isOlympiadMode);
+
+        setExamDialog({
+          isOpen: true,
+          variant: unansweredCount > 0 ? "warning" : "confirm",
+          title:
+            unansweredCount > 0
+              ? `${unansweredCount} Soal Belum Dijawab`
+              : "Kumpulkan Jawaban Ujian?",
+          message:
+            unansweredCount > 0
+              ? isOlympiadMode
+                ? `Masih ada ${unansweredCount} soal yang kosong (tanpa penalti poin). Yakin ingin mengumpulkan jawaban sekarang?`
+                : `Masih ada ${unansweredCount} soal yang belum dijawab atau belum lengkap. Yakin ingin mengumpulkan sekarang?`
+              : "Pastikan seluruh jawaban sudah sesuai sebelum dikumpulkan. Anda tidak dapat mengubah jawaban setelah ujian dikumpulkan.",
+          unansweredItems: unansweredCount > 0 ? unansweredItems : undefined,
+          confirmLabel: "Ya, Kumpulkan",
+          cancelLabel: "Periksa Kembali",
+          closeOnBackdrop: true,
+        });
+        return;
+      }
+
+      await executeSubmit(status);
+    },
+    [activeExam.questions, activeExam.config?.isOlympiadMode, executeSubmit, isAnswered],
+  );
+
+  const triggerTeacherForceStop = useCallback(
+    (message: string, status: ResultStatus = "completed") => {
+      if (
+        hasTriggeredTeacherStopRef.current ||
+        isSubmittingRef.current ||
+        student.class === "PREVIEW"
+      ) {
+        return;
+      }
+      hasTriggeredTeacherStopRef.current = true;
+      setExamDialog({
+        isOpen: true,
+        variant: "warning",
+        title: "Ujian Dihentikan oleh Guru",
+        message,
+        confirmLabel: "Mengumpulkan Jawaban...",
+        isLoading: true,
+        closeOnBackdrop: false,
+      });
+      executeSubmit(status);
+    },
+    [executeSubmit, student.class],
+  );
+
+  const closeExamDialog = useCallback(() => {
+    setExamDialog((prev) => (prev.isLoading ? prev : { ...prev, isOpen: false }));
+  }, []);
+
+  const confirmExamDialog = useCallback(() => {
+    setExamDialog((prev) => ({
+      ...prev,
+      isOpen: false,
+    }));
+    executeSubmit("completed");
+  }, [executeSubmit]);
 
   const { timeLeft } = useExamAntiCheat({
     student,
@@ -266,6 +359,7 @@ export const useStudentExamLogic = ({
     logRef,
     timeLeftRef,
     onForceSubmit: handleSubmit,
+    onTeacherForceStop: triggerTeacherForceStop,
     isSubmitting,
   });
 
@@ -290,12 +384,10 @@ export const useStudentExamLogic = ({
           )
             return;
 
-          if (student.class !== "PREVIEW" && !isSubmittingRef.current) {
-            alert(
-              "Ujian telah dihentikan oleh Guru. Jawaban Anda akan dikumpulkan otomatis.",
-            );
-            handleSubmit(true, "completed");
-          }
+          triggerTeacherForceStop(
+            "Ujian telah dihentikan oleh Guru. Jawaban Anda sedang dikumpulkan otomatis.",
+            "completed",
+          );
         })
         .subscribe(async (status) => {
           if (status === "SUBSCRIBED") {
@@ -322,16 +414,16 @@ export const useStudentExamLogic = ({
               filter: `id=eq.${student.resultId}`,
             },
             (payload) => {
-              const newStatus = payload.new.status;
+              const newStatus = payload.new.status as ResultStatus;
               if (
                 (newStatus === "completed" || newStatus === "force_closed") &&
                 !isSubmittingRef.current &&
                 student.class !== "PREVIEW"
               ) {
-                alert(
-                  "Ujian telah dihentikan oleh Guru. Jawaban Anda akan dikumpulkan otomatis.",
+                triggerTeacherForceStop(
+                  "Ujian telah dihentikan oleh Guru. Jawaban Anda sedang dikumpulkan otomatis.",
+                  newStatus,
                 );
-                handleSubmit(true, newStatus);
               }
             },
           )
@@ -348,7 +440,7 @@ export const useStudentExamLogic = ({
     student.studentId,
     student.class,
     student.resultId,
-    handleSubmit,
+    triggerTeacherForceStop,
   ]);
 
   useEffect(() => {
@@ -429,9 +521,11 @@ export const useStudentExamLogic = ({
             .single();
           if (data) {
             if (data.status === "closed" && !isSubmittingRef.current) {
-              alert("Ujian telah ditutup oleh Guru.");
               const currentIsPR = (activeExam.config.examMode || "").trim().toUpperCase() === "PR";
-              handleSubmit(true, currentIsPR ? "completed" : "force_closed");
+              triggerTeacherForceStop(
+                "Ujian telah ditutup oleh Guru. Jawaban Anda sedang dikumpulkan otomatis.",
+                currentIsPR ? "completed" : "force_closed",
+              );
               return;
             }
             if (data.config) {
@@ -460,10 +554,10 @@ export const useStudentExamLogic = ({
               (!currentIsPR && resultData.status === "force_closed")
             );
             if (shouldStop && !isSubmittingRef.current) {
-              alert(
-                "Ujian telah dihentikan oleh Guru. Jawaban Anda akan dikumpulkan otomatis.",
+              triggerTeacherForceStop(
+                "Ujian telah dihentikan oleh Guru. Jawaban Anda sedang dikumpulkan otomatis.",
+                resultData.status,
               );
-              handleSubmit(true, resultData.status);
               return;
             }
           }
@@ -497,7 +591,7 @@ export const useStudentExamLogic = ({
     exam.config.disableRealtime,
     student.resultId,
     student.class,
-    handleSubmit,
+    triggerTeacherForceStop,
     activeExam.config.examMode,
   ]);
 
@@ -902,7 +996,7 @@ export const useStudentExamLogic = ({
     (q) => q.questionType !== "INFO" && isAnswered(q, answers),
   ).length;
   const progress =
-    totalQuestions > 0 ? (answeredCount / totalQuestions) * 100 : 0;
+    totalQuestions > 0 ? Math.round((answeredCount / totalQuestions) * 100) : 0;
   const optimizeHtml = (html: string) => {
     if (!html) return "";
     let cleaned = sanitizeHtml(html);
@@ -925,82 +1019,52 @@ export const useStudentExamLogic = ({
     );
   };
 
-  // Check if daily session ends during the active exam
+  // Activate Grace Period info banner ONLY when teacher enabled "Izinkan Kerja Lewat Waktu"
+  // AND current time has passed either the daily session end time or global exam end time
   useEffect(() => {
-    if (!activeExam.config.enableDailyWindow) return;
     const mode = (activeExam.config.examMode || "UJIAN").trim().toUpperCase();
-    if (mode === "PR" || student.class === "PREVIEW") return;
+    if (
+      mode === "PR" ||
+      student.class === "PREVIEW" ||
+      !isOvertimeAllowedForExam(activeExam.config)
+    ) {
+      setIsSessionGracePeriodActive(false);
+      setSessionEndTime("");
+      return;
+    }
 
-    const checkDailySession = () => {
+    const checkOvertimeGrace = () => {
       if (isSubmittingRef.current) return;
-      const access = calculateStudentAccess(activeExam.config, student.class, new Date());
-      if (access.status === "OUTSIDE_DAILY_SESSION") {
-        if (timeLeftRef.current > 0 && timeLeftRef.current !== Infinity) {
-          // Logika baru: Langsung memberikan kesempatan bagi siswa untuk melanjutkan pengerjaan sampai durasi pengerjaan habis
-          setIsSessionGracePeriodActive(true);
-          const endLabel =
-            access.applicableSessions.find((s) => s.endTime)?.endTime ||
-            activeExam.config.dailyEndTime ||
-            "10:00";
-          setSessionEndTime(endLabel);
-        }
+      const startTimeStr = answersRef.current["_startTime"];
+      const parsedStart = startTimeStr ? parseInt(startTimeStr, 10) : NaN;
+      const actualStartTimeMs =
+        (!isNaN(parsedStart) && parsedStart > 0 ? parsedStart : null) ||
+        initialData?.timestamp ||
+        Date.now();
+
+      const { isGraceActive, boundaryEndTimeLabel } = getOvertimeGraceStatus(
+        activeExam.config,
+        student.class,
+        actualStartTimeMs,
+        Date.now(),
+      );
+
+      if (
+        isGraceActive &&
+        timeLeftRef.current > 0 &&
+        timeLeftRef.current !== Infinity
+      ) {
+        setIsSessionGracePeriodActive(true);
+        setSessionEndTime(boundaryEndTimeLabel);
       } else {
         setIsSessionGracePeriodActive(false);
       }
     };
 
-    checkDailySession();
-    const interval = setInterval(checkDailySession, 3000);
+    checkOvertimeGrace();
+    const interval = setInterval(checkOvertimeGrace, 3000);
     return () => clearInterval(interval);
-  }, [activeExam.config, student.class]);
-
-  const handleContinueSessionNow = () => {
-    setIsSessionGracePeriodActive(false);
-  };
-
-  const handlePauseAndResumeNextSession = async () => {
-    setIsSavingPause(true);
-    try {
-      await storageService.saveLocalProgress(STORAGE_KEY, {
-        answers: answersRef.current,
-        logs: logRef.current,
-        resultId: studentResultIdRef.current,
-        lastUpdated: Date.now(),
-      });
-      const currentSignature = getQuestionAnswersSignature(answersRef.current);
-      if (
-        student.class !== "PREVIEW" &&
-        currentSignature !== lastSyncedSignatureRef.current &&
-        (typeof navigator === "undefined" || navigator.onLine !== false)
-      ) {
-        const res = await storageService.autoSaveStudentAnswers({
-          resultId: studentResultIdRef.current,
-          examCode: activeExam.code,
-          studentId: student.studentId,
-          studentName: student.fullName,
-          className: student.class,
-          schoolName: student.schoolName || "",
-          answers: { ...answersRef.current },
-        });
-        if (res.ok) {
-          lastSyncedSignatureRef.current = currentSignature;
-          lastServerSyncAtRef.current = Date.now();
-          if (typeof res.resultId === "number" && res.resultId > 0) {
-            studentResultIdRef.current = res.resultId;
-          }
-        }
-      }
-      if (onUpdate) {
-        onUpdate(answersRef.current, timeLeftRef.current);
-      }
-      window.location.href = "/";
-    } catch (e) {
-      console.error("Gagal menyimpan progres sesi:", e);
-      window.location.href = "/";
-    } finally {
-      setIsSavingPause(false);
-    }
-  };
+  }, [activeExam.config, student.class, initialData?.timestamp]);
 
   return {
     formatTime,
@@ -1026,11 +1090,10 @@ export const useStudentExamLogic = ({
     handleAnswerChange,
     scrollToQuestion,
     answersRef,
-    isSessionTimeoutModalOpen,
     isSessionGracePeriodActive,
     sessionEndTime,
-    isSavingPause,
-    handleContinueSessionNow,
-    handlePauseAndResumeNextSession,
+    examDialog,
+    closeExamDialog,
+    confirmExamDialog,
   };
 };

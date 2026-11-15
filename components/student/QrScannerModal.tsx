@@ -1,11 +1,12 @@
-import React, { useRef, useEffect } from "react";
-import { XMarkIcon } from "../Icons";
+import React, { useRef, useEffect, useState } from "react";
+import { XMarkIcon, ExclamationTriangleIcon } from "../Icons";
 
 export const QrScannerModal: React.FC<{
   onScanSuccess: (text: string) => void;
   onClose: () => void;
 }> = ({ onScanSuccess, onClose }) => {
   const scannerRef = useRef<any>(null);
+  const [scanError, setScanError] = useState<string | null>(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -61,10 +62,9 @@ export const QrScannerModal: React.FC<{
       } catch (err) {
         console.error("Error starting scanner", err);
         if (isMounted) {
-          alert(
-            "Gagal memuat pemindai kamera. Pastikan koneksi internet stabil.",
+          setScanError(
+            "Gagal memuat pemindai kamera. Pastikan izin kamera aktif dan koneksi internet stabil, atau ketik kode ujian secara manual.",
           );
-          onClose();
         }
       }
     };
@@ -91,7 +91,7 @@ export const QrScannerModal: React.FC<{
           .catch((e: any) => console.log("Stop failed", e));
       }
     };
-  }, [onClose, onScanSuccess]);
+  }, [onScanSuccess]);
 
   return (
     <div className="fixed inset-0 z-[100] bg-slate-900/90 backdrop-blur-sm flex flex-col items-center justify-center p-4 animate-fade-in">
@@ -99,12 +99,30 @@ export const QrScannerModal: React.FC<{
         <h3 className="text-center font-black text-slate-800 dark:text-white mb-4 text-lg">
           Pindai QR Code Ujian
         </h3>
-        <div className="relative rounded-2xl overflow-hidden bg-black aspect-square shadow-inner">
-          <div id="reader-entry" className="w-full h-full"></div>
-          {/* Scanning Line Animation */}
-          <div className="absolute inset-0 pointer-events-none overflow-hidden">
-            <div className="w-full h-0.5 bg-emerald-500 shadow-[0_0_15px_rgba(16,185,129,1)] animate-[scan_2s_ease-in-out_infinite]"></div>
-            <style>{`
+        {scanError ? (
+          <div className="p-5 rounded-2xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 text-center space-y-3">
+            <div className="w-11 h-11 rounded-2xl bg-rose-100 dark:bg-rose-900/60 text-rose-600 dark:text-rose-300 flex items-center justify-center mx-auto">
+              <ExclamationTriangleIcon className="w-6 h-6" />
+            </div>
+            <p className="text-xs font-medium text-rose-700 dark:text-rose-300 leading-relaxed">
+              {scanError}
+            </p>
+            <button
+              type="button"
+              onClick={onClose}
+              className="w-full min-h-[44px] py-2.5 rounded-xl bg-slate-900 dark:bg-indigo-600 text-white text-xs font-bold hover:bg-black dark:hover:bg-indigo-700 transition-colors cursor-pointer"
+            >
+              Tutup & Masukkan Kode Manual
+            </button>
+          </div>
+        ) : (
+          <>
+            <div className="relative rounded-2xl overflow-hidden bg-black aspect-square shadow-inner">
+              <div id="reader-entry" className="w-full h-full"></div>
+              {/* Scanning Line Animation */}
+              <div className="absolute inset-0 pointer-events-none overflow-hidden">
+                <div className="w-full h-0.5 bg-emerald-500 shadow-[0_0_15px_rgba(16,185,129,1)] animate-[scan_2s_ease-in-out_infinite]"></div>
+                <style>{`
                              @keyframes scan {
                                  0% { transform: translateY(0); opacity: 0; }
                                  10% { opacity: 1; }
@@ -112,16 +130,20 @@ export const QrScannerModal: React.FC<{
                                  100% { transform: translateY(100%); opacity: 0; }
                              }
                          `}</style>
-          </div>
-        </div>
-        <p className="text-xs text-center text-slate-500 dark:text-slate-400 mt-4 font-medium">
-          Arahkan kamera ke QR Code ujian.
-          <br />
-          Pastikan cahaya cukup terang.
-        </p>
+              </div>
+            </div>
+            <p className="text-xs text-center text-slate-500 dark:text-slate-400 mt-4 font-medium">
+              Arahkan kamera ke QR Code ujian.
+              <br />
+              Pastikan cahaya cukup terang.
+            </p>
+          </>
+        )}
         <button
+          type="button"
           onClick={onClose}
-          className="absolute top-4 right-4 p-2 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-full transition-colors"
+          className="absolute top-4 right-4 w-9 h-9 flex items-center justify-center text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-full transition-colors cursor-pointer"
+          aria-label="Tutup pemindai QR"
         >
           <XMarkIcon className="w-5 h-5" />
         </button>
