@@ -942,7 +942,7 @@ export class ExamService {
             return { config: offlineExam?.config || null, isNetworkError: true };
         }
         try {
-            const { data, error } = await supabase.from('exams').select('config').eq('code', cleanCode).maybeSingle();
+            const { data, error } = await supabase.from('exams').select('config, status').eq('code', cleanCode).maybeSingle();
             if (error) {
                 const msg = String(error.message || '').toLowerCase();
                 const isNet = !error.code || msg.includes('failed to fetch') || msg.includes('network');
@@ -952,7 +952,13 @@ export class ExamService {
                 }
                 return { config: null, isNetworkError: false };
             }
-            return { config: data?.config || null, isNetworkError: false };
+            if (!data?.config) {
+                return { config: null, isNetworkError: false };
+            }
+            const resolvedConfig: ExamConfig = data.status === 'closed'
+                ? { ...data.config, isFinished: true }
+                : data.config;
+            return { config: resolvedConfig, isNetworkError: false };
         } catch {
             const offlineExam = await offlineService.getLocalProgress(`offline_exam_${cleanCode}`) as Exam | null;
             return { config: offlineExam?.config || null, isNetworkError: true };
