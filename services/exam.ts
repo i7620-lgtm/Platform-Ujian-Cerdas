@@ -4,6 +4,7 @@ import type { Exam, Question, TeacherProfile, ExamConfig, ResultStatus } from '.
 import { compressImage, calculateExamScore, cleanupQuestionContent, parseList } from '../components/teacher/examUtils';
 import { uploadToCloudinary } from './cloudinary';
 import { offlineService } from './offline';
+import { clearExamLocalCache } from '../utils/cacheHygiene';
 import { ContentModerator, ModerationError } from './contentModeration';
 
 export { ModerationError };
@@ -256,13 +257,66 @@ function selectBankSoalQuestions(questions: Question[], config: ExamConfig): Que
 export class ExamService {
     sanitizeHtmlString(html: string): string {
         if (!html || typeof html !== 'string') return html;
+        if (!html.includes('<')) return html;
+        if (typeof DOMParser === 'undefined') return html;
+
         try {
             const parser = new DOMParser();
             const doc = parser.parseFromString(html, 'text/html');
 
-            const allElements = doc.querySelectorAll('*');
+            // Security hardening: Strip dangerous tags (preserving raw LaTeX/text until render)
+            const dangerousTags = ['script', 'iframe', 'object', 'embed', 'applet', 'meta', 'link', 'base', 'noscript'];
+            dangerousTags.forEach((tag) => {
+                const elements = doc.getElementsByTagName(tag);
+                for (let i = elements.length - 1; i >= 0; i--) {
+                    elements[i].parentNode?.removeChild(elements[i]);
+                }
+            });
+
+            const isMathOrGeometryStyle = (el: Element) =>
+                el.closest('.math-visual, .katex, .katex-html, .katex-mathml, .math-fallback, math, .MathJax, .mjx-container, .math-tex, .geometry-shape, svg') !== null;
+
+            const styleElements = doc.getElementsByTagName('style');
+            for (let i = styleElements.length - 1; i >= 0; i--) {
+                if (!isMathOrGeometryStyle(styleElements[i])) {
+                    styleElements[i].parentNode?.removeChild(styleElements[i]);
+                }
+            }
+
+            const uriAttrs = ['href', 'src', 'xlink:href', 'formaction', 'action', 'poster'];
+            const allElements = doc.body.querySelectorAll('*');
             for (let i = 0; i < allElements.length; i++) {
                 const el = allElements[i];
+
+                // Strip inline event handlers (on*)
+                const attrs = el.attributes;
+                for (let j = attrs.length - 1; j >= 0; j--) {
+                    if (attrs[j].name.toLowerCase().startsWith('on')) {
+                        el.removeAttribute(attrs[j].name);
+                    }
+                }
+
+                // Strip dangerous URI schemes while keeping image/audio data URIs for storage upload
+                uriAttrs.forEach((attrName) => {
+                    const val = el.getAttribute(attrName);
+                    if (val) {
+                        const normalized = Array.from(val)
+                            .filter((ch) => ch.charCodeAt(0) > 32)
+                            .join('')
+                            .toLowerCase();
+                        const isDangerousProtocol =
+                            normalized.startsWith('javascript:') ||
+                            normalized.startsWith('vbscript:') ||
+                            normalized.startsWith('data:text/html') ||
+                            (normalized.startsWith('data:') &&
+                             !normalized.startsWith('data:image/') &&
+                             !normalized.startsWith('data:audio/'));
+                        if (isDangerousProtocol) {
+                            el.removeAttribute(attrName);
+                        }
+                    }
+                });
+
                 const styleAttr = el.getAttribute('style');
                 if (styleAttr && styleAttr.includes('--tw-')) {
                     const newStyle = styleAttr.split(';')
@@ -523,7 +577,7 @@ export class ExamService {
             }
         }
 
-        let query = supabase.from('exams').select('*');
+        let query = supabase.from('exams').select('code, author_id, school, config, questions, status, created_at');
 
         if (profile) {
             if (profile.accountType === 'super_admin') {
@@ -615,7 +669,7 @@ export class ExamService {
             if (scheduleError) {
                 const fallbackRes = await supabase
                     .from('exams')
-                    .select('*')
+                    .select('code, author_id, school, config, status, created_at')
                     .eq('code', cleanCode)
                     .maybeSingle();
                 scheduleData = fallbackRes.data;
@@ -669,7 +723,7 @@ export class ExamService {
         if (metaError) {
             const fallbackRes = await supabase
                 .from('exams')
-                .select('*')
+                .select('code, author_id, school, config, status, created_at')
                 .eq('code', cleanCode)
                 .maybeSingle();
             metaData = fallbackRes.data;
@@ -804,33 +858,35 @@ export class ExamService {
     subscribeToExamVersionUpdates(
         code: string,
         currentVersion: number,
-        onUpdate: (newVersion: number) => void
+        onUpdate: (newVersion: number) => void,
+        disableRealtime = true
     ): () => void {
         const cleanCode = (code || '').trim().toUpperCase();
         let active = true;
 
-        // 1. Supabase Realtime Listener (if supported)
-        const channel = supabase
-            .channel(`exam_live_version_${cleanCode}`)
-            .on(
-                'postgres_changes',
-                {
-                    event: 'UPDATE',
-                    schema: 'public',
-                    table: 'exams',
-                    filter: `code=eq.${cleanCode}`
-                },
-                (payload: any) => {
-                    const newVer = payload.new?.config?.version ?? payload.new?.version;
-                    if (typeof newVer === 'number' && newVer > currentVersion) {
-                        onUpdate(newVer);
+        // 1. Supabase Realtime Listener (ONLY when Realtime is explicitly enabled)
+        const channel = !disableRealtime
+            ? supabase
+                .channel(`exam_live_version_${cleanCode}`)
+                .on(
+                    'postgres_changes',
+                    {
+                        event: 'UPDATE',
+                        schema: 'public',
+                        table: 'exams',
+                        filter: `code=eq.${cleanCode}`
+                    },
+                    (payload: any) => {
+                        const newVer = payload.new?.config?.version;
+                        if (typeof newVer === 'number' && newVer > currentVersion) {
+                            onUpdate(newVer);
+                        }
                     }
-                }
-            )
-            .subscribe();
+                )
+                .subscribe()
+            : null;
 
-        // 2. Normal Mode Fallback: Staggered Periodic Check (every 3 minutes + random jitter)
-        // Only queries { config } from Supabase
+        // 2. Normal Mode Fallback: Staggered Periodic Check (every 3 minutes + random jitter, <50 bytes)
         const jitterMs = Math.floor(Math.random() * 20000) + 180000;
         const timerId = setInterval(async () => {
             if (!active) return;
@@ -853,7 +909,9 @@ export class ExamService {
         return () => {
             active = false;
             clearInterval(timerId);
-            channel.unsubscribe();
+            if (channel) {
+                supabase.removeChannel(channel);
+            }
         };
     }
 
@@ -863,61 +921,21 @@ export class ExamService {
         return data.config;
     }
 
-    async saveExam(exam: Exam): Promise<void> {
-        // Content Moderation Check (SARA, Pornography, Bullying, etc.)
-        const moderation = await ContentModerator.validateExamContent(exam);
-        if (!moderation.isValid) {
-            throw new ModerationError(moderation.issues);
-        }
-
-        // Immediate local cache save to prevent data loss or UI disappearance
-        this.saveLocalTeacherExam(exam);
-
-        if (exam.config && (exam.config.examMode || '').trim().toUpperCase() === 'PR') {
-            exam.config.detectBehavior = false;
-            exam.config.continueWithPermission = false;
-            exam.config.trackLocation = false;
-        }
-
-        const processedQuestions = exam.questions.map(q => {
+    private async prepareQuestionsForSave(questions: Question[], examCode: string): Promise<Question[]> {
+        const processedQuestions: Question[] = (questions || []).map(q => {
             let qCopy = JSON.parse(JSON.stringify(q));
             if (typeof cleanupQuestionContent === 'function') {
                 qCopy = cleanupQuestionContent(qCopy);
             }
             return qCopy;
         });
-        const BUCKET_NAME = 'soal';
-        const examCode = exam.code;
-
-        const { data: existing } = await supabase.from('exams').select('code, author_id, config').eq('code', examCode).maybeSingle();
-        const existingVersion = (existing?.config && typeof (existing.config as any).version === 'number') ? (existing.config as any).version : 1;
-        const nextVersion = existingVersion + 1;
-        if (!exam.config) exam.config = {} as any;
-        (exam.config as any).version = nextVersion;
-        
-        let finalAuthorId = exam.authorId;
-
-        if (existing) {
-            finalAuthorId = existing.author_id;
-        } else {
-            (exam.config as any).version = 1;
-            const { error: initError } = await supabase.from('exams').insert({
-                code: exam.code, 
-                author_id: finalAuthorId, 
-                school: exam.authorSchool || "",
-                config: exam.config, 
-                questions: [], 
-                status: 'DRAFT'
-            });
-            if (initError) throw initError;
-        }
 
         const processHtmlString = async (html: string, contextId: string): Promise<string> => {
             const sanitizedHtml = this.sanitizeHtmlString(html);
             if (!sanitizedHtml || (!sanitizedHtml.includes('data:image') && !sanitizedHtml.includes('data:audio'))) return sanitizedHtml;
             const parser = new DOMParser();
             const doc = parser.parseFromString(sanitizedHtml, 'text/html');
-            
+
             const images = doc.getElementsByTagName('img');
             for (let i = 0; i < images.length; i++) {
                 const img = images[i];
@@ -972,7 +990,7 @@ export class ExamService {
                     q.trueFalseRows = q.trueFalseRows.map((r: { text: string; answer?: boolean }) => ({ ...r, text: this.sanitizeHtmlString(r.text) }));
                 }
                 if (q.categoryLabels && Array.isArray(q.categoryLabels)) {
-                    q.categoryLabels = q.categoryLabels.map((l: string) => this.sanitizeHtmlString(String(l)));
+                    q.categoryLabels = q.categoryLabels.map((l: string) => this.sanitizeHtmlString(String(l))) as [string, string];
                 }
                 if (q.matchingPairs) {
                     q.matchingPairs = q.matchingPairs.map((p: { left: string; right: string }) => ({ left: this.sanitizeHtmlString(p.left), right: this.sanitizeHtmlString(p.right) }));
@@ -991,23 +1009,64 @@ export class ExamService {
                 if (q.imageUrl && q.imageUrl.startsWith('data:image')) {
                     try {
                         const res = await uploadMediaWithFallback(q.imageUrl, examCode, q.id, 'img');
-                        if (res) {
-                            q.imageUrl = res.url;
-                        }
+                        if (res) q.imageUrl = res.url;
                     } catch (e) { console.error("Upload image failed", e); }
                 }
 
                 if (q.audioUrl && q.audioUrl.startsWith('data:audio')) {
                     try {
                         const res = await uploadMediaWithFallback(q.audioUrl, examCode, q.id, 'audio');
-                        if (res) {
-                            q.audioUrl = res.url;
-                        }
+                        if (res) q.audioUrl = res.url;
                     } catch (e) { console.error("Gagal upload audio", e); }
                 }
             }),
             4
         );
+
+        return processedQuestions;
+    }
+
+    async saveExam(exam: Exam): Promise<void> {
+        // Content Moderation Check (SARA, Pornography, Bullying, etc.)
+        const moderation = await ContentModerator.validateExamContent(exam);
+        if (!moderation.isValid) {
+            throw new ModerationError(moderation.issues);
+        }
+
+        // Immediate local cache save to prevent data loss or UI disappearance
+        this.saveLocalTeacherExam(exam);
+
+        if (exam.config && (exam.config.examMode || '').trim().toUpperCase() === 'PR') {
+            exam.config.detectBehavior = false;
+            exam.config.continueWithPermission = false;
+            exam.config.trackLocation = false;
+        }
+
+        const examCode = exam.code;
+
+        const { data: existing } = await supabase.from('exams').select('code, author_id, config').eq('code', examCode).maybeSingle();
+        const existingVersion = (existing?.config && typeof (existing.config as any).version === 'number') ? (existing.config as any).version : 1;
+        const nextVersion = existing ? existingVersion + 1 : 1;
+        if (!exam.config) exam.config = {} as any;
+        (exam.config as any).version = nextVersion;
+        
+        let finalAuthorId = exam.authorId;
+
+        if (existing) {
+            finalAuthorId = existing.author_id;
+        } else {
+            const { error: initError } = await supabase.from('exams').insert({
+                code: exam.code, 
+                author_id: finalAuthorId, 
+                school: exam.authorSchool || "",
+                config: exam.config, 
+                questions: [], 
+                status: 'DRAFT'
+            });
+            if (initError) throw initError;
+        }
+
+        const processedQuestions = await this.prepareQuestionsForSave(exam.questions, examCode);
 
         const { data, error } = await supabase.from('exams').update({
             school: exam.authorSchool || "",
@@ -1128,12 +1187,11 @@ export class ExamService {
 
     async saveCollaboratorExam(exam: Exam, token: string): Promise<void> {
         console.log("Saving exam as collaborator...", { code: exam.code, token });
-        const BUCKET_NAME = 'soal';
         const examCode = exam.code;
 
         const { data: existingExam, error: fetchError } = await supabase
             .from('exams')
-            .select('*')
+            .select('code, config')
             .eq('code', exam.code)
             .single();
 
@@ -1150,117 +1208,28 @@ export class ExamService {
             throw new Error("Akses ditolak. Token kolaborator tidak valid atau Anda hanya memiliki akses 'viewer'.");
         }
 
-        const processedQuestions = exam.questions.map(q => {
-            let qCopy = JSON.parse(JSON.stringify(q));
-            if (typeof cleanupQuestionContent === 'function') {
-                qCopy = cleanupQuestionContent(qCopy);
-            }
-            return qCopy;
-        });
+        const currentVersion = typeof (config as any).version === 'number' ? (config as any).version : 1;
+        const nextVersion = currentVersion + 1;
+        const processedQuestions = await this.prepareQuestionsForSave(exam.questions, examCode);
 
-        const processHtmlString = async (html: string, contextId: string): Promise<string> => {
-            const sanitizedHtml = this.sanitizeHtmlString(html);
-            if (!sanitizedHtml || (!sanitizedHtml.includes('data:image') && !sanitizedHtml.includes('data:audio'))) return sanitizedHtml;
-            const parser = new DOMParser();
-            const doc = parser.parseFromString(sanitizedHtml, 'text/html');
-            
-            const images = doc.getElementsByTagName('img');
-            for (let i = 0; i < images.length; i++) {
-                const img = images[i];
-                const src = img.getAttribute('src');
-                if (src && src.startsWith('data:image')) {
-                    try {
-                        const res = await uploadMediaWithFallback(src, examCode, contextId, 'img', i);
-                        if (res) {
-                            img.setAttribute('src', res.url);
-                            if (res.bucketPath) img.setAttribute('data-bucket-path', res.bucketPath);
-                        }
-                    } catch (e) { console.error("Gagal upload gambar", e); }
-                }
-            }
-
-            const audios = doc.getElementsByTagName('audio');
-            for (let i = 0; i < audios.length; i++) {
-                const audio = audios[i];
-                const src = audio.getAttribute('src');
-                if (src && src.startsWith('data:audio')) {
-                    try {
-                        const res = await uploadMediaWithFallback(src, examCode, contextId, 'audio', i);
-                        if (res) {
-                            audio.setAttribute('src', res.url);
-                            if (res.bucketPath) audio.setAttribute('data-bucket-path', res.bucketPath);
-                        }
-                    } catch (e) { console.error("Gagal upload audio", e); }
-                }
-            }
-
-            return doc.body.innerHTML;
+        const nextConfig = {
+            ...exam.config,
+            collaborators: config.collaborators,
+            version: nextVersion
         };
-
-        await runWithConcurrency(
-            processedQuestions.map((q) => async () => {
-                if (q.questionText) q.questionText = this.sanitizeHtmlString(q.questionText);
-                q.questionText = await processHtmlString(q.questionText, q.id);
-
-                if (q.options) {
-                    for (let i = 0; i < q.options.length; i++) {
-                        if (q.options[i]) q.options[i] = this.sanitizeHtmlString(q.options[i]);
-                        q.options[i] = await processHtmlString(q.options[i], `${q.id}_opt_${i}`);
-                    }
-                }
-                if (q.trueFalseRows) {
-                    q.trueFalseRows = q.trueFalseRows.map((r: { text: string; answer?: boolean }) => ({ ...r, text: this.sanitizeHtmlString(r.text) }));
-                }
-                if (q.categoryLabels && Array.isArray(q.categoryLabels)) {
-                    q.categoryLabels = q.categoryLabels.map((l: string) => this.sanitizeHtmlString(String(l)));
-                }
-                if (q.matchingPairs) {
-                    q.matchingPairs = q.matchingPairs.map((p: { left: string; right: string }) => ({ left: this.sanitizeHtmlString(p.left), right: this.sanitizeHtmlString(p.right) }));
-                }
-                if (q.correctAnswer && typeof q.correctAnswer === 'string') {
-                    if (q.questionType === 'COMPLEX_MULTIPLE_CHOICE') {
-                        const parsed = parseList(q.correctAnswer, q.options);
-                        q.correctAnswer = JSON.stringify(
-                            (parsed || []).map((opt: string) => this.sanitizeHtmlString(opt))
-                        );
-                    } else {
-                        q.correctAnswer = this.sanitizeHtmlString(q.correctAnswer);
-                    }
-                }
-
-                if (q.imageUrl && q.imageUrl.startsWith('data:image')) {
-                    try {
-                        const res = await uploadMediaWithFallback(q.imageUrl, examCode, q.id, 'img');
-                        if (res) {
-                            q.imageUrl = res.url;
-                        }
-                    } catch (e) { console.error("Upload image failed", e); }
-                }
-
-                if (q.audioUrl && q.audioUrl.startsWith('data:audio')) {
-                    try {
-                        const res = await uploadMediaWithFallback(q.audioUrl, examCode, q.id, 'audio');
-                        if (res) {
-                            q.audioUrl = res.url;
-                        }
-                    } catch (e) { console.error("Gagal upload audio", e); }
-                }
-            }),
-            4
-        );
 
         const { error: rpcError } = await supabase.rpc('save_collaborator_exam', {
             p_exam_code: exam.code,
             p_token: token,
-            p_new_config: {
-                ...exam.config,
-                collaborators: config.collaborators
-            },
+            p_new_config: nextConfig,
             p_new_questions: processedQuestions
         });
 
         if (!rpcError) {
             console.log("Collaborator save success (RPC)");
+            try {
+                fetch(`/api/exam-content/${exam.code}/warm?v=${nextVersion}`, { method: 'POST' }).catch(() => {});
+            } catch { /* ignore */ }
             return;
         }
 
@@ -1269,18 +1238,24 @@ export class ExamService {
     }
 
     async deleteExam(code: string): Promise<void> {
-        this.removeLocalTeacherExam(code);
-        await supabase.from('results').delete().eq('exam_code', code);
-        await supabase.from('exams').delete().eq('code', code);
-        const { data: files } = await supabase.storage.from('soal').list(code);
+        const cleanCode = (code || '').trim().toUpperCase();
+        if (!cleanCode) return;
+
+        this.removeLocalTeacherExam(cleanCode);
+        await clearExamLocalCache(cleanCode);
+
+        await supabase.from('registered_students').delete().eq('exam_code', cleanCode);
+        await supabase.from('results').delete().eq('exam_code', cleanCode);
+        await supabase.from('exams').delete().eq('code', cleanCode);
+        const { data: files } = await supabase.storage.from('soal').list(cleanCode);
         if (files && files.length > 0) {
-            const paths = files.map(f => `${code}/${f.name}`);
+            const paths = files.map(f => `${cleanCode}/${f.name}`);
             await supabase.storage.from('soal').remove(paths);
         }
     }
 
     async getExamForArchive(code: string): Promise<Exam | null> {
-        const { data, error } = await supabase.from('exams').select('*').eq('code', code).maybeSingle();
+        const { data, error } = await supabase.from('exams').select('code, author_id, school, config, questions, status, created_at').eq('code', code).maybeSingle();
         if (error || !data) return null;
 
         const examData: Exam = {
@@ -1362,7 +1337,7 @@ export class ExamService {
         // 1. Fetch Exam
         const { data: examData, error: examError } = await supabase
             .from('exams')
-            .select('*')
+            .select('questions, config')
             .eq('code', examCode)
             .single();
         
@@ -1577,7 +1552,7 @@ export class ExamService {
 
         const { data } = await supabase
             .from('exams')
-            .select('*')
+            .select('code, author_id, school, config, questions, status')
             .eq('code', cleanCode)
             .maybeSingle();
 
