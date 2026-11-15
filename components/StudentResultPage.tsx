@@ -29,6 +29,7 @@ import { CompletedClosedScreen } from "./student/result/CompletedClosedScreen";
 import { AnalysisCards } from "./student/result/AnalysisCards";
 import { ReviewSection } from "./student/result/ReviewSection";
 import { StudentFeedbackModal } from "./student/result/StudentFeedbackModal";
+import { StudentDialogModal } from "./student/StudentDialogModal";
 import { checkAnswerStatus } from "./teacher/archive/archiveUtils";
 import { QuestionResultDetailPopover } from "./QuestionResultDetailPopover";
 import { examService } from "../services/exam";
@@ -54,6 +55,7 @@ export const StudentResultPage: React.FC<StudentResultPageProps> = ({
   const config = exam.config;
   const [expandedReview, setExpandedReview] = useState(false);
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
+  const [certErrorMsg, setCertErrorMsg] = useState<string | null>(null);
   const [enrichedQuestions, setEnrichedQuestions] = useState<Question[]>(exam.questions);
 
   // Fetch authorized solution package if teacher permitted review
@@ -182,13 +184,12 @@ export const StudentResultPage: React.FC<StudentResultPageProps> = ({
       const { downloadCertificateAsPdf } =
         await import("../utils/certificateExport");
 
-      const displayScore =
-        result.status === "completed" || result.status === "force_closed"
-          ? result.score === 0 &&
-            hasAutoGradable &&
-            (calculatedStats?.calculatedScore || 0) > 0
-            ? calculatedStats?.calculatedScore || 0
-            : result.score
+      const certScore =
+        (result.status === "completed" || result.status === "force_closed") &&
+        typeof result.score === "number" &&
+        !isNaN(result.score) &&
+        !isWaitingForServer
+          ? result.score
           : 0;
 
       const qrLink = `${window.location.origin}/result/${encodeURIComponent(exam.code)}/${encodeURIComponent(result.student.studentId)}`;
@@ -200,7 +201,7 @@ export const StudentResultPage: React.FC<StudentResultPageProps> = ({
         [
           {
             studentName: result.student.fullName,
-            score: displayScore,
+            score: certScore,
             qrLink,
             verifyCode,
           },
@@ -215,7 +216,7 @@ export const StudentResultPage: React.FC<StudentResultPageProps> = ({
       );
     } catch (error) {
       console.error("Gagal mencetak PDF", error);
-      alert("Terjadi kesalahan saat mengunduh sertifikat.");
+      setCertErrorMsg("Terjadi kesalahan saat mengunduh sertifikat PDF. Silakan coba beberapa saat lagi.");
     } finally {
       setIsUnlocking(false);
     }
@@ -240,7 +241,10 @@ export const StudentResultPage: React.FC<StudentResultPageProps> = ({
       emptyScore: grading.emptyScore,
       olympiadScoring: grading.olympiadScoring,
       olympiadTier: grading.olympiadTier,
-      hasDiscrepancy: typeof result.score === "number" && grading.score !== result.score,
+      hasDiscrepancy:
+        Boolean(enrichedExam.config?.showCorrectAnswer) &&
+        typeof result.score === "number" &&
+        grading.score !== result.score,
     };
   }, [
     enrichedExam,
@@ -328,12 +332,16 @@ export const StudentResultPage: React.FC<StudentResultPageProps> = ({
 
   const isOlympiad = !!config.isOlympiadMode;
 
-  // REAL-TIME FALLBACK & RPC BUGFIX:
-  // If server score is 0 but client calculated > 0, use client score for display (happens on outdated RPCs when submitting MATCHING logic)
+  // Trust legitimate server score (including genuine 0) once completed and not waiting for server
   const displayScore =
-    typeof result.score === "number" && (isOlympiad ? !isNaN(result.score) : result.score > 0)
+    (result.status === "completed" || result.status === "force_closed") &&
+    typeof result.score === "number" &&
+    !isNaN(result.score) &&
+    !isWaitingForServer
       ? result.score
-      : calculatedStats.calculatedScore;
+      : typeof result.score === "number" && (isOlympiad ? !isNaN(result.score) : result.score > 0)
+        ? result.score
+        : calculatedStats.calculatedScore;
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#F8FAFC] dark:bg-slate-950 p-6 font-sans relative overflow-hidden transition-colors duration-300">
@@ -438,13 +446,6 @@ export const StudentResultPage: React.FC<StudentResultPageProps> = ({
                           </span>
                         </div>
                       ) : null}
-                      {calculatedStats.hasDiscrepancy &&
-                        !isWaitingForServer && (
-                          <span className="absolute top-3 right-3 flex h-2.5 w-2.5">
-                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
-                            <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-500"></span>
-                          </span>
-                        )}
                     </>
                   )}
                 </div>
@@ -534,20 +535,26 @@ export const StudentResultPage: React.FC<StudentResultPageProps> = ({
                 maxScore={calculatedStats.maxScore}
               />
 
-              {/* PALET NOMOR SOAL & DETAIL HASIL SISWA (Hanya ditampilkan jika guru mengizinkan pembahasan/kunci) */}
-              {(config.showCorrectAnswer || config.showHints || config.showSolutionSteps) && (
-                <div className="bg-slate-50/80 dark:bg-slate-800/40 rounded-3xl p-5 border border-slate-100 dark:border-slate-800 text-left">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3 pb-3 border-b border-slate-200/60 dark:border-slate-700/60">
-                    <div>
-                      <h3 className="text-xs font-black text-slate-800 dark:text-white uppercase tracking-wider flex items-center gap-2">
-                        <SparklesIcon className="w-4 h-4 text-indigo-500" />
-                        <span>Rincian Hasil Pengerjaan Soal</span>
-                      </h3>
-                      <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
-                        Klik atau ketuk nomor soal untuk melihat pertanyaan, jawaban Anda, kunci yang benar, serta pembahasannya.
-                      </p>
-                    </div>
-                    {/* Legend */}
+              {/* PALET NOMOR SOAL & REKAPAN / DETAIL JAWABAN SISWA */}
+              <div className="bg-slate-50/80 dark:bg-slate-800/40 rounded-3xl p-5 border border-slate-100 dark:border-slate-800 text-left">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3 pb-3 border-b border-slate-200/60 dark:border-slate-700/60">
+                  <div>
+                    <h3 className="text-xs font-black text-slate-800 dark:text-white uppercase tracking-wider flex items-center gap-2">
+                      <SparklesIcon className="w-4 h-4 text-indigo-500" />
+                      <span>
+                        {config.showCorrectAnswer
+                          ? "Rincian Hasil Pengerjaan Soal"
+                          : "Rekapan Jawaban Siswa"}
+                      </span>
+                    </h3>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                      {config.showCorrectAnswer
+                        ? "Klik atau ketuk nomor soal untuk melihat pertanyaan, jawaban Anda, kunci yang benar, serta pembahasannya."
+                        : "Ketuk nomor soal untuk melihat kembali pertanyaan dan jawaban yang sudah Anda pilih atau tulis."}
+                    </p>
+                  </div>
+                  {/* Legend */}
+                  {config.showCorrectAnswer ? (
                     <div className="flex items-center gap-3 text-[10px] font-bold text-slate-600 dark:text-slate-400 shrink-0">
                       <span className="flex items-center gap-1">
                         <span className="w-2.5 h-2.5 rounded-full bg-emerald-400"></span> Benar
@@ -559,59 +566,75 @@ export const StudentResultPage: React.FC<StudentResultPageProps> = ({
                         <span className="w-2.5 h-2.5 rounded-full bg-slate-300 dark:bg-slate-600"></span> Kosong
                       </span>
                     </div>
-                  </div>
-
-                  <div className="flex flex-wrap gap-2 pt-1">
-                    {enrichedQuestions
-                      .filter((q) => q.questionType !== "INFO")
-                      .map((q, idx) => {
-                        const status = checkAnswerStatus(q, result.answers || {});
-                        const isManual =
-                          q.questionType === "ESSAY" ||
-                          q.questionType === "FILL_IN_THE_BLANK";
-                        const isGraded = result.answers?.[`_grade_${q.id}`];
-                        return (
-                          <QuestionResultDetailPopover
-                            key={q.id}
-                            question={q}
-                            questionIndex={idx}
-                            answers={result.answers || {}}
-                            status={status}
-                            isManual={isManual}
-                            isGraded={isGraded}
-                            showCorrectAnswer={Boolean(config.showCorrectAnswer)}
-                            showSolutionSteps={Boolean(config.showSolutionSteps || config.showHints)}
-                            size="md"
-                          />
-                        );
-                      })}
-                  </div>
+                  ) : (
+                    <div className="flex items-center gap-3 text-[10px] font-bold text-slate-600 dark:text-slate-400 shrink-0">
+                      <span className="flex items-center gap-1">
+                        <span className="w-2.5 h-2.5 rounded-full bg-indigo-500"></span> Sudah Dijawab
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <span className="w-2.5 h-2.5 rounded-full bg-slate-300 dark:bg-slate-600"></span> Kosong
+                      </span>
+                    </div>
+                  )}
                 </div>
-              )}
 
-              <div className="flex flex-col md:flex-row items-center justify-end gap-6 border-t border-slate-50 dark:border-slate-800 pt-6">
+                <div className="flex flex-wrap gap-2 pt-1">
+                  {enrichedQuestions
+                    .filter((q) => q.questionType !== "INFO")
+                    .map((q, idx) => {
+                      const status = config.showCorrectAnswer
+                        ? checkAnswerStatus(q, result.answers || {})
+                        : "EMPTY";
+                      const isManual =
+                        q.questionType === "ESSAY" ||
+                        q.questionType === "FILL_IN_THE_BLANK";
+                      const isGraded = result.answers?.[`_grade_${q.id}`];
+                      return (
+                        <QuestionResultDetailPopover
+                          key={q.id}
+                          question={q}
+                          questionIndex={idx}
+                          answers={result.answers || {}}
+                          status={status}
+                          isManual={isManual}
+                          isGraded={isGraded}
+                          showCorrectAnswer={Boolean(config.showCorrectAnswer)}
+                          showHints={Boolean(config.showHints)}
+                          showSolutionSteps={Boolean(config.showSolutionSteps)}
+                          size="md"
+                        />
+                      );
+                    })}
+                </div>
+              </div>
+
+              <div className="flex flex-col md:flex-row items-center justify-end gap-4 border-t border-slate-50 dark:border-slate-800 pt-6">
                 {config.enableCertificate && (
                   <button
                     onClick={handleDownloadCertificate}
-                    className="text-[10px] font-black uppercase tracking-widest text-emerald-600 dark:text-emerald-400 hover:text-white hover:bg-emerald-600 dark:hover:bg-emerald-500 px-6 py-3 rounded-2xl transition-all inline-flex items-center gap-2 border-2 border-emerald-100 dark:border-emerald-900/30"
+                    className="min-h-[44px] text-[10px] font-black uppercase tracking-widest text-emerald-600 dark:text-emerald-400 hover:text-white hover:bg-emerald-600 dark:hover:bg-emerald-500 px-6 py-3 rounded-2xl transition-all inline-flex items-center gap-2 border-2 border-emerald-100 dark:border-emerald-900/30 cursor-pointer"
                   >
                     <SparklesIcon className="w-3.5 h-3.5" /> Unduh Sertifikat
                   </button>
                 )}
 
-                {(config.showCorrectAnswer || config.showHints || config.showSolutionSteps) && (
-                  <button
-                    onClick={() => setExpandedReview(!expandedReview)}
-                    className="text-[10px] font-black uppercase tracking-widest text-indigo-600 dark:text-indigo-400 hover:text-white hover:bg-indigo-600 dark:hover:bg-indigo-500 px-6 py-3 rounded-2xl transition-all inline-flex items-center gap-2 border-2 border-indigo-100 dark:border-indigo-900/30"
-                  >
-                    {expandedReview ? "Tutup Pembahasan" : "Lihat Pembahasan"}
-                    {expandedReview ? (
-                      <ChevronUpIcon className="w-3 h-3" />
-                    ) : (
-                      <ChevronDownIcon className="w-3 h-3" />
-                    )}
-                  </button>
-                )}
+                <button
+                  onClick={() => setExpandedReview(!expandedReview)}
+                  className="min-h-[44px] text-[10px] font-black uppercase tracking-widest text-indigo-600 dark:text-indigo-400 hover:text-white hover:bg-indigo-600 dark:hover:bg-indigo-500 px-6 py-3 rounded-2xl transition-all inline-flex items-center gap-2 border-2 border-indigo-100 dark:border-indigo-900/30 cursor-pointer"
+                >
+                  {config.showCorrectAnswer || config.showHints || config.showSolutionSteps
+                    ? expandedReview
+                      ? "Tutup Pembahasan"
+                      : "Lihat Pembahasan"
+                    : expandedReview
+                      ? "Tutup Rekapan Jawaban"
+                      : "Lihat Rekapan Jawaban"}
+                  {expandedReview ? (
+                    <ChevronUpIcon className="w-3 h-3" />
+                  ) : (
+                    <ChevronDownIcon className="w-3 h-3" />
+                  )}
+                </button>
               </div>
 
               {expandedReview && <ReviewSection exam={enrichedExam} result={result} />}
@@ -654,6 +677,15 @@ export const StudentResultPage: React.FC<StudentResultPageProps> = ({
           onClose={() => setShowFeedbackModal(false)}
         />
       )}
+
+      <StudentDialogModal
+        isOpen={!!certErrorMsg}
+        variant="error"
+        title="Gagal Mengunduh Sertifikat"
+        message={certErrorMsg || ""}
+        confirmLabel="Mengerti"
+        onClose={() => setCertErrorMsg(null)}
+      />
     </div>
   );
 };

@@ -7,6 +7,7 @@ import { StudentExamHeader, type FontStepConfig } from "./student/exam/StudentEx
 import { StudentExamNavDrawer } from "./student/exam/StudentExamNavDrawer";
 import { StudentExamQuestionCard } from "./student/exam/StudentExamQuestionCard";
 import { StudentExamCompletionCard } from "./student/exam/StudentExamCompletionCard";
+import { StudentDialogModal } from "./student/StudentDialogModal";
 
 const FONT_STEP_CONFIGS: FontStepConfig[] = [
   { step: -2, percentage: 80, qSizeRem: 0.825, optSizeRem: 0.775, inputSizeRem: 0.775, lineHeight: 1.55, label: "Sangat Kecil" },
@@ -75,6 +76,9 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({
     scrollToQuestion,
     isSessionGracePeriodActive,
     sessionEndTime,
+    examDialog,
+    closeExamDialog,
+    confirmExamDialog,
   } = useStudentExamLogic({ exam, student, initialData, onSubmit, onUpdate });
 
   const [isSessionBannerDismissed, setIsSessionBannerDismissed] = useState(false);
@@ -422,10 +426,10 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({
               </div>
               <div>
                 <strong className="block font-bold text-sm text-amber-900 dark:text-amber-100">
-                  Batas Jam Sesi Telah Berakhir ({sessionEndTime || "Selesai"})
+                  Masa Perpanjangan Waktu Pengerjaan ({sessionEndTime || "Jadwal Berakhir"})
                 </strong>
                 <p className="text-amber-700 dark:text-amber-300 mt-0.5">
-                  Anda diberikan kesempatan untuk melanjutkan pengerjaan hingga durasi pengerjaan Anda habis. Jawaban akan otomatis terkirim saat sisa waktu pengerjaan berakhir.
+                  Jam selesai sesi atau ujian telah berakhir, namun guru mengizinkan Anda menuntaskan sisa durasi pengerjaan hingga waktu habis atau ujian ditutup secara manual.
                 </p>
               </div>
             </div>
@@ -503,6 +507,25 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({
           onSubmit={() => handleSubmit(false)}
         />
       </main>
+
+      <StudentDialogModal
+        isOpen={examDialog.isOpen}
+        variant={examDialog.variant}
+        title={examDialog.title}
+        message={examDialog.message}
+        unansweredItems={examDialog.unansweredItems}
+        onJumpToQuestion={scrollToQuestion}
+        confirmLabel={examDialog.confirmLabel}
+        cancelLabel={examDialog.cancelLabel}
+        isLoading={examDialog.isLoading}
+        closeOnBackdrop={examDialog.closeOnBackdrop}
+        onConfirm={
+          examDialog.variant === "confirm" || examDialog.unansweredItems
+            ? confirmExamDialog
+            : closeExamDialog
+        }
+        onClose={closeExamDialog}
+      />
     </div>
   );
 };
