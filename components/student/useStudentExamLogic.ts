@@ -23,6 +23,18 @@ interface UseStudentExamLogicProps {
   onUpdate?: (answers: Record<string, string>, timeLeft: number) => void;
 }
 
+const getQuestionAnswersSignature = (ans?: Record<string, string> | null): string => {
+  if (!ans) return "{}";
+  const keys = Object.keys(ans)
+    .filter((k) => !k.startsWith("_"))
+    .sort();
+  const clean: Record<string, string> = {};
+  for (const k of keys) {
+    clean[k] = ans[k];
+  }
+  return JSON.stringify(clean);
+};
+
 export const useStudentExamLogic = ({
   exam,
   student,
@@ -43,6 +55,11 @@ export const useStudentExamLogic = ({
 
   const [activeExam, setActiveExam] = useState<Exam>(exam);
   const lastConfigJsonRef = useRef<string>(JSON.stringify(exam.config));
+  const latestVersionRef = useRef<number>(
+    typeof exam.version === "number"
+      ? exam.version
+      : (typeof exam.config?.version === "number" ? exam.config.version : 1)
+  );
 
   // Session Timeout & Grace Period State
   const [isSessionTimeoutModalOpen] = useState(false);
@@ -57,10 +74,20 @@ export const useStudentExamLogic = ({
   const timeLeftRef = useRef(0);
   const lastBroadcastTimeRef = useRef<number>(0);
   const examRoomChannelRef = useRef<RealtimeChannel | null>(null);
-  const lastSyncedAnswersJsonRef = useRef<string>(
-    initialData?.answers ? JSON.stringify(initialData.answers) : ""
+  const lastSyncedSignatureRef = useRef<string>(
+    getQuestionAnswersSignature(initialData?.answers)
   );
+  const lastServerSyncAtRef = useRef<number>(Date.now());
+  const isStateLoadedRef = useRef<boolean>(false);
+  const studentResultIdRef = useRef<number | undefined>(student.resultId ?? initialData?.id);
   const isAutoSavingRef = useRef(false);
+
+  useEffect(() => {
+    const nextId = student.resultId ?? initialData?.id;
+    if (typeof nextId === "number" && nextId > 0) {
+      studentResultIdRef.current = nextId;
+    }
+  }, [student.resultId, initialData?.id]);
 
   const [matchingOptionsMap] = useState<Record<string, string[]>>(() => {
     const map: Record<string, string[]> = {};
@@ -191,7 +218,30 @@ export const useStudentExamLogic = ({
             .catch(() => {});
         }
 
-        await storageService.clearLocalProgress(STORAGE_KEY);
+        await storageService.waitForQueueSaved();
+
+        if (
+          resolvedStatus === "force_closed" &&
+          !currentIsPR &&
+          activeExam.config.detectBehavior &&
+          activeExam.config.continueWithPermission
+        ) {
+          try {
+            localStorage.setItem(`exam_lock_${activeExam.code}_${student.studentId}`, "1");
+          } catch {
+            // ignore
+          }
+          await storageService.saveLocalProgress(STORAGE_KEY, {
+            answers: answersRef.current,
+            logs: logRef.current,
+            status: "force_closed",
+            resultId: studentResultIdRef.current,
+            lastUpdated: Date.now(),
+          });
+        } else {
+          await storageService.clearLocalProgress(STORAGE_KEY);
+        }
+
         try {
           localStorage.removeItem(`exam_last_q_${activeExam.code}_${student.studentId}`);
         } catch {
@@ -306,6 +356,35 @@ export const useStudentExamLogic = ({
     // HARD BLOCK: Ensure Realtime is ONLY enabled if disableRealtime is explicitly false.
     const isRealtimeEnabled = exam.config.disableRealtime === false;
 
+    const applyVersionBundleUpdate = (newVersion?: number) => {
+      if (typeof newVersion !== "number" || newVersion <= latestVersionRef.current) {
+        return;
+      }
+      latestVersionRef.current = newVersion;
+      fetch(`/api/exam-content/${exam.code}/test?v=${newVersion}`)
+        .then((res) => res.json())
+        .then((json) => {
+          if (json.success && Array.isArray(json.questions)) {
+            setActiveExam((current) => {
+              const qMap = new Map(json.questions.map((q: Question) => [q.id, q]));
+              const updated = current.questions.map((q) => (qMap.get(q.id) as Question) || q);
+              storageService.saveLocalProgress(`edge_bundle_${exam.code}`, {
+                version: newVersion,
+                questions: updated,
+                savedAt: Date.now(),
+              }).catch(() => {});
+              return {
+                ...current,
+                questions: updated,
+                version: newVersion,
+                config: { ...current.config, version: newVersion },
+              };
+            });
+          }
+        })
+        .catch(() => {});
+    };
+
     if (isRealtimeEnabled) {
       channel = supabase
         .channel(`exam-config-${exam.code}`)
@@ -319,7 +398,6 @@ export const useStudentExamLogic = ({
           },
           (payload) => {
             const newConfig = payload.new.config;
-            const newVersion = payload.new.version;
             if (newConfig) {
               const nextConfigJson = JSON.stringify(newConfig);
               if (nextConfigJson !== lastConfigJsonRef.current) {
@@ -327,26 +405,10 @@ export const useStudentExamLogic = ({
                 setActiveExam((prev) => ({ ...prev, config: newConfig }));
               }
             }
-            if (typeof newVersion === "number") {
-              setActiveExam((prev) => {
-                if (!prev.version || newVersion > prev.version) {
-                  // Fetch updated sanitized question bundle from Vercel Edge CDN
-                  fetch(`/api/exam-content/${exam.code}/test?v=${newVersion}`)
-                    .then((res) => res.json())
-                    .then((json) => {
-                      if (json.success && Array.isArray(json.questions)) {
-                        setActiveExam((current) => {
-                          const qMap = new Map(json.questions.map((q: Question) => [q.id, q]));
-                          const updated = current.questions.map((q) => (qMap.get(q.id) as Question) || q);
-                          return { ...current, questions: updated, version: newVersion };
-                        });
-                      }
-                    })
-                    .catch(() => {});
-                }
-                return prev;
-              });
-            }
+            const newVersion = typeof newConfig?.version === "number"
+              ? newConfig.version
+              : (typeof payload.new.version === "number" ? payload.new.version : undefined);
+            applyVersionBundleUpdate(newVersion);
           },
         )
         .subscribe();
@@ -359,10 +421,10 @@ export const useStudentExamLogic = ({
       if (!isPolling) return;
       if (typeof navigator !== "undefined" && navigator.onLine !== false) {
         try {
-          // Select extreme for exams (lightweight: status, config, version)
+          // Select lightweight exam columns (version is stored in config.version)
           const { data } = await supabase
             .from("exams")
-            .select("status, config, version")
+            .select("status, config")
             .eq("code", exam.code)
             .single();
           if (data) {
@@ -378,25 +440,10 @@ export const useStudentExamLogic = ({
                 lastConfigJsonRef.current = nextConfigJson;
                 setActiveExam((prev) => ({ ...prev, config: data.config }));
               }
-            }
-            if (typeof data.version === "number") {
-              setActiveExam((prev) => {
-                if (!prev.version || data.version > prev.version) {
-                  fetch(`/api/exam-content/${exam.code}/test?v=${data.version}`)
-                    .then((res) => res.json())
-                    .then((json) => {
-                      if (json.success && Array.isArray(json.questions)) {
-                        setActiveExam((current) => {
-                          const qMap = new Map(json.questions.map((q: Question) => [q.id, q]));
-                          const updated = current.questions.map((q) => (qMap.get(q.id) as Question) || q);
-                          return { ...current, questions: updated, version: data.version };
-                        });
-                      }
-                    })
-                    .catch(() => {});
-                }
-                return prev;
-              });
+              const nextVersion = typeof (data.config as any).version === "number"
+                ? (data.config as any).version
+                : undefined;
+              applyVersionBundleUpdate(nextVersion);
             }
           }
 
@@ -471,6 +518,7 @@ export const useStudentExamLogic = ({
         storageService.saveLocalProgress(newKey, {
           answers: answersRef.current,
           logs: logRef.current,
+          resultId: studentResultIdRef.current,
           lastUpdated: Date.now(),
         });
         storageService.clearLocalProgress(oldKey);
@@ -492,8 +540,11 @@ export const useStudentExamLogic = ({
         }
         const localData = (await storageService.getLocalProgress(
           STORAGE_KEY,
-        )) as { answers?: Record<string, string>; logs?: string[] } | null;
+        )) as { answers?: Record<string, string>; logs?: string[]; resultId?: number } | null;
         if (localData) {
+          if (typeof localData.resultId === "number" && localData.resultId > 0 && !studentResultIdRef.current) {
+            studentResultIdRef.current = localData.resultId;
+          }
           const loadedAnswers = localData.answers || {};
           // Fix sorting for old data
           Object.keys(loadedAnswers).forEach((qId) => {
@@ -553,6 +604,10 @@ export const useStudentExamLogic = ({
           setAnswers(loadedAnswers);
           answersRef.current = loadedAnswers;
           if (localData.logs) logRef.current = localData.logs;
+          lastSyncedSignatureRef.current = initialData?.id
+            ? getQuestionAnswersSignature(initialData.answers)
+            : "{}";
+          isStateLoadedRef.current = true;
           return;
         }
         if (initialData?.answers) {
@@ -614,6 +669,7 @@ export const useStudentExamLogic = ({
           }
           setAnswers(loadedAnswers);
           answersRef.current = loadedAnswers;
+          lastSyncedSignatureRef.current = getQuestionAnswersSignature(loadedAnswers);
         } else {
           let deviceId = localStorage.getItem("deviceId");
           if (!deviceId) {
@@ -623,7 +679,9 @@ export const useStudentExamLogic = ({
           const loadedAnswers = { _startTime: Date.now().toString(), _deviceId: deviceId };
           setAnswers(loadedAnswers);
           answersRef.current = loadedAnswers;
+          lastSyncedSignatureRef.current = "{}";
         }
+        isStateLoadedRef.current = true;
       })();
       await loadPromiseRef.current;
     };
@@ -634,48 +692,107 @@ export const useStudentExamLogic = ({
     isSubmittingRef.current = isSubmitting;
   }, [isSubmitting]);
 
-  // Periodic Server Auto-Save (REST-only without Realtime, min 60s, dirty-checked, answers payload only)
+  // Adaptive Dirty-Checked Server Auto-Save:
+  // - Normal phase: min 60s wait since session start / last server sync AND only sends if question answers changed
+  // - Critical phase (remaining time <= 5% of total exam duration): reduces wait to 20s with identical dirty-check rules
   useEffect(() => {
     if (student.class === "PREVIEW") return;
-    const intervalMs = Math.max(
+
+    const baseCooldownMs = Math.max(
       60000,
       (Number(activeExam.config.autoSaveInterval) || 60) * 1000,
     );
 
     const runAutoSave = async () => {
-      if (isSubmittingRef.current || isAutoSavingRef.current) return;
+      if (!isStateLoadedRef.current || isSubmittingRef.current || isAutoSavingRef.current) return;
       if (typeof navigator !== "undefined" && navigator.onLine === false) return;
-      if (!student.resultId) return;
 
       const currentAnswers = answersRef.current;
-      const currentJson = JSON.stringify(currentAnswers);
-      if (!currentJson || currentJson === lastSyncedAnswersJsonRef.current) {
+      const currentSignature = getQuestionAnswersSignature(currentAnswers);
+      // Strict dirty check: no change -> zero requests sent
+      if (currentSignature === lastSyncedSignatureRef.current) {
+        return;
+      }
+
+      const mode = (activeExam.config.examMode || "UJIAN").trim().toUpperCase();
+      const currentIsPR = mode === "PR";
+      const timeLimitMin = Number(activeExam.config.timeLimit) || 0;
+      const totalDurationSec = !currentIsPR && timeLimitMin > 0 ? timeLimitMin * 60 : 0;
+      const currentLeft = timeLeftRef.current;
+      const isLastFivePercent =
+        totalDurationSec > 0 &&
+        typeof currentLeft === "number" &&
+        currentLeft > 0 &&
+        currentLeft !== Infinity &&
+        currentLeft <= Math.ceil(totalDurationSec * 0.05);
+
+      const cooldownMs = isLastFivePercent ? 20000 : baseCooldownMs;
+
+      // Strict minimum cooldown wait (60s normal / 20s last 5%) before sending changes
+      if (Date.now() - lastServerSyncAtRef.current < cooldownMs) {
         return;
       }
 
       isAutoSavingRef.current = true;
+      const payloadSnapshot = { ...currentAnswers };
       try {
-        const ok = await storageService.autoSaveStudentAnswers({
-          resultId: student.resultId,
+        const res = await storageService.autoSaveStudentAnswers({
+          resultId: studentResultIdRef.current,
           examCode: activeExam.code,
           studentId: student.studentId,
-          answers: { ...currentAnswers },
+          studentName: student.fullName,
+          className: student.class,
+          schoolName: student.schoolName || "",
+          answers: payloadSnapshot,
         });
-        if (ok) {
-          lastSyncedAnswersJsonRef.current = currentJson;
+
+        if (res.lockedStatus && !isSubmittingRef.current) {
+          handleSubmit(true, res.lockedStatus);
+          return;
+        }
+
+        if (res.ok) {
+          lastSyncedSignatureRef.current = currentSignature;
+          lastServerSyncAtRef.current = Date.now();
+          if (typeof res.resultId === "number" && res.resultId > 0) {
+            studentResultIdRef.current = res.resultId;
+            storageService.saveLocalProgress(STORAGE_KEY, {
+              answers: answersRef.current,
+              logs: logRef.current,
+              resultId: res.resultId,
+              lastUpdated: Date.now(),
+            }).catch(() => {});
+            try {
+              const rawSession = localStorage.getItem("ujiancerdas_active_exam_session");
+              if (rawSession) {
+                const parsed = JSON.parse(rawSession);
+                if (parsed?.student) {
+                  parsed.student.resultId = res.resultId;
+                  localStorage.setItem("ujiancerdas_active_exam_session", JSON.stringify(parsed));
+                }
+              }
+            } catch {
+              // ignore
+            }
+          }
         }
       } finally {
         isAutoSavingRef.current = false;
       }
     };
 
-    const timer = setInterval(runAutoSave, intervalMs);
+    const timer = setInterval(runAutoSave, 2000);
     return () => clearInterval(timer);
   }, [
+    STORAGE_KEY,
     activeExam.code,
     activeExam.config.autoSaveInterval,
+    activeExam.config.examMode,
+    activeExam.config.timeLimit,
+    handleSubmit,
     student.class,
-    student.resultId,
+    student.fullName,
+    student.schoolName,
     student.studentId,
   ]);
 
@@ -726,6 +843,7 @@ export const useStudentExamLogic = ({
           storageService.saveLocalProgress(STORAGE_KEY, {
             answers: next,
             logs: logRef.current,
+            resultId: studentResultIdRef.current,
             lastUpdated: Date.now(),
           });
           try {
@@ -846,22 +964,30 @@ export const useStudentExamLogic = ({
       await storageService.saveLocalProgress(STORAGE_KEY, {
         answers: answersRef.current,
         logs: logRef.current,
+        resultId: studentResultIdRef.current,
+        lastUpdated: Date.now(),
       });
-      const currentJson = JSON.stringify(answersRef.current);
+      const currentSignature = getQuestionAnswersSignature(answersRef.current);
       if (
         student.class !== "PREVIEW" &&
-        student.resultId &&
-        currentJson !== lastSyncedAnswersJsonRef.current &&
+        currentSignature !== lastSyncedSignatureRef.current &&
         (typeof navigator === "undefined" || navigator.onLine !== false)
       ) {
-        const ok = await storageService.autoSaveStudentAnswers({
-          resultId: student.resultId,
+        const res = await storageService.autoSaveStudentAnswers({
+          resultId: studentResultIdRef.current,
           examCode: activeExam.code,
           studentId: student.studentId,
+          studentName: student.fullName,
+          className: student.class,
+          schoolName: student.schoolName || "",
           answers: { ...answersRef.current },
         });
-        if (ok) {
-          lastSyncedAnswersJsonRef.current = currentJson;
+        if (res.ok) {
+          lastSyncedSignatureRef.current = currentSignature;
+          lastServerSyncAtRef.current = Date.now();
+          if (typeof res.resultId === "number" && res.resultId > 0) {
+            studentResultIdRef.current = res.resultId;
+          }
         }
       }
       if (onUpdate) {

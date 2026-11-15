@@ -1,6 +1,7 @@
 import { useState, useRef, useMemo, useEffect } from "react";
 import { Student, ExamConfig } from "../../types";
 import { storageService } from "../../services/storage";
+import { offlineService } from "../../services/offline";
 import { supabase } from "../../lib/supabase";
 import { normalizeDateString, toAbsoluteUtcTimestamp } from "../../utils/timezoneUtils";
 
@@ -53,6 +54,7 @@ export const useStudentEntryForm = ({ initialCode, onLoginSuccess }: UseStudentE
   
   const examCodeInputRef = useRef<HTMLInputElement>(null);
   const nameInputRef = useRef<HTMLInputElement>(null);
+  const prefetchedConfigRef = useRef<{ code: string; config: ExamConfig } | null>(null);
 
   // Derived state for absent/NIS limit
   const { limit: absentLimit } = parseClassConfig(studentClass);
@@ -315,118 +317,125 @@ export const useStudentEntryForm = ({ initialCode, onLoginSuccess }: UseStudentE
     return [];
   }, [filteredStudents, absentLimit]);
 
-  // Auto-fetch config and load scoped student data when code changes
+  // Auto-fetch config and load scoped student data when code changes (debounced)
   useEffect(() => {
     let isMounted = true;
-    const checkConfig = async () => {
-      const cleanCode = examCode.toUpperCase().trim();
-      if (cleanCode.length === 6) {
-        setIsCheckingCode(true);
-        // Load scoped student data for this specific exam code
-        try {
-          const scopedData = localStorage.getItem(`student_pref_${cleanCode}`);
-          if (scopedData && isMounted) {
-            const parsed = JSON.parse(scopedData);
-            if (parsed.fullName) setFullName(parsed.fullName);
-            if (parsed.schoolName) setSchoolName(parsed.schoolName);
-            if (parsed.studentClass) setStudentClass(parsed.studentClass);
-            if (parsed.absentNumber) setAbsentNumber(parsed.absentNumber);
-          }
-        } catch {
-          /* ignore */
-        }
+    const cleanCode = examCode.toUpperCase().trim();
 
-        try {
-          const config = await storageService.getExamConfig(cleanCode);
-          const { data: regData } = await supabase
-            .from("registered_students")
-            .select("*")
-            .eq("exam_code", cleanCode);
+    if (cleanCode.length !== 6) {
+      prefetchedConfigRef.current = null;
+      setAvailableClasses([]);
+      setRegisteredData([]);
+      setIsCheckingCode(false);
+      return;
+    }
 
-          if (!isMounted) return;
+    setIsCheckingCode(true);
 
-          const combinedRegData = regData ? [...regData] : [];
-          if (config && config.registeredStudents && config.registeredStudents.length > 0) {
-            config.registeredStudents.forEach((cs: any, idx: number) => {
-              const sName = cs.student_name || cs.fullName || "";
-              const cName = cs.class_name || cs.className || "";
-              const aNum = cs.absent_number || cs.absentNumber || "";
-              const sSchool = cs.school_name || cs.schoolName || "";
-              const already = combinedRegData.some(
-                (r) =>
-                  (r.student_name || "").trim().toLowerCase() === sName.trim().toLowerCase() &&
-                  normalizeClassName(r.class_name) === normalizeClassName(cName)
-              );
-              if (!already) {
-                combinedRegData.push({
-                  id: cs.id || `cfg-${idx}`,
-                  exam_code: cleanCode,
-                  school_name: sSchool,
-                  class_name: cName,
-                  student_name: sName,
-                  absent_number: aNum,
-                  is_active: false,
-                });
-              }
-            });
-          }
-
-          if (combinedRegData.length > 0) {
-            setRegisteredData(combinedRegData);
-            const schools = Array.from(
-              new Set(combinedRegData.map((r) => r.school_name).filter(Boolean)),
-            );
-            if (schools.length === 1) {
-              setSchoolName(schools[0]);
-            } else if (schools.length > 1) {
-              setSchoolName((prev) => (schools.includes(prev) ? prev : ""));
-            }
-          } else {
-            setRegisteredData([]);
-          }
-
-          if (
-            config &&
-            config.targetClasses &&
-            config.targetClasses.length > 0
-          ) {
-            setAvailableClasses(config.targetClasses);
-            setStudentClass((prev) => {
-              if (prev && !config.targetClasses?.includes(prev)) return "";
-              return prev;
-            });
-
-            if (combinedRegData.length === 0) {
-              const schools = new Set<string>();
-              config.targetClasses.forEach((c) => {
-                const parsed = parseClassConfig(c);
-                if (parsed.schoolName) schools.add(parsed.schoolName);
-              });
-              if (schools.size === 1) {
-                setSchoolName(Array.from(schools)[0]);
-              } else if (schools.size > 1) {
-                setSchoolName((prev) => (schools.has(prev) ? prev : ""));
-              }
-            }
-          } else {
-            setAvailableClasses([]);
-          }
-        } catch (err) {
-          console.error("Error fetching config", err);
-        } finally {
-          if (isMounted) setIsCheckingCode(false);
-        }
-      } else {
-        if (isMounted) {
-          setAvailableClasses([]);
-          setRegisteredData([]);
-          setIsCheckingCode(false);
-        }
+    // Load scoped student data immediately without waiting for network debounce
+    try {
+      const scopedData = localStorage.getItem(`student_pref_${cleanCode}`);
+      if (scopedData && isMounted) {
+        const parsed = JSON.parse(scopedData);
+        if (parsed.fullName) setFullName(parsed.fullName);
+        if (parsed.schoolName) setSchoolName(parsed.schoolName);
+        if (parsed.studentClass) setStudentClass(parsed.studentClass);
+        if (parsed.absentNumber) setAbsentNumber(parsed.absentNumber);
       }
-    };
-    checkConfig();
+    } catch {
+      /* ignore */
+    }
+
+    const debounceTimer = setTimeout(async () => {
+      try {
+        const [{ config }, { data: regData }] = await Promise.all([
+          storageService.getExamConfigStatus(cleanCode),
+          supabase
+            .from("registered_students")
+            .select("id, exam_code, school_name, class_name, student_name, absent_number, is_active")
+            .eq("exam_code", cleanCode),
+        ]);
+
+        if (!isMounted) return;
+
+        prefetchedConfigRef.current = config ? { code: cleanCode, config } : null;
+
+        const combinedRegData = regData ? [...regData] : [];
+        if (config && config.registeredStudents && config.registeredStudents.length > 0) {
+          config.registeredStudents.forEach((cs: any, idx: number) => {
+            const sName = cs.student_name || cs.fullName || "";
+            const cName = cs.class_name || cs.className || "";
+            const aNum = cs.absent_number || cs.absentNumber || "";
+            const sSchool = cs.school_name || cs.schoolName || "";
+            const already = combinedRegData.some(
+              (r) =>
+                (r.student_name || "").trim().toLowerCase() === sName.trim().toLowerCase() &&
+                normalizeClassName(r.class_name) === normalizeClassName(cName)
+            );
+            if (!already) {
+              combinedRegData.push({
+                id: cs.id || `cfg-${idx}`,
+                exam_code: cleanCode,
+                school_name: sSchool,
+                class_name: cName,
+                student_name: sName,
+                absent_number: aNum,
+                is_active: false,
+              });
+            }
+          });
+        }
+
+        if (combinedRegData.length > 0) {
+          setRegisteredData(combinedRegData);
+          const schools = Array.from(
+            new Set(combinedRegData.map((r) => r.school_name).filter(Boolean)),
+          );
+          if (schools.length === 1) {
+            setSchoolName(schools[0]);
+          } else if (schools.length > 1) {
+            setSchoolName((prev) => (schools.includes(prev) ? prev : ""));
+          }
+        } else {
+          setRegisteredData([]);
+        }
+
+        if (
+          config &&
+          config.targetClasses &&
+          config.targetClasses.length > 0
+        ) {
+          setAvailableClasses(config.targetClasses);
+          setStudentClass((prev) => {
+            if (prev && !config.targetClasses?.includes(prev)) return "";
+            return prev;
+          });
+
+          if (combinedRegData.length === 0) {
+            const schools = new Set<string>();
+            config.targetClasses.forEach((c) => {
+              const parsed = parseClassConfig(c);
+              if (parsed.schoolName) schools.add(parsed.schoolName);
+            });
+            if (schools.size === 1) {
+              setSchoolName(Array.from(schools)[0]);
+            } else if (schools.size > 1) {
+              setSchoolName((prev) => (schools.has(prev) ? prev : ""));
+            }
+          }
+        } else {
+          setAvailableClasses([]);
+        }
+      } catch (err) {
+        console.error("Error fetching config", err);
+      } finally {
+        if (isMounted) setIsCheckingCode(false);
+      }
+    }, 250);
+
     return () => {
       isMounted = false;
+      clearTimeout(debounceTimer);
     };
   }, [examCode]);
 
@@ -479,9 +488,24 @@ export const useStudentEntryForm = ({ initialCode, onLoginSuccess }: UseStudentE
     setError("");
 
     try {
-      const config = await storageService.getExamConfig(cleanExamCode);
+      const isBrowserOffline = typeof navigator !== "undefined" && navigator.onLine === false;
+      let config: ExamConfig | null = null;
+      let isConfigNetErr = isBrowserOffline;
+
+      if (!isBrowserOffline && prefetchedConfigRef.current?.code === cleanExamCode) {
+        config = prefetchedConfigRef.current.config;
+      } else {
+        const cfgStatus = await storageService.getExamConfigStatus(cleanExamCode);
+        config = cfgStatus.config;
+        isConfigNetErr = cfgStatus.isNetworkError;
+      }
+
       if (!config) {
-        setError("Kode ujian tidak ditemukan atau tidak aktif");
+        setError(
+          isConfigNetErr
+            ? "Perangkat sedang offline. Sambungkan ke internet untuk mengunduh soal dan mendaftarkan sesi ujian."
+            : "Kode ujian tidak ditemukan atau tidak aktif",
+        );
         setIsLoading(false);
         return;
       }
@@ -521,10 +545,9 @@ export const useStudentEntryForm = ({ initialCode, onLoginSuccess }: UseStudentE
         schoolName: cleanSchoolName,
       };
 
-      const result = await storageService.getStudentResult(
-        cleanExamCode,
-        studentId,
-      );
+      const { result, isNetworkError: isResultNetErr } =
+        await storageService.getStudentResultStatus(cleanExamCode, studentId);
+      const isOfflineFlow = isBrowserOffline || isConfigNetErr || isResultNetErr;
 
       // --- DEADLINE CHECK ---
       const mode = (config.examMode || 'UJIAN').trim().toUpperCase();
@@ -554,7 +577,62 @@ export const useStudentEntryForm = ({ initialCode, onLoginSuccess }: UseStudentE
       }
       // ----------------------
 
-      if (result) {
+      const lockKey = `exam_lock_${cleanExamCode}_${studentId}`;
+
+      if (isOfflineFlow && !result) {
+        const isNotPR = !isPR;
+        const requiresLock = isNotPR && !!config.detectBehavior && !!config.continueWithPermission;
+        let hasLocalLock = false;
+        try {
+          hasLocalLock = localStorage.getItem(lockKey) === "1";
+        } catch {
+          /* ignore */
+        }
+
+        const localProgress = (await storageService.getLocalProgress(
+          `exam_local_${cleanExamCode}_${studentId}`,
+        )) as { status?: string } | null;
+
+        const queued = offlineService
+          .getSyncQueue()
+          .find((q) => q.examCode === cleanExamCode && q.student.studentId === studentId);
+
+        if (
+          requiresLock &&
+          (hasLocalLock ||
+            localProgress?.status === "force_closed" ||
+            queued?.status === "force_closed")
+        ) {
+          setError(
+            "Sesi ini terkunci karena terdeteksi pelanggaran. Sambungkan ke internet dan hubungi pengawas untuk membuka kunci.",
+          );
+          setPendingStudentData({ cleanExamCode, studentData, config });
+          setIsLocked(true);
+          setIsLoading(false);
+          return;
+        }
+
+        if (queued?.status === "completed" && !config.allowRetakes) {
+          setError(
+            "Jawaban ujian untuk peserta ini sudah selesai dikerjakan dan menunggu sinkronisasi. Sambungkan ke internet untuk mengirim dan melihat hasil.",
+          );
+          setIsLoading(false);
+          return;
+        }
+
+        const [cachedOfflineExam, cachedEdgeBundle] = await Promise.all([
+          storageService.getLocalProgress(`offline_exam_${cleanExamCode}`),
+          storageService.getLocalProgress(`edge_bundle_${cleanExamCode}`),
+        ]);
+
+        if ((!cachedOfflineExam && !cachedEdgeBundle) || !localProgress) {
+          setError(
+            "Perangkat sedang offline dan belum ada sesi ujian aktif di perangkat ini. Sambungkan ke internet untuk masuk dan mengunduh soal.",
+          );
+          setIsLoading(false);
+          return;
+        }
+      } else if (result) {
         const isNotPR = !isPR;
 
         // Jika ujian sudah selesai dan tidak boleh retake, izinkan login agar App.tsx dapat mengarahkan ke halaman hasil.
@@ -632,9 +710,14 @@ export const useStudentEntryForm = ({ initialCode, onLoginSuccess }: UseStudentE
         JSON.stringify(scopedPref),
       );
 
-      // Clear pending locks
-      const lockKey = `exam_lock_${cleanExamCode}_${studentId}`;
-      localStorage.removeItem(lockKey);
+      // Clear pending locks ONLY when online check verified student is allowed
+      if (!isOfflineFlow) {
+        try {
+          localStorage.removeItem(lockKey);
+        } catch {
+          /* ignore */
+        }
+      }
 
       setPendingStudentData({ cleanExamCode, studentData, config });
       setIsLoading(false);
