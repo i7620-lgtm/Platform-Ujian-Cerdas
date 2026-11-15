@@ -298,8 +298,11 @@ export const useTeacherDashboard = ({
                 detectBehavior: false,
                 continueWithPermission: false,
                 trackLocation: false,
+                allowOvertime: false,
               }
-            : {}),
+            : !(Number(examData.config.timeLimit) > 0)
+              ? { allowOvertime: false }
+              : {}),
           isFinished: false, // Reset on save/publish to ensure it's not stuck in finished state
         },
       };

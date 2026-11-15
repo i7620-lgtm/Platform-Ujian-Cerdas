@@ -111,21 +111,34 @@ export const useExamEditor = ({
       if (type === "checkbox") {
         const { checked } = e.target as HTMLInputElement;
         handleConfigChangeManual((prev) => {
+          const isPR = (prev.examMode || "").trim().toUpperCase() === "PR";
           const newConfig = { ...prev, [name]: checked };
-          if (name === "detectBehavior" && !checked)
+          if (name === "detectBehavior" && !checked) {
             newConfig.continueWithPermission = false;
+          }
+          if (name === "continueWithPermission" && (!prev.detectBehavior || isPR)) {
+            newConfig.continueWithPermission = false;
+          }
+          if (name === "allowOvertime" && (isPR || !(Number(prev.timeLimit) > 0))) {
+            newConfig.allowOvertime = false;
+          }
           return newConfig;
         });
       } else {
         handleConfigChangeManual((prev) => {
+          const parsedLimit = name === "timeLimit" ? parseInt(value) || 0 : prev.timeLimit;
           const newConfig = {
             ...prev,
-            [name]: name === "timeLimit" ? parseInt(value) || 0 : value,
+            [name]: name === "timeLimit" ? parsedLimit : value,
           };
+          if (name === "timeLimit" && parsedLimit <= 0) {
+            newConfig.allowOvertime = false;
+          }
           if (name === "examMode" && value === "PR") {
             newConfig.detectBehavior = false;
             newConfig.continueWithPermission = false;
             newConfig.trackLocation = false;
+            newConfig.allowOvertime = false;
             if (!newConfig.endTime || newConfig.endTime === "10:00") {
               newConfig.endTime = "23:59";
             }
