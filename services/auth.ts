@@ -1,70 +1,40 @@
 import { supabase } from '../lib/supabase';
 import type { TeacherProfile, AccountType, UserProfile } from '../types';
 
+const PROFILE_EXTENDED_PREFIX = 'profile_extended_';
+const PROFILE_CORE_COLUMNS = 'id, full_name, role, school, regency, is_premium';
+const PROFILE_LIST_COLUMNS = 'id, full_name, role, school, is_premium';
+
 export class AuthService {
-    async getCurrentUser(): Promise<TeacherProfile | null> {
-        const auth = supabase.auth;
-        const { data: { session }, error: sessionError } = await auth.getSession();
-        
-        if (sessionError) {
-            if (sessionError.message.includes('Refresh Token Not Found') || sessionError.message.includes('Invalid Refresh Token')) {
-                await auth.signOut().catch(() => {});
-            }
-            return null;
-        }
-        
-        if (!session?.user) return null;
-
-        const { data: profile, error } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', session.user.id)
-            .maybeSingle();
-
-        if (error) return null;
-
-        if (!profile) {
-            const meta = session.user.user_metadata || {};
-            const { data: newProfile, error: insertError } = await supabase
-                .from('profiles')
-                .insert({
-                    id: session.user.id,
-                    full_name: meta.full_name || meta.name || 'Pengguna',
-                    school: '-',
-                    regency: '-',
-                    role: 'guru'
-                })
-                .select()
-                .single();
-            
-            if (insertError || !newProfile) return null;
-
-            return {
-                id: session.user.id,
-                fullName: newProfile.full_name,
-                accountType: newProfile.role as AccountType,
-                school: newProfile.school,
-                regency: newProfile.regency,
-                nip: meta.nip || '',
-                nipType: meta.nipType || 'NIP',
-                headmasterName: meta.headmasterName || '',
-                headmasterNip: meta.headmasterNip || '',
-                headmasterNipType: meta.headmasterNipType || 'NIP',
-                email: session.user.email,
-                isPremium: newProfile.is_premium
-            };
-        }
-
-        const meta = session.user.user_metadata || {};
-        // Local cache fallback for instant offline/speed retrieval
-        let cachedData: any = {};
+    private clearProfileExtendedCache(userId?: string): void {
         try {
-            const raw = localStorage.getItem(`profile_extended_${session.user.id}`);
-            if (raw) cachedData = JSON.parse(raw);
-        } catch {}
+            if (typeof window === 'undefined' || !window.localStorage) return;
+            if (userId) {
+                localStorage.removeItem(`${PROFILE_EXTENDED_PREFIX}${userId}`);
+                return;
+            }
+            const keysToRemove: string[] = [];
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (key && key.startsWith(PROFILE_EXTENDED_PREFIX)) {
+                    keysToRemove.push(key);
+                }
+            }
+            keysToRemove.forEach((key) => localStorage.removeItem(key));
+        } catch {
+            /* ignore localStorage access errors */
+        }
+    }
 
+    private mapToTeacherProfile(
+        userId: string,
+        email: string | undefined,
+        meta: Record<string, any>,
+        profile: Record<string, any>,
+        cachedData: Record<string, any> = {}
+    ): TeacherProfile {
         return {
-            id: session.user.id,
+            id: userId,
             fullName: profile.full_name,
             accountType: profile.role as AccountType,
             school: profile.school,
@@ -74,7 +44,7 @@ export class AuthService {
             headmasterName: profile.headmaster_name || meta.headmasterName || cachedData.headmasterName || '',
             headmasterNip: profile.headmaster_nip || meta.headmasterNip || cachedData.headmasterNip || '',
             headmasterNipType: (profile.headmaster_nip_type || meta.headmasterNipType || cachedData.headmasterNipType || 'NIP') as 'NIP' | 'NIPPPK',
-            email: session.user.email,
+            email,
             isPremium: profile.is_premium,
 
             // Instansi & Kop Sekolah
@@ -100,6 +70,59 @@ export class AuthService {
         };
     }
 
+    async getCurrentUser(): Promise<TeacherProfile | null> {
+        const auth = supabase.auth;
+        const { data: { session }, error: sessionError } = await auth.getSession();
+
+        if (sessionError) {
+            if (sessionError.message.includes('Refresh Token Not Found') || sessionError.message.includes('Invalid Refresh Token')) {
+                await auth.signOut().catch(() => {});
+                this.clearProfileExtendedCache();
+            }
+            return null;
+        }
+
+        if (!session?.user) return null;
+
+        const { data: profile, error } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', session.user.id)
+            .maybeSingle();
+
+        if (error) return null;
+
+        const meta = session.user.user_metadata || {};
+
+        if (!profile) {
+            const { data: newProfile, error: insertError } = await supabase
+                .from('profiles')
+                .insert({
+                    id: session.user.id,
+                    full_name: meta.full_name || meta.name || 'Pengguna',
+                    school: '-',
+                    regency: '-',
+                    role: 'guru'
+                })
+                .select(PROFILE_CORE_COLUMNS)
+                .single();
+
+            if (insertError || !newProfile) return null;
+            return this.mapToTeacherProfile(session.user.id, session.user.email, meta, newProfile);
+        }
+
+        // Local cache fallback for instant offline/speed retrieval
+        let cachedData: Record<string, any> = {};
+        try {
+            const raw = localStorage.getItem(`${PROFILE_EXTENDED_PREFIX}${session.user.id}`);
+            if (raw) cachedData = JSON.parse(raw);
+        } catch {
+            /* ignore malformed cache */
+        }
+
+        return this.mapToTeacherProfile(session.user.id, session.user.email, meta, profile, cachedData);
+    }
+
     async _verifyRole(allowedRoles: AccountType[]): Promise<TeacherProfile> {
         const profile = await this.getCurrentUser();
         if (!profile || !allowedRoles.includes(profile.accountType)) {
@@ -109,8 +132,8 @@ export class AuthService {
     }
 
     async signUpWithEmail(email: string, password: string, fullName: string, school: string, regency: string): Promise<TeacherProfile> {
-        const { data: authData, error: authError } = await supabase.auth.signUp({ 
-            email, 
+        const { data: authData, error: authError } = await supabase.auth.signUp({
+            email,
             password,
             options: {
                 data: {
@@ -140,17 +163,20 @@ export class AuthService {
     async signInWithEmail(email: string, password: string): Promise<TeacherProfile> {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw new Error('Email atau password salah.');
-        
-        await new Promise(r => setTimeout(r, 500));
 
-        const profile = await this.getCurrentUser();
-        
+        let profile = await this.getCurrentUser();
+        if (!profile) {
+            await new Promise(r => setTimeout(r, 150));
+            profile = await this.getCurrentUser();
+        }
+
         if (!profile) throw new Error('Gagal memuat profil pengguna. Silakan hubungi admin.');
         return profile;
     }
 
     async signOut() {
         await supabase.auth.signOut();
+        this.clearProfileExtendedCache();
     }
 
     async updateTeacherProfile(id: string, updates: Partial<TeacherProfile> & { password?: string }): Promise<void> {
@@ -187,7 +213,7 @@ export class AuthService {
 
         // Save immediately to local persistent cache for zero-latency retrieval
         try {
-            const cacheKey = `profile_extended_${id}`;
+            const cacheKey = `${PROFILE_EXTENDED_PREFIX}${id}`;
             const existingRaw = localStorage.getItem(cacheKey);
             const currentCache = existingRaw ? JSON.parse(existingRaw) : {};
             localStorage.setItem(cacheKey, JSON.stringify({ ...currentCache, ...updates }));
@@ -202,28 +228,30 @@ export class AuthService {
                 .eq('id', id);
             if (error) {
                 // If custom columns don't exist in SQL profiles table, fallback to core fields
-                const { 
-                    nip, nip_type, headmaster_name, headmaster_nip, headmaster_nip_type,
-                    dinas_pendidikan, npsn, alamat_sekolah, desa_kelurahan, kecamatan,
-                    provinsi, kode_pos, email_sekolah, telepon_sekolah, website_sekolah,
-                    faksimile, logo_sekolah_url, logo_dinas_url, is_aksara_bali_active,
-                    aksara_bali_pemda, aksara_bali_dinas, aksara_bali_sekolah, aksara_bali_alamat,
-                    kop_divider_style,
-                    ...baseUpdates 
-                } = dbUpdates;
-                await supabase.from('profiles').update(baseUpdates).eq('id', id);
+                const baseUpdates: Record<string, any> = {};
+                if (dbUpdates.full_name !== undefined) baseUpdates.full_name = dbUpdates.full_name;
+                if (dbUpdates.school !== undefined) baseUpdates.school = dbUpdates.school;
+                if (dbUpdates.regency !== undefined) baseUpdates.regency = dbUpdates.regency;
+                if (Object.keys(baseUpdates).length > 0) {
+                    await supabase.from('profiles').update(baseUpdates).eq('id', id);
+                }
             }
         } catch {
-            const baseUpdates: any = {
-                full_name: updates.fullName,
-                school: updates.school,
-                regency: updates.regency,
-            };
-            await supabase.from('profiles').update(baseUpdates).eq('id', id).catch(() => {});
+            try {
+                const baseUpdates: Record<string, any> = {};
+                if (updates.fullName !== undefined) baseUpdates.full_name = updates.fullName;
+                if (updates.school !== undefined) baseUpdates.school = updates.school;
+                if (updates.regency !== undefined) baseUpdates.regency = updates.regency;
+                if (Object.keys(baseUpdates).length > 0) {
+                    await supabase.from('profiles').update(baseUpdates).eq('id', id);
+                }
+            } catch {
+                /* ignore fallback failure */
+            }
         }
 
         // Sync metadata & credentials via Supabase Auth (supports nested JSON attributes flawlessly)
-        const authUserUpdates: any = {
+        const authUserUpdates: Record<string, any> = {
             data: {
                 full_name: updates.fullName,
                 school: updates.school,
@@ -275,10 +303,26 @@ export class AuthService {
     async getAllUsers(): Promise<UserProfile[]> {
         await this._verifyRole(['super_admin']);
 
-        const { data: profiles, error } = await supabase.from('profiles').select('*');
-        if (error) throw error;
-        
-        return profiles.map((p: Record<string, unknown>) => ({
+        const PAGE_SIZE = 1000;
+        const allProfiles: Record<string, unknown>[] = [];
+        let from = 0;
+
+        while (true) {
+            const { data: pageRows, error } = await supabase
+                .from('profiles')
+                .select(PROFILE_LIST_COLUMNS)
+                .order('full_name', { ascending: true })
+                .range(from, from + PAGE_SIZE - 1);
+
+            if (error) throw error;
+            if (!pageRows || pageRows.length === 0) break;
+
+            allProfiles.push(...(pageRows as Record<string, unknown>[]));
+            if (pageRows.length < PAGE_SIZE) break;
+            from += PAGE_SIZE;
+        }
+
+        return allProfiles.map((p: Record<string, unknown>) => ({
             id: p.id as string,
             fullName: p.full_name as string,
             accountType: p.role as AccountType,
@@ -291,7 +335,7 @@ export class AuthService {
     async updateUserRole(userId: string, newRole: AccountType, newSchool: string, isPremium?: boolean): Promise<void> {
         await this._verifyRole(['super_admin']);
 
-        const updateData: any = { role: newRole, school: newSchool };
+        const updateData: Record<string, any> = { role: newRole, school: newSchool };
         if (isPremium !== undefined) {
             updateData.is_premium = isPremium;
         }
@@ -300,7 +344,7 @@ export class AuthService {
             .from('profiles')
             .update(updateData)
             .eq('id', userId);
-        
+
         if (error) throw error;
     }
 }
