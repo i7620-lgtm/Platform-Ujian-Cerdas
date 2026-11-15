@@ -369,6 +369,7 @@ export const ExamConfigSettings: React.FC<ExamConfigSettingsProps> = ({
                 detectBehavior: false,
                 continueWithPermission: false,
                 trackLocation: false,
+                allowOvertime: false,
                 endTime: prev.endTime && prev.endTime !== "10:00" ? prev.endTime : "23:59",
               }))
             }
@@ -559,74 +560,182 @@ export const ExamConfigSettings: React.FC<ExamConfigSettingsProps> = ({
           <DailySessionsSettings config={config} store={store} />
         )}
 
-        <div className="md:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4">
-          <label className="flex items-center p-3 rounded-xl border border-gray-100 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors cursor-pointer group shadow-sm">
-            <input
-              type="checkbox"
-              name="shuffleQuestions"
-              checked={config.shuffleQuestions || false}
-              onChange={handleConfigChange}
-              className="h-5 w-5 rounded text-primary focus:ring-primary border-gray-300"
-            />
-            <span className="ml-3 text-sm font-medium text-gray-700 dark:text-slate-300 group-hover:text-primary transition-colors">
-              Acak Soal
-            </span>
-          </label>
-          <label className="flex items-center p-3 rounded-xl border border-gray-100 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors cursor-pointer group shadow-sm">
-            <input
-              type="checkbox"
-              name="shuffleAnswers"
-              checked={config.shuffleAnswers || false}
-              onChange={handleConfigChange}
-              className="h-5 w-5 rounded text-primary focus:ring-primary border-gray-300"
-            />
-            <span className="ml-3 text-sm font-medium text-gray-700 dark:text-slate-300 group-hover:text-primary transition-colors">
-              Acak Opsi
-            </span>
-          </label>
-          <label className="flex items-center p-3 rounded-xl border border-gray-100 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors cursor-pointer group shadow-sm">
-            <input
-              type="checkbox"
-              name="allowRetakes"
-              checked={config.allowRetakes || false}
-              onChange={handleConfigChange}
-              className="h-5 w-5 rounded text-primary focus:ring-primary border-gray-300"
-            />
-            <span className="ml-3 text-sm font-medium text-gray-700 dark:text-slate-300 group-hover:text-primary transition-colors">
-              Izinkan Kerjakan Ulang
-            </span>
-          </label>
-          {(config.examMode || "").trim().toUpperCase() !== "PR" && (
-            <>
+        {(() => {
+          const isPRMode = (config.examMode || "").trim().toUpperCase() === "PR";
+          const isOvertimeDisabled = isPRMode || !(Number(config.timeLimit) > 0);
+          const isLockViolationDisabled = isPRMode || !config.detectBehavior;
+
+          return (
+            <div className="md:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4">
+              {/* Baris 1 Kiri: Acak Soal */}
               <label className="flex items-center p-3 rounded-xl border border-gray-100 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors cursor-pointer group shadow-sm">
                 <input
                   type="checkbox"
-                  name="detectBehavior"
-                  checked={config.detectBehavior || false}
+                  name="shuffleQuestions"
+                  checked={config.shuffleQuestions || false}
                   onChange={handleConfigChange}
-                  className="h-5 w-5 rounded text-primary focus:ring-primary border-gray-300"
+                  className="h-5 w-5 rounded text-primary focus:ring-primary border-gray-300 shrink-0"
                 />
                 <span className="ml-3 text-sm font-medium text-gray-700 dark:text-slate-300 group-hover:text-primary transition-colors">
-                  Deteksi Kecurangan
+                  Acak Soal
                 </span>
               </label>
-              {config.detectBehavior && (
-                <label className="flex items-center ml-6 p-2 rounded-lg transition-colors cursor-pointer group bg-rose-50 dark:bg-rose-900/30 text-rose-700 dark:text-rose-400">
-                  <input
-                    type="checkbox"
-                    name="continueWithPermission"
-                    checked={config.continueWithPermission || false}
-                    onChange={handleConfigChange}
-                    className="h-4 w-4 rounded border-rose-300 text-rose-600 focus:ring-rose-500"
-                  />
-                  <span className="ml-2 text-xs font-bold uppercase tracking-tight">
+
+              {/* Baris 1 Kanan: Acak Opsi */}
+              <label className="flex items-center p-3 rounded-xl border border-gray-100 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors cursor-pointer group shadow-sm">
+                <input
+                  type="checkbox"
+                  name="shuffleAnswers"
+                  checked={config.shuffleAnswers || false}
+                  onChange={handleConfigChange}
+                  className="h-5 w-5 rounded text-primary focus:ring-primary border-gray-300 shrink-0"
+                />
+                <span className="ml-3 text-sm font-medium text-gray-700 dark:text-slate-300 group-hover:text-primary transition-colors">
+                  Acak Opsi
+                </span>
+              </label>
+
+              {/* Baris 2 Kiri: Izinkan Kerjakan Ulang */}
+              <label className="flex items-center p-3 rounded-xl border border-gray-100 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors cursor-pointer group shadow-sm">
+                <input
+                  type="checkbox"
+                  name="allowRetakes"
+                  checked={config.allowRetakes || false}
+                  onChange={handleConfigChange}
+                  className="h-5 w-5 rounded text-primary focus:ring-primary border-gray-300 shrink-0"
+                />
+                <span className="ml-3 text-sm font-medium text-gray-700 dark:text-slate-300 group-hover:text-primary transition-colors">
+                  Izinkan Kerjakan Ulang
+                </span>
+              </label>
+
+              {/* Baris 2 Kanan: Izinkan Kerja Lewat Waktu */}
+              <label
+                title={
+                  isOvertimeDisabled
+                    ? "Hanya aktif pada Mode Ujian dengan durasi pengerjaan > 0 menit"
+                    : "Siswa yang mulai sebelum jam tutup tetap mendapat durasi pengerjaan penuh"
+                }
+                className={`flex items-start p-3 rounded-xl border transition-colors shadow-sm ${
+                  isOvertimeDisabled
+                    ? "border-gray-100 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-800/40 opacity-55 cursor-not-allowed"
+                    : "border-gray-100 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 cursor-pointer group"
+                }`}
+              >
+                <input
+                  type="checkbox"
+                  name="allowOvertime"
+                  checked={!isOvertimeDisabled && (config.allowOvertime || false)}
+                  disabled={isOvertimeDisabled}
+                  onChange={handleConfigChange}
+                  className="mt-0.5 h-5 w-5 rounded text-primary focus:ring-primary border-gray-300 disabled:cursor-not-allowed shrink-0"
+                />
+                <span className="ml-3 flex flex-col">
+                  <span
+                    className={`text-sm font-medium transition-colors ${
+                      isOvertimeDisabled
+                        ? "text-gray-500 dark:text-slate-400"
+                        : "text-gray-700 dark:text-slate-300 group-hover:text-primary"
+                    }`}
+                  >
+                    Izinkan Kerja Lewat Waktu
+                  </span>
+                  <span className="text-[11px] text-slate-400 dark:text-slate-500 leading-snug mt-0.5">
+                    {isOvertimeDisabled
+                      ? "Hanya aktif pada Mode Ujian dengan durasi > 0 menit."
+                      : "Siswa tetap memperoleh durasi penuh meski melewati jam selesai ujian/sesi."}
+                  </span>
+                </span>
+              </label>
+
+              {/* Baris 3 Kiri: Deteksi Kecurangan */}
+              <label
+                title={
+                  isPRMode
+                    ? "Tidak tersedia pada Mode PR / Latihan"
+                    : "Mencatat aktivitas keluar aplikasi atau berpindah tab selama ujian"
+                }
+                className={`flex items-start p-3 rounded-xl border transition-colors shadow-sm ${
+                  isPRMode
+                    ? "border-gray-100 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-800/40 opacity-55 cursor-not-allowed"
+                    : "border-gray-100 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 cursor-pointer group"
+                }`}
+              >
+                <input
+                  type="checkbox"
+                  name="detectBehavior"
+                  checked={!isPRMode && (config.detectBehavior || false)}
+                  disabled={isPRMode}
+                  onChange={handleConfigChange}
+                  className="mt-0.5 h-5 w-5 rounded text-primary focus:ring-primary border-gray-300 disabled:cursor-not-allowed shrink-0"
+                />
+                <span className="ml-3 flex flex-col">
+                  <span
+                    className={`text-sm font-medium transition-colors ${
+                      isPRMode
+                        ? "text-gray-500 dark:text-slate-400"
+                        : "text-gray-700 dark:text-slate-300 group-hover:text-primary"
+                    }`}
+                  >
+                    Deteksi Kecurangan
+                  </span>
+                  {isPRMode && (
+                    <span className="text-[11px] text-slate-400 dark:text-slate-500 leading-snug mt-0.5">
+                      Tidak tersedia pada Mode PR.
+                    </span>
+                  )}
+                </span>
+              </label>
+
+              {/* Baris 3 Kanan: Kunci Akses Jika Melanggar (tetap ditampilkan, aktif hanya jika Deteksi Kecurangan aktif) */}
+              <label
+                title={
+                  isLockViolationDisabled
+                    ? "Aktifkan Deteksi Kecurangan terlebih dahulu untuk menggunakan opsi ini"
+                    : "Mengunci sesi siswa yang terbukti meninggalkan halaman ujian hingga dibuka pengawas"
+                }
+                className={`flex items-start p-3 rounded-xl border transition-colors shadow-sm ${
+                  isLockViolationDisabled
+                    ? "border-gray-100 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-800/40 opacity-55 cursor-not-allowed text-gray-500 dark:text-slate-400"
+                    : "border-rose-200 dark:border-rose-900/60 bg-rose-50/80 dark:bg-rose-900/20 text-rose-700 dark:text-rose-400 cursor-pointer group"
+                }`}
+              >
+                <input
+                  type="checkbox"
+                  name="continueWithPermission"
+                  checked={!isLockViolationDisabled && (config.continueWithPermission || false)}
+                  disabled={isLockViolationDisabled}
+                  onChange={handleConfigChange}
+                  className="mt-0.5 h-5 w-5 rounded border-rose-300 text-rose-600 focus:ring-rose-500 disabled:cursor-not-allowed shrink-0"
+                />
+                <span className="ml-3 flex flex-col">
+                  <span
+                    className={`text-sm font-medium transition-colors ${
+                      isLockViolationDisabled
+                        ? "text-gray-500 dark:text-slate-400"
+                        : "font-bold text-rose-700 dark:text-rose-300"
+                    }`}
+                  >
                     Kunci Akses Jika Melanggar
                   </span>
-                </label>
-              )}
-            </>
-          )}
-        </div>
+                  <span
+                    className={`text-[11px] leading-snug mt-0.5 ${
+                      isLockViolationDisabled
+                        ? "text-slate-400 dark:text-slate-500"
+                        : "text-rose-600/80 dark:text-rose-400/80"
+                    }`}
+                  >
+                    {isPRMode
+                      ? "Tidak tersedia pada Mode PR."
+                      : !config.detectBehavior
+                        ? "Aktifkan Deteksi Kecurangan untuk menekan opsi ini."
+                        : "Sesi siswa dikunci otomatis saat pelanggaran."}
+                  </span>
+                </span>
+              </label>
+            </div>
+          );
+        })()}
 
         <div className="md:col-span-2 space-y-4 pt-6 mt-2 border-t border-gray-100 dark:border-slate-700">
           <h4 className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">
