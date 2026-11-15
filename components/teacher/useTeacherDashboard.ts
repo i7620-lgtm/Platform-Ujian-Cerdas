@@ -9,45 +9,12 @@ import type {
 } from "../../types";
 import { generateExamCode, sanitizeHtml, parseList } from "./examUtils";
 import { storageService } from "../../services/storage";
-import { useExamEditorStore } from "../../stores/examEditorStore";
+import { useExamEditorStore, DEFAULT_EXAM_CONFIG } from "../../stores/examEditorStore";
 import { useTeacherDashboardStore } from "../../stores/teacherDashboardStore";
 import { useArchiveExam } from "./useArchiveExam";
 import { getExamDates } from "./timeUtils";
 
 export type { TeacherView };
-
-const DEFAULT_CONFIG: ExamConfig = {
-  examMode: "UJIAN",
-  startDate: new Date().toLocaleDateString("en-CA"),
-  endDate: new Date(Date.now() + 86400000).toLocaleDateString("en-CA"),
-  useBankSoal: false,
-  bankSoalCount: 10,
-  bankSoalProportions: { mudah: 30, sedang: 50, sulit: 20 },
-  timeLimit: 60,
-  date: new Date().toLocaleDateString("en-CA"),
-  startTime: "08:00",
-  endTime: "10:00",
-  allowRetakes: false,
-  detectBehavior: true,
-  autoSubmitInactive: true,
-  autoSaveInterval: 10,
-  shuffleQuestions: false,
-  shuffleAnswers: false,
-  continueWithPermission: false,
-  showResultToStudent: true,
-  showCorrectAnswer: false,
-  showHints: false,
-  showSolutionSteps: false,
-  enableCertificate: false,
-  enablePublicStream: false,
-  disableRealtime: true,
-  trackLocation: false,
-  subject: "Lainnya",
-  classLevel: "Lainnya",
-  targetClasses: [],
-  examType: "Lainnya",
-  description: "",
-};
 
 interface UseTeacherDashboardParams {
   teacherProfile: TeacherProfile;
@@ -180,7 +147,7 @@ export const useTeacherDashboard = ({
     const tomorrow = tomorrowDate.toLocaleDateString("en-CA");
 
     setConfig({
-      ...DEFAULT_CONFIG,
+      ...DEFAULT_EXAM_CONFIG,
       startDate: today,
       endDate: tomorrow,
       date: today,
@@ -380,10 +347,10 @@ export const useTeacherDashboard = ({
     }
   };
 
-  // 7. Duplicate Exam Action
-  const handleDuplicateExam = (exam: Exam) => {
+  // Shared helper for duplicating an existing exam or reusing an archived exam
+  const cloneExamIntoEditor = (sourceExam: Exam) => {
     const newExamCode = generateExamCode();
-    const clonedQuestions = (exam.questions || []).map((q, idx) => ({
+    const clonedQuestions = (sourceExam.questions || []).map((q, idx) => ({
       ...JSON.parse(JSON.stringify(q)),
       id: `q-${Date.now()}-${idx}-${Math.random().toString(36).substring(2, 7)}`,
     }));
@@ -393,7 +360,7 @@ export const useTeacherDashboard = ({
     const localDate = today.toLocaleDateString("en-CA");
     const localTomorrow = tomorrow.toLocaleDateString("en-CA");
 
-    const rawConfig = JSON.parse(JSON.stringify(exam.config || {}));
+    const rawConfig = JSON.parse(JSON.stringify(sourceExam.config || {}));
     delete (rawConfig as any).code;
     delete (rawConfig as any).examCode;
     delete (rawConfig as any).version;
@@ -422,57 +389,12 @@ export const useTeacherDashboard = ({
     incrementResetKey();
   };
 
-  // 8. Reuse Exam from Archive
-  const handleReuseExam = (examToReuse: Exam) => {
-    const newExamCode = generateExamCode();
-    const clonedQuestions = (examToReuse.questions || []).map((q, idx) => ({
-      ...JSON.parse(JSON.stringify(q)),
-      id: `q-${Date.now()}-${idx}-${Math.random().toString(36).substring(2, 7)}`,
-    }));
-
-    const today = new Date();
-    const tomorrow = new Date(today.getTime() + 86400000);
-    const localDate = today.toLocaleDateString("en-CA");
-    const localTomorrow = tomorrow.toLocaleDateString("en-CA");
-
-    const rawConfig = JSON.parse(JSON.stringify(examToReuse.config || {}));
-    delete (rawConfig as any).code;
-    delete (rawConfig as any).examCode;
-    delete (rawConfig as any).version;
-
-    const newConfig = {
-      ...rawConfig,
-      date: localDate,
-      startDate: localDate,
-      endDate: localTomorrow,
-      isFinished: false,
-      collaborators: [],
-      registeredStudents: Array.isArray(rawConfig.registeredStudents)
-        ? rawConfig.registeredStudents.map((s: any) => ({
-            ...s,
-            exam_code: newExamCode,
-          }))
-        : [],
-    };
-
-    setQuestions(clonedQuestions);
-    setConfig(newConfig);
-    setManualMode(true);
-    setEditingExam(null);
-    setGeneratedCode(newExamCode);
-    setView("UPLOAD");
-    incrementResetKey();
-  };
-
-  // 8.5 Continue Draft
-  const handleContinueDraft = (exam: Exam) => {
-    setEditingExam(exam);
-    setQuestions(exam.questions);
-
-    let localStartDate = exam.config.startDate || exam.config.date;
-    let localEndDate = exam.config.endDate;
-    let localStartTime = exam.config.startTime;
-    let localEndTime = exam.config.endTime;
+  // Shared helper to hydrate an exam's ISO schedule fields back into local editor inputs
+  const prepareExamConfigForEditor = (examConfig: ExamConfig): ExamConfig => {
+    let localStartDate = examConfig.startDate || examConfig.date;
+    let localEndDate = examConfig.endDate;
+    let localStartTime = examConfig.startTime;
+    let localEndTime = examConfig.endTime;
 
     if (localStartDate && localStartDate.includes("T")) {
       const d = new Date(localStartDate);
@@ -496,19 +418,36 @@ export const useTeacherDashboard = ({
       }
     }
 
-    const isEditPR = (exam.config.examMode || "").trim().toUpperCase() === "PR";
+    const isEditPR = (examConfig.examMode || "").trim().toUpperCase() === "PR";
     if (isEditPR) {
-      localEndTime = exam.config.endTime || localEndTime || "23:59";
+      localEndTime = examConfig.endTime || localEndTime || "23:59";
     }
 
-    setConfig({
-      ...exam.config,
+    return {
+      ...examConfig,
       date: localStartDate,
       startDate: localStartDate,
       endDate: localEndDate,
       startTime: localStartTime,
       endTime: localEndTime,
-    });
+    };
+  };
+
+  // 7. Duplicate Exam Action
+  const handleDuplicateExam = (exam: Exam) => {
+    cloneExamIntoEditor(exam);
+  };
+
+  // 8. Reuse Exam from Archive
+  const handleReuseExam = (examToReuse: Exam) => {
+    cloneExamIntoEditor(examToReuse);
+  };
+
+  // 8.5 Continue Draft
+  const handleContinueDraft = (exam: Exam) => {
+    setEditingExam(exam);
+    setQuestions(exam.questions);
+    setConfig(prepareExamConfigForEditor(exam.config));
     setManualMode(true);
     setView("UPLOAD");
   };
@@ -517,47 +456,7 @@ export const useTeacherDashboard = ({
   const handleEditExamModal = (exam: Exam) => {
     setEditingExam(exam);
     setQuestions(exam.questions);
-
-    let localStartDate = exam.config.startDate || exam.config.date;
-    let localEndDate = exam.config.endDate;
-    let localStartTime = exam.config.startTime;
-    let localEndTime = exam.config.endTime;
-
-    if (localStartDate && localStartDate.includes("T")) {
-      const d = new Date(localStartDate);
-      if (!isNaN(d.getTime())) {
-        localStartDate = d.toLocaleDateString("en-CA");
-        localStartTime = d.toLocaleTimeString("en-GB", {
-          hour: "2-digit",
-          minute: "2-digit",
-        });
-      }
-    }
-
-    if (localEndDate && localEndDate.includes("T")) {
-      const d = new Date(localEndDate);
-      if (!isNaN(d.getTime())) {
-        localEndDate = d.toLocaleDateString("en-CA");
-        localEndTime = d.toLocaleTimeString("en-GB", {
-          hour: "2-digit",
-          minute: "2-digit",
-        });
-      }
-    }
-
-    const isEditPR = (exam.config.examMode || "").trim().toUpperCase() === "PR";
-    if (isEditPR) {
-      localEndTime = exam.config.endTime || localEndTime || "23:59";
-    }
-
-    setConfig({
-      ...exam.config,
-      date: localStartDate,
-      startDate: localStartDate,
-      endDate: localEndDate,
-      startTime: localStartTime,
-      endTime: localEndTime,
-    });
+    setConfig(prepareExamConfigForEditor(exam.config));
     setIsEditModalOpen(true);
   };
 

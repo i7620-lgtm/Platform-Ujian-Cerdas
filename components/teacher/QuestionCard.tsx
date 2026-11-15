@@ -27,8 +27,6 @@ interface QuestionCardProps {
   q: Question;
   index: number;
   questionNumber: number;
-  isGenerating?: boolean;
-  onGenerate?: (q: Question) => void;
 }
 
 export const QuestionCard = React.memo(
@@ -36,8 +34,6 @@ export const QuestionCard = React.memo(
     q,
     index,
     questionNumber,
-    isGenerating,
-    onGenerate,
   }: QuestionCardProps) => {
     const handleTypeChange = useExamEditorStore((s) => s.handleTypeChange);
     const handleDeleteQuestion = useExamEditorStore((s) => s.handleDeleteQuestion);
@@ -173,50 +169,7 @@ export const QuestionCard = React.memo(
           </div>
 
           <div className="p-5 md:p-6 relative">
-            {isGenerating ? (
-              <div className="space-y-6 animate-pulse p-2">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-primary/10 dark:bg-primary/20 rounded-xl">
-                    <SparklesIcon className="w-5 h-5 text-primary animate-spin" />
-                  </div>
-                  <div>
-                    <h4 className="text-sm font-bold text-slate-700 dark:text-slate-300">AI Sedang Merumuskan Butir Soal...</h4>
-                    <p className="text-xs text-slate-450 dark:text-slate-500">Menganalisis kisi-kisi dan menyusun alternatif jawaban berkualitas tinggi.</p>
-                  </div>
-                </div>
-
-                <div className="space-y-3">
-                  <div className="h-4 bg-gray-200 dark:bg-slate-700 rounded-full w-3/4"></div>
-                  <div className="h-3 bg-gray-200 dark:bg-slate-700 rounded-full w-1/2"></div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <div className="space-y-2 border border-gray-100 dark:border-slate-800 p-3 rounded-xl">
-                    <div className="h-2 bg-gray-200 dark:bg-slate-700 rounded-full w-1/2 mb-2"></div>
-                    <div className="h-4 bg-gray-200 dark:bg-slate-700 rounded-lg"></div>
-                  </div>
-                  <div className="space-y-2 border border-gray-100 dark:border-slate-800 p-3 rounded-xl">
-                    <div className="h-2 bg-gray-200 dark:bg-slate-700 rounded-full w-1/2 mb-2"></div>
-                    <div className="h-4 bg-gray-200 dark:bg-slate-700 rounded-lg"></div>
-                  </div>
-                  <div className="space-y-2 border border-gray-100 dark:border-slate-800 p-3 rounded-xl">
-                    <div className="h-2 bg-gray-200 dark:bg-slate-700 rounded-full w-1/2 mb-2"></div>
-                    <div className="h-4 bg-gray-200 dark:bg-slate-700 rounded-lg"></div>
-                  </div>
-                </div>
-
-                <div className="space-y-2 border border-gray-100 dark:border-slate-800 p-4 rounded-xl">
-                  <div className="h-2 bg-gray-200 dark:bg-slate-700 rounded-full w-1/4 mb-2"></div>
-                  <div className="h-20 bg-gray-200 dark:bg-slate-700 rounded-lg"></div>
-                </div>
-
-                <div className="space-y-2">
-                  <div className="h-8 bg-gray-200 dark:bg-slate-700 rounded-lg w-full"></div>
-                  <div className="h-8 bg-gray-200 dark:bg-slate-700 rounded-lg w-full"></div>
-                </div>
-              </div>
-            ) : (
-              <div className="w-full min-w-0">
+            <div className="w-full min-w-0">
                 {q.questionType !== "INFO" && (
                   <>
                       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
@@ -591,7 +544,6 @@ export const QuestionCard = React.memo(
                     </div>
                   )}
                 </div>
-            )}
           </div>
 
           {/* Modal Kelola Audio Listening (Upload Berkas / Suara Narasi Otomatis) */}
@@ -647,8 +599,7 @@ export const QuestionCard = React.memo(
     return (
       prev.q === next.q &&
       prev.index === next.index &&
-      prev.questionNumber === next.questionNumber &&
-      prev.isGenerating === next.isGenerating
+      prev.questionNumber === next.questionNumber
     );
   },
 );

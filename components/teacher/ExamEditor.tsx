@@ -117,7 +117,6 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
     generatedCodeSectionRef,
     handleAddClassTag,
     hasManualGrading,
-    handleGenerateSingleQuestion,
     handleConfigChange,
   } = hookResult;
 
@@ -270,8 +269,6 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
                 q={q}
                 index={index}
                 questionNumber={questionNumber}
-                isGenerating={store.isGeneratingId === q.id}
-                onGenerate={handleGenerateSingleQuestion}
               />
             );
           })}
