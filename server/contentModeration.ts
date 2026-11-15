@@ -13,16 +13,16 @@ export interface ModerationResult {
   educationalSafetyDirective?: string;
 }
 
-// Pola kata kunci terlarang (Pornografi, Seksual Vulgar, Ketelanjangan, SARA Negatif, Kekerasan Sadis)
+// Pola kata kunci terlarang (Pornografi, Seksual Vulgar, Ketelanjangan, SARA Negatif, Kekerasan Sadis, Perundungan)
 const PROHIBITED_PATTERNS = [
   // Pornografi & Seksual Vulgar
-  /\b(bokep|porno|porn|pornografi|bugil|telanjang|nude|nudity|naked|erotis|cabul|mesum|syahwat|masturbasi|onani|vagina|penis|kontol|memek|tetek|toket|jembut|ngentot|bersetubuh|seksual|open\s*bo|lendir|hentai|ecchi)\b/i,
+  /\b(bokep|porno|porn|pornografi|bugil|telanjang|nude|nudity|naked|erotis|cabul|mesum|syahwat|masturbasi|onani|vagina|penis|kontol|memek|tetek|toket|jembut|ngentot|bersetubuh|seksual|open\s*bo|lendir|hentai|ecchi|crot|sange)\b/i,
   // Isu SARA, Ujaran Kebencian, Diskriminasi Rasial & Penistaan Agama
-  /\b(cina\s*kafir|pribumi\s*vs|dasar\s*kafir|anti\s*islam|anti\s*kristen|penistaan\s*agama|benci\s*suku|suku\s*biadab|anjing\s*yahudi|teroris\s*islam|kafir\s*laknat|radikalisme\s*teror)\b/i,
+  /\b(cina\s*kafir|pribumi\s*vs|dasar\s*kafir|anti\s*islam|anti\s*kristen|penistaan\s*agama|benci\s*suku|suku\s*biadab|anjing\s*yahudi|teroris\s*islam|kafir\s*laknat|radikalisme\s*teror|kadrun|cebong|kampret|pk\s*i)\b/i,
   // Kekerasan Sadis & Konten Berbahaya
-  /\b(mutilasi|pembantaian|potong\s*leher|gorok|darah\s*kental|bunuh\s*diri|suicide|sadis|gore|eksekusi\s*mati|senjata\s*api\s*rakitan|merakit\s*bom)\b/i,
-  // Umpatan & Kata Kasar
-  /\b(bajingan|bangsat|tolol|goblok|kampret|brengsek|babi\s*lu|kontol|pantek)\b/i,
+  /\b(mutilasi|pembantaian|potong\s*leher|gorok|darah\s*kental|bunuh\s*diri|suicide|sadis|gore|eksekusi\s*mati|senjata\s*api\s*rakitan|merakit\s*bom|racun\s*mematikan)\b/i,
+  // Umpatan, Kata Kasar & Bullying
+  /\b(bajingan|bangsat|tolol|goblok|kampret|brengsek|babi\s*lu|kontol|pantek|anjing|asu|perek|lonte|pelacur|bencong|banci|idiot|autis|cacat\s*mental)\b/i,
 ];
 
 // Topik kurikulum yang sah namun membutuhkan arahan kesantunan medis/formal (Misal Biologi Reproduksi, Suku Adat)
@@ -60,8 +60,8 @@ export function validateEducationalSafety(prompt: string): ModerationResult {
     if (pattern.test(cleanPrompt)) {
       return {
         isSafe: false,
-        reason: "Permintaan mengandung kata atau unsur yang tidak sesuai dengan standar etika pendidikan sekolah (bebas dari pornografi, ketelanjangan, kekerasan, dan SARA). Harap masukkan topik materi pelajaran sekolah yang mendidik.",
-        category: "pornography",
+        reason: "Teks mengandung kata atau unsur yang tidak pantas (pornografi, kekerasan, umpatan, atau SARA) yang tidak sesuai dengan standar etika pendidikan sekolah.",
+        category: "profanity",
         sanitizedPrompt: "",
         isSensitiveEducationalTopic: false,
       };
@@ -86,3 +86,50 @@ export function validateEducationalSafety(prompt: string): ModerationResult {
     educationalSafetyDirective: educationalSafetyDirective.trim(),
   };
 }
+
+/**
+ * Validasi mendalam menggunakan AI untuk mendeteksi konten tidak pantas yang tersamar.
+ */
+export async function validateContentWithAIOnServer(content: string, getAI: any): Promise<{ isSafe: boolean; issues: string[] }> {
+  const ai = getAI();
+  try {
+    const response = await ai.models.generateContent({
+      model: "gemini-3.1-flash-lite", // Gunakan model lite yang cepat untuk moderasi
+      contents: `Analisis teks berikut untuk konten tidak pantas dalam konteks pendidikan sekolah (K-12) di Indonesia. 
+Kategori pelanggaran:
+1. SARA: Ujaran kebencian, diskriminasi suku/agama/ras, penistaan simbol agama/negara.
+2. Pornografi: Deskripsi seksual eksplisit, konten vulgar, promosi asusila.
+3. Bullying/Cyberbullying: Penghinaan pribadi, pelecehan, ancaman, perundungan siswa/guru.
+4. Kekerasan: Konten sadis, instruksi pembuatan senjata/bahan berbahaya, promosi radikalisme.
+
+Teks:
+---
+${content.substring(0, 8000)}
+---
+
+Kembalikan hasil dalam format JSON:
+{
+  "isSafe": boolean,
+  "issues": string[] // Daftar masalah dalam Bahasa Indonesia jika isSafe false, contoh: ["Terdeteksi ujaran kebencian SARA", "Mengandung umpatan kasar"]
+}`,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            isSafe: { type: Type.BOOLEAN },
+            issues: { type: Type.ARRAY, items: { type: Type.STRING } },
+          },
+          required: ["isSafe", "issues"],
+        },
+      },
+    });
+
+    const result = JSON.parse(response.text || '{"isSafe": true, "issues": []}');
+    return result;
+  } catch (error) {
+    console.error("AI Moderation Server Error:", error);
+    return { isSafe: true, issues: [] }; // Fallback aman agar tidak memblokir simpan jika API down
+  }
+}
+

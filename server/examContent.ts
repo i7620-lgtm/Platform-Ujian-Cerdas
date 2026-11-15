@@ -2,7 +2,7 @@ import { createClient } from '@supabase/supabase-js';
 import { supabase as anonSupabase } from '../lib/supabase.ts';
 import type { Question } from '../types.ts';
 
-function getServerSupabase() {
+function getServerSupabase(): { client: typeof anonSupabase | null; errorStatus?: number; errorCode?: string } {
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   const supabaseUrl =
     process.env.VITE_SUPABASE_URL ||
@@ -10,11 +10,25 @@ function getServerSupabase() {
     'https://fidxmkjpdlfawagawrrm.supabase.co';
 
   if (serviceRoleKey && supabaseUrl) {
-    return createClient(supabaseUrl, serviceRoleKey, {
-      auth: { autoRefreshToken: false, persistSession: false },
-    });
+    return {
+      client: createClient(supabaseUrl, serviceRoleKey, {
+        auth: { autoRefreshToken: false, persistSession: false },
+      }),
+    };
   }
-  return anonSupabase;
+
+  const isProdRuntime = process.env.NODE_ENV === 'production' || Boolean(process.env.VERCEL);
+  if (isProdRuntime) {
+    console.error('[Security Error] SUPABASE_SERVICE_ROLE_KEY tidak dikonfigurasi di server produksi.');
+    return {
+      client: null,
+      errorStatus: 503,
+      errorCode: 'SERVER_SERVICE_ROLE_REQUIRED',
+    };
+  }
+
+  console.warn('[Security Warning] SUPABASE_SERVICE_ROLE_KEY belum disetel; memakai anonSupabase khusus mode dev lokal.');
+  return { client: anonSupabase };
 }
 
 // In-memory origin cache to shield Supabase from simultaneous origin requests
@@ -83,7 +97,15 @@ export async function getStudentQuestionBundle(code: string, requestedVersion?: 
     };
   }
 
-  const db = getServerSupabase();
+  const { client: db, errorStatus, errorCode } = getServerSupabase();
+  if (!db) {
+    return {
+      success: false,
+      status: errorStatus || 503,
+      error: errorCode || 'SERVER_SERVICE_ROLE_REQUIRED'
+    };
+  }
+
   const { data, error } = await db
     .from('exams')
     .select('code, questions, config, status, created_at')
@@ -126,21 +148,34 @@ export async function getStudentQuestionBundle(code: string, requestedVersion?: 
   };
 }
 
+export interface SolutionOwnershipProof {
+  deviceId?: string;
+  resultId?: string | number;
+}
+
 /**
  * Fetch exam solutions and answer keys with rigorous authorization guards:
  * 1. Checks if teacher enabled showCorrectAnswer / showSolutionSteps / showResultToStudent.
- * 2. Checks if student has already completed the exam (or is authorized proctor).
+ * 2. Checks if student has already completed the exam AND presents matching session ownership proof (no account login required), or is an authorized proctor.
  */
 export async function getAuthorizedExamSolutions(
   code: string,
   studentId?: string,
-  proctorToken?: string
+  proctorToken?: string,
+  proof?: SolutionOwnershipProof
 ) {
   if (!code) {
     return { success: false, status: 400, error: 'EXAM_CODE_REQUIRED' };
   }
 
-  const db = getServerSupabase();
+  const { client: db, errorStatus, errorCode } = getServerSupabase();
+  if (!db) {
+    return {
+      success: false,
+      status: errorStatus || 503,
+      error: errorCode || 'SERVER_SERVICE_ROLE_REQUIRED'
+    };
+  }
 
   // 1. Fetch exam configuration & full questions
   const { data: exam, error: examError } = await db
@@ -171,7 +206,7 @@ export async function getAuthorizedExamSolutions(
     if (isProctor) isAuthorized = true;
   }
 
-  // If student requesting, verify student result has completed status in database
+  // If student requesting, verify student result is completed and session ownership proof matches
   if (!isAuthorized && studentId && studentId !== 'monitor') {
     if (!isSolutionsAllowed) {
       return {
@@ -183,12 +218,31 @@ export async function getAuthorizedExamSolutions(
 
     const { data: result } = await db
       .from('results')
-      .select('status')
+      .select('id, status, device_id, answers')
       .eq('exam_code', code)
       .eq('student_id', studentId)
       .maybeSingle();
 
     if (result && (result.status === 'completed' || result.status === 'force_closed')) {
+      const dbDeviceId = String(result.device_id || (result.answers as Record<string, unknown> | null)?._deviceId || '').trim();
+      const dbResultId = result.id ? String(result.id) : '';
+      const providedDeviceId = String(proof?.deviceId || '').trim();
+      const providedResultId =
+        proof?.resultId !== undefined && proof?.resultId !== null
+          ? String(proof.resultId).trim()
+          : '';
+
+      const hasValidProof = dbDeviceId
+        ? Boolean(providedDeviceId) && providedDeviceId === dbDeviceId
+        : Boolean(dbResultId) && Boolean(providedResultId) && providedResultId === dbResultId;
+
+      if (!hasValidProof) {
+        return {
+          success: false,
+          status: 403,
+          error: 'ACCESS_DENIED_OWNERSHIP_PROOF'
+        };
+      }
       isAuthorized = true;
     }
   }
