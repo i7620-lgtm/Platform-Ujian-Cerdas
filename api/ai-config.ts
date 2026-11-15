@@ -1,10 +1,14 @@
-export default function handler(_req: any, res: any) {
+export default function handler(req: any, res: any) {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
   res.setHeader("Content-Type", "application/json");
 
-  const key = process.env.GEMINI_API_KEY || process.env.API_KEY || "";
-  return res.status(200).json({
-    hasKey: Boolean(key),
+  if (req.method === "OPTIONS") {
+    return res.status(200).end();
+  }
+
+  return res.status(410).json({
+    success: false,
+    error: "Endpoint konfigurasi AI server telah dinonaktifkan.",
   });
 }

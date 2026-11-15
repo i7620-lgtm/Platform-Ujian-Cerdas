@@ -9,4 +9,3 @@ export default function handler(_req: any, res: any) {
     timestamp: Date.now()
   });
 }
-

@@ -1,8 +1,15 @@
-import handler from "./generate-analysis.ts";
+export default async function handler(req: any, res: any) {
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  res.setHeader("Content-Type", "application/json");
 
-export const config = {
-  maxDuration: 60,
-};
+  if (req.method === "OPTIONS") {
+    return res.status(200).end();
+  }
 
-export default handler;
-
+  return res.status(410).json({
+    success: false,
+    error: "Endpoint AI proxy telah dinonaktifkan.",
+  });
+}

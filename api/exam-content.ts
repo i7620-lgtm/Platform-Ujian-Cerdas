@@ -4,7 +4,7 @@ export default async function handler(req: any, res: any) {
   // CORS & common headers
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Proctor-Token");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Proctor-Token, X-Device-Id, X-Result-Id");
 
   if (req.method === "OPTIONS") {
     return res.status(200).end();
@@ -56,8 +56,10 @@ export default async function handler(req: any, res: any) {
     if (action === 'solutions') {
       const studentId = req.query?.studentId || url.searchParams.get('studentId') || '';
       const proctorToken = req.query?.token || url.searchParams.get('token') || (req.headers && req.headers['x-proctor-token']) || '';
+      const deviceId = req.query?.deviceId || url.searchParams.get('deviceId') || (req.headers && req.headers['x-device-id']) || '';
+      const resultId = req.query?.resultId || url.searchParams.get('resultId') || (req.headers && req.headers['x-result-id']) || '';
 
-      const result = await getAuthorizedExamSolutions(code, studentId, proctorToken);
+      const result = await getAuthorizedExamSolutions(code, studentId, proctorToken, { deviceId, resultId });
       if (!result.success) {
         return res.status(result.status || 403).json(result);
       }
@@ -70,6 +72,9 @@ export default async function handler(req: any, res: any) {
     if (action === 'warm') {
       // Internal cache warmer trigger
       const bundle = await getStudentQuestionBundle(code, versionNum);
+      if (!bundle.success) {
+        return res.status(bundle.status || 500).json(bundle);
+      }
       return res.status(200).json({ success: true, warmed: true, version: bundle.version });
     }
 

@@ -1,8 +1,4 @@
 import healthHandler from "./health.ts";
-import aiConfigHandler from "./ai-config.ts";
-import generateQuestionsHandler from "./generate-questions.ts";
-import generateAnalysisHandler from "./generate-analysis.ts";
-
 import examContentHandler from "./exam-content.ts";
 
 export const config = {
@@ -19,16 +15,20 @@ export default async function handler(req: any, res: any) {
     return healthHandler(req, res);
   }
 
-  if (pathname === "/api/ai-config" || pathname === "/ai-config") {
-    return aiConfigHandler(req, res);
-  }
-
-  if (pathname === "/api/generate-questions" || pathname === "/generate-questions") {
-    return generateQuestionsHandler(req, res);
-  }
-
-  if (pathname === "/api/generate-analysis" || pathname === "/generate-analysis" || pathname === "/api/ai-proxy" || pathname === "/ai-proxy") {
-    return generateAnalysisHandler(req, res);
+  if (
+    pathname === "/api/ai-config" ||
+    pathname === "/ai-config" ||
+    pathname === "/api/generate-questions" ||
+    pathname === "/generate-questions" ||
+    pathname === "/api/generate-analysis" ||
+    pathname === "/generate-analysis" ||
+    pathname === "/api/ai-proxy" ||
+    pathname === "/ai-proxy"
+  ) {
+    return res.status(410).json({
+      success: false,
+      error: "Endpoint AI server telah dinonaktifkan. Gunakan fitur Prompt & Impor AI Eksternal.",
+    });
   }
 
   if (pathname.startsWith("/api/exam-content")) {
