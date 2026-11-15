@@ -82,6 +82,8 @@ export const ReviewSection: React.FC<ReviewSectionProps> = ({
   const [openHints, setOpenHints] = useState<Record<string, boolean>>({});
   const [openSteps, setOpenSteps] = useState<Record<string, boolean>>({});
 
+  const showKeys = Boolean(exam.config?.showCorrectAnswer);
+
   const toggleHint = (qId: string) => {
     setOpenHints((prev) => ({ ...prev, [qId]: !prev[qId] }));
   };
@@ -95,9 +97,12 @@ export const ReviewSection: React.FC<ReviewSectionProps> = ({
       {exam.questions
         .filter((q) => q.questionType !== "INFO")
         .map((q, idx) => {
-          const studentAns = result.answers[q.id] || "-";
+          const rawStudentAns = result.answers?.[q.id] || "";
+          const studentAns = rawStudentAns.trim().length > 0 ? rawStudentAns : "-";
           const correctAns = q.correctAnswer || "-";
+          const manualGrade = result.answers?.[`_grade_${q.id}`];
 
+          let isAnsweredByStudent = rawStudentAns.trim().length > 0;
           let isCorrect = false;
 
           let displayStudentAns = studentAns;
@@ -107,35 +112,43 @@ export const ReviewSection: React.FC<ReviewSectionProps> = ({
             q.questionType === "MULTIPLE_CHOICE" ||
             q.questionType === "FILL_IN_THE_BLANK"
           ) {
-            isCorrect = isAnswerMatch(correctAns, studentAns, q.questionType);
+            isCorrect = showKeys && isAnswerMatch(correctAns, rawStudentAns, q.questionType, q.options);
           } else if (q.questionType === "COMPLEX_MULTIPLE_CHOICE") {
+            const parsedStudent = parseList(rawStudentAns, q.options);
+            isAnsweredByStudent = parsedStudent.length > 0;
             const sSet = new Set(
-              parseList(studentAns).map((a) => normalize(a, q.questionType)),
+              parsedStudent.map((a) => normalize(a, q.questionType)),
             );
             const cSet = new Set(
-              parseList(correctAns).map((a) => normalize(a, q.questionType)),
+              parseList(correctAns, q.options).map((a) => normalize(a, q.questionType)),
             );
             isCorrect =
-              sSet.size === cSet.size && [...sSet].every((x) => cSet.has(x));
+              showKeys &&
+              sSet.size === cSet.size &&
+              sSet.size > 0 &&
+              [...sSet].every((x) => cSet.has(x));
             try {
-              const parsedStudent = parseList(studentAns);
               parsedStudent.sort(
                 (a, b) =>
                   (q.options || []).indexOf(a) - (q.options || []).indexOf(b),
               );
-              if (parsedStudent.length > 0)
+              if (parsedStudent.length > 0) {
                 displayStudentAns = parsedStudent
                   .map((p) => `• ${p}`)
                   .join("<br/>");
-              const parsedCorrect = parseList(correctAns);
+              } else {
+                displayStudentAns = "-";
+              }
+              const parsedCorrect = parseList(correctAns, q.options);
               parsedCorrect.sort(
                 (a, b) =>
                   (q.options || []).indexOf(a) - (q.options || []).indexOf(b),
               );
-              if (parsedCorrect.length > 0)
+              if (parsedCorrect.length > 0) {
                 displayCorrectAns = parsedCorrect
                   .map((p) => `• ${p}`)
                   .join("<br/>");
+              }
             } catch {
               /* ignore */
             }
@@ -146,19 +159,26 @@ export const ReviewSection: React.FC<ReviewSectionProps> = ({
             isCorrect = false;
             try {
               if (q.questionType === "TRUE_FALSE") {
-                const ansObj = JSON.parse(studentAns);
+                const ansObj = rawStudentAns ? JSON.parse(rawStudentAns) : {};
+                isAnsweredByStudent = Boolean(ansObj && typeof ansObj === "object" && Object.keys(ansObj).length > 0);
                 const trueLabel = (q.categoryLabels && q.categoryLabels[0]) || "Benar";
                 const falseLabel = (q.categoryLabels && q.categoryLabels[1]) || "Salah";
                 isCorrect =
-                  q.trueFalseRows?.every(
-                    (row, i) => ansObj[i] === row.answer,
-                  ) ?? false;
+                  showKeys &&
+                  (q.trueFalseRows?.every(
+                    (row, i) => ansObj[i] !== undefined && ansObj[i] === row.answer,
+                  ) ?? false);
                 displayStudentAns =
                   q.trueFalseRows
-                    ?.map(
-                      (r, i) =>
-                        `• ${r.text.replace(/<[^>]*>/g, "")}: <strong>${ansObj[i] ? trueLabel : falseLabel}</strong>`,
-                    )
+                    ?.map((r, i) => {
+                      const valLabel =
+                        ansObj[i] === true
+                          ? trueLabel
+                          : ansObj[i] === false
+                            ? falseLabel
+                            : "-";
+                      return `• ${r.text.replace(/<[^>]*>/g, "")}: <strong>${valLabel}</strong>`;
+                    })
                     .join("<br/>") || studentAns;
                 displayCorrectAns =
                   q.trueFalseRows
@@ -168,11 +188,13 @@ export const ReviewSection: React.FC<ReviewSectionProps> = ({
                     )
                     .join("<br/>") || correctAns;
               } else {
-                const ansObj = JSON.parse(studentAns);
+                const ansObj = rawStudentAns ? JSON.parse(rawStudentAns) : {};
+                isAnsweredByStudent = Boolean(ansObj && typeof ansObj === "object" && Object.keys(ansObj).length > 0);
                 isCorrect =
-                  q.matchingPairs?.every((pair, i) =>
+                  showKeys &&
+                  (q.matchingPairs?.every((pair, i) =>
                     isAnswerMatch(pair.right, ansObj[i], q.questionType),
-                  ) ?? false;
+                  ) ?? false);
                 displayStudentAns =
                   q.matchingPairs
                     ?.map(
@@ -205,6 +227,15 @@ export const ReviewSection: React.FC<ReviewSectionProps> = ({
             }
           }
 
+          if (manualGrade) {
+            isCorrect = showKeys && manualGrade === "CORRECT";
+          }
+
+          const isPendingManualEssay =
+            showKeys && q.questionType === "ESSAY" && !manualGrade;
+
+          const solutionContent = q.solutionSteps || q.explanation || "";
+
           return (
             <div
               key={q.id}
@@ -217,6 +248,20 @@ export const ReviewSection: React.FC<ReviewSectionProps> = ({
                 {q.questionType === "QUESTIONNAIRE" ? (
                   <span className="text-[10px] font-black px-2.5 py-1 rounded-lg uppercase tracking-wide bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300">
                     Respon Tercatat
+                  </span>
+                ) : !showKeys ? (
+                  <span
+                    className={`text-[10px] font-black px-2.5 py-1 rounded-lg uppercase tracking-wide ${
+                      isAnsweredByStudent
+                        ? "bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300"
+                        : "bg-slate-200/80 dark:bg-slate-700 text-slate-600 dark:text-slate-300"
+                    }`}
+                  >
+                    {isAnsweredByStudent ? "Sudah Dijawab" : "Kosong"}
+                  </span>
+                ) : isPendingManualEssay ? (
+                  <span className="text-[10px] font-black px-2.5 py-1 rounded-lg uppercase tracking-wide bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-300">
+                    Menunggu Penilaian
                   </span>
                 ) : (
                   <span
@@ -234,13 +279,23 @@ export const ReviewSection: React.FC<ReviewSectionProps> = ({
                     Jawaban Kamu:
                   </span>
                   <div
-                    className={`text-right font-black option-content flex-1 min-w-0 [&_p]:inline ${q.questionType === "QUESTIONNAIRE" ? "text-indigo-600 dark:text-indigo-400" : isCorrect ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"}`}
+                    className={`text-right font-black option-content flex-1 min-w-0 [&_p]:inline ${
+                      q.questionType === "QUESTIONNAIRE"
+                        ? "text-indigo-600 dark:text-indigo-400"
+                        : !showKeys || isPendingManualEssay
+                          ? isAnsweredByStudent
+                            ? "text-slate-800 dark:text-slate-100"
+                            : "text-slate-400 dark:text-slate-500 italic font-medium"
+                          : isCorrect
+                            ? "text-emerald-600 dark:text-emerald-400"
+                            : "text-rose-600 dark:text-rose-400"
+                    }`}
                     dangerouslySetInnerHTML={{
                       __html: sanitizeHtml(displayStudentAns),
                     }}
                   ></div>
                 </div>
-                {exam.config?.showCorrectAnswer && q.questionType !== "QUESTIONNAIRE" && (
+                {showKeys && q.questionType !== "QUESTIONNAIRE" && (
                   <div className="flex justify-between items-start border-t border-slate-50 dark:border-slate-800 pt-2 mt-2 gap-2">
                     <span className="text-slate-400 dark:text-slate-500 font-bold shrink-0">
                       Kunci Jawaban:
@@ -257,7 +312,7 @@ export const ReviewSection: React.FC<ReviewSectionProps> = ({
 
               {/* Petunjuk Pengerjaan & Langkah Pengerjaan (Hanya jika diizinkan oleh guru) */}
               {((exam.config?.showHints && q.hint && q.hint.trim() !== "") ||
-                (exam.config?.showSolutionSteps && q.solutionSteps && q.solutionSteps.trim() !== "")) && (
+                (exam.config?.showSolutionSteps && solutionContent.trim() !== "")) && (
                 <div className="mt-3 pt-3 border-t border-slate-200/60 dark:border-slate-700/60 flex flex-col gap-2">
                   {/* Accordion Petunjuk Pengerjaan */}
                   {exam.config?.showHints && q.hint && q.hint.trim() !== "" && (
@@ -265,7 +320,7 @@ export const ReviewSection: React.FC<ReviewSectionProps> = ({
                       <button
                         type="button"
                         onClick={() => toggleHint(q.id)}
-                        className="w-full px-3.5 py-2.5 flex items-center justify-between text-left hover:bg-amber-100/50 dark:hover:bg-amber-900/30 transition-colors"
+                        className="w-full min-h-[44px] px-3.5 py-2.5 flex items-center justify-between text-left hover:bg-amber-100/50 dark:hover:bg-amber-900/30 transition-colors cursor-pointer"
                       >
                         <div className="flex items-center gap-2 min-w-0">
                           <LightBulbIcon className="w-4 h-4 text-amber-500 shrink-0" />
@@ -297,12 +352,12 @@ export const ReviewSection: React.FC<ReviewSectionProps> = ({
                   )}
 
                   {/* Accordion Langkah Pengerjaan */}
-                  {exam.config?.showSolutionSteps && q.solutionSteps && q.solutionSteps.trim() !== "" && (
+                  {exam.config?.showSolutionSteps && solutionContent.trim() !== "" && (
                     <div className="rounded-xl border border-indigo-200/80 dark:border-indigo-800/60 overflow-hidden bg-indigo-50/40 dark:bg-indigo-950/20">
                       <button
                         type="button"
                         onClick={() => toggleSteps(q.id)}
-                        className="w-full px-3.5 py-2.5 flex items-center justify-between text-left hover:bg-indigo-100/50 dark:hover:bg-indigo-900/30 transition-colors"
+                        className="w-full min-h-[44px] px-3.5 py-2.5 flex items-center justify-between text-left hover:bg-indigo-100/50 dark:hover:bg-indigo-900/30 transition-colors cursor-pointer"
                       >
                         <div className="flex items-center gap-2 min-w-0">
                           <AcademicCapIcon className="w-4 h-4 text-indigo-500 shrink-0" />
@@ -325,7 +380,7 @@ export const ReviewSection: React.FC<ReviewSectionProps> = ({
                           <div
                             className="prose prose-sm dark:prose-invert max-w-none text-slate-700 dark:text-slate-200 [&_p]:my-1"
                             dangerouslySetInnerHTML={{
-                              __html: sanitizeHtml(q.solutionSteps),
+                              __html: sanitizeHtml(solutionContent),
                             }}
                           />
                         </div>
