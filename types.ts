@@ -174,6 +174,7 @@ export interface ExamConfig {
   startTime: string; // HH:mm (Deprecated, use startDate/endDate)
   endTime?: string; // HH:mm (NEW: End time for the exam)
   allowRetakes: boolean;
+  allowOvertime?: boolean; // Izinkan siswa menyelesaikan durasi penuh meski melewati jam selesai ujian/sesi
   detectBehavior: boolean;
   autoSubmitInactive: boolean;
   autoSaveInterval: number; // in seconds

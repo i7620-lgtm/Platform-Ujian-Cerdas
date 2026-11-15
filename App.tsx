@@ -16,9 +16,10 @@ import { TermsPage, PrivacyPage } from './components/LegalPages';
 import { TutorialPage } from './components/TutorialPage';
 import { CollaboratorView } from './components/CollaboratorView';
 import { VisualLightboxModal } from './components/VisualLightboxModal';
+import { StudentDialogModal, type StudentDialogVariant } from './components/student/StudentDialogModal';
 import { supabase } from './lib/supabase';
 import { hydrateMathInContainer } from './utils/mathRenderer';
-import { calculateStudentAccess } from './utils/scheduleUtils';
+import { calculateStudentAccess, canStudentResumeInOvertime } from './utils/scheduleUtils';
 import { measureClientBandwidthBytes, detectClientDevice, countIntegrityViolations } from './utils/telemetryUtils';
 import { cleanupExpiredExamCaches } from './utils/cacheHygiene';
 
@@ -77,6 +78,37 @@ const App: React.FC = () => {
   const [isInviteOpen, setIsInviteOpen] = useState(false);
   const [collaboratorData, setCollaboratorData] = useState<{ exam: Exam, role: 'editor' | 'viewer' | 'public', token: string } | null>(null);
   const [isMonitorProctor, setIsMonitorProctor] = useState(false);
+  const [appDialog, setAppDialog] = useState<{
+    isOpen: boolean;
+    variant: StudentDialogVariant;
+    title: string;
+    message: string;
+    onCloseAction?: () => void;
+  } | null>(null);
+
+  const showAppDialog = useCallback(
+    (
+      variant: StudentDialogVariant,
+      title: string,
+      message: string,
+      onCloseAction?: () => void,
+    ) => {
+      setAppDialog({
+        isOpen: true,
+        variant,
+        title,
+        message,
+        onCloseAction,
+      });
+    },
+    [],
+  );
+
+  const closeAppDialog = useCallback(() => {
+    const action = appDialog?.onCloseAction;
+    setAppDialog(null);
+    if (action) action();
+  }, [appDialog]);
 
   // Theme State Management
   const [darkMode, setDarkMode] = useState(() => {
@@ -224,8 +256,15 @@ const App: React.FC = () => {
             const newStudentId = payload.new.student_id;
             
             if (newStudentName && newClassName && newStudentId) {
-                const [schoolName, className] = newClassName.includes('::') ? newClassName.split('::') : ['', newClassName];
-                const absentNumber = newStudentId.match(/%([^%]+)$/)?.[1] || '';
+                const [schoolName, className] = newClassName.includes('::')
+                  ? newClassName.split('::')
+                  : newClassName.includes(' - ')
+                    ? newClassName.split(' - ')
+                    : ['', newClassName];
+                const absentNumber =
+                  newStudentId.match(/%([^%]+)$/)?.[1] ||
+                  newStudentId.match(/_([^_]+)$/)?.[1] ||
+                  '';
 
                 setCurrentStudent(prev => {
                     if (!prev) return null;
@@ -287,21 +326,23 @@ const App: React.FC = () => {
       // Pass studentId to ensure consistent shuffling (Fix #2)
       const exam = await storageService.getExamForStudent(examCode, student.studentId, isPreview);
       if (!exam) { 
-        alert("Kode Ujian tidak ditemukan atau belum dipublikasikan."); 
+        showAppDialog("error", "Kode Ujian Tidak Ditemukan", "Kode Ujian tidak ditemukan atau belum dipublikasikan.");
         return; 
       }
 
-      // FIX: Check schedule before allowing entry (Manual Login & Class Session Isolation)
-      if (!isPreview) {
-          const access = calculateStudentAccess(exam.config, student.class, new Date());
-          if (!access.canAccess) {
-              setInvitationExam(exam);
-              return;
-          }
-      }
-      
       const { result: res, isNetworkError: isResultNetErr } = await storageService.getStudentResultStatus(examCode, student.studentId);
-      
+
+      const localProgressForResume =
+        !res && isResultNetErr && !isPreview
+          ? ((await storageService.getLocalProgress(`exam_local_${examCode}_${student.studentId}`)) as {
+              answers?: Record<string, string>;
+              logs?: string[];
+              status?: ResultStatus;
+              resultId?: number;
+              lastUpdated?: number;
+            } | null)
+          : null;
+
       if (res && res.status === 'completed' && !isPreview) {
           if (!exam.config.allowRetakes) {
               setCurrentExam(exam);
@@ -309,6 +350,47 @@ const App: React.FC = () => {
               setStudentResult(res);
               setView('STUDENT_RESULT');
               return;
+          }
+      }
+
+      const isClosedByTeacher = Boolean(exam.config.isFinished) || exam.status === 'closed';
+      if (isClosedByTeacher && !isPreview) {
+          showAppDialog(
+            "info",
+            "Ujian Telah Ditutup",
+            "Ujian ini telah ditutup oleh guru dan tidak lagi menerima pengerjaan.",
+          );
+          return;
+      }
+
+      // Check schedule before allowing entry, EXCEPT returning students eligible for overtime resumption
+      if (!isPreview) {
+          const access = calculateStudentAccess(exam.config, student.class, new Date());
+          if (!access.canAccess) {
+              const resumeStatus = res?.status || localProgressForResume?.status || (localProgressForResume ? 'in_progress' : undefined);
+              const resumeStartStr = res?.answers?._startTime || localProgressForResume?.answers?._startTime;
+              const parsedResumeStart = resumeStartStr ? parseInt(resumeStartStr, 10) : NaN;
+              const resumeStartMs =
+                (!isNaN(parsedResumeStart) && parsedResumeStart > 0 ? parsedResumeStart : null) ||
+                res?.timestamp ||
+                localProgressForResume?.lastUpdated ||
+                null;
+
+              const canResumeOvertime = canStudentResumeInOvertime(
+                exam.config,
+                resumeStatus,
+                resumeStartMs,
+                Date.now(),
+              );
+
+              if (!canResumeOvertime) {
+                  if (access.status === 'FINISHED_GLOBAL') {
+                      showAppDialog("error", "Ujian Telah Berakhir", access.message);
+                  } else {
+                      setInvitationExam(exam);
+                  }
+                  return;
+              }
           }
       }
 
@@ -335,13 +417,7 @@ const App: React.FC = () => {
         studentWithId = { ...student, resultId: res.id };
       } else if (!res && isResultNetErr && !isPreview) {
         // Offline / network failure during login check: allow ONLY unlocked returning students with local exam data
-        const localProgress = (await storageService.getLocalProgress(`exam_local_${examCode}_${student.studentId}`)) as {
-          answers?: Record<string, string>;
-          logs?: string[];
-          status?: ResultStatus;
-          resultId?: number;
-          lastUpdated?: number;
-        } | null;
+        const localProgress = localProgressForResume;
         const queued = offlineService.getSyncQueue().find((q) => q.examCode === examCode && q.student.studentId === student.studentId);
         const isPR = (exam.config.examMode || '').trim().toUpperCase() === 'PR';
         const lockKey = `exam_lock_${examCode}_${student.studentId}`;
@@ -358,12 +434,20 @@ const App: React.FC = () => {
           exam.config.continueWithPermission &&
           (hasLocalLock || localProgress?.status === 'force_closed' || queued?.status === 'force_closed')
         ) {
-          alert("Sesi ini terkunci karena terdeteksi pelanggaran. Sambungkan ke internet dan hubungi pengawas untuk membuka kunci.");
+          showAppDialog(
+            "warning",
+            "Sesi Ujian Terkunci",
+            "Sesi ini terkunci karena terdeteksi pelanggaran. Sambungkan ke internet dan hubungi pengawas untuk membuka kunci.",
+          );
           return;
         }
 
         if (!localProgress) {
-          alert("Perangkat sedang offline dan belum ada sesi ujian aktif di perangkat ini. Sambungkan ke internet untuk memulai ujian.");
+          showAppDialog(
+            "error",
+            "Perangkat Sedang Offline",
+            "Perangkat sedang offline dan belum ada sesi ujian aktif di perangkat ini. Sambungkan ke internet untuk memulai ujian.",
+          );
           return;
         }
 
@@ -427,19 +511,19 @@ const App: React.FC = () => {
     } catch (err: unknown) {
         const error = err as Error;
         if (error.message === 'EXAM_IS_DRAFT') {
-            alert("Ujian ini masih berupa draf.");
+            showAppDialog("info", "Ujian Belum Tersedia", "Ujian ini masih berupa draf dan belum dibuka oleh guru.");
         } else if (error.message === 'OFFLINE_NO_LOCAL_EXAM') {
-            alert("Perangkat sedang offline dan naskah soal belum tersimpan di perangkat ini. Sambungkan ke internet untuk mengunduh soal.");
+            showAppDialog("error", "Perangkat Sedang Offline", "Perangkat sedang offline dan naskah soal belum tersimpan di perangkat ini. Sambungkan ke internet untuk mengunduh soal.");
         } else if (error.message === 'EDGE_CONTENT_UNAVAILABLE') {
-            alert("Gagal mengunduh naskah soal dari server. Pastikan koneksi internet stabil dan coba lagi.");
+            showAppDialog("error", "Gagal Mengunduh Soal", "Gagal mengunduh naskah soal dari server. Pastikan koneksi internet stabil dan coba lagi.");
         } else if (error.message === 'EXAM_NOT_FOUND') {
-            alert("Kode Ujian tidak ditemukan atau belum dipublikasikan.");
+            showAppDialog("error", "Kode Ujian Tidak Ditemukan", "Kode Ujian tidak ditemukan atau belum dipublikasikan.");
         } else {
             console.error(error);
-            alert("Gagal memuat ujian. Periksa koneksi internet Anda.");
+            showAppDialog("error", "Gagal Memuat Ujian", "Terjadi kendala saat memuat ujian. Periksa koneksi internet Anda lalu coba lagi.");
         }
     } finally { setIsSyncing(false); }
-  }, []);
+  }, [showAppDialog]);
 
   // Session check & automatic recovery on reload (iPhone/mobile crash protection)
   useEffect(() => {
@@ -578,13 +662,13 @@ const App: React.FC = () => {
                     }
                     window.history.replaceState({}, document.title, window.location.pathname);
                 } else {
-                    alert("Tautan pengawas atau publik tidak valid atau akses telah dinonaktifkan.");
+                    showAppDialog("error", "Tautan Tidak Valid", "Tautan pengawas atau publik tidak valid atau akses telah dinonaktifkan.");
                     window.history.replaceState({}, '', '/');
                 }
             })
             .catch(e => {
                 console.error(e);
-                alert("Gagal memuat sesi pantauan ujian.");
+                showAppDialog("error", "Gagal Memuat Sesi", "Gagal memuat sesi pantauan ujian.");
                 window.history.replaceState({}, '', '/');
             })
             .finally(() => setIsSyncing(false));
@@ -646,11 +730,11 @@ const App: React.FC = () => {
 
     const liveCode = params.get('live');
     if (liveCode) {
-        alert("Akses pantauan langsung memerlukan tautan resmi ber-token dari guru atau pengawas.");
+        showAppDialog("info", "Tautan Pantauan Diperlukan", "Akses pantauan langsung memerlukan tautan resmi ber-token dari guru atau pengawas.");
         window.history.replaceState({}, '', '/');
         return;
     }
-  }, [handleStudentLoginSuccess]);
+  }, [handleStudentLoginSuccess, showAppDialog]);
 
   useEffect(() => {
     const handleOnline = () => { setIsOnline(true); storageService.syncData(); };
@@ -699,8 +783,8 @@ const App: React.FC = () => {
     if (!currentExam || !currentStudent) return;
     
     if (currentStudent.class === 'PREVIEW') {
-        alert("Mode Pratinjau selesai.");
         resetToHome();
+        showAppDialog("success", "Mode Pratinjau Selesai", "Simulasi pengerjaan dalam Mode Pratinjau selesai. Tidak ada jawaban yang disimpan ke server.");
         return;
     }
 
@@ -1180,6 +1264,18 @@ const App: React.FC = () => {
 
         {/* Global Visual Lightbox Modal for Fullscreen Zoom */}
         <VisualLightboxModal />
+
+        {/* Global In-App Dialog Modal for Student & Public Alerts */}
+        {appDialog && (
+          <StudentDialogModal
+            isOpen={appDialog.isOpen}
+            variant={appDialog.variant}
+            title={appDialog.title}
+            message={appDialog.message}
+            confirmLabel="Mengerti"
+            onClose={closeAppDialog}
+          />
+        )}
     </div>
   );
 };
