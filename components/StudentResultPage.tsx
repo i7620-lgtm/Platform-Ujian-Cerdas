@@ -63,7 +63,17 @@ export const StudentResultPage: React.FC<StudentResultPageProps> = ({
       config.showCorrectAnswer || config.showHints || config.showSolutionSteps || config.showResultToStudent
     );
     if (shouldFetchSolutions && (result.status === "completed" || result.status === "force_closed")) {
-      examService.getExamSolutions(exam.code, result.student.studentId).then((solutionsMap) => {
+      let localDeviceId = "";
+      try {
+        localDeviceId = localStorage.getItem("deviceId") || "";
+      } catch {
+        /* ignore */
+      }
+      const proof = {
+        deviceId: result.device_id || result.answers?._deviceId || localDeviceId || undefined,
+        resultId: result.id ?? result.student.resultId,
+      };
+      examService.getExamSolutions(exam.code, result.student.studentId, undefined, proof).then((solutionsMap) => {
         if (solutionsMap) {
           setEnrichedQuestions((prev) =>
             prev.map((q) => {
@@ -82,7 +92,7 @@ export const StudentResultPage: React.FC<StudentResultPageProps> = ({
         }
       });
     }
-  }, [exam.code, exam.questions, result.student.studentId, result.status, config]);
+  }, [exam.code, exam.questions, result.student.studentId, result.status, result.id, result.student.resultId, result.device_id, result.answers, config]);
 
   const enrichedExam = useMemo(() => ({ ...exam, questions: enrichedQuestions }), [exam, enrichedQuestions]);
 
