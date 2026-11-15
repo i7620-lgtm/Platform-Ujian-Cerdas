@@ -140,6 +140,61 @@ export class OfflineService {
         }
     }
 
+    async getLocalProgressEntriesByPrefix<T = unknown>(prefix: string): Promise<Array<{ key: string; data: T; updatedAt?: number }>> {
+        const entries: Array<{ key: string; data: T; updatedAt?: number }> = [];
+        try {
+            const db = await initDB();
+            return await new Promise((resolve, reject) => {
+                const tx = db.transaction(STORE_PROGRESS, 'readonly');
+                const store = tx.objectStore(STORE_PROGRESS);
+                const req = store.openCursor();
+                req.onsuccess = (e) => {
+                    const cursor = (e.target as IDBRequest<IDBCursorWithValue | null>).result;
+                    if (cursor) {
+                        const row = cursor.value as { key?: string; data?: T; updatedAt?: number };
+                        if (row?.key && row.key.startsWith(prefix)) {
+                            entries.push({ key: row.key, data: row.data as T, updatedAt: row.updatedAt });
+                        }
+                        cursor.continue();
+                    } else {
+                        resolve(entries);
+                    }
+                };
+                req.onerror = () => reject(req.error);
+            });
+        } catch {
+            return entries;
+        }
+    }
+
+    async clearLocalProgressByPrefix(prefix: string): Promise<number> {
+        let removedCount = 0;
+        try {
+            const db = await initDB();
+            await new Promise<void>((resolve, reject) => {
+                const tx = db.transaction(STORE_PROGRESS, 'readwrite');
+                const store = tx.objectStore(STORE_PROGRESS);
+                const req = store.openCursor();
+                req.onsuccess = (e) => {
+                    const cursor = (e.target as IDBRequest<IDBCursorWithValue | null>).result;
+                    if (cursor) {
+                        const row = cursor.value as { key?: string };
+                        if (row?.key && row.key.startsWith(prefix)) {
+                            cursor.delete();
+                            removedCount++;
+                        }
+                        cursor.continue();
+                    }
+                };
+                tx.oncomplete = () => resolve();
+                tx.onerror = () => reject(tx.error);
+            });
+        } catch {
+            /* ignore IndexedDB cleanup errors */
+        }
+        return removedCount;
+    }
+
     // --- QUEUE METHODS ---
     addToQueue(payload: Result) {
         this.syncQueue = this.syncQueue.filter(item => !(item.examCode === payload.examCode && item.student.studentId === payload.student.studentId));
@@ -270,7 +325,7 @@ export class OfflineService {
                 let calculatedTotal = payload.totalQuestions || 0;
 
                 try {
-                    const { data: examData } = await supabase.from('exams').select('*').eq('code', payload.examCode).maybeSingle();
+                    const { data: examData } = await supabase.from('exams').select('questions, config').eq('code', payload.examCode).maybeSingle();
                     if (examData) {
                         const exam = examData as Exam;
                         const { score, correctAnswers, totalQuestions } = calculateExamScore(exam, payload.answers || {});
