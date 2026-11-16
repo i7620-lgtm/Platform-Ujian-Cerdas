@@ -10,6 +10,7 @@ import {
   isAnswerMatch,
   normalize,
 } from "../../examUtils";
+import { showAlertModal, showConfirmModal, showToast } from "../../../../stores/feedbackStore";
 
 interface UseFinishedExamModalProps {
   exam: Exam;
@@ -114,12 +115,13 @@ export const useFinishedExamModal = ({
   }, [fetchData, isOpen, exam?.code]);
 
   const handleUpdateKey = async (qId: string, newKey: string) => {
-    if (
-      !confirm(
-        "Apakah Anda yakin ingin mengubah kunci jawaban? Nilai semua siswa akan dihitung ulang.",
-      )
-    )
-      return;
+    const confirmed = await showConfirmModal({
+      title: "Ubah Kunci Jawaban?",
+      message: "Apakah Anda yakin ingin mengubah kunci jawaban? Nilai semua siswa akan dihitung ulang.",
+      tone: "warning",
+      confirmLabel: "Ubah Kunci",
+    });
+    if (!confirmed) return;
     try {
       await storageService.updateExamAnswerKey(
         activeDisplayExam.code,
@@ -158,20 +160,25 @@ export const useFinishedExamModal = ({
       // Refresh results to get new scores
       await fetchData();
 
-      alert("Kunci jawaban berhasil diperbarui.");
+      showToast("Kunci jawaban berhasil diperbarui.", "success");
     } catch (e) {
       console.error(e);
-      alert("Gagal memperbarui kunci jawaban: " + (e as Error).message);
+      await showAlertModal({
+        title: "Gagal Memperbarui Kunci",
+        message: "Gagal memperbarui kunci jawaban: " + (e as Error).message,
+        tone: "danger",
+      });
     }
   };
 
   const handleDeleteResult = async (studentId: string, studentName: string) => {
-    if (
-      !confirm(
-        `Hapus hasil ujian siswa "${studentName}"? Data yang dihapus tidak dapat dikembalikan.`,
-      )
-    )
-      return;
+    const confirmed = await showConfirmModal({
+      title: "Hapus Hasil Ujian Siswa?",
+      message: `Hapus hasil ujian siswa "${studentName}"? Data yang dihapus tidak dapat dikembalikan.`,
+      tone: "danger",
+      confirmLabel: "Hapus Siswa",
+    });
+    if (!confirmed) return;
 
     try {
       await storageService.deleteStudentResult(
@@ -179,9 +186,14 @@ export const useFinishedExamModal = ({
         studentId,
       );
       setResults(results.filter((r) => r.student.studentId !== studentId));
+      showToast(`Hasil ujian "${studentName}" berhasil dihapus.`, "success");
     } catch (e) {
       console.error("Gagal menghapus data:", e);
-      alert("Gagal menghapus data siswa.");
+      await showAlertModal({
+        title: "Gagal Menghapus Data",
+        message: "Gagal menghapus data siswa.",
+        tone: "danger",
+      });
     }
   };
 
@@ -402,7 +414,11 @@ export const useFinishedExamModal = ({
         .eq("student_id", studentResult.student.studentId);
     } catch (e) {
       console.error("Grading failed", e);
-      alert("Gagal menyimpan nilai.");
+      await showAlertModal({
+        title: "Gagal Menyimpan Nilai",
+        message: "Gagal menyimpan nilai koreksi manual siswa.",
+        tone: "danger",
+      });
       fetchData();
     }
   };

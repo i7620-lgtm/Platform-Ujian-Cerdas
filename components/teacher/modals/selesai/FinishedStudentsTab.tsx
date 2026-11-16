@@ -10,6 +10,7 @@ import {
   MagnifyingGlassIcon,
 } from "../../../Icons";
 import { QuestionResultDetailPopover } from "../../../QuestionResultDetailPopover";
+import { showAlertModal } from "../../../../stores/feedbackStore";
 
 interface FinishedStudentsTabProps {
   displayExam: Exam;
@@ -111,7 +112,11 @@ export const FinishedStudentsTab: React.FC<FinishedStudentsTabProps> = ({
       downloadArchiveExcel(displayExam, searchFilteredResults);
     } catch (e) {
       console.error("Gagal mengekspor Excel", e);
-      alert("Gagal mengunduh file Excel.");
+      await showAlertModal({
+        title: "Gagal Mengunduh Excel",
+        message: "Gagal mengunduh file Excel. Silakan coba beberapa saat lagi.",
+        tone: "danger",
+      });
     }
   };
 
