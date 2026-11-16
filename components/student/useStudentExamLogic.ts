@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import type { Exam, Student, Result, Question, ResultStatus } from "../../types";
 import { storageService } from "../../services/storage";
+import { examService } from "../../services/exam";
 import { supabase } from "../../lib/supabase";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { calculateExamScore, sanitizeHtml } from "../teacher/examUtils";
@@ -453,12 +454,12 @@ export const useStudentExamLogic = ({
         return;
       }
       latestVersionRef.current = newVersion;
-      fetch(`/api/exam-content/${exam.code}/test?v=${newVersion}`)
-        .then((res) => res.json())
-        .then((json) => {
-          if (json.success && Array.isArray(json.questions)) {
+      examService
+        .fetchLatestQuestionsBundleForStudent(exam.code, newVersion)
+        .then((questions) => {
+          if (questions && Array.isArray(questions)) {
             setActiveExam((current) => {
-              const qMap = new Map(json.questions.map((q: Question) => [q.id, q]));
+              const qMap = new Map(questions.map((q: Question) => [q.id, q]));
               const updated = current.questions.map((q) => (qMap.get(q.id) as Question) || q);
               storageService.saveLocalProgress(`edge_bundle_${exam.code}`, {
                 version: newVersion,
