@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useCallback, useState } from "react";
+import { useEffect, useMemo, useCallback, useRef, useState } from "react";
 import type { Exam, Result, Question, TeacherProfile } from "../../../../types";
 import { storageService } from "../../../../services/storage";
 import { supabase } from "../../../../lib/supabase";
@@ -8,8 +8,9 @@ import {
   parseList,
   calculateExamScore,
   isAnswerMatch,
-  getOlympiadMedalTier,
+  normalize,
 } from "../../examUtils";
+import { showAlertModal, showConfirmModal, showToast } from "../../../../stores/feedbackStore";
 
 interface UseFinishedExamModalProps {
   exam: Exam;
@@ -19,7 +20,6 @@ interface UseFinishedExamModalProps {
 
 export const useFinishedExamModal = ({
   exam,
-  teacherProfile,
   isOpen,
 }: UseFinishedExamModalProps) => {
   const [displayExam, setDisplayExam] = useState<Exam | null>(null);
@@ -65,12 +65,16 @@ export const useFinishedExamModal = ({
     ).length;
   }, [results, activeDisplayExam]);
 
-  const fetchData = useCallback(async () => {
-    if (!activeDisplayExam) return;
+  const activeDisplayExamCodeRef = useRef<string>(exam?.code || "");
+  activeDisplayExamCodeRef.current = activeDisplayExam?.code || "";
+
+  const fetchData = useCallback(async (examCodeOverride?: string) => {
+    const targetCode = examCodeOverride || activeDisplayExamCodeRef.current;
+    if (!targetCode) return;
     setIsLoading(true);
     try {
       const data = await storageService.getResults(
-        activeDisplayExam.code,
+        targetCode,
         undefined,
       );
 
@@ -102,21 +106,22 @@ export const useFinishedExamModal = ({
     } finally {
       setIsLoading(false);
     }
-  }, [activeDisplayExam]);
+  }, []);
 
   useEffect(() => {
-    if (isOpen && activeDisplayExam) {
-      fetchData();
+    if (isOpen && exam?.code) {
+      fetchData(exam.code);
     }
-  }, [fetchData, teacherProfile, isOpen, activeDisplayExam]);
+  }, [fetchData, isOpen, exam?.code]);
 
   const handleUpdateKey = async (qId: string, newKey: string) => {
-    if (
-      !confirm(
-        "Apakah Anda yakin ingin mengubah kunci jawaban? Nilai semua siswa akan dihitung ulang.",
-      )
-    )
-      return;
+    const confirmed = await showConfirmModal({
+      title: "Ubah Kunci Jawaban?",
+      message: "Apakah Anda yakin ingin mengubah kunci jawaban? Nilai semua siswa akan dihitung ulang.",
+      tone: "warning",
+      confirmLabel: "Ubah Kunci",
+    });
+    if (!confirmed) return;
     try {
       await storageService.updateExamAnswerKey(
         activeDisplayExam.code,
@@ -155,20 +160,25 @@ export const useFinishedExamModal = ({
       // Refresh results to get new scores
       await fetchData();
 
-      alert("Kunci jawaban berhasil diperbarui.");
+      showToast("Kunci jawaban berhasil diperbarui.", "success");
     } catch (e) {
       console.error(e);
-      alert("Gagal memperbarui kunci jawaban: " + (e as Error).message);
+      await showAlertModal({
+        title: "Gagal Memperbarui Kunci",
+        message: "Gagal memperbarui kunci jawaban: " + (e as Error).message,
+        tone: "danger",
+      });
     }
   };
 
   const handleDeleteResult = async (studentId: string, studentName: string) => {
-    if (
-      !confirm(
-        `Hapus hasil ujian siswa "${studentName}"? Data yang dihapus tidak dapat dikembalikan.`,
-      )
-    )
-      return;
+    const confirmed = await showConfirmModal({
+      title: "Hapus Hasil Ujian Siswa?",
+      message: `Hapus hasil ujian siswa "${studentName}"? Data yang dihapus tidak dapat dikembalikan.`,
+      tone: "danger",
+      confirmLabel: "Hapus Siswa",
+    });
+    if (!confirmed) return;
 
     try {
       await storageService.deleteStudentResult(
@@ -176,42 +186,16 @@ export const useFinishedExamModal = ({
         studentId,
       );
       setResults(results.filter((r) => r.student.studentId !== studentId));
+      showToast(`Hasil ujian "${studentName}" berhasil dihapus.`, "success");
     } catch (e) {
       console.error("Gagal menghapus data:", e);
-      alert("Gagal menghapus data siswa.");
+      await showAlertModal({
+        title: "Gagal Menghapus Data",
+        message: "Gagal menghapus data siswa.",
+        tone: "danger",
+      });
     }
   };
-
-  const normalize = useCallback((str: string, qType: string) => {
-    const s = String(str || "");
-    if (qType === "FILL_IN_THE_BLANK") {
-      return s
-        .replace(/<[^>]*>?/gm, "")
-        .trim()
-        .toLowerCase()
-        .replace(/\s+/g, " ");
-    }
-    try {
-      const div = document.createElement("div");
-      div.innerHTML = s;
-
-      div.querySelectorAll(".math-visual").forEach((el) => {
-        const latex = el.getAttribute("data-latex");
-        if (latex) {
-          el.replaceWith(document.createTextNode(`$${latex}$`));
-        } else {
-          while (el.firstChild) {
-            el.parentNode?.insertBefore(el.firstChild, el);
-          }
-          el.parentNode?.removeChild(el);
-        }
-      });
-
-      return div.innerHTML.replace(/>\s+</g, "><").trim().replace(/\s+/g, " ");
-    } catch {
-      return s.trim().replace(/\s+/g, " ");
-    }
-  }, []);
 
   const checkAnswerStatus = useCallback(
     (q: Question, studentAnswers: Record<string, string>) => {
@@ -260,10 +244,10 @@ export const useFinishedExamModal = ({
 
       return "WRONG";
     },
-    [normalize],
+    [],
   );
 
-  const getCalculatedStats = useCallback(
+  const computeStudentStats = useCallback(
     (r: Result) => {
       const grading = calculateExamScore(activeDisplayExam, r.answers || {});
       const duration = r.completionTime || 0;
@@ -282,6 +266,20 @@ export const useFinishedExamModal = ({
       };
     },
     [activeDisplayExam],
+  );
+
+  const studentStatsMap = useMemo(() => {
+    const map = new Map<string, ReturnType<typeof computeStudentStats>>();
+    for (const r of results) {
+      map.set(r.student.studentId, computeStudentStats(r));
+    }
+    return map;
+  }, [results, computeStudentStats]);
+
+  const getCalculatedStats = useCallback(
+    (r: Result) =>
+      studentStatsMap.get(r.student.studentId) ?? computeStudentStats(r),
+    [studentStatsMap, computeStudentStats],
   );
 
   const totalStudents = results.length;
@@ -416,7 +414,11 @@ export const useFinishedExamModal = ({
         .eq("student_id", studentResult.student.studentId);
     } catch (e) {
       console.error("Grading failed", e);
-      alert("Gagal menyimpan nilai.");
+      await showAlertModal({
+        title: "Gagal Menyimpan Nilai",
+        message: "Gagal menyimpan nilai koreksi manual siswa.",
+        tone: "danger",
+      });
       fetchData();
     }
   };

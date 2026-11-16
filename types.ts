@@ -76,6 +76,8 @@ export interface Question {
   correctAnswer?: string; 
   imageUrl?: string; 
   audioUrl?: string; // URL Audio
+  listeningScript?: string; // Naskah percakapan / narasi listening audio (Text-to-Speech)
+  videoUrl?: string; // URL Video stimulus jika tersedia
   optionImages?: (string | null)[];
   chartData?: ChartData; 
   optionCharts?: (ChartData | null)[];
@@ -172,6 +174,7 @@ export interface ExamConfig {
   startTime: string; // HH:mm (Deprecated, use startDate/endDate)
   endTime?: string; // HH:mm (NEW: End time for the exam)
   allowRetakes: boolean;
+  allowOvertime?: boolean; // Izinkan siswa menyelesaikan durasi penuh meski melewati jam selesai ujian/sesi
   detectBehavior: boolean;
   autoSubmitInactive: boolean;
   autoSaveInterval: number; // in seconds
@@ -265,6 +268,7 @@ export interface Result {
     isSynced?: boolean; 
     timestamp?: number;
     location?: { lat: number; lng: number } | string;
+    device_id?: string;
     isPlaceholder?: boolean;
 }
 

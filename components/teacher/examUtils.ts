@@ -2,6 +2,7 @@ import type { Question, QuestionType, Exam, Result, ChartData } from "../../type
 import { generateGeometrySVG, parseGeometryLabels } from "./geometryUtils";
 import { renderLatexToString, renderMathInHtml, normalizeLatex } from "../../utils/mathRenderer";
 import { convertLlmFormattingToHtml } from "../../utils/llmTextFormatter";
+import { showAlertModal } from "../../stores/feedbackStore";
 
 export { convertLlmFormattingToHtml };
 
@@ -707,60 +708,32 @@ export const parseList = (
 };
 
 // --- HELPER: Normalize Answer String ---
+const NORMALIZE_CACHE = new Map<string, string>();
+const NORMALIZE_CACHE_MAX = 3000;
+
 export const normalize = (str: string, qType: string) => {
   const s = String(str || "").trim();
+  const cacheKey = `${qType}\u0000${s}`;
+  const cached = NORMALIZE_CACHE.get(cacheKey);
+  if (cached !== undefined) return cached;
+
+  let result: string;
 
   // For short answers, we want to be very aggressive in stripping HTML
   if (qType === "FILL_IN_THE_BLANK") {
-    return s
+    result = s
       .replace(/<[^>]*>?/gm, "")
       .trim()
       .toLowerCase()
       .replace(/\s+/g, " ");
-  }
-
-  try {
-    const div = document.createElement("div");
-    div.innerHTML = s;
-
-    // Remove math-visual wrappers to compare actual content
-    div.querySelectorAll(".math-visual").forEach((el) => {
-      const latex = el.getAttribute("data-latex");
-      if (latex) {
-        el.replaceWith(document.createTextNode(`$${latex}$`));
-      } else {
-        while (el.firstChild) {
-          el.parentNode?.insertBefore(el.firstChild, el);
-        }
-        el.parentNode?.removeChild(el);
-      }
-    });
-
-    // Standardize images: remove unnecessary attributes that might differ
-    div.querySelectorAll("img").forEach((img) => {
-      // Keep only essential attributes for comparison
-      const src = img.getAttribute("src");
-      const alt = img.getAttribute("alt");
-
-      // Clear all attributes
-      while (img.attributes.length > 0) {
-        img.removeAttribute(img.attributes[0].name);
-      }
-
-      // Restore essential ones
-      if (src) img.setAttribute("src", src);
-      if (alt) img.setAttribute("alt", alt);
-    });
-
-    // Standardize HTML by removing whitespace between tags and collapsing spaces
-    // Also replace non-breaking spaces with regular spaces for comparison
-    let html = div.innerHTML
+  } else if (!s.includes("math-visual") && !s.includes("<img")) {
+    // Fast-path without DOM allocation when there are no math-visual wrappers or img elements
+    let html = s
       .replace(/&nbsp;|\u00A0/g, " ")
       .replace(/>\s+</g, "><")
       .replace(/\s+/g, " ")
       .trim();
 
-    // Strip wrapping <p> tags if they are the only ones (common from markdownToHtml)
     if (
       html.startsWith("<p>") &&
       html.endsWith("</p>") &&
@@ -768,11 +741,64 @@ export const normalize = (str: string, qType: string) => {
     ) {
       html = html.substring(3, html.length - 4).trim();
     }
+    result = html;
+  } else {
+    try {
+      const div = document.createElement("div");
+      div.innerHTML = s;
 
-    return html;
-  } catch {
-    return s.replace(/\s+/g, " ").trim();
+      // Remove math-visual wrappers to compare actual content
+      div.querySelectorAll(".math-visual").forEach((el) => {
+        const latex = el.getAttribute("data-latex");
+        if (latex) {
+          el.replaceWith(document.createTextNode(`$${latex}$`));
+        } else {
+          while (el.firstChild) {
+            el.parentNode?.insertBefore(el.firstChild, el);
+          }
+          el.parentNode?.removeChild(el);
+        }
+      });
+
+      // Standardize images: remove unnecessary attributes that might differ
+      div.querySelectorAll("img").forEach((img) => {
+        const src = img.getAttribute("src");
+        const alt = img.getAttribute("alt");
+
+        while (img.attributes.length > 0) {
+          img.removeAttribute(img.attributes[0].name);
+        }
+
+        if (src) img.setAttribute("src", src);
+        if (alt) img.setAttribute("alt", alt);
+      });
+
+      let html = div.innerHTML
+        .replace(/&nbsp;|\u00A0/g, " ")
+        .replace(/>\s+</g, "><")
+        .replace(/\s+/g, " ")
+        .trim();
+
+      if (
+        html.startsWith("<p>") &&
+        html.endsWith("</p>") &&
+        (html.match(/<p>/g) || []).length === 1
+      ) {
+        html = html.substring(3, html.length - 4).trim();
+      }
+
+      result = html;
+    } catch {
+      result = s.replace(/\s+/g, " ").trim();
+    }
   }
+
+  if (NORMALIZE_CACHE.size >= NORMALIZE_CACHE_MAX) {
+    const firstKey = NORMALIZE_CACHE.keys().next().value;
+    if (firstKey !== undefined) NORMALIZE_CACHE.delete(firstKey);
+  }
+  NORMALIZE_CACHE.set(cacheKey, result);
+  return result;
 };
 
 // --- ANALYTICS ENGINE (Pure Functions) ---
@@ -2382,8 +2408,13 @@ export const repairGeometrySvgInHtml = (html: string): string => {
   return repaired;
 };
 
+const SANITIZE_HTML_CACHE = new Map<string, string>();
+const SANITIZE_HTML_CACHE_MAX = 600;
+
 export const sanitizeHtml = (html: string): string => {
   if (!html) return "";
+  const cached = SANITIZE_HTML_CACHE.get(html);
+  if (cached !== undefined) return cached;
 
   // Pre-process any raw LaTeX / math markers ($...$, $$...$$, \(...\), \[...\])
   const mathProcessed = renderMathInHtml(html);
@@ -2537,11 +2568,13 @@ export const sanitizeHtml = (html: string): string => {
   });
 
   const result = doc.body.innerHTML;
-  const withoutAiSvg = result.replace(
-    /(?:<p[^>]*>)?\s*\\?\[\s*ai_svg(?::\s*[^\]]*)?\s*\\?\]\s*(?:<\/p>)?/gi,
-    "",
-  );
-  return repairGeometrySvgInHtml(cleanOrphanedSvgMarkup(withoutAiSvg));
+  const finalHtml = repairGeometrySvgInHtml(cleanOrphanedSvgMarkup(result));
+  if (SANITIZE_HTML_CACHE.size >= SANITIZE_HTML_CACHE_MAX) {
+    const oldestKey = SANITIZE_HTML_CACHE.keys().next().value;
+    if (oldestKey !== undefined) SANITIZE_HTML_CACHE.delete(oldestKey);
+  }
+  SANITIZE_HTML_CACHE.set(html, finalHtml);
+  return finalHtml;
 };
 
 // --- MARKDOWN CONVERTER ---
@@ -2945,9 +2978,11 @@ export const generateQuestionsPDF = async (exam: Exam): Promise<void> => {
   try {
     const printWindow = window.open("", "_blank");
     if (!printWindow) {
-      alert(
-        "Pop-up blocker mencegah pembukaan tab baru. Mohon izinkan pop-up untuk situs ini.",
-      );
+      await showAlertModal({
+        title: "Pop-up Diblokir",
+        message: "Pop-up blocker mencegah pembukaan tab baru. Mohon izinkan pop-up untuk situs ini.",
+        tone: "warning",
+      });
       return;
     }
 
@@ -3685,7 +3720,11 @@ export const generateQuestionsPDF = async (exam: Exam): Promise<void> => {
     printWindow.document.close();
   } catch (e) {
     console.error("Gagal membuat naskah soal", e);
-    alert("Terjadi kesalahan saat membuat dokumen soal.");
+    await showAlertModal({
+      title: "Gagal Membuat Dokumen",
+      message: "Terjadi kesalahan saat membuat dokumen soal.",
+      tone: "danger",
+    });
   }
 };
 

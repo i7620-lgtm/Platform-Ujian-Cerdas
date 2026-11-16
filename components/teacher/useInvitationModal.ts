@@ -13,6 +13,7 @@ import {
   parseStudentDataExcel,
   type StudentExcelRecord as Student,
 } from "./studentDataUtils";
+import { showAlertModal, showToast } from "../../stores/feedbackStore";
 
 export interface TimeLeft {
   d: number;
@@ -284,7 +285,11 @@ export const useInvitationModal = ({
 
         if (assignment.mode === "existing") {
           if (!assignment.existingSessionId) {
-            alert(`Silakan pilih sesi untuk kelas ${className}`);
+            await showAlertModal({
+              title: "Sesi Belum Dipilih",
+              message: `Silakan pilih sesi untuk kelas ${className}.`,
+              tone: "warning",
+            });
             return;
           }
         } else {
@@ -297,17 +302,21 @@ export const useInvitationModal = ({
 
           if (examStartDate && examEndDate && sessionDate) {
             if (sessionDate < examStartDate || sessionDate > examEndDate) {
-              alert(
-                `Tanggal sesi untuk kelas ${className} (${sessionDate}) harus berada dalam rentang ujian (${examStartDate} s.d. ${examEndDate}).`,
-              );
+              await showAlertModal({
+                title: "Tanggal Sesi Di Luar Jadwal",
+                message: `Tanggal sesi untuk kelas ${className} (${sessionDate}) harus berada dalam rentang ujian (${examStartDate} s.d. ${examEndDate}).`,
+                tone: "warning",
+              });
               return;
             }
           }
 
           if (parseTimeMinutes(endTime) <= parseTimeMinutes(startTime)) {
-            alert(
-              `Jam selesai (${endTime}) harus setelah jam mulai (${startTime}) untuk kelas ${className}.`,
-            );
+            await showAlertModal({
+              title: "Jam Sesi Tidak Valid",
+              message: `Jam selesai (${endTime}) harus setelah jam mulai (${startTime}) untuk kelas ${className}.`,
+              tone: "warning",
+            });
             return;
           }
         }
@@ -468,11 +477,15 @@ export const useInvitationModal = ({
       // Instantly update liveExam state for immediate UI reflection
       setLiveExam((prev) => (prev ? { ...prev, config: updatedConfig } : prev));
 
-      alert("Pendaftaran sekolah dan pengaturan sesi berhasil disimpan!");
+      showToast("Pendaftaran sekolah dan pengaturan sesi berhasil disimpan!", "success");
       setShowRegisterModal(false);
     } catch (error: any) {
       console.error("Error registering school:", error);
-      alert(`Gagal mendaftar: ${error.message || "Terjadi kesalahan"}`);
+      await showAlertModal({
+        title: "Gagal Mendaftar",
+        message: `Gagal mendaftar: ${error.message || "Terjadi kesalahan"}`,
+        tone: "danger",
+      });
     } finally {
       setIsSubmitting(false);
     }

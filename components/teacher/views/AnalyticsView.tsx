@@ -22,6 +22,7 @@ import {
   TrendingUp,
   RefreshCw
 } from 'lucide-react';
+import { showAlertModal } from '../../../stores/feedbackStore';
 
 interface AnalyticsViewProps {
   exams: Record<string, Exam>;
@@ -129,7 +130,11 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
       URL.revokeObjectURL(url);
     } catch (err) {
       console.error('Gagal mengekspor CSV:', err);
-      alert('Terjadi kesalahan saat mengekspor data.');
+      void showAlertModal({
+        title: 'Gagal Mengekspor CSV',
+        message: 'Terjadi kesalahan saat mengekspor data.',
+        tone: 'danger',
+      });
     } finally {
       setIsExporting(false);
     }

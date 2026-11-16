@@ -108,7 +108,7 @@ export const DEFAULT_EXAM_CONFIG: ExamConfig = {
     allowRetakes: false,
     detectBehavior: true,
     autoSubmitInactive: true,
-    autoSaveInterval: 10,
+    autoSaveInterval: 60,
     shuffleQuestions: false,
     shuffleAnswers: false,
     continueWithPermission: false,

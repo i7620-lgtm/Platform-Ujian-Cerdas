@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import type { Exam, TeacherProfile } from "../../../types";
 import {
   CalendarDaysIcon,
@@ -9,6 +9,7 @@ import {
   DocumentDuplicateIcon,
   EyeIcon,
   TrashIcon,
+  ArrowPathIcon,
 } from "../../Icons";
 import { MetaBadge } from "./SharedComponents";
 import { InvitationModal } from "../InvitationModal";
@@ -19,7 +20,7 @@ interface UpcomingExamsViewProps {
   exams: Exam[];
   teacherProfile: TeacherProfile;
   onDeleteExam: (exam: Exam) => void;
-  onRefresh?: () => void;
+  onRefresh?: () => Promise<void> | void;
   onEditExam: (exam: Exam) => void;
   onDuplicateExam: (exam: Exam) => void;
 }
@@ -32,6 +33,7 @@ export const UpcomingExamsView: React.FC<UpcomingExamsViewProps> = ({
   onEditExam,
   onDuplicateExam,
 }) => {
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const {
     selectedInviteExam,
     selectedCollaboratorExam,
@@ -41,23 +43,47 @@ export const UpcomingExamsView: React.FC<UpcomingExamsViewProps> = ({
     schoolName,
   } = useUpcomingExamsView({ teacherProfile });
 
+  const handleManualRefresh = async () => {
+    if (!onRefresh || isRefreshing) return;
+    setIsRefreshing(true);
+    try {
+      await onRefresh();
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
   return (
     <div
       id="upcoming-exams-view-container"
       className="space-y-6 animate-fade-in"
     >
-      <div className="flex items-center gap-2">
-        <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
-          <CalendarDaysIcon className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
+            <CalendarDaysIcon className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+          </div>
+          <div>
+            <h2 className="text-2xl font-bold text-neutral dark:text-white">
+              Ujian Akan Datang
+            </h2>
+            <p className="text-sm text-gray-500 dark:text-slate-400">
+              Daftar semua ujian yang telah dijadwalkan.
+            </p>
+          </div>
         </div>
-        <div>
-          <h2 className="text-2xl font-bold text-neutral dark:text-white">
-            Ujian Akan Datang
-          </h2>
-          <p className="text-sm text-gray-500 dark:text-slate-400">
-            Daftar semua ujian yang telah dijadwalkan.
-          </p>
-        </div>
+        {onRefresh && (
+          <button
+            type="button"
+            onClick={handleManualRefresh}
+            disabled={isRefreshing}
+            className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-bold rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 shadow-xs transition-all shrink-0 cursor-pointer disabled:opacity-60"
+            title="Perbarui Daftar Ujian"
+          >
+            <ArrowPathIcon className={`w-4 h-4 ${isRefreshing ? "animate-spin text-blue-600" : ""}`} />
+            <span className="hidden sm:inline">Perbarui</span>
+          </button>
+        )}
       </div>
 
       {exams.length > 0 ? (

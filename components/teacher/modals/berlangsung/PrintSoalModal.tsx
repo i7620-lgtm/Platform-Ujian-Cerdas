@@ -930,6 +930,14 @@ export const PrintSoalModal: React.FC<PrintSoalModalProps> = ({
                       </div>
                     )}
 
+                    {/* Listening Script Note for Teacher Print */}
+                    {q.listeningScript && (
+                      <div className="my-2 p-2 bg-slate-50 rounded text-xs text-slate-700 border border-slate-300 block">
+                        <span className="font-bold block mb-1 text-slate-800">[Naskah Menyimak / Listening]:</span>
+                        <p className="whitespace-pre-line text-slate-600 font-sans italic">{q.listeningScript}</p>
+                      </div>
+                    )}
+
                     {/* Multiple Choice Options */}
                     {q.questionType === "MULTIPLE_CHOICE" && q.options && (
                       <div

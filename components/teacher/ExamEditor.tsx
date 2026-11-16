@@ -24,6 +24,7 @@ import { QuestionCard } from "./QuestionCard";
 import { ExamConfigSettings } from "./features/exam-editor/components/ExamConfigSettings";
 
 import { WysiwygEditor, SelectionModal } from "./WysiwygEditor";
+import { showToast } from "../../stores/feedbackStore";
 
 const ChartConfigModal = lazy(() => import("./ChartConfigModal").then(module => ({ default: module.ChartConfigModal })));
 const CertificateEditorModal = lazy(() => import("./CertificateEditorModal").then(module => ({ default: module.CertificateEditorModal })));
@@ -117,7 +118,6 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
     generatedCodeSectionRef,
     handleAddClassTag,
     hasManualGrading,
-    handleGenerateSingleQuestion,
     handleConfigChange,
   } = hookResult;
 
@@ -270,8 +270,6 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
                 q={q}
                 index={index}
                 questionNumber={questionNumber}
-                isGenerating={store.isGeneratingId === q.id}
-                onGenerate={handleGenerateSingleQuestion}
               />
             );
           })}
@@ -419,7 +417,7 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
                     <button
                       onClick={() => {
                         navigator.clipboard.writeText(generatedCode);
-                        alert("Kode berhasil disalin!");
+                        showToast("Kode berhasil disalin!", "success");
                       }}
                       className="text-xs font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-widest hover:text-emerald-700 dark:hover:text-emerald-300 transition-colors py-2"
                     >

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { Exam, TeacherProfile } from "../../types";
 import { storageService } from "../../services/storage";
+import { showAlertModal, showConfirmModal, showToast } from "../../stores/feedbackStore";
 
 export const useArchiveExam = (
   teacherProfile: TeacherProfile,
@@ -19,9 +20,11 @@ export const useArchiveExam = (
       teacherProfile.accountType === "admin_sekolah";
 
     if (!isAuthor && !isCollaborator && !isAdmin) {
-      alert(
-        "Akses Ditolak: Hanya guru pembuat soal asli atau kolaborator yang dapat melakukan finalisasi dan arsip ke penyimpanan cloud.",
-      );
+      await showAlertModal({
+        title: "Akses Ditolak",
+        message: "Hanya guru pembuat soal asli atau kolaborator yang dapat melakukan finalisasi dan arsip ke penyimpanan cloud.",
+        tone: "danger",
+      });
       return;
     }
 
@@ -48,16 +51,23 @@ export const useArchiveExam = (
         }
 
         if (ungradedCount > 0) {
-          alert(
-            `Gagal Arsip: Ditemukan ${ungradedCount} jawaban esai yang belum diperiksa.\n\nSilakan buka menu 'Lihat Hasil' dan berikan penilaian manual (Benar/Salah) untuk setiap jawaban esai siswa terlebih dahulu.`,
-          );
+          await showAlertModal({
+            title: "Koreksi Esai Belum Selesai",
+            message: `Ditemukan ${ungradedCount} jawaban esai yang belum diperiksa.\n\nSilakan buka menu 'Lihat Hasil' dan berikan penilaian manual (Benar/Salah) untuk setiap jawaban esai siswa terlebih dahulu.`,
+            tone: "warning",
+          });
           setIsLoadingArchive(false);
           return;
         }
       }
 
-      const confirmMsg = `Konfirmasi Finalisasi & Arsip?\n\nSistem akan:\n1. Menghitung & menyimpan statistik ke Database Pusat (Untuk Analisis).\n2. Memindahkan data detail ke Cloud Storage (Cold Data).\n3. Menghapus data detail dari Database SQL (Optimasi).\n\nPastikan proses selesai 100%.`;
-      if (!confirm(confirmMsg)) {
+      const confirmed = await showConfirmModal({
+        title: "Konfirmasi Finalisasi & Arsip?",
+        message: `Sistem akan:\n1. Menghitung & menyimpan statistik ke Database Pusat (Untuk Analisis).\n2. Memindahkan data detail ke Cloud Storage (Cold Data).\n3. Menghapus data detail dari Database SQL (Optimasi).\n\nPastikan proses selesai 100%.`,
+        tone: "warning",
+        confirmLabel: "Finalisasi & Arsip",
+      });
+      if (!confirmed) {
         setIsLoadingArchive(false);
         return;
       }
@@ -75,18 +85,21 @@ export const useArchiveExam = (
         link.click();
         document.body.removeChild(link);
         URL.revokeObjectURL(backupUrl);
-        alert(
-          "Arsip Cloud gagal, namun Statistik telah tersimpan dan Backup Lokal telah diunduh.",
-        );
+        await showAlertModal({
+          title: "Arsip Cloud Gagal (Backup Lokal Tersimpan)",
+          message: "Arsip Cloud gagal, namun Statistik telah tersimpan dan Backup Lokal telah diunduh.",
+          tone: "warning",
+        });
       } else {
-        alert("Berhasil! Ujian telah diarsipkan dan statistik tersimpan.");
+        showToast("Ujian berhasil diarsipkan dan statistik tersimpan.", "success");
       }
     } catch (e: unknown) {
       console.error(e);
-      alert(
-        "Gagal memproses arsip: " +
-          (e instanceof Error ? e.message : String(e)),
-      );
+      await showAlertModal({
+        title: "Gagal Memproses Arsip",
+        message: "Gagal memproses arsip: " + (e instanceof Error ? e.message : String(e)),
+        tone: "danger",
+      });
     } finally {
       setIsLoadingArchive(false);
     }

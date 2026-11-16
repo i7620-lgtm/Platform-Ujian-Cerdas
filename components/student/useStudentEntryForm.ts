@@ -1,7 +1,14 @@
 import { useState, useRef, useMemo, useEffect } from "react";
 import { Student, ExamConfig } from "../../types";
 import { storageService } from "../../services/storage";
+import { offlineService } from "../../services/offline";
 import { supabase } from "../../lib/supabase";
+import { normalizeDateString } from "../../utils/timezoneUtils";
+import {
+  isClassMatch,
+  canStudentResumeInOvertime,
+  getGlobalExamEndTimestamp,
+} from "../../utils/scheduleUtils";
 
 
 // Helper to parse "SchoolName-ClassName(Limit)" format
@@ -38,6 +45,7 @@ export const useStudentEntryForm = ({ initialCode, onLoginSuccess }: UseStudentE
     cleanExamCode: string;
     studentData: Student;
     config?: ExamConfig;
+    canResumeOvertime?: boolean;
   } | null>(null);
 
   // UI State
@@ -48,10 +56,13 @@ export const useStudentEntryForm = ({ initialCode, onLoginSuccess }: UseStudentE
   const [absentNumber, setAbsentNumber] = useState("");
   const [isCheckingCode, setIsCheckingCode] = useState(false);
   const [error, setError] = useState("");
+  const [unlockError, setUnlockError] = useState("");
+  const [isUnlocking, setIsUnlocking] = useState(false);
   const [isFocused, setIsFocused] = useState<string | null>(null);
   
   const examCodeInputRef = useRef<HTMLInputElement>(null);
   const nameInputRef = useRef<HTMLInputElement>(null);
+  const prefetchedConfigRef = useRef<{ code: string; config: ExamConfig } | null>(null);
 
   // Derived state for absent/NIS limit
   const { limit: absentLimit } = parseClassConfig(studentClass);
@@ -314,118 +325,125 @@ export const useStudentEntryForm = ({ initialCode, onLoginSuccess }: UseStudentE
     return [];
   }, [filteredStudents, absentLimit]);
 
-  // Auto-fetch config and load scoped student data when code changes
+  // Auto-fetch config and load scoped student data when code changes (debounced)
   useEffect(() => {
     let isMounted = true;
-    const checkConfig = async () => {
-      const cleanCode = examCode.toUpperCase().trim();
-      if (cleanCode.length === 6) {
-        setIsCheckingCode(true);
-        // Load scoped student data for this specific exam code
-        try {
-          const scopedData = localStorage.getItem(`student_pref_${cleanCode}`);
-          if (scopedData && isMounted) {
-            const parsed = JSON.parse(scopedData);
-            if (parsed.fullName) setFullName(parsed.fullName);
-            if (parsed.schoolName) setSchoolName(parsed.schoolName);
-            if (parsed.studentClass) setStudentClass(parsed.studentClass);
-            if (parsed.absentNumber) setAbsentNumber(parsed.absentNumber);
-          }
-        } catch {
-          /* ignore */
-        }
+    const cleanCode = examCode.toUpperCase().trim();
 
-        try {
-          const config = await storageService.getExamConfig(cleanCode);
-          const { data: regData } = await supabase
-            .from("registered_students")
-            .select("*")
-            .eq("exam_code", cleanCode);
+    if (cleanCode.length !== 6) {
+      prefetchedConfigRef.current = null;
+      setAvailableClasses([]);
+      setRegisteredData([]);
+      setIsCheckingCode(false);
+      return;
+    }
 
-          if (!isMounted) return;
+    setIsCheckingCode(true);
 
-          const combinedRegData = regData ? [...regData] : [];
-          if (config && config.registeredStudents && config.registeredStudents.length > 0) {
-            config.registeredStudents.forEach((cs: any, idx: number) => {
-              const sName = cs.student_name || cs.fullName || "";
-              const cName = cs.class_name || cs.className || "";
-              const aNum = cs.absent_number || cs.absentNumber || "";
-              const sSchool = cs.school_name || cs.schoolName || "";
-              const already = combinedRegData.some(
-                (r) =>
-                  (r.student_name || "").trim().toLowerCase() === sName.trim().toLowerCase() &&
-                  normalizeClassName(r.class_name) === normalizeClassName(cName)
-              );
-              if (!already) {
-                combinedRegData.push({
-                  id: cs.id || `cfg-${idx}`,
-                  exam_code: cleanCode,
-                  school_name: sSchool,
-                  class_name: cName,
-                  student_name: sName,
-                  absent_number: aNum,
-                  is_active: false,
-                });
-              }
-            });
-          }
-
-          if (combinedRegData.length > 0) {
-            setRegisteredData(combinedRegData);
-            const schools = Array.from(
-              new Set(combinedRegData.map((r) => r.school_name).filter(Boolean)),
-            );
-            if (schools.length === 1) {
-              setSchoolName(schools[0]);
-            } else if (schools.length > 1) {
-              setSchoolName((prev) => (schools.includes(prev) ? prev : ""));
-            }
-          } else {
-            setRegisteredData([]);
-          }
-
-          if (
-            config &&
-            config.targetClasses &&
-            config.targetClasses.length > 0
-          ) {
-            setAvailableClasses(config.targetClasses);
-            setStudentClass((prev) => {
-              if (prev && !config.targetClasses?.includes(prev)) return "";
-              return prev;
-            });
-
-            if (combinedRegData.length === 0) {
-              const schools = new Set<string>();
-              config.targetClasses.forEach((c) => {
-                const parsed = parseClassConfig(c);
-                if (parsed.schoolName) schools.add(parsed.schoolName);
-              });
-              if (schools.size === 1) {
-                setSchoolName(Array.from(schools)[0]);
-              } else if (schools.size > 1) {
-                setSchoolName((prev) => (schools.has(prev) ? prev : ""));
-              }
-            }
-          } else {
-            setAvailableClasses([]);
-          }
-        } catch (err) {
-          console.error("Error fetching config", err);
-        } finally {
-          if (isMounted) setIsCheckingCode(false);
-        }
-      } else {
-        if (isMounted) {
-          setAvailableClasses([]);
-          setRegisteredData([]);
-          setIsCheckingCode(false);
-        }
+    // Load scoped student data immediately without waiting for network debounce
+    try {
+      const scopedData = localStorage.getItem(`student_pref_${cleanCode}`);
+      if (scopedData && isMounted) {
+        const parsed = JSON.parse(scopedData);
+        if (parsed.fullName) setFullName(parsed.fullName);
+        if (parsed.schoolName) setSchoolName(parsed.schoolName);
+        if (parsed.studentClass) setStudentClass(parsed.studentClass);
+        if (parsed.absentNumber) setAbsentNumber(parsed.absentNumber);
       }
-    };
-    checkConfig();
+    } catch {
+      /* ignore */
+    }
+
+    const debounceTimer = setTimeout(async () => {
+      try {
+        const [{ config }, { data: regData }] = await Promise.all([
+          storageService.getExamConfigStatus(cleanCode),
+          supabase
+            .from("registered_students")
+            .select("id, exam_code, school_name, class_name, student_name, absent_number, is_active")
+            .eq("exam_code", cleanCode),
+        ]);
+
+        if (!isMounted) return;
+
+        prefetchedConfigRef.current = config ? { code: cleanCode, config } : null;
+
+        const combinedRegData = regData ? [...regData] : [];
+        if (config && config.registeredStudents && config.registeredStudents.length > 0) {
+          config.registeredStudents.forEach((cs: any, idx: number) => {
+            const sName = cs.student_name || cs.fullName || "";
+            const cName = cs.class_name || cs.className || "";
+            const aNum = cs.absent_number || cs.absentNumber || "";
+            const sSchool = cs.school_name || cs.schoolName || "";
+            const already = combinedRegData.some(
+              (r) =>
+                (r.student_name || "").trim().toLowerCase() === sName.trim().toLowerCase() &&
+                normalizeClassName(r.class_name) === normalizeClassName(cName)
+            );
+            if (!already) {
+              combinedRegData.push({
+                id: cs.id || `cfg-${idx}`,
+                exam_code: cleanCode,
+                school_name: sSchool,
+                class_name: cName,
+                student_name: sName,
+                absent_number: aNum,
+                is_active: false,
+              });
+            }
+          });
+        }
+
+        if (combinedRegData.length > 0) {
+          setRegisteredData(combinedRegData);
+          const schools = Array.from(
+            new Set(combinedRegData.map((r) => r.school_name).filter(Boolean)),
+          );
+          if (schools.length === 1) {
+            setSchoolName(schools[0]);
+          } else if (schools.length > 1) {
+            setSchoolName((prev) => (schools.includes(prev) ? prev : ""));
+          }
+        } else {
+          setRegisteredData([]);
+        }
+
+        if (
+          config &&
+          config.targetClasses &&
+          config.targetClasses.length > 0
+        ) {
+          setAvailableClasses(config.targetClasses);
+          setStudentClass((prev) => {
+            if (prev && !config.targetClasses?.includes(prev)) return "";
+            return prev;
+          });
+
+          if (combinedRegData.length === 0) {
+            const schools = new Set<string>();
+            config.targetClasses.forEach((c) => {
+              const parsed = parseClassConfig(c);
+              if (parsed.schoolName) schools.add(parsed.schoolName);
+            });
+            if (schools.size === 1) {
+              setSchoolName(Array.from(schools)[0]);
+            } else if (schools.size > 1) {
+              setSchoolName((prev) => (schools.has(prev) ? prev : ""));
+            }
+          }
+        } else {
+          setAvailableClasses([]);
+        }
+      } catch (err) {
+        console.error("Error fetching config", err);
+      } finally {
+        if (isMounted) setIsCheckingCode(false);
+      }
+    }, 250);
+
     return () => {
       isMounted = false;
+      clearTimeout(debounceTimer);
     };
   }, [examCode]);
 
@@ -478,14 +496,27 @@ export const useStudentEntryForm = ({ initialCode, onLoginSuccess }: UseStudentE
     setError("");
 
     try {
-      const exists = await storageService.getExamConfig(cleanExamCode);
-      if (!exists) {
-        setError("Kode ujian tidak ditemukan atau tidak aktif");
+      const isBrowserOffline = typeof navigator !== "undefined" && navigator.onLine === false;
+      let config: ExamConfig | null = null;
+      let isConfigNetErr = isBrowserOffline;
+
+      if (!isBrowserOffline && prefetchedConfigRef.current?.code === cleanExamCode) {
+        config = prefetchedConfigRef.current.config;
+      } else {
+        const cfgStatus = await storageService.getExamConfigStatus(cleanExamCode);
+        config = cfgStatus.config;
+        isConfigNetErr = cfgStatus.isNetworkError;
+      }
+
+      if (!config) {
+        setError(
+          isConfigNetErr
+            ? "Perangkat sedang offline. Sambungkan ke internet untuk mengunduh soal dan mendaftarkan sesi ujian."
+            : "Kode ujian tidak ditemukan atau tidak aktif",
+        );
         setIsLoading(false);
         return;
       }
-
-      const config = await storageService.getExamConfig(cleanExamCode);
 
       const parsedClass = parseClassConfig(studentClass);
       const cleanClassName = parsedClass.name || studentClass;
@@ -495,12 +526,14 @@ export const useStudentEntryForm = ({ initialCode, onLoginSuccess }: UseStudentE
         config.targetClasses &&
         config.targetClasses.length > 0
       ) {
-        const matchesTarget = config.targetClasses.some(
-          (tc) =>
+        const matchesTarget = config.targetClasses.some((tc) => {
+          const parsedTcName = parseClassConfig(tc).name || tc;
+          return (
             tc === studentClass ||
-            parseClassConfig(tc).name === cleanClassName ||
-            tc === cleanClassName,
-        );
+            isClassMatch(parsedTcName, cleanClassName) ||
+            isClassMatch(tc, cleanClassName)
+          );
+        });
         if (!matchesTarget) {
           setError(
             `Ujian ini tidak diperuntukkan bagi kelas ${cleanClassName}. Harap periksa kembali.`,
@@ -522,47 +555,128 @@ export const useStudentEntryForm = ({ initialCode, onLoginSuccess }: UseStudentE
         schoolName: cleanSchoolName,
       };
 
-      const result = await storageService.getStudentResult(
-        cleanExamCode,
-        studentId,
-      );
+      const { result, isNetworkError: isResultNetErr } =
+        await storageService.getStudentResultStatus(cleanExamCode, studentId);
+      const isOfflineFlow = isBrowserOffline || isConfigNetErr || isResultNetErr;
 
-      // --- DEADLINE CHECK ---
+      const localProgressEarly =
+        isOfflineFlow && !result
+          ? ((await storageService.getLocalProgress(
+              `exam_local_${cleanExamCode}_${studentId}`,
+            )) as {
+              status?: string;
+              answers?: Record<string, string>;
+              lastUpdated?: number;
+            } | null)
+          : null;
+
+      const queuedEarly =
+        isOfflineFlow && !result
+          ? offlineService
+              .getSyncQueue()
+              .find((q) => q.examCode === cleanExamCode && q.student.studentId === studentId)
+          : undefined;
+
+      const existingStatus = result
+        ? result.status
+        : queuedEarly?.status ||
+          localProgressEarly?.status ||
+          (localProgressEarly ? "in_progress" : undefined);
+
+      const existingStartStr = result
+        ? result.answers?._startTime
+        : localProgressEarly?.answers?._startTime;
+      const parsedExistingStart = existingStartStr ? parseInt(existingStartStr, 10) : NaN;
+      const existingStartMs =
+        (!isNaN(parsedExistingStart) && parsedExistingStart > 0 ? parsedExistingStart : null) ||
+        result?.timestamp ||
+        localProgressEarly?.lastUpdated ||
+        null;
+
+      const canViewCompletedResult =
+        Boolean(result && result.status === "completed" && !config.allowRetakes);
+
+      const canResumeOvertime =
+        !config.isFinished &&
+        canStudentResumeInOvertime(config, existingStatus, existingStartMs, Date.now());
+
+      // --- DEADLINE & CLOSURE CHECK ---
       const mode = (config.examMode || 'UJIAN').trim().toUpperCase();
       const isPR = mode === 'PR';
-      const getLocalDateStr = (raw) => {
-          if (!raw) return '';
-          if (raw.includes('T')) {
-              const d = new Date(raw);
-              return isNaN(d.getTime()) ? '' : d.toLocaleDateString('en-CA');
-          }
-          return raw;
-      };
-      
-      const endDateStr = getLocalDateStr(config.endDate || config.date);
-      const endTimeStr = isPR ? (config.endTime || '23:59') : (config.endTime || '23:59');
+      const examTz = config.timezone || 'WIB';
+      const rawEndDate = config.endDate || config.date;
+      const endDateStr = rawEndDate ? normalizeDateString(rawEndDate) : '';
+      const endTimeStr = config.endTime || '23:59';
+      const absoluteExamEndTime = getGlobalExamEndTimestamp(config);
 
-      let absoluteExamEndTime;
-      if (isPR) {
-          absoluteExamEndTime = new Date(`${endDateStr}T${endTimeStr}:59`).getTime();
-      } else if (config.endDate && config.endDate.includes('T')) {
-          absoluteExamEndTime = new Date(config.endDate).getTime();
-      } else {
-          absoluteExamEndTime = new Date(`${endDateStr}T${endTimeStr}:59`).getTime();
+      if (config.isFinished && !canViewCompletedResult) {
+        setError(
+          "Ujian ini telah ditutup oleh guru dan tidak lagi menerima pengerjaan baru maupun lanjutan.",
+        );
+        setIsLoading(false);
+        return;
       }
 
-      if (isNaN(absoluteExamEndTime)) {
-          absoluteExamEndTime = Infinity;
-      }
-
-      if (Date.now() > absoluteExamEndTime) {
-          setError(`Ujian ini telah ditutup karena melewati batas waktu pengerjaan (${endDateStr} ${endTimeStr}).`);
-          setIsLoading(false);
-          return;
+      if (Date.now() > absoluteExamEndTime && !canViewCompletedResult && !canResumeOvertime) {
+        setError(
+          `Ujian ini telah ditutup karena melewati batas waktu pengerjaan (${endDateStr || "-"} ${endTimeStr} ${examTz}).`,
+        );
+        setIsLoading(false);
+        return;
       }
       // ----------------------
 
-      if (result) {
+      const lockKey = `exam_lock_${cleanExamCode}_${studentId}`;
+
+      if (isOfflineFlow && !result) {
+        const isNotPR = !isPR;
+        const requiresLock = isNotPR && !!config.detectBehavior && !!config.continueWithPermission;
+        let hasLocalLock = false;
+        try {
+          hasLocalLock = localStorage.getItem(lockKey) === "1";
+        } catch {
+          /* ignore */
+        }
+
+        const localProgress = localProgressEarly;
+        const queued = queuedEarly;
+
+        if (
+          requiresLock &&
+          (hasLocalLock ||
+            localProgress?.status === "force_closed" ||
+            queued?.status === "force_closed")
+        ) {
+          setError(
+            "Sesi ini terkunci karena terdeteksi pelanggaran. Sambungkan ke internet dan hubungi pengawas untuk membuka kunci.",
+          );
+          setPendingStudentData({ cleanExamCode, studentData, config, canResumeOvertime });
+          setIsLocked(true);
+          setIsLoading(false);
+          return;
+        }
+
+        if (queued?.status === "completed" && !config.allowRetakes) {
+          setError(
+            "Jawaban ujian untuk peserta ini sudah selesai dikerjakan dan menunggu sinkronisasi. Sambungkan ke internet untuk mengirim dan melihat hasil.",
+          );
+          setIsLoading(false);
+          return;
+        }
+
+        const [cachedOfflineExam, cachedEdgeBundle] = await Promise.all([
+          storageService.getLocalProgress(`offline_exam_${cleanExamCode}`),
+          storageService.getLocalProgress(`edge_bundle_${cleanExamCode}`),
+        ]);
+
+        if ((!cachedOfflineExam && !cachedEdgeBundle) || !localProgress) {
+          setError(
+            "Perangkat sedang offline dan belum ada sesi ujian aktif di perangkat ini. Sambungkan ke internet untuk masuk dan mengunduh soal.",
+          );
+          setIsLoading(false);
+          return;
+        }
+      } else if (result) {
         const isNotPR = !isPR;
 
         // Jika ujian sudah selesai dan tidak boleh retake, izinkan login agar App.tsx dapat mengarahkan ke halaman hasil.
@@ -575,7 +689,7 @@ export const useStudentEntryForm = ({ initialCode, onLoginSuccess }: UseStudentE
             setError(
               `Sesi ini terkunci. Hubungi pengawas untuk meminta izin melanjutkan ujian.`
             );
-            setPendingStudentData({ cleanExamCode, studentData });
+            setPendingStudentData({ cleanExamCode, studentData, config, canResumeOvertime });
             setIsLocked(true);
             setIsLoading(false);
             return;
@@ -583,32 +697,18 @@ export const useStudentEntryForm = ({ initialCode, onLoginSuccess }: UseStudentE
             // Jika tidak diizinkan melanjutkan (continueWithPermission=false), biarkan masuk agar App.tsx 
             // menendang mereka ke halaman hasil (Student Result).
           }
-        }
-
-        const currentAnswers =
-          localStorage.getItem(
-            `exam_local_${cleanExamCode}_${studentData.studentId}`,
-          ) || "{}";
-        const parsedAnswers = JSON.parse(currentAnswers);
-        const hasStarted = Object.keys(parsedAnswers).length > 0;
-        const savedDuration = parsedAnswers._duration;
-
-        if (
-          hasStarted &&
-          !savedDuration &&
-          config.detectBehavior &&
-          !config.continueWithPermission &&
-          isNotPR
-        ) {
-          const deviceId =
-            localStorage.getItem("deviceId") ||
-            Math.random().toString(36).substring(2);
-          localStorage.setItem("deviceId", deviceId);
-          if ((result as any).device_id && (result as any).device_id !== deviceId) {
+        } else if (isNotPR && result.status === "in_progress" && config.detectBehavior) {
+          let deviceId = localStorage.getItem("deviceId");
+          if (!deviceId) {
+            deviceId = `${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 10)}`;
+            localStorage.setItem("deviceId", deviceId);
+          }
+          const existingDeviceId = result.device_id || result.answers?._deviceId;
+          if (existingDeviceId && existingDeviceId !== deviceId) {
             setError(
-              `Sesi ini sedang aktif di perangkat lain. Hubungi pengawas jika Anda ingin berpindah perangkat.`,
+              `Sesi ini sedang aktif di perangkat lain. Masukkan Token Pengawas untuk melanjutkan di perangkat ini.`,
             );
-            setPendingStudentData({ cleanExamCode, studentData });
+            setPendingStudentData({ cleanExamCode, studentData, config, canResumeOvertime });
             setIsLocked(true);
             setIsLoading(false);
             return;
@@ -619,19 +719,28 @@ export const useStudentEntryForm = ({ initialCode, onLoginSuccess }: UseStudentE
         try {
           const classResults = await storageService.getResults(
             cleanExamCode,
-            studentClass,
-            schoolName.trim(),
+            cleanClassName,
+            cleanSchoolName,
           );
           if (classResults && classResults.length > 0) {
-            const existingSameAbsent = classResults.find(
-              (r) =>
-                r.student.absentNumber === absentNumber &&
+            const cleanInputAbsent = absentNumber.trim();
+            const parsedInputAbsent = parseInt(cleanInputAbsent, 10);
+            const existingSameAbsent = classResults.find((r) => {
+              const rAbsent = String(r.student.absentNumber ?? "").trim();
+              const sameAbsent =
+                rAbsent === cleanInputAbsent ||
+                (!isNaN(parsedInputAbsent) &&
+                  /^\d+$/.test(rAbsent) &&
+                  parseInt(rAbsent, 10) === parsedInputAbsent);
+              return (
+                sameAbsent &&
                 r.student.fullName.trim().toLowerCase() !==
-                  fullName.trim().toLowerCase(),
-            );
+                  fullName.trim().toLowerCase()
+              );
+            });
             if (existingSameAbsent) {
               setError(
-                `Nomor urut ${absentNumber} di kelas ${studentClass} sudah terdaftar atas nama ${existingSameAbsent.student.fullName}. Hubungi pengawas.`,
+                `Nomor urut ${cleanInputAbsent} di kelas ${cleanClassName} sudah terdaftar atas nama ${existingSameAbsent.student.fullName}. Hubungi pengawas.`,
               );
               setIsLoading(false);
               return;
@@ -654,11 +763,16 @@ export const useStudentEntryForm = ({ initialCode, onLoginSuccess }: UseStudentE
         JSON.stringify(scopedPref),
       );
 
-      // Clear pending locks
-      const lockKey = `exam_lock_${cleanExamCode}_${studentId}`;
-      localStorage.removeItem(lockKey);
+      // Clear pending locks ONLY when online check verified student is allowed
+      if (!isOfflineFlow) {
+        try {
+          localStorage.removeItem(lockKey);
+        } catch {
+          /* ignore */
+        }
+      }
 
-      setPendingStudentData({ cleanExamCode, studentData, config });
+      setPendingStudentData({ cleanExamCode, studentData, config, canResumeOvertime });
       setIsLoading(false);
     } catch (err) {
       console.error(err);
@@ -669,14 +783,23 @@ export const useStudentEntryForm = ({ initialCode, onLoginSuccess }: UseStudentE
 
   const handleUnlockAndResume = async (token: string) => {
     if (!pendingStudentData) return;
+    setUnlockError("");
+    setIsUnlocking(true);
     try {
+      let deviceId = localStorage.getItem("deviceId");
+      if (!deviceId) {
+        deviceId = `${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 10)}`;
+        localStorage.setItem("deviceId", deviceId);
+      }
       const isValid = await storageService.verifyUnlockToken(
         pendingStudentData.cleanExamCode,
         pendingStudentData.studentData.studentId,
         token,
+        deviceId,
       );
       if (isValid) {
         setIsLocked(false);
+        setUnlockError("");
         const lockKey = `exam_lock_${pendingStudentData.cleanExamCode}_${pendingStudentData.studentData.studentId}`;
         localStorage.removeItem(lockKey);
 
@@ -694,10 +817,12 @@ export const useStudentEntryForm = ({ initialCode, onLoginSuccess }: UseStudentE
           pendingStudentData.studentData,
         );
       } else {
-        alert("Token tidak valid atau sudah kadaluarsa!");
+        setUnlockError("Token tidak valid atau sudah kadaluarsa.");
       }
     } catch {
-      alert("Gagal verifikasi token.");
+      setUnlockError("Gagal verifikasi token. Periksa koneksi internet Anda.");
+    } finally {
+      setIsUnlocking(false);
     }
   };
 
@@ -720,6 +845,9 @@ export const useStudentEntryForm = ({ initialCode, onLoginSuccess }: UseStudentE
     setAbsentNumber,
     isCheckingCode,
     error,
+    unlockError,
+    setUnlockError,
+    isUnlocking,
     isFocused,
     setIsFocused,
     examCodeInputRef,

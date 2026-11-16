@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect, useCallback } from "react";
 import type { Question, Result } from "../../../types";
 import { parseList, normalize, isAnswerMatch } from "../examUtils";
+import { showAlertModal } from "../../../stores/feedbackStore";
 
 interface UseQuestionAnalysisItemLogicProps {
   q: Question;
@@ -54,7 +55,11 @@ export const useQuestionAnalysisItemLogic = ({
         await onUpdateKey(q.id, tempKey);
         setIsEditingKey(false);
       } catch (e) {
-        alert("Gagal memperbarui kunci jawaban");
+        await showAlertModal({
+          title: "Gagal Memperbarui Kunci",
+          message: "Gagal memperbarui kunci jawaban.",
+          tone: "danger",
+        });
         console.error(e);
       } finally {
         setIsSaving(false);

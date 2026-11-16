@@ -1,17 +1,17 @@
-import React from "react";
+import React, { useMemo } from "react";
 import type { Question } from "../../../types";
 import { CheckCircleIcon } from "../../Icons";
 
 interface TrueFalseViewProps {
   question: Question;
-  answers: Record<string, string>;
+  answerValue: string;
   onAnswerChange: (qId: string, value: string) => void;
   optimizeHtml: (html: string) => string;
 }
 
-export const TrueFalseView: React.FC<TrueFalseViewProps> = ({
+export const TrueFalseView: React.FC<TrueFalseViewProps> = React.memo(({
   question,
-  answers,
+  answerValue,
   onAnswerChange,
   optimizeHtml,
 }) => {
@@ -20,12 +20,20 @@ export const TrueFalseView: React.FC<TrueFalseViewProps> = ({
   const trueLabel = (categoryLabels && categoryLabels[0]) || "Benar";
   const falseLabel = (categoryLabels && categoryLabels[1]) || "Salah";
 
+  const currentAnsObj = useMemo<Record<number, boolean>>(() => {
+    if (!answerValue) return {};
+    try {
+      return JSON.parse(answerValue) || {};
+    } catch {
+      return {};
+    }
+  }, [answerValue]);
+
   if (!trueFalseRows) return null;
 
   return (
     <div className="space-y-3">
       {trueFalseRows.map((row, i) => {
-        const currentAnsObj = answers[qId] ? JSON.parse(answers[qId]) : {};
         const isTrue = currentAnsObj[i] === true;
         const isFalse = currentAnsObj[i] === false;
 
@@ -91,4 +99,4 @@ export const TrueFalseView: React.FC<TrueFalseViewProps> = ({
       })}
     </div>
   );
-};
+});

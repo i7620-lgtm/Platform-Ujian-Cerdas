@@ -9,9 +9,9 @@ import {
   LinkIcon,
 } from "../Icons";
 import { ChartRenderer } from "../ChartRenderer";
+import { AudioPlayer } from "../AudioPlayer";
 import EmojiPickerModal from "./EmojiPickerModal";
 import { GeometryModal } from "./GeometryModal";
-import { AiImageModal } from "./AiImageModal";
 import { ToolbarActions } from "./ToolbarActions";
 import { InlineEquationToolbar } from "./InlineEquationToolbar";
 import { InlineLatexCursorChip } from "./InlineLatexCursorChip";
@@ -398,6 +398,10 @@ export const WysiwygEditor: React.FC<{
   minHeight?: string;
   showTabs?: boolean;
   onChartClick?: (chartType?: "cartesian") => void;
+  onAudioClick?: () => void;
+  onAudioDelete?: () => void;
+  audioUrl?: string;
+  listeningScript?: string;
   chartData?: ChartData;
 }> = ({
   value,
@@ -406,6 +410,10 @@ export const WysiwygEditor: React.FC<{
   minHeight = "120px",
   showTabs = true,
   onChartClick,
+  onAudioClick,
+  onAudioDelete,
+  audioUrl,
+  listeningScript,
   chartData,
 }) => {
   const {
@@ -432,7 +440,6 @@ export const WysiwygEditor: React.FC<{
     cancelInlineMath,
     activeInlineLatex,
     setActiveInlineLatex,
-    insertAiImage,
     openLinkModal,
     insertLink,
     handlePaste,
@@ -453,12 +460,12 @@ export const WysiwygEditor: React.FC<{
     showGeometry,
     showAksara,
     showEmoji,
-    showAiImage,
     showLink,
     selectedTextForLink,
   } = state;
 
   const [chartNode, setChartNode] = useState<HTMLElement | null>(null);
+  const [audioNode, setAudioNode] = useState<HTMLElement | null>(null);
   const lastValueRef = useRef(value);
 
   useEffect(() => {
@@ -526,6 +533,20 @@ export const WysiwygEditor: React.FC<{
             newHtml += CHART_PLACEHOLDER;
           }
 
+          const AUDIO_PLACEHOLDER = `<div class="audio-placeholder-wrapper" contenteditable="false" data-audio="true" style="display: block; width: 100%; margin: 12px 0;"><div class="audio-placeholder-text" style="display: block; padding: 12px; background: #f0fdf4; border: 1px dashed #22c55e; text-align: center; border-radius: 8px; color: #15803d; font-weight: 500; font-size: 12px; cursor: pointer;">🔊 Stimulus Audio Listening (Klik 'Kelola Audio' di toolbar untuk mengkonfigurasi)</div></div>`;
+
+          if (/\[AUDIO_STIMULUS\]/i.test(newHtml)) {
+            newHtml = newHtml.replace(
+              /(?:<p>)?\s*\[AUDIO_STIMULUS\]\s*(?:<\/p>)?/gi,
+              AUDIO_PLACEHOLDER,
+            );
+          } else if (
+            (audioUrl || listeningScript) &&
+            !newHtml.includes('data-audio="true"')
+          ) {
+            newHtml += AUDIO_PLACEHOLDER;
+          }
+
           // Resolve any unrendered geometry tag
           if (
             /\[GEOMETRY:([a-zA-Z0-9_-]+)(?:[:|]([\s\S]*?))?\]/i.test(newHtml)
@@ -566,7 +587,7 @@ export const WysiwygEditor: React.FC<{
         }
       }
     }
-  }, [value, chartData, editorRef, lastEmittedValueRef, isTypingRef, debounceRef]);
+  }, [value, chartData, audioUrl, listeningScript, editorRef, lastEmittedValueRef, isTypingRef, debounceRef]);
 
   useEffect(() => {
     if (editorRef.current) {
@@ -580,8 +601,19 @@ export const WysiwygEditor: React.FC<{
         }
       }
       setChartNode(node as HTMLElement);
+
+      const aNode = editorRef.current.querySelector('[data-audio="true"]');
+      if (aNode) {
+        const textSpan = aNode.querySelector(
+          ".audio-placeholder-text",
+        ) as HTMLElement;
+        if (textSpan) {
+          textSpan.style.display = (audioUrl || listeningScript) ? "none" : "block";
+        }
+      }
+      setAudioNode(aNode as HTMLElement);
     }
-  }, [value, chartData, editorRef]);
+  }, [value, chartData, audioUrl, listeningScript, editorRef]);
 
   return (
     <div className="relative group rounded-xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-900 transition-all focus-within:ring-2 focus-within:ring-indigo-100 dark:focus-within:ring-indigo-900 focus-within:border-indigo-300 dark:focus-within:border-indigo-700 w-full max-w-full">
@@ -617,9 +649,8 @@ export const WysiwygEditor: React.FC<{
             activeTab={activeTab}
             activeCmds={activeCmds}
             runCmd={runCmd}
-            onAudioClick={() => audioInputRef.current?.click()}
+            onAudioClick={onAudioClick || (() => audioInputRef.current?.click())}
             onImageClick={() => fileInputRef.current?.click()}
-            onAiImageClick={() => setEditorSubState({ showAiImage: true })}
             onTableClick={() => setEditorSubState({ showTable: true })}
             onGeometryClick={() => setEditorSubState({ showGeometry: true })}
             onChartClick={onChartClick}
@@ -684,6 +715,20 @@ export const WysiwygEditor: React.FC<{
             </div>,
             chartNode,
           )}
+        {audioNode &&
+          (audioUrl || listeningScript) &&
+          createPortal(
+            <div className="w-full pointer-events-auto my-2">
+              <AudioPlayer
+                src={audioUrl}
+                script={listeningScript}
+                isTeacher={true}
+                onEdit={onAudioClick}
+                onDelete={onAudioDelete}
+              />
+            </div>,
+            audioNode,
+          )}
         {inlineMathNode &&
           createPortal(
             <InlineLatexCursorChip
@@ -747,12 +792,6 @@ export const WysiwygEditor: React.FC<{
           runCmd("insertHTML", emoji);
           handleInput();
         }}
-      />
-      <AiImageModal
-        key={showAiImage ? "ai-image-open" : "ai-image-closed"}
-        isOpen={showAiImage}
-        onClose={() => setEditorSubState({ showAiImage: false })}
-        onInsert={insertAiImage}
       />
       <LinkModal
         key={showLink ? `link-open-${selectedTextForLink}` : "link-closed"}

@@ -91,6 +91,10 @@ class StorageService {
       return examService.getExamConfig(code);
   }
 
+  async getExamConfigStatus(code: string): Promise<{ config: ExamConfig | null; isNetworkError: boolean }> {
+      return examService.getExamConfigStatus(code);
+  }
+
   async saveExam(exam: Exam): Promise<void> {
       return examService.saveExam(exam);
   }
@@ -125,10 +129,6 @@ class StorageService {
       return archiveService.generateAnalysisPrompt(summaries, customPrompt);
   }
 
-  async generateAIAnalysis(summaries: ExamSummary[], customPrompt?: string): Promise<string> {
-      return archiveService.generateAIAnalysis(summaries, customPrompt);
-  }
-
   async getExamForArchive(code: string): Promise<Exam | null> {
       return examService.getExamForArchive(code);
   }
@@ -141,8 +141,20 @@ class StorageService {
       return resultService.mapRowToResult(row);
   }
 
-  async getResults(examCode?: string, className?: string, schoolName?: string): Promise<Result[]> {
-      return resultService.getResults(examCode, className, schoolName);
+  async getResults(examCodeOrCodes?: string | string[], className?: string, schoolName?: string): Promise<Result[]> {
+      return resultService.getResults(examCodeOrCodes, className, schoolName);
+  }
+
+  async autoSaveStudentAnswers(params: {
+      resultId?: number;
+      examCode: string;
+      studentId: string;
+      studentName?: string;
+      className?: string;
+      schoolName?: string;
+      answers: Record<string, string>;
+  }): Promise<{ ok: boolean; resultId?: number; lockedStatus?: ResultStatus }> {
+      return resultService.autoSaveStudentAnswers(params);
   }
 
   async submitExamResult(resultPayload: Result): Promise<Result> {
@@ -153,8 +165,16 @@ class StorageService {
       return offlineService.processQueue();
   }
 
+  async waitForQueueSaved(): Promise<void> {
+      return offlineService.waitForQueueSaved();
+  }
+
   async getStudentResult(examCode: string, studentId: string): Promise<Result | null> {
       return resultService.getStudentResult(examCode, studentId);
+  }
+
+  async getStudentResultStatus(examCode: string, studentId: string): Promise<{ result: Result | null; isNetworkError: boolean }> {
+      return resultService.getStudentResultStatus(examCode, studentId);
   }
 
   async unlockStudentExam(examCode: string, studentId: string): Promise<void> {
@@ -187,8 +207,8 @@ class StorageService {
       return resultService.generateUnlockToken(examCode, studentId);
   }
 
-  async verifyUnlockToken(examCode: string, studentId: string, token: string): Promise<boolean> {
-      return resultService.verifyUnlockToken(examCode, studentId, token);
+  async verifyUnlockToken(examCode: string, studentId: string, token: string, newDeviceId?: string): Promise<boolean> {
+      return resultService.verifyUnlockToken(examCode, studentId, token, newDeviceId);
   }
 
   async deleteStudentResult(examCode: string, studentId: string): Promise<void> {

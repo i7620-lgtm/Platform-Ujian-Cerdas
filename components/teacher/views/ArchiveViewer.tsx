@@ -25,9 +25,7 @@ import {
 import { ArchiveQuestionAnalysis } from "../archive/ArchiveQuestionAnalysis";
 import { ArchiveClassAnalysis } from "../archive/ArchiveClassAnalysis";
 import { ArchiveHeaderActions } from "../archive/ArchiveHeaderActions";
-import { AiAnalysisTargetModal } from "../archive/AiAnalysisTargetModal";
 import { ArchiveAiPromptPanel } from "../archive/ArchiveAiPromptPanel";
-import { AiAnalysisProgressModal } from "../archive/AiAnalysisProgressModal";
 import { PrintSoalModal } from "../modals/berlangsung/PrintSoalModal";
 import {
   fixArchiveDataSorting,
@@ -71,24 +69,13 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({
 }) => {
   const archiveViewerInstance = useArchiveViewer({ teacherProfile });
   const {
-    isGeneratingAI,
-    aiProgressStatus,
-    aiProgressMessage,
     aiAnalysisResult,
     activeAiSubTab,
     setActiveAiSubTab,
     isTargetModalOpen,
     setIsTargetModalOpen,
-    isProgressModalOpen,
-    setIsProgressModalOpen,
     analysisTargets,
-    aiQueue,
-    aiCurrentQueueIndex,
-    aiFailedItem,
     handleOpenAiTargetModal,
-    handleStartBatchAiAnalysis,
-    handleResumeAiAnalysis,
-    handleFinishAiAnalysis,
     sortedResults,
     uniqueSchools,
     uniqueClasses,
@@ -309,8 +296,6 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({
         activeTab={activeTab}
         setActiveTab={setActiveTab}
         totalStudents={totalStudentsDisplay}
-        isGeneratingAI={isGeneratingAI}
-        aiProgressMessage={aiProgressMessage || aiProgressStatus?.message}
         onGenerateAI={handleOpenAiTargetModal}
         hasAiAnalysis={Boolean(archiveData?.ai_analyses && Object.keys(archiveData.ai_analyses).length > 0) || Boolean(aiAnalysisResult)}
       />
@@ -445,8 +430,6 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({
             onDeleteAIAnalysis={handleDeleteAIAnalysis}
             onOpenTargetModal={handleOpenAiTargetModal}
             viewMode="CLASS_ONLY"
-            isGeneratingAI={isGeneratingAI}
-            aiProgressStatus={aiProgressStatus}
           />
         )}
 
@@ -466,8 +449,6 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({
             onDeleteAIAnalysis={handleDeleteAIAnalysis}
             onOpenTargetModal={handleOpenAiTargetModal}
             viewMode="AI_ONLY"
-            isGeneratingAI={isGeneratingAI}
-            aiProgressStatus={aiProgressStatus}
           />
         )}
       </div>
@@ -554,16 +535,6 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({
           onSaveAnalysisBatch={handleSaveImportedAnalysisBatch}
         />
       )}
-
-      <AiAnalysisProgressModal
-        isOpen={isProgressModalOpen}
-        queue={aiQueue}
-        currentIndex={aiCurrentQueueIndex}
-        currentMessage={aiProgressMessage}
-        failedItem={aiFailedItem}
-        onResume={handleResumeAiAnalysis}
-        onFinish={handleFinishAiAnalysis}
-      />
     </div>
   );
 };

@@ -1,18 +1,18 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import type { Question } from "../../../types";
 import { ChevronDownIcon } from "../../Icons";
 
 interface MatchingViewProps {
   question: Question;
-  answers: Record<string, string>;
+  answerValue: string;
   onAnswerChange: (qId: string, value: string) => void;
   optimizeHtml: (html: string) => string;
   rightOptions: string[];
 }
 
-export const MatchingView: React.FC<MatchingViewProps> = ({
+export const MatchingView: React.FC<MatchingViewProps> = React.memo(({
   question,
-  answers,
+  answerValue,
   onAnswerChange,
   optimizeHtml,
   rightOptions = [],
@@ -21,11 +21,9 @@ export const MatchingView: React.FC<MatchingViewProps> = ({
   const [openDropdownIdx, setOpenDropdownIdx] = useState<number | null>(null);
 
   useEffect(() => {
+    if (openDropdownIdx === null) return;
     const handleClickOutside = (e: MouseEvent) => {
-      if (
-        openDropdownIdx !== null &&
-        !(e.target as Element).closest(".custom-dropdown-container")
-      ) {
+      if (!(e.target as Element).closest(".custom-dropdown-container")) {
         setOpenDropdownIdx(null);
       }
     };
@@ -33,12 +31,20 @@ export const MatchingView: React.FC<MatchingViewProps> = ({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [openDropdownIdx]);
 
+  const currentAnsObj = useMemo<Record<number, string>>(() => {
+    if (!answerValue) return {};
+    try {
+      return JSON.parse(answerValue) || {};
+    } catch {
+      return {};
+    }
+  }, [answerValue]);
+
   if (!matchingPairs) return null;
 
   return (
     <div className="space-y-3">
       {matchingPairs.map((pair, i) => {
-        const currentAnsObj = answers[qId] ? JSON.parse(answers[qId]) : {};
         const selectedValue = currentAnsObj[i] || "";
         const isOpen = openDropdownIdx === i;
 
@@ -134,4 +140,4 @@ export const MatchingView: React.FC<MatchingViewProps> = ({
       })}
     </div>
   );
-};
+});

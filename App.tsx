@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, Suspense } from 'react';
+import React, { useState, useCallback, useEffect, useRef, Suspense } from 'react';
 import { StudentLogin } from './components/StudentLogin';
 import { StudentExamPage } from './components/StudentExamPage';
 import { StudentResultPage } from './components/StudentResultPage';
@@ -8,16 +8,22 @@ import { OngoingExamModal } from './components/teacher/DashboardModals';
 import type { Exam, Student, Result, TeacherProfile, ResultStatus } from './types';
 import { LogoIcon, NoWifiIcon, UserIcon, ArrowLeftIcon, SunIcon, MoonIcon, QrCodeIcon, BookOpenIcon } from './components/Icons';
 import { storageService } from './services/storage';
+import { offlineService } from './services/offline';
+import { ModerationError } from './services/exam';
 import { InvitationModal } from './components/teacher/InvitationModal';
 import { ProfileCompletionModal } from './components/teacher/ProfileCompletionModal';
 import { TermsPage, PrivacyPage } from './components/LegalPages';
 import { TutorialPage } from './components/TutorialPage';
 import { CollaboratorView } from './components/CollaboratorView';
 import { VisualLightboxModal } from './components/VisualLightboxModal';
+import { StudentDialogModal, type StudentDialogVariant } from './components/student/StudentDialogModal';
 import { supabase } from './lib/supabase';
 import { hydrateMathInContainer } from './utils/mathRenderer';
-import { calculateStudentAccess } from './utils/scheduleUtils';
+import { calculateStudentAccess, canStudentResumeInOvertime } from './utils/scheduleUtils';
 import { measureClientBandwidthBytes, detectClientDevice, countIntegrityViolations } from './utils/telemetryUtils';
+import { cleanupExpiredExamCaches } from './utils/cacheHygiene';
+import { FeedbackHost } from './components/FeedbackHost';
+import { showAlertModal } from './stores/feedbackStore';
 
 function lazyWithRetry<T extends React.ComponentType<any>>(
   componentImport: () => Promise<{ default: T }>
@@ -62,7 +68,13 @@ const App: React.FC = () => {
   const [teacherProfile, setTeacherProfile] = useState<TeacherProfile | null>(null);
   const [showProfileCompletion, setShowProfileCompletion] = useState(false);
   const [exams, setExams] = useState<Record<string, Exam>>({});
+  const examsRef = useRef<Record<string, Exam>>(exams);
+  useEffect(() => {
+    examsRef.current = exams;
+  }, [exams]);
   const [results, setResults] = useState<Result[]>([]);
+  const lastExamsFetchRef = useRef<{ teacherId: string; ts: number }>({ teacherId: '', ts: 0 });
+  const lastResultsFetchRef = useRef<{ teacherId: string; ts: number }>({ teacherId: '', ts: 0 });
   const [isSyncing, setIsSyncing] = useState(false);
   const [isOnline, setIsOnline] = useState(typeof navigator !== 'undefined' && navigator.onLine !== undefined ? navigator.onLine : true);
   const [isLoadingSession, setIsLoadingSession] = useState(true);
@@ -70,6 +82,37 @@ const App: React.FC = () => {
   const [isInviteOpen, setIsInviteOpen] = useState(false);
   const [collaboratorData, setCollaboratorData] = useState<{ exam: Exam, role: 'editor' | 'viewer' | 'public', token: string } | null>(null);
   const [isMonitorProctor, setIsMonitorProctor] = useState(false);
+  const [appDialog, setAppDialog] = useState<{
+    isOpen: boolean;
+    variant: StudentDialogVariant;
+    title: string;
+    message: string;
+    onCloseAction?: () => void;
+  } | null>(null);
+
+  const showAppDialog = useCallback(
+    (
+      variant: StudentDialogVariant,
+      title: string,
+      message: string,
+      onCloseAction?: () => void,
+    ) => {
+      setAppDialog({
+        isOpen: true,
+        variant,
+        title,
+        message,
+        onCloseAction,
+      });
+    },
+    [],
+  );
+
+  const closeAppDialog = useCallback(() => {
+    const action = appDialog?.onCloseAction;
+    setAppDialog(null);
+    if (action) action();
+  }, [appDialog]);
 
   // Theme State Management
   const [darkMode, setDarkMode] = useState(() => {
@@ -150,10 +193,11 @@ const App: React.FC = () => {
     // Initial hydration
     hydrateMathInContainer(document.body);
 
-    // Observe changes for dynamic rendering with intelligent node filtering
+    // Observe changes for dynamic rendering with intelligent node filtering & scoped root hydration
     let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+    const pendingRoots = new Set<HTMLElement>();
     const observer = new MutationObserver((mutations) => {
-      let shouldRender = false;
+      let hasNewRoots = false;
       for (const m of mutations) {
         if (m.addedNodes.length > 0) {
           for (let i = 0; i < m.addedNodes.length; i++) {
@@ -168,21 +212,36 @@ const App: React.FC = () => {
               ) {
                 continue;
               }
-              // Ignore inputs and form controls
-              if (node.tagName === 'INPUT' || node.tagName === 'TEXTAREA' || node.tagName === 'SELECT') {
+              // Ignore inputs, form controls, and editable containers
+              if (
+                node.tagName === 'INPUT' ||
+                node.tagName === 'TEXTAREA' ||
+                node.tagName === 'SELECT' ||
+                node.isContentEditable ||
+                node.closest?.('[contenteditable="true"]')
+              ) {
                 continue;
               }
-              shouldRender = true;
-              break;
+              pendingRoots.add(node);
+              hasNewRoots = true;
             }
           }
-          if (shouldRender) break;
         }
       }
-      if (shouldRender) {
+      if (hasNewRoots) {
         if (debounceTimer) clearTimeout(debounceTimer);
         debounceTimer = setTimeout(() => {
-          hydrateMathInContainer(document.body);
+          const roots = Array.from(pendingRoots);
+          pendingRoots.clear();
+          if (roots.length > 15) {
+            hydrateMathInContainer(document.body);
+          } else {
+            for (const root of roots) {
+              if (root.isConnected) {
+                hydrateMathInContainer(root);
+              }
+            }
+          }
         }, 120);
       }
     });
@@ -191,6 +250,7 @@ const App: React.FC = () => {
     
     return () => {
       observer.disconnect();
+      pendingRoots.clear();
       if (debounceTimer) clearTimeout(debounceTimer);
     };
   }, []);
@@ -217,8 +277,15 @@ const App: React.FC = () => {
             const newStudentId = payload.new.student_id;
             
             if (newStudentName && newClassName && newStudentId) {
-                const [schoolName, className] = newClassName.includes('::') ? newClassName.split('::') : ['', newClassName];
-                const absentNumber = newStudentId.match(/%([^%]+)$/)?.[1] || '';
+                const [schoolName, className] = newClassName.includes('::')
+                  ? newClassName.split('::')
+                  : newClassName.includes(' - ')
+                    ? newClassName.split(' - ')
+                    : ['', newClassName];
+                const absentNumber =
+                  newStudentId.match(/%([^%]+)$/)?.[1] ||
+                  newStudentId.match(/_([^_]+)$/)?.[1] ||
+                  '';
 
                 setCurrentStudent(prev => {
                     if (!prev) return null;
@@ -280,21 +347,23 @@ const App: React.FC = () => {
       // Pass studentId to ensure consistent shuffling (Fix #2)
       const exam = await storageService.getExamForStudent(examCode, student.studentId, isPreview);
       if (!exam) { 
-        alert("Kode Ujian tidak ditemukan atau belum dipublikasikan."); 
+        showAppDialog("error", "Kode Ujian Tidak Ditemukan", "Kode Ujian tidak ditemukan atau belum dipublikasikan.");
         return; 
       }
 
-      // FIX: Check schedule before allowing entry (Manual Login & Class Session Isolation)
-      if (!isPreview) {
-          const access = calculateStudentAccess(exam.config, student.class, new Date());
-          if (!access.canAccess) {
-              setInvitationExam(exam);
-              return;
-          }
-      }
-      
-      const res = await storageService.getStudentResult(examCode, student.studentId);
-      
+      const { result: res, isNetworkError: isResultNetErr } = await storageService.getStudentResultStatus(examCode, student.studentId);
+
+      const localProgressForResume =
+        !res && isResultNetErr && !isPreview
+          ? ((await storageService.getLocalProgress(`exam_local_${examCode}_${student.studentId}`)) as {
+              answers?: Record<string, string>;
+              logs?: string[];
+              status?: ResultStatus;
+              resultId?: number;
+              lastUpdated?: number;
+            } | null)
+          : null;
+
       if (res && res.status === 'completed' && !isPreview) {
           if (!exam.config.allowRetakes) {
               setCurrentExam(exam);
@@ -305,8 +374,49 @@ const App: React.FC = () => {
           }
       }
 
+      const isClosedByTeacher = Boolean(exam.config.isFinished) || exam.status === 'closed';
+      if (isClosedByTeacher && !isPreview) {
+          showAppDialog(
+            "info",
+            "Ujian Telah Ditutup",
+            "Ujian ini telah ditutup oleh guru dan tidak lagi menerima pengerjaan.",
+          );
+          return;
+      }
+
+      // Check schedule before allowing entry, EXCEPT returning students eligible for overtime resumption
+      if (!isPreview) {
+          const access = calculateStudentAccess(exam.config, student.class, new Date());
+          if (!access.canAccess) {
+              const resumeStatus = res?.status || localProgressForResume?.status || (localProgressForResume ? 'in_progress' : undefined);
+              const resumeStartStr = res?.answers?._startTime || localProgressForResume?.answers?._startTime;
+              const parsedResumeStart = resumeStartStr ? parseInt(resumeStartStr, 10) : NaN;
+              const resumeStartMs =
+                (!isNaN(parsedResumeStart) && parsedResumeStart > 0 ? parsedResumeStart : null) ||
+                res?.timestamp ||
+                localProgressForResume?.lastUpdated ||
+                null;
+
+              const canResumeOvertime = canStudentResumeInOvertime(
+                exam.config,
+                resumeStatus,
+                resumeStartMs,
+                Date.now(),
+              );
+
+              if (!canResumeOvertime) {
+                  if (access.status === 'FINISHED_GLOBAL') {
+                      showAppDialog("error", "Ujian Telah Berakhir", access.message);
+                  } else {
+                      setInvitationExam(exam);
+                  }
+                  return;
+              }
+          }
+      }
+
       // Initialize with potential resultId if resuming
-      let studentWithId = { ...student, resultId: res?.id };
+      let studentWithId = { ...student, resultId: res?.id ?? student.resultId };
 
       if (res && res.status === 'force_closed' && !isPreview) {
           const isPR = (exam.config.examMode || '').trim().toUpperCase() === 'PR';
@@ -326,16 +436,74 @@ const App: React.FC = () => {
       if (res && res.status === 'in_progress' && !isPreview) {
         setResumedResult(res);
         studentWithId = { ...student, resultId: res.id };
+      } else if (!res && isResultNetErr && !isPreview) {
+        // Offline / network failure during login check: allow ONLY unlocked returning students with local exam data
+        const localProgress = localProgressForResume;
+        const queued = offlineService.getSyncQueue().find((q) => q.examCode === examCode && q.student.studentId === student.studentId);
+        const isPR = (exam.config.examMode || '').trim().toUpperCase() === 'PR';
+        const lockKey = `exam_lock_${examCode}_${student.studentId}`;
+        let hasLocalLock = false;
+        try {
+          hasLocalLock = localStorage.getItem(lockKey) === '1';
+        } catch {
+          /* ignore */
+        }
+
+        if (
+          !isPR &&
+          exam.config.detectBehavior &&
+          exam.config.continueWithPermission &&
+          (hasLocalLock || localProgress?.status === 'force_closed' || queued?.status === 'force_closed')
+        ) {
+          showAppDialog(
+            "warning",
+            "Sesi Ujian Terkunci",
+            "Sesi ini terkunci karena terdeteksi pelanggaran. Sambungkan ke internet dan hubungi pengawas untuk membuka kunci.",
+          );
+          return;
+        }
+
+        if (!localProgress) {
+          showAppDialog(
+            "error",
+            "Perangkat Sedang Offline",
+            "Perangkat sedang offline dan belum ada sesi ujian aktif di perangkat ini. Sambungkan ke internet untuk memulai ujian.",
+          );
+          return;
+        }
+
+        const resolvedResultId = localProgress.resultId ?? student.resultId;
+        studentWithId = { ...student, resultId: resolvedResultId };
+        const offlineResumedResult: Result = {
+          id: resolvedResultId,
+          student: studentWithId,
+          examCode,
+          answers: localProgress.answers || {},
+          score: 0,
+          correctAnswers: 0,
+          totalQuestions: exam.questions.length,
+          status: localProgress.status === 'force_closed' ? 'force_closed' : 'in_progress',
+          activityLog: localProgress.logs || [],
+          timestamp: localProgress.lastUpdated || Date.now(),
+        };
+        setResumedResult(offlineResumedResult);
       } else if (!isPreview) {
-        // Initial creation
+        let deviceId = '';
+        try {
+          deviceId = localStorage.getItem('deviceId') || `${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 10)}`;
+          localStorage.setItem('deviceId', deviceId);
+        } catch { /* ignore */ }
+
+        // Initial creation (online)
         const newRes = await storageService.submitExamResult({
           student,
           examCode,
-          answers: { _startTime: Date.now().toString() },
+          answers: { _startTime: Date.now().toString(), ...(deviceId ? { _deviceId: deviceId } : {}) },
           score: 0,
           totalQuestions: exam.questions.length,
           correctAnswers: 0,
           status: 'in_progress',
+          device_id: deviceId || undefined,
           timestamp: Date.now()
         });
         // Capture the new ID
@@ -364,13 +532,19 @@ const App: React.FC = () => {
     } catch (err: unknown) {
         const error = err as Error;
         if (error.message === 'EXAM_IS_DRAFT') {
-            alert("Ujian ini masih berupa draf.");
+            showAppDialog("info", "Ujian Belum Tersedia", "Ujian ini masih berupa draf dan belum dibuka oleh guru.");
+        } else if (error.message === 'OFFLINE_NO_LOCAL_EXAM') {
+            showAppDialog("error", "Perangkat Sedang Offline", "Perangkat sedang offline dan naskah soal belum tersimpan di perangkat ini. Sambungkan ke internet untuk mengunduh soal.");
+        } else if (error.message === 'EDGE_CONTENT_UNAVAILABLE') {
+            showAppDialog("error", "Gagal Mengunduh Soal", "Gagal mengunduh naskah soal dari server. Pastikan koneksi internet stabil dan coba lagi.");
+        } else if (error.message === 'EXAM_NOT_FOUND') {
+            showAppDialog("error", "Kode Ujian Tidak Ditemukan", "Kode Ujian tidak ditemukan atau belum dipublikasikan.");
         } else {
             console.error(error);
-            alert("Gagal memuat ujian. Periksa koneksi internet Anda.");
+            showAppDialog("error", "Gagal Memuat Ujian", "Terjadi kendala saat memuat ujian. Periksa koneksi internet Anda lalu coba lagi.");
         }
     } finally { setIsSyncing(false); }
-  }, []);
+  }, [showAppDialog]);
 
   // Session check & automatic recovery on reload (iPhone/mobile crash protection)
   useEffect(() => {
@@ -433,6 +607,12 @@ const App: React.FC = () => {
     };
 
     checkSession();
+
+    const hygieneTimer = setTimeout(() => {
+      cleanupExpiredExamCaches().catch(() => {});
+    }, 1500);
+
+    return () => clearTimeout(hygieneTimer);
   }, [handleStudentLoginSuccess]);
 
   useEffect(() => {
@@ -503,13 +683,13 @@ const App: React.FC = () => {
                     }
                     window.history.replaceState({}, document.title, window.location.pathname);
                 } else {
-                    alert("Tautan pengawas atau publik tidak valid atau akses telah dinonaktifkan.");
+                    showAppDialog("error", "Tautan Tidak Valid", "Tautan pengawas atau publik tidak valid atau akses telah dinonaktifkan.");
                     window.history.replaceState({}, '', '/');
                 }
             })
             .catch(e => {
                 console.error(e);
-                alert("Gagal memuat sesi pantauan ujian.");
+                showAppDialog("error", "Gagal Memuat Sesi", "Gagal memuat sesi pantauan ujian.");
                 window.history.replaceState({}, '', '/');
             })
             .finally(() => setIsSyncing(false));
@@ -571,11 +751,11 @@ const App: React.FC = () => {
 
     const liveCode = params.get('live');
     if (liveCode) {
-        alert("Akses pantauan langsung memerlukan tautan resmi ber-token dari guru atau pengawas.");
+        showAppDialog("info", "Tautan Pantauan Diperlukan", "Akses pantauan langsung memerlukan tautan resmi ber-token dari guru atau pengawas.");
         window.history.replaceState({}, '', '/');
         return;
     }
-  }, [handleStudentLoginSuccess]);
+  }, [handleStudentLoginSuccess, showAppDialog]);
 
   useEffect(() => {
     const handleOnline = () => { setIsOnline(true); storageService.syncData(); };
@@ -588,21 +768,57 @@ const App: React.FC = () => {
     };
   }, []);
 
-  const refreshExams = useCallback(async () => {
+  const DASHBOARD_CACHE_TTL_MS = 45_000;
+
+  const refreshExams = useCallback(async (force = false) => {
     if (!teacherProfile) return;
+    const now = Date.now();
+    if (
+      !force &&
+      lastExamsFetchRef.current.teacherId === teacherProfile.id &&
+      now - lastExamsFetchRef.current.ts < DASHBOARD_CACHE_TTL_MS
+    ) {
+      return;
+    }
     setIsSyncing(true);
     try {
         const examMap = await storageService.getExams(teacherProfile);
+        examsRef.current = examMap;
         setExams(examMap);
+        lastExamsFetchRef.current = { teacherId: teacherProfile.id, ts: Date.now() };
     } finally { setIsSyncing(false); }
   }, [teacherProfile]);
 
-  const refreshResults = useCallback(async () => {
+  const refreshResults = useCallback(async (force = false) => {
     if (!teacherProfile) return;
+    const now = Date.now();
+    if (
+      !force &&
+      lastResultsFetchRef.current.teacherId === teacherProfile.id &&
+      now - lastResultsFetchRef.current.ts < DASHBOARD_CACHE_TTL_MS
+    ) {
+      return;
+    }
     setIsSyncing(true);
     try {
-        const data = await storageService.getResults();
+        let examCodes = Object.keys(examsRef.current);
+        if (examCodes.length === 0) {
+            const examMap = await storageService.getExams(teacherProfile);
+            examsRef.current = examMap;
+            examCodes = Object.keys(examMap);
+            lastExamsFetchRef.current = { teacherId: teacherProfile.id, ts: Date.now() };
+            if (examCodes.length > 0) {
+                setExams(examMap);
+            }
+        }
+        if (examCodes.length === 0) {
+            setResults([]);
+            lastResultsFetchRef.current = { teacherId: teacherProfile.id, ts: Date.now() };
+            return;
+        }
+        const data = await storageService.getResults(examCodes);
         setResults(data);
+        lastResultsFetchRef.current = { teacherId: teacherProfile.id, ts: Date.now() };
     } finally { setIsSyncing(false); }
   }, [teacherProfile]);
 
@@ -610,8 +826,8 @@ const App: React.FC = () => {
     if (!currentExam || !currentStudent) return;
     
     if (currentStudent.class === 'PREVIEW') {
-        alert("Mode Pratinjau selesai.");
         resetToHome();
+        showAppDialog("success", "Mode Pratinjau Selesai", "Simulasi pengerjaan dalam Mode Pratinjau selesai. Tidak ada jawaban yang disimpan ke server.");
         return;
     }
 
@@ -686,6 +902,11 @@ const App: React.FC = () => {
 
   const handleResumeFromLock = () => {
       if (studentResult) {
+          if (currentExam && currentStudent) {
+              try {
+                  localStorage.removeItem(`exam_lock_${currentExam.code}_${currentStudent.studentId}`);
+              } catch { /* ignore */ }
+          }
           const unlockedResult = { ...studentResult, status: 'in_progress' } as Result;
           setStudentResult(unlockedResult);
           setResumedResult(unlockedResult);
@@ -711,6 +932,8 @@ const App: React.FC = () => {
     setPrefillCode('');
     setCollaboratorData(null);
     // FIX: Clear shared state to prevent data leakage/ghosting between sessions
+    lastExamsFetchRef.current = { teacherId: '', ts: 0 };
+    lastResultsFetchRef.current = { teacherId: '', ts: 0 };
     setExams({});
     setResults([]);
     window.history.replaceState({}, '', '/');
@@ -941,25 +1164,41 @@ const App: React.FC = () => {
                     onUpdateProfile={(updated) => setTeacherProfile(updated)}
                     addExam={async (e) => { 
                         const examWithAuthor: Exam = { ...e, authorId: teacherProfile.id, authorSchool: teacherProfile.school };
-                        // Optimistic UI update: immediately add to state so tabs show it with zero delay
-                        setExams((prev) => ({ ...prev, [examWithAuthor.code]: examWithAuthor }));
                         try {
                             await storageService.saveExam(examWithAuthor); 
+                            // Optimistic UI update only AFTER successful server validation
+                            setExams((prev) => ({ ...prev, [examWithAuthor.code]: examWithAuthor }));
                         } catch (err) {
-                            console.error("Gagal simpan ujian ke database, data aman di lokal:", err);
+                            if (err instanceof ModerationError) {
+                                void showAlertModal({
+                                  title: 'Penyimpanan Diblokir',
+                                  message: `Sistem mendeteksi konten yang tidak pantas:\n- ${err.issues.join('\n- ')}\n\nMohon perbaiki konten ujian Anda sebelum menyimpan.`,
+                                  tone: 'danger',
+                                });
+                            } else {
+                                console.error("Gagal simpan ujian ke database, data aman di lokal:", err);
+                            }
                         }
-                        await refreshExams(); 
+                        await refreshExams(true); 
                     }}
                     updateExam={async (e) => { 
                         const examWithAuthor: Exam = { ...e, authorId: teacherProfile.id, authorSchool: teacherProfile.school };
-                        // Optimistic UI update: immediately reflect changes
-                        setExams((prev) => ({ ...prev, [examWithAuthor.code]: examWithAuthor }));
                         try {
                             await storageService.saveExam(examWithAuthor); 
+                            // Optimistic UI update only AFTER successful server validation
+                            setExams((prev) => ({ ...prev, [examWithAuthor.code]: examWithAuthor }));
                         } catch (err) {
-                            console.error("Gagal perbarui ujian ke database, data aman di lokal:", err);
+                            if (err instanceof ModerationError) {
+                                void showAlertModal({
+                                  title: 'Perubahan Diblokir',
+                                  message: `Sistem mendeteksi konten yang tidak pantas:\n- ${err.issues.join('\n- ')}\n\nMohon perbaiki konten ujian Anda sebelum menyimpan.`,
+                                  tone: 'danger',
+                                });
+                            } else {
+                                console.error("Gagal perbarui ujian ke database, data aman di lokal:", err);
+                            }
                         }
-                        await refreshExams(); 
+                        await refreshExams(true); 
                     }}
                     deleteExam={async (c) => { 
                         setExams((prev) => {
@@ -972,7 +1211,7 @@ const App: React.FC = () => {
                         } catch (err) {
                             console.error("Gagal menghapus ujian di server:", err);
                         }
-                        await refreshExams(); 
+                        await refreshExams(true); 
                     }}
                     onLogout={handleLogout}
                     onRefreshExams={refreshExams}
@@ -1078,6 +1317,20 @@ const App: React.FC = () => {
 
         {/* Global Visual Lightbox Modal for Fullscreen Zoom */}
         <VisualLightboxModal />
+
+        {/* Global In-App Dialog Modal for Student & Public Alerts */}
+        {appDialog && (
+          <StudentDialogModal
+            isOpen={appDialog.isOpen}
+            variant={appDialog.variant}
+            title={appDialog.title}
+            message={appDialog.message}
+            confirmLabel="Mengerti"
+            onClose={closeAppDialog}
+          />
+        )}
+        {/* Global Feedback Modals & Toasts */}
+        <FeedbackHost />
     </div>
   );
 };

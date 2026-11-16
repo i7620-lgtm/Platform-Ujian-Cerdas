@@ -1,5 +1,6 @@
 import { useEffect, useRef, useCallback, useState } from "react";
 import { processTransparentImage } from "../../utils/imageProcessor";
+import { showAlertModal } from "../../stores/feedbackStore";
 
 export interface PositionDef {
   x: number;
@@ -128,7 +129,11 @@ export const useCertificateEditorModal = ({
     const file = e.target.files?.[0];
     if (file) {
       if (file.size > 1 * 1024 * 1024) {
-        alert("Ukuran gambar tanda tangan maksimal 1MB");
+        void showAlertModal({
+          title: "Ukuran Gambar Terlalu Besar",
+          message: "Ukuran gambar tanda tangan maksimal 1MB.",
+          tone: "warning",
+        });
         return;
       }
       const reader = new FileReader();
@@ -144,7 +149,11 @@ export const useCertificateEditorModal = ({
     const file = e.target.files?.[0];
     if (file) {
       if (file.size > 2 * 1024 * 1024) {
-        alert("Ukuran gambar maksimal 2MB");
+        void showAlertModal({
+          title: "Ukuran Gambar Terlalu Besar",
+          message: "Ukuran gambar latar belakang sertifikat maksimal 2MB.",
+          tone: "warning",
+        });
         return;
       }
       const reader = new FileReader();

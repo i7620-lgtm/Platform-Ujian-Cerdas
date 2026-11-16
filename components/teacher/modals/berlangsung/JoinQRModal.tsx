@@ -1,5 +1,6 @@
 import React from "react";
 import { XMarkIcon, DocumentDuplicateIcon } from "../../../Icons";
+import { showToast } from "../../../../stores/feedbackStore";
 
 interface JoinQRModalProps {
   isOpen: boolean;
@@ -18,7 +19,7 @@ export const JoinQRModal: React.FC<JoinQRModalProps> = ({
 
   const handleCopy = () => {
     navigator.clipboard.writeText(joinUrl);
-    alert("Link ujian berhasil disalin!");
+    showToast("Link ujian berhasil disalin!", "success");
   };
 
   return (

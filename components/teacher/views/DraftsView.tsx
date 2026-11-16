@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import type { Exam, TeacherProfile } from "../../../types";
-import { PencilIcon } from "../../Icons";
+import { PencilIcon, ArrowPathIcon } from "../../Icons";
 import { useDraftsView } from "../useDraftsView";
 import { PreviewModal } from "./PreviewModal";
 import { DraftExamCard } from "./DraftExamCard";
@@ -13,28 +13,54 @@ export const DraftsView: React.FC<{
   teacherProfile?: TeacherProfile;
   onDeleteDraft: (exam: Exam) => void;
   onContinueDraft: (exam: Exam) => void;
-}> = ({ exams, teacherProfile, onDeleteDraft, onContinueDraft }) => {
+  onRefresh?: () => Promise<void> | void;
+}> = ({ exams, teacherProfile, onDeleteDraft, onContinueDraft, onRefresh }) => {
   const { previewExam, setPreviewExam, handleCopyPreviewLink } =
     useDraftsView();
 
   const [printSoalExam, setPrintSoalExam] = useState<Exam | null>(null);
   const [printKisiKisiExam, setPrintKisiKisiExam] = useState<Exam | null>(null);
   const [printKunciExam, setPrintKunciExam] = useState<Exam | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const handleManualRefresh = async () => {
+    if (!onRefresh || isRefreshing) return;
+    setIsRefreshing(true);
+    try {
+      await onRefresh();
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <div className="flex items-center gap-2">
-        <div className="p-2 bg-gray-100 dark:bg-slate-800 rounded-lg">
-          <PencilIcon className="w-6 h-6 text-gray-600 dark:text-slate-400" />
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <div className="p-2 bg-gray-100 dark:bg-slate-800 rounded-lg">
+            <PencilIcon className="w-6 h-6 text-gray-600 dark:text-slate-400" />
+          </div>
+          <div>
+            <h2 className="text-2xl font-bold text-neutral dark:text-white">
+              Draf Soal
+            </h2>
+            <p className="text-sm text-gray-500 dark:text-slate-400">
+              Lanjutkan pembuatan soal yang belum selesai.
+            </p>
+          </div>
         </div>
-        <div>
-          <h2 className="text-2xl font-bold text-neutral dark:text-white">
-            Draf Soal
-          </h2>
-          <p className="text-sm text-gray-500 dark:text-slate-400">
-            Lanjutkan pembuatan soal yang belum selesai.
-          </p>
-        </div>
+        {onRefresh && (
+          <button
+            type="button"
+            onClick={handleManualRefresh}
+            disabled={isRefreshing}
+            className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-bold rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 shadow-xs transition-all shrink-0 cursor-pointer disabled:opacity-60"
+            title="Perbarui Daftar Draf"
+          >
+            <ArrowPathIcon className={`w-4 h-4 ${isRefreshing ? "animate-spin text-indigo-600" : ""}`} />
+            <span className="hidden sm:inline">Perbarui</span>
+          </button>
+        )}
       </div>
 
       {exams.length > 0 ? (

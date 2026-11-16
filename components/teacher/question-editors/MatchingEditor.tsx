@@ -4,6 +4,7 @@ import { TrashIcon, PlusCircleIcon } from "../../Icons";
 import { WysiwygEditor } from "../WysiwygEditor";
 import { useExamEditorStore } from "../../../stores/examEditorStore";
 import { useExamEditorUIStore } from "../../../stores/examEditorUIStore";
+import { showConfirmModal } from "../../../stores/feedbackStore";
 
 interface MatchingEditorProps {
   q: Question;
@@ -90,8 +91,14 @@ export const MatchingEditor: React.FC<MatchingEditorProps> = ({ q }) => {
               <div className="flex justify-end mt-2.5 pt-2 border-t border-slate-100 dark:border-slate-700/60 lg:hidden">
                 <button
                   type="button"
-                  onClick={() => {
-                    if (window.confirm("Hapus pasangan menjodohkan ini?")) {
+                  onClick={async () => {
+                    const confirmed = await showConfirmModal({
+                      title: "Hapus Pasangan?",
+                      message: "Hapus pasangan menjodohkan ini?",
+                      tone: "danger",
+                      confirmLabel: "Hapus Pasangan",
+                    });
+                    if (confirmed) {
                       handleDeleteMatchingPair(q.id, pIndex);
                     }
                   }}
@@ -121,8 +128,14 @@ export const MatchingEditor: React.FC<MatchingEditorProps> = ({ q }) => {
               {q.matchingPairs!.length > 2 ? (
                 <button
                   type="button"
-                  onClick={() => {
-                    if (window.confirm("Hapus pasangan menjodohkan ini?")) {
+                  onClick={async () => {
+                    const confirmed = await showConfirmModal({
+                      title: "Hapus Pasangan?",
+                      message: "Hapus pasangan menjodohkan ini?",
+                      tone: "danger",
+                      confirmLabel: "Hapus Pasangan",
+                    });
+                    if (confirmed) {
                       handleDeleteMatchingPair(q.id, pIndex);
                     }
                   }}

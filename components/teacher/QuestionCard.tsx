@@ -19,13 +19,15 @@ import { TrueFalseEditor } from "./question-editors/TrueFalseEditor";
 import { MatchingEditor } from "./question-editors/MatchingEditor";
 import { ShortAnswerEditor } from "./question-editors/ShortAnswerEditor";
 import { QuestionnaireEditor } from "./question-editors/QuestionnaireEditor";
+import { AudioPlayer } from "../AudioPlayer";
+import { Volume2 } from "lucide-react";
+import { QuestionAudioModal } from "./modals/QuestionAudioModal";
+import { showConfirmModal } from "../../stores/feedbackStore";
 
 interface QuestionCardProps {
   q: Question;
   index: number;
   questionNumber: number;
-  isGenerating?: boolean;
-  onGenerate?: (q: Question) => void;
 }
 
 export const QuestionCard = React.memo(
@@ -33,8 +35,6 @@ export const QuestionCard = React.memo(
     q,
     index,
     questionNumber,
-    isGenerating,
-    onGenerate,
   }: QuestionCardProps) => {
     const handleTypeChange = useExamEditorStore((s) => s.handleTypeChange);
     const handleDeleteQuestion = useExamEditorStore((s) => s.handleDeleteQuestion);
@@ -54,6 +54,7 @@ export const QuestionCard = React.memo(
 
     const [isHintOpen, setIsHintOpen] = useState(false);
     const [isStepsOpen, setIsStepsOpen] = useState(false);
+    const [isAudioModalOpen, setIsAudioModalOpen] = useState(false);
     const stripHtml = (html?: string) => (html ? html.replace(/<[^>]*>/g, "").trim() : "");
     const hasHint = Boolean(stripHtml(q.hint));
     const hasSteps = Boolean(stripHtml(q.solutionSteps));
@@ -152,11 +153,15 @@ export const QuestionCard = React.memo(
 
               <button
                 type="button"
-                onClick={(e) => {
+                onClick={async (e) => {
                   e.stopPropagation();
-                  if (
-                    window.confirm("Apakah Anda yakin ingin menghapus soal ini?")
-                  ) {
+                  const confirmed = await showConfirmModal({
+                    title: "Hapus Soal?",
+                    message: "Apakah Anda yakin ingin menghapus soal ini? Perubahan ini belum dapat dibatalkan setelah disimpan.",
+                    tone: "danger",
+                    confirmLabel: "Hapus Soal",
+                  });
+                  if (confirmed) {
                     handleDeleteQuestion(q.id);
                   }
                 }}
@@ -169,50 +174,7 @@ export const QuestionCard = React.memo(
           </div>
 
           <div className="p-5 md:p-6 relative">
-            {isGenerating ? (
-              <div className="space-y-6 animate-pulse p-2">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-primary/10 dark:bg-primary/20 rounded-xl">
-                    <SparklesIcon className="w-5 h-5 text-primary animate-spin" />
-                  </div>
-                  <div>
-                    <h4 className="text-sm font-bold text-slate-700 dark:text-slate-300">AI Sedang Merumuskan Butir Soal...</h4>
-                    <p className="text-xs text-slate-450 dark:text-slate-500">Menganalisis kisi-kisi dan menyusun alternatif jawaban berkualitas tinggi.</p>
-                  </div>
-                </div>
-
-                <div className="space-y-3">
-                  <div className="h-4 bg-gray-200 dark:bg-slate-700 rounded-full w-3/4"></div>
-                  <div className="h-3 bg-gray-200 dark:bg-slate-700 rounded-full w-1/2"></div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <div className="space-y-2 border border-gray-100 dark:border-slate-800 p-3 rounded-xl">
-                    <div className="h-2 bg-gray-200 dark:bg-slate-700 rounded-full w-1/2 mb-2"></div>
-                    <div className="h-4 bg-gray-200 dark:bg-slate-700 rounded-lg"></div>
-                  </div>
-                  <div className="space-y-2 border border-gray-100 dark:border-slate-800 p-3 rounded-xl">
-                    <div className="h-2 bg-gray-200 dark:bg-slate-700 rounded-full w-1/2 mb-2"></div>
-                    <div className="h-4 bg-gray-200 dark:bg-slate-700 rounded-lg"></div>
-                  </div>
-                  <div className="space-y-2 border border-gray-100 dark:border-slate-800 p-3 rounded-xl">
-                    <div className="h-2 bg-gray-200 dark:bg-slate-700 rounded-full w-1/2 mb-2"></div>
-                    <div className="h-4 bg-gray-200 dark:bg-slate-700 rounded-lg"></div>
-                  </div>
-                </div>
-
-                <div className="space-y-2 border border-gray-100 dark:border-slate-800 p-4 rounded-xl">
-                  <div className="h-2 bg-gray-200 dark:bg-slate-700 rounded-full w-1/4 mb-2"></div>
-                  <div className="h-20 bg-gray-200 dark:bg-slate-700 rounded-lg"></div>
-                </div>
-
-                <div className="space-y-2">
-                  <div className="h-8 bg-gray-200 dark:bg-slate-700 rounded-lg w-full"></div>
-                  <div className="h-8 bg-gray-200 dark:bg-slate-700 rounded-lg w-full"></div>
-                </div>
-              </div>
-            ) : (
-              <div className="w-full min-w-0">
+            <div className="w-full min-w-0">
                 {q.questionType !== "INFO" && (
                   <>
                       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
@@ -359,6 +321,20 @@ export const QuestionCard = React.memo(
                         : "Tulis pertanyaan di sini..."
                     }
                     minHeight="80px"
+                    onAudioClick={() => setIsAudioModalOpen(true)}
+                    onAudioDelete={() => {
+                      let updatedText = q.questionText || "";
+                      updatedText = updatedText
+                        .replace(/(?:<p[^>]*>)?\s*\[AUDIO_STIMULUS\]\s*(?:<\/p>)?/gi, "")
+                        .trim();
+                      useExamEditorStore.getState().handleUpdateQuestion(q.id, {
+                        audioUrl: undefined,
+                        listeningScript: undefined,
+                        questionText: updatedText,
+                      });
+                    }}
+                    audioUrl={q.audioUrl}
+                    listeningScript={q.listeningScript}
                     onChartClick={(chartType) =>
                       setEditingChartTarget({
                         qId: q.id,
@@ -573,8 +549,34 @@ export const QuestionCard = React.memo(
                     </div>
                   )}
                 </div>
-            )}
           </div>
+
+          {/* Modal Kelola Audio Listening (Upload Berkas / Suara Narasi Otomatis) */}
+          {isAudioModalOpen && (
+            <QuestionAudioModal
+              isOpen={isAudioModalOpen}
+              onClose={() => setIsAudioModalOpen(false)}
+              initialAudioUrl={q.audioUrl}
+              initialScript={q.listeningScript}
+              onSave={(data) => {
+                let updatedQuestionText = q.questionText || "";
+                const hasAudio = Boolean(data.audioUrl || data.listeningScript);
+                const hasMarker = /\[AUDIO_STIMULUS\]/i.test(updatedQuestionText);
+
+                if (hasAudio && !hasMarker) {
+                  updatedQuestionText = `<p>[AUDIO_STIMULUS]</p>\n` + updatedQuestionText;
+                } else if (!hasAudio && hasMarker) {
+                  updatedQuestionText = updatedQuestionText.replace(/(?:<p[^>]*>)?\s*\[AUDIO_STIMULUS\]\s*(?:<\/p>)?/gi, "").trim();
+                }
+
+                useExamEditorStore.getState().handleUpdateQuestion(q.id, {
+                  audioUrl: data.audioUrl,
+                  listeningScript: data.listeningScript,
+                  questionText: updatedQuestionText,
+                });
+              }}
+            />
+          )}
         </div>
         <div className="relative py-2 group/insert">
           <div
@@ -602,8 +604,7 @@ export const QuestionCard = React.memo(
     return (
       prev.q === next.q &&
       prev.index === next.index &&
-      prev.questionNumber === next.questionNumber &&
-      prev.isGenerating === next.isGenerating
+      prev.questionNumber === next.questionNumber
     );
   },
 );

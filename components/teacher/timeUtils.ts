@@ -1,4 +1,8 @@
-import type { Exam } from "../../types";
+import type { Exam, IndonesianTimezone } from "../../types";
+import {
+  normalizeDateString,
+  toAbsoluteUtcTimestamp,
+} from "../../utils/timezoneUtils";
 
 export interface ExamTimeState {
   status: "UPCOMING" | "FINISHED" | "ONGOING";
@@ -7,7 +11,8 @@ export interface ExamTimeState {
 }
 
 export const getExamDates = (exam: Exam): { start: Date; end: Date } => {
-  const mode = exam.config?.examMode || "UJIAN";
+  const mode = (exam.config?.examMode || "UJIAN").trim().toUpperCase();
+  const examTz: IndonesianTimezone = exam.config?.timezone || "WIB";
   const startDateRaw = exam.config?.startDate || exam.config?.date || "";
   const endDateRaw = exam.config?.endDate;
 
@@ -16,41 +21,50 @@ export const getExamDates = (exam: Exam): { start: Date; end: Date } => {
     start = new Date(startDateRaw);
   } else {
     const startTimeStr = exam.config?.startTime || "00:00";
-    start = new Date(`${startDateRaw}T${startTimeStr}`);
+    start = new Date(
+      toAbsoluteUtcTimestamp(
+        normalizeDateString(startDateRaw),
+        startTimeStr,
+        examTz,
+        false,
+      ),
+    );
   }
 
   if (isNaN(start.getTime())) start = new Date();
 
   let end: Date;
   const endTimeStr = exam.config?.endTime || "23:59";
-
-  const getLocalDateStr = (raw: string | undefined) => {
-    if (!raw) return "";
-    if (raw.includes("T")) {
-      const d = new Date(raw);
-      return isNaN(d.getTime()) ? "" : d.toLocaleDateString("en-CA");
-    }
-    return raw;
-  };
-
-  const localStartDateStr = getLocalDateStr(startDateRaw);
-  const localEndDateStr = getLocalDateStr(endDateRaw) || localStartDateStr;
+  const cleanStartDateStr = normalizeDateString(startDateRaw);
+  const cleanEndDateStr = endDateRaw
+    ? normalizeDateString(endDateRaw)
+    : cleanStartDateStr;
 
   if (mode === "PR") {
     // Mode PR is available anytime before the deadline end time (default 23:59)
-    start = new Date(0); // Available anytime before deadline
-    end = new Date(`${localEndDateStr}T${endTimeStr}:59`);
+    start = new Date(0);
+    if (endDateRaw && endDateRaw.includes("T")) {
+      end = new Date(endDateRaw);
+    } else {
+      end = new Date(
+        toAbsoluteUtcTimestamp(cleanEndDateStr, endTimeStr, examTz, true),
+      );
+    }
   } else {
     if (endDateRaw || exam.config?.endTime) {
       if (endDateRaw && endDateRaw.includes("T")) {
         end = new Date(endDateRaw);
       } else {
-        end = new Date(`${localEndDateStr}T${endTimeStr}:59`);
+        end = new Date(
+          toAbsoluteUtcTimestamp(cleanEndDateStr, endTimeStr, examTz, true),
+        );
       }
     } else if (exam.config && exam.config.timeLimit > 0) {
       end = new Date(start.getTime() + (exam.config.timeLimit || 0) * 60000);
     } else {
-      end = new Date(`${localStartDateStr}T23:59:59`);
+      end = new Date(
+        toAbsoluteUtcTimestamp(cleanStartDateStr, "23:59", examTz, true),
+      );
     }
   }
 

@@ -4,6 +4,10 @@ import type { Exam, Question, TeacherProfile, ExamConfig, ResultStatus } from '.
 import { compressImage, calculateExamScore, cleanupQuestionContent, parseList } from '../components/teacher/examUtils';
 import { uploadToCloudinary } from './cloudinary';
 import { offlineService } from './offline';
+import { clearExamLocalCache } from '../utils/cacheHygiene';
+import { ContentModerator, ModerationError } from './contentModeration';
+
+export { ModerationError };
 
 // Helper: Get file extension safely from data URI
 const getExtFromDataUrl = (dataUrl: string, defaultExt: string = 'png'): string => {
@@ -161,6 +165,21 @@ const uploadMediaWithFallback = async (
     return null;
 };
 
+// Helper: Bounded concurrency runner for media uploads
+async function runWithConcurrency<T>(tasks: (() => Promise<T>)[], limit = 4): Promise<T[]> {
+    const results: T[] = new Array(tasks.length);
+    let nextIndex = 0;
+    const worker = async () => {
+        while (nextIndex < tasks.length) {
+            const current = nextIndex++;
+            results[current] = await tasks[current]();
+        }
+    };
+    const workers = Array.from({ length: Math.min(limit, tasks.length) }, () => worker());
+    await Promise.all(workers);
+    return results;
+}
+
 // Helper: shuffle array (Fisher-Yates)
 function shuffleArray<T>(array: T[]): T[] {
     const newArr = [...array];
@@ -238,13 +257,66 @@ function selectBankSoalQuestions(questions: Question[], config: ExamConfig): Que
 export class ExamService {
     sanitizeHtmlString(html: string): string {
         if (!html || typeof html !== 'string') return html;
+        if (!html.includes('<')) return html;
+        if (typeof DOMParser === 'undefined') return html;
+
         try {
             const parser = new DOMParser();
             const doc = parser.parseFromString(html, 'text/html');
 
-            const allElements = doc.querySelectorAll('*');
+            // Security hardening: Strip dangerous tags (preserving raw LaTeX/text until render)
+            const dangerousTags = ['script', 'iframe', 'object', 'embed', 'applet', 'meta', 'link', 'base', 'noscript'];
+            dangerousTags.forEach((tag) => {
+                const elements = doc.getElementsByTagName(tag);
+                for (let i = elements.length - 1; i >= 0; i--) {
+                    elements[i].parentNode?.removeChild(elements[i]);
+                }
+            });
+
+            const isMathOrGeometryStyle = (el: Element) =>
+                el.closest('.math-visual, .katex, .katex-html, .katex-mathml, .math-fallback, math, .MathJax, .mjx-container, .math-tex, .geometry-shape, svg') !== null;
+
+            const styleElements = doc.getElementsByTagName('style');
+            for (let i = styleElements.length - 1; i >= 0; i--) {
+                if (!isMathOrGeometryStyle(styleElements[i])) {
+                    styleElements[i].parentNode?.removeChild(styleElements[i]);
+                }
+            }
+
+            const uriAttrs = ['href', 'src', 'xlink:href', 'formaction', 'action', 'poster'];
+            const allElements = doc.body.querySelectorAll('*');
             for (let i = 0; i < allElements.length; i++) {
                 const el = allElements[i];
+
+                // Strip inline event handlers (on*)
+                const attrs = el.attributes;
+                for (let j = attrs.length - 1; j >= 0; j--) {
+                    if (attrs[j].name.toLowerCase().startsWith('on')) {
+                        el.removeAttribute(attrs[j].name);
+                    }
+                }
+
+                // Strip dangerous URI schemes while keeping image/audio data URIs for storage upload
+                uriAttrs.forEach((attrName) => {
+                    const val = el.getAttribute(attrName);
+                    if (val) {
+                        const normalized = Array.from(val)
+                            .filter((ch) => ch.charCodeAt(0) > 32)
+                            .join('')
+                            .toLowerCase();
+                        const isDangerousProtocol =
+                            normalized.startsWith('javascript:') ||
+                            normalized.startsWith('vbscript:') ||
+                            normalized.startsWith('data:text/html') ||
+                            (normalized.startsWith('data:') &&
+                             !normalized.startsWith('data:image/') &&
+                             !normalized.startsWith('data:audio/'));
+                        if (isDangerousProtocol) {
+                            el.removeAttribute(attrName);
+                        }
+                    }
+                });
+
                 const styleAttr = el.getAttribute('style');
                 if (styleAttr && styleAttr.includes('--tw-')) {
                     const newStyle = styleAttr.split(';')
@@ -387,22 +459,99 @@ export class ExamService {
         return { ...exam, questions: finalQuestions };
     }
 
-    getLocalTeacherExams(): Record<string, Exam> {
+    private static readonly LEGACY_TEACHER_EXAMS_KEY = 'ujiancerdas_saved_teacher_exams';
+    private static readonly TEACHER_EXAM_INDEX_KEY = 'ujiancerdas_teacher_exam_index';
+    private static readonly TEACHER_EXAM_IDB_PREFIX = 'teacher_exam_';
+    private teacherExamsMemoryCache: Record<string, Exam> = {};
+    private hasHydratedLocalExams = false;
+    private hydratePromise: Promise<Record<string, Exam>> | null = null;
+
+    private writeTeacherExamIndex(map: Record<string, Exam>) {
+        try {
+            if (typeof window === 'undefined') return;
+            const index: Record<string, { code: string; authorId?: string; authorSchool?: string; status?: string; updatedAt: number }> = {};
+            Object.values(map).forEach((ex) => {
+                if (!ex?.code) return;
+                index[ex.code] = {
+                    code: ex.code,
+                    authorId: ex.authorId,
+                    authorSchool: ex.authorSchool,
+                    status: ex.status,
+                    updatedAt: Date.now()
+                };
+            });
+            localStorage.setItem(ExamService.TEACHER_EXAM_INDEX_KEY, JSON.stringify(index));
+        } catch (e) {
+            console.warn("Failed to write lightweight teacher exam index:", e);
+        }
+    }
+
+    private migrateLegacyLocalStorageCache(): Record<string, Exam> {
         try {
             if (typeof window === 'undefined') return {};
-            const raw = localStorage.getItem('ujiancerdas_saved_teacher_exams');
-            return raw ? JSON.parse(raw) : {};
+            const raw = localStorage.getItem(ExamService.LEGACY_TEACHER_EXAMS_KEY);
+            if (!raw) return {};
+            const parsed = JSON.parse(raw) as Record<string, Exam>;
+            if (parsed && typeof parsed === 'object') {
+                Object.values(parsed).forEach((ex) => {
+                    if (ex?.code) {
+                        this.teacherExamsMemoryCache[ex.code] = ex;
+                        offlineService.saveLocalProgress(`${ExamService.TEACHER_EXAM_IDB_PREFIX}${ex.code}`, ex).catch(() => {});
+                    }
+                });
+                this.writeTeacherExamIndex(this.teacherExamsMemoryCache);
+                localStorage.removeItem(ExamService.LEGACY_TEACHER_EXAMS_KEY);
+                return parsed;
+            }
         } catch {
-            return {};
+            /* ignore */
         }
+        return {};
+    }
+
+    async getLocalTeacherExamsAsync(): Promise<Record<string, Exam>> {
+        if (this.hasHydratedLocalExams) {
+            return { ...this.teacherExamsMemoryCache };
+        }
+        if (this.hydratePromise) {
+            return this.hydratePromise;
+        }
+        this.hydratePromise = (async () => {
+            this.migrateLegacyLocalStorageCache();
+            try {
+                const fromIdb = await offlineService.getLocalProgressByPrefix<Exam>(ExamService.TEACHER_EXAM_IDB_PREFIX);
+                Object.entries(fromIdb).forEach(([code, exam]) => {
+                    if (exam && !this.teacherExamsMemoryCache[code]) {
+                        this.teacherExamsMemoryCache[code] = exam;
+                    }
+                });
+                if (Object.keys(this.teacherExamsMemoryCache).length > 0) {
+                    this.writeTeacherExamIndex(this.teacherExamsMemoryCache);
+                }
+            } catch (e) {
+                console.warn("Failed to hydrate teacher exams from IndexedDB:", e);
+            }
+            this.hasHydratedLocalExams = true;
+            this.hydratePromise = null;
+            return { ...this.teacherExamsMemoryCache };
+        })();
+        return this.hydratePromise;
+    }
+
+    getLocalTeacherExams(): Record<string, Exam> {
+        this.migrateLegacyLocalStorageCache();
+        return { ...this.teacherExamsMemoryCache };
     }
 
     saveLocalTeacherExam(exam: Exam) {
         try {
-            if (typeof window === 'undefined') return;
-            const current = this.getLocalTeacherExams();
-            current[exam.code] = exam;
-            localStorage.setItem('ujiancerdas_saved_teacher_exams', JSON.stringify(current));
+            if (typeof window === 'undefined' || !exam?.code) return;
+            this.migrateLegacyLocalStorageCache();
+            this.teacherExamsMemoryCache[exam.code] = exam;
+            this.writeTeacherExamIndex(this.teacherExamsMemoryCache);
+            offlineService.saveLocalProgress(`${ExamService.TEACHER_EXAM_IDB_PREFIX}${exam.code}`, exam).catch((err) => {
+                console.warn("Failed to persist exam to IndexedDB:", err);
+            });
         } catch (e) {
             console.warn("Failed to persist exam to local cache:", e);
         }
@@ -411,9 +560,9 @@ export class ExamService {
     removeLocalTeacherExam(code: string) {
         try {
             if (typeof window === 'undefined') return;
-            const current = this.getLocalTeacherExams();
-            delete current[code];
-            localStorage.setItem('ujiancerdas_saved_teacher_exams', JSON.stringify(current));
+            delete this.teacherExamsMemoryCache[code];
+            this.writeTeacherExamIndex(this.teacherExamsMemoryCache);
+            offlineService.clearLocalProgress(`${ExamService.TEACHER_EXAM_IDB_PREFIX}${code}`).catch(() => {});
         } catch (e) {
             console.warn("Failed to delete exam from local cache:", e);
         }
@@ -428,7 +577,7 @@ export class ExamService {
             }
         }
 
-        let query = supabase.from('exams').select('*');
+        let query = supabase.from('exams').select('code, author_id, school, config, questions, status, created_at');
 
         if (profile) {
             if (profile.accountType === 'super_admin') {
@@ -459,8 +608,8 @@ export class ExamService {
             console.error("Error fetching exams from Supabase:", error);
         }
 
-        // Merge local teacher exams cache to guarantee drafts and published exams never disappear
-        const localExams = this.getLocalTeacherExams();
+        // Merge local teacher exams cache (IndexedDB) to guarantee drafts and published exams never disappear
+        const localExams = await this.getLocalTeacherExamsAsync();
         Object.values(localExams).forEach((localExam) => {
             const isMatch = !profile ||
                 profile.accountType === 'super_admin' ||
@@ -497,7 +646,7 @@ export class ExamService {
                 console.warn("Preview cache check failed:", e);
             }
 
-            const localExams = this.getLocalTeacherExams();
+            const localExams = await this.getLocalTeacherExamsAsync();
             if (localExams[cleanCode] && Array.isArray(localExams[cleanCode].questions) && localExams[cleanCode].questions.length > 0) {
                 return this.sanitizeExamForStudent(localExams[cleanCode], studentId, true);
             }
@@ -520,7 +669,7 @@ export class ExamService {
             if (scheduleError) {
                 const fallbackRes = await supabase
                     .from('exams')
-                    .select('*')
+                    .select('code, author_id, school, config, status, created_at')
                     .eq('code', cleanCode)
                     .maybeSingle();
                 scheduleData = fallbackRes.data;
@@ -528,7 +677,7 @@ export class ExamService {
             }
 
             if (scheduleError || !scheduleData) {
-                const localExams = this.getLocalTeacherExams();
+                const localExams = await this.getLocalTeacherExamsAsync();
                 if (localExams[cleanCode]) {
                     const local = localExams[cleanCode];
                     return {
@@ -574,7 +723,7 @@ export class ExamService {
         if (metaError) {
             const fallbackRes = await supabase
                 .from('exams')
-                .select('*')
+                .select('code, author_id, school, config, status, created_at')
                 .eq('code', cleanCode)
                 .maybeSingle();
             metaData = fallbackRes.data;
@@ -599,7 +748,7 @@ export class ExamService {
                 return this.sanitizeExamForStudent(offlineExam, studentId, isPreview);
             }
             // Check local teacher exam cache (for drafts or unsynced exams)
-            const localExams = this.getLocalTeacherExams();
+            const localExams = await this.getLocalTeacherExamsAsync();
             if (localExams[cleanCode]) {
                 return this.sanitizeExamForStudent(localExams[cleanCode], studentId, isPreview);
             }
@@ -637,23 +786,24 @@ export class ExamService {
                 console.warn("Edge CDN fetch error, checking local/DB fallback:", edgeErr);
             }
 
-            // Fallback: If edge endpoint was unreachable, check local cached questions or query database
+            // Fallback: If edge endpoint was unreachable, check local cached/teacher questions without querying exams.questions directly
             if (loadedQuestions.length === 0) {
-                const localExams = this.getLocalTeacherExams();
+                const localExams = await this.getLocalTeacherExamsAsync();
                 if (localExams[cleanCode] && Array.isArray(localExams[cleanCode].questions) && localExams[cleanCode].questions.length > 0) {
                     loadedQuestions = isPreview ? localExams[cleanCode].questions : localExams[cleanCode].questions.map(q => this.stripAnswersFromQuestion(q));
                 } else if (localCached && Array.isArray(localCached.questions) && localCached.questions.length > 0) {
                     loadedQuestions = localCached.questions;
                 } else {
-                    const { data: fullData } = await supabase
-                        .from('exams')
-                        .select('questions')
-                        .eq('code', cleanCode)
-                        .maybeSingle();
-                    if (fullData && Array.isArray(fullData.questions)) {
-                        loadedQuestions = isPreview ? fullData.questions : fullData.questions.map(q => this.stripAnswersFromQuestion(q));
+                    const offlineExam = await offlineService.getLocalProgress(`offline_exam_${cleanCode}`) as Exam | null;
+                    if (offlineExam && Array.isArray(offlineExam.questions) && offlineExam.questions.length > 0) {
+                        loadedQuestions = isPreview ? offlineExam.questions : offlineExam.questions.map(q => this.stripAnswersFromQuestion(q));
                     }
                 }
+            }
+
+            if (loadedQuestions.length === 0 && !isPreview) {
+                const isOffline = typeof navigator !== 'undefined' && navigator.onLine === false;
+                throw new Error(isOffline ? 'OFFLINE_NO_LOCAL_EXAM' : 'EDGE_CONTENT_UNAVAILABLE');
             }
         }
 
@@ -680,12 +830,25 @@ export class ExamService {
     }
 
     /**
-     * Fetch solutions and explanations with server-side authorization guard
+     * Fetch solutions and explanations with server-side authorization and zero-login ownership proof
      */
-    async getExamSolutions(code: string, studentId: string, proctorToken?: string): Promise<Record<string, any> | null> {
+    async getExamSolutions(
+        code: string,
+        studentId: string,
+        proctorToken?: string,
+        proof?: { deviceId?: string; resultId?: string | number }
+    ): Promise<Record<string, any> | null> {
         const cleanCode = (code || '').trim().toUpperCase();
         try {
-            const url = `/api/exam-content/${cleanCode}/solutions?studentId=${encodeURIComponent(studentId)}&token=${encodeURIComponent(proctorToken || '')}`;
+            const params = new URLSearchParams({
+                studentId: studentId || '',
+                token: proctorToken || '',
+            });
+            if (proof?.deviceId) params.set('deviceId', String(proof.deviceId));
+            if (proof?.resultId !== undefined && proof?.resultId !== null) {
+                params.set('resultId', String(proof.resultId));
+            }
+            const url = `/api/exam-content/${cleanCode}/solutions?${params.toString()}`;
             const res = await fetch(url);
             if (!res.ok) {
                 return null;
@@ -709,33 +872,35 @@ export class ExamService {
     subscribeToExamVersionUpdates(
         code: string,
         currentVersion: number,
-        onUpdate: (newVersion: number) => void
+        onUpdate: (newVersion: number) => void,
+        disableRealtime = true
     ): () => void {
         const cleanCode = (code || '').trim().toUpperCase();
         let active = true;
 
-        // 1. Supabase Realtime Listener (if supported)
-        const channel = supabase
-            .channel(`exam_live_version_${cleanCode}`)
-            .on(
-                'postgres_changes',
-                {
-                    event: 'UPDATE',
-                    schema: 'public',
-                    table: 'exams',
-                    filter: `code=eq.${cleanCode}`
-                },
-                (payload: any) => {
-                    const newVer = payload.new?.config?.version ?? payload.new?.version;
-                    if (typeof newVer === 'number' && newVer > currentVersion) {
-                        onUpdate(newVer);
+        // 1. Supabase Realtime Listener (ONLY when Realtime is explicitly enabled)
+        const channel = !disableRealtime
+            ? supabase
+                .channel(`exam_live_version_${cleanCode}`)
+                .on(
+                    'postgres_changes',
+                    {
+                        event: 'UPDATE',
+                        schema: 'public',
+                        table: 'exams',
+                        filter: `code=eq.${cleanCode}`
+                    },
+                    (payload: any) => {
+                        const newVer = payload.new?.config?.version;
+                        if (typeof newVer === 'number' && newVer > currentVersion) {
+                            onUpdate(newVer);
+                        }
                     }
-                }
-            )
-            .subscribe();
+                )
+                .subscribe()
+            : null;
 
-        // 2. Normal Mode Fallback: Staggered Periodic Check (every 3 minutes + random jitter)
-        // Only queries { config } from Supabase
+        // 2. Normal Mode Fallback: Staggered Periodic Check (every 3 minutes + random jitter, <50 bytes)
         const jitterMs = Math.floor(Math.random() * 20000) + 180000;
         const timerId = setInterval(async () => {
             if (!active) return;
@@ -758,7 +923,9 @@ export class ExamService {
         return () => {
             active = false;
             clearInterval(timerId);
-            channel.unsubscribe();
+            if (channel) {
+                supabase.removeChannel(channel);
+            }
         };
     }
 
@@ -768,55 +935,51 @@ export class ExamService {
         return data.config;
     }
 
-    async saveExam(exam: Exam): Promise<void> {
-        // Immediate local cache save to prevent data loss or UI disappearance
-        this.saveLocalTeacherExam(exam);
-
-        if (exam.config && (exam.config.examMode || '').trim().toUpperCase() === 'PR') {
-            exam.config.detectBehavior = false;
-            exam.config.continueWithPermission = false;
-            exam.config.trackLocation = false;
+    async getExamConfigStatus(code: string): Promise<{ config: ExamConfig | null; isNetworkError: boolean }> {
+        const cleanCode = (code || '').trim().toUpperCase();
+        if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+            const offlineExam = await offlineService.getLocalProgress(`offline_exam_${cleanCode}`) as Exam | null;
+            return { config: offlineExam?.config || null, isNetworkError: true };
         }
+        try {
+            const { data, error } = await supabase.from('exams').select('config, status').eq('code', cleanCode).maybeSingle();
+            if (error) {
+                const msg = String(error.message || '').toLowerCase();
+                const isNet = !error.code || msg.includes('failed to fetch') || msg.includes('network');
+                if (isNet) {
+                    const offlineExam = await offlineService.getLocalProgress(`offline_exam_${cleanCode}`) as Exam | null;
+                    return { config: offlineExam?.config || null, isNetworkError: true };
+                }
+                return { config: null, isNetworkError: false };
+            }
+            if (!data?.config) {
+                return { config: null, isNetworkError: false };
+            }
+            const resolvedConfig: ExamConfig = data.status === 'closed'
+                ? { ...data.config, isFinished: true }
+                : data.config;
+            return { config: resolvedConfig, isNetworkError: false };
+        } catch {
+            const offlineExam = await offlineService.getLocalProgress(`offline_exam_${cleanCode}`) as Exam | null;
+            return { config: offlineExam?.config || null, isNetworkError: true };
+        }
+    }
 
-        const processedQuestions = exam.questions.map(q => {
+    private async prepareQuestionsForSave(questions: Question[], examCode: string): Promise<Question[]> {
+        const processedQuestions: Question[] = (questions || []).map(q => {
             let qCopy = JSON.parse(JSON.stringify(q));
             if (typeof cleanupQuestionContent === 'function') {
                 qCopy = cleanupQuestionContent(qCopy);
             }
             return qCopy;
         });
-        const BUCKET_NAME = 'soal';
-        const examCode = exam.code;
-
-        const { data: existing } = await supabase.from('exams').select('code, author_id, config').eq('code', examCode).maybeSingle();
-        const existingVersion = (existing?.config && typeof (existing.config as any).version === 'number') ? (existing.config as any).version : 1;
-        const nextVersion = existingVersion + 1;
-        if (!exam.config) exam.config = {} as any;
-        (exam.config as any).version = nextVersion;
-        
-        let finalAuthorId = exam.authorId;
-
-        if (existing) {
-            finalAuthorId = existing.author_id;
-        } else {
-            (exam.config as any).version = 1;
-            const { error: initError } = await supabase.from('exams').insert({
-                code: exam.code, 
-                author_id: finalAuthorId, 
-                school: exam.authorSchool || "",
-                config: exam.config, 
-                questions: [], 
-                status: 'DRAFT'
-            });
-            if (initError) throw initError;
-        }
 
         const processHtmlString = async (html: string, contextId: string): Promise<string> => {
             const sanitizedHtml = this.sanitizeHtmlString(html);
             if (!sanitizedHtml || (!sanitizedHtml.includes('data:image') && !sanitizedHtml.includes('data:audio'))) return sanitizedHtml;
             const parser = new DOMParser();
             const doc = parser.parseFromString(sanitizedHtml, 'text/html');
-            
+
             const images = doc.getElementsByTagName('img');
             for (let i = 0; i < images.length; i++) {
                 const img = images[i];
@@ -850,60 +1013,104 @@ export class ExamService {
             return doc.body.innerHTML;
         };
 
-        for (const q of processedQuestions) {
-            if (q.questionText) q.questionText = this.sanitizeHtmlString(q.questionText);
-            q.questionText = await processHtmlString(q.questionText, q.id);
-            
-            if (q.options) {
-                for (let i = 0; i < q.options.length; i++) {
-                    if (q.options[i]) q.options[i] = this.sanitizeHtmlString(q.options[i]);
-                    q.options[i] = await processHtmlString(q.options[i], `${q.id}_opt_${i}`);
-                }
-            }
-            if (q.hint) {
-                q.hint = await processHtmlString(this.sanitizeHtmlString(q.hint), `${q.id}_hint`);
-            }
-            if (q.solutionSteps) {
-                q.solutionSteps = await processHtmlString(this.sanitizeHtmlString(q.solutionSteps), `${q.id}_steps`);
-            }
-            if (q.trueFalseRows) {
-                q.trueFalseRows = q.trueFalseRows.map((r: { text: string; answer?: boolean }) => ({ ...r, text: this.sanitizeHtmlString(r.text) }));
-            }
-            if (q.categoryLabels && Array.isArray(q.categoryLabels)) {
-                q.categoryLabels = q.categoryLabels.map((l: string) => this.sanitizeHtmlString(String(l)));
-            }
-            if (q.matchingPairs) {
-                q.matchingPairs = q.matchingPairs.map((p: { left: string; right: string }) => ({ left: this.sanitizeHtmlString(p.left), right: this.sanitizeHtmlString(p.right) }));
-            }
-            if (q.correctAnswer && typeof q.correctAnswer === 'string') {
-                if (q.questionType === 'COMPLEX_MULTIPLE_CHOICE') {
-                    const parsed = parseList(q.correctAnswer, q.options);
-                    q.correctAnswer = JSON.stringify(
-                        (parsed || []).map((opt: string) => this.sanitizeHtmlString(opt))
-                    );
-                } else {
-                    q.correctAnswer = this.sanitizeHtmlString(q.correctAnswer);
-                }
-            }
+        await runWithConcurrency(
+            processedQuestions.map((q) => async () => {
+                if (q.questionText) q.questionText = this.sanitizeHtmlString(q.questionText);
+                q.questionText = await processHtmlString(q.questionText, q.id);
 
-            if (q.imageUrl && q.imageUrl.startsWith('data:image')) {
-                try {
-                    const res = await uploadMediaWithFallback(q.imageUrl, examCode, q.id, 'img');
-                    if (res) {
-                        q.imageUrl = res.url;
+                if (q.options) {
+                    for (let i = 0; i < q.options.length; i++) {
+                        if (q.options[i]) q.options[i] = this.sanitizeHtmlString(q.options[i]);
+                        q.options[i] = await processHtmlString(q.options[i], `${q.id}_opt_${i}`);
                     }
-                } catch (e) { console.error("Upload image failed", e); }
-            }
+                }
+                if (q.hint) {
+                    q.hint = await processHtmlString(this.sanitizeHtmlString(q.hint), `${q.id}_hint`);
+                }
+                if (q.solutionSteps) {
+                    q.solutionSteps = await processHtmlString(this.sanitizeHtmlString(q.solutionSteps), `${q.id}_steps`);
+                }
+                if (q.trueFalseRows) {
+                    q.trueFalseRows = q.trueFalseRows.map((r: { text: string; answer?: boolean }) => ({ ...r, text: this.sanitizeHtmlString(r.text) }));
+                }
+                if (q.categoryLabels && Array.isArray(q.categoryLabels)) {
+                    q.categoryLabels = q.categoryLabels.map((l: string) => this.sanitizeHtmlString(String(l))) as [string, string];
+                }
+                if (q.matchingPairs) {
+                    q.matchingPairs = q.matchingPairs.map((p: { left: string; right: string }) => ({ left: this.sanitizeHtmlString(p.left), right: this.sanitizeHtmlString(p.right) }));
+                }
+                if (q.correctAnswer && typeof q.correctAnswer === 'string') {
+                    if (q.questionType === 'COMPLEX_MULTIPLE_CHOICE') {
+                        const parsed = parseList(q.correctAnswer, q.options);
+                        q.correctAnswer = JSON.stringify(
+                            (parsed || []).map((opt: string) => this.sanitizeHtmlString(opt))
+                        );
+                    } else {
+                        q.correctAnswer = this.sanitizeHtmlString(q.correctAnswer);
+                    }
+                }
 
-            if (q.audioUrl && q.audioUrl.startsWith('data:audio')) {
-                try {
-                    const res = await uploadMediaWithFallback(q.audioUrl, examCode, q.id, 'audio');
-                    if (res) {
-                        q.audioUrl = res.url;
-                    }
-                } catch (e) { console.error("Gagal upload audio", e); }
-            }
+                if (q.imageUrl && q.imageUrl.startsWith('data:image')) {
+                    try {
+                        const res = await uploadMediaWithFallback(q.imageUrl, examCode, q.id, 'img');
+                        if (res) q.imageUrl = res.url;
+                    } catch (e) { console.error("Upload image failed", e); }
+                }
+
+                if (q.audioUrl && q.audioUrl.startsWith('data:audio')) {
+                    try {
+                        const res = await uploadMediaWithFallback(q.audioUrl, examCode, q.id, 'audio');
+                        if (res) q.audioUrl = res.url;
+                    } catch (e) { console.error("Gagal upload audio", e); }
+                }
+            }),
+            4
+        );
+
+        return processedQuestions;
+    }
+
+    async saveExam(exam: Exam): Promise<void> {
+        // Content Moderation Check (SARA, Pornography, Bullying, etc.)
+        const moderation = await ContentModerator.validateExamContent(exam);
+        if (!moderation.isValid) {
+            throw new ModerationError(moderation.issues);
         }
+
+        // Immediate local cache save to prevent data loss or UI disappearance
+        this.saveLocalTeacherExam(exam);
+
+        if (exam.config && (exam.config.examMode || '').trim().toUpperCase() === 'PR') {
+            exam.config.detectBehavior = false;
+            exam.config.continueWithPermission = false;
+            exam.config.trackLocation = false;
+        }
+
+        const examCode = exam.code;
+
+        const { data: existing } = await supabase.from('exams').select('code, author_id, config').eq('code', examCode).maybeSingle();
+        const existingVersion = (existing?.config && typeof (existing.config as any).version === 'number') ? (existing.config as any).version : 1;
+        const nextVersion = existing ? existingVersion + 1 : 1;
+        if (!exam.config) exam.config = {} as any;
+        (exam.config as any).version = nextVersion;
+        
+        let finalAuthorId = exam.authorId;
+
+        if (existing) {
+            finalAuthorId = existing.author_id;
+        } else {
+            const { error: initError } = await supabase.from('exams').insert({
+                code: exam.code, 
+                author_id: finalAuthorId, 
+                school: exam.authorSchool || "",
+                config: exam.config, 
+                questions: [], 
+                status: 'DRAFT'
+            });
+            if (initError) throw initError;
+        }
+
+        const processedQuestions = await this.prepareQuestionsForSave(exam.questions, examCode);
 
         const { data, error } = await supabase.from('exams').update({
             school: exam.authorSchool || "",
@@ -985,12 +1192,36 @@ export class ExamService {
                 is_active: false,
             }));
 
-            // Clean up existing records for this exam to prevent duplicate or conflicting data
-            await supabase.from('registered_students').delete().eq('exam_code', exam.code);
-            const { error: regErr } = await supabase.from('registered_students').insert(recordsToInsert);
-            if (regErr) {
-                console.warn("Sync to registered_students failed:", regErr);
-            } else {
+            // Backup existing records before replacing so transient insert failures never wipe registered students
+            const { data: backupRows } = await supabase
+                .from('registered_students')
+                .select('exam_code, school_name, class_name, student_name, absent_number, is_active')
+                .eq('exam_code', exam.code);
+
+            const { error: delErr } = await supabase.from('registered_students').delete().eq('exam_code', exam.code);
+            if (delErr) {
+                console.warn("Delete existing registered_students failed, aborting replace:", delErr);
+                return;
+            }
+
+            const BATCH_SIZE = 200;
+            let insertFailed = false;
+            for (let i = 0; i < recordsToInsert.length; i += BATCH_SIZE) {
+                const batch = recordsToInsert.slice(i, i + BATCH_SIZE);
+                const { error: regErr } = await supabase.from('registered_students').insert(batch);
+                if (regErr) {
+                    console.warn("Sync to registered_students batch failed:", regErr);
+                    insertFailed = true;
+                    break;
+                }
+            }
+
+            if (insertFailed && backupRows && backupRows.length > 0) {
+                await supabase.from('registered_students').delete().eq('exam_code', exam.code);
+                for (let i = 0; i < backupRows.length; i += BATCH_SIZE) {
+                    await supabase.from('registered_students').insert(backupRows.slice(i, i + BATCH_SIZE));
+                }
+            } else if (!insertFailed) {
                 console.log(`Berhasil menyinkronkan ${recordsToInsert.length} data siswa ke tabel registered_students.`);
             }
         } catch (syncErr) {
@@ -1000,12 +1231,11 @@ export class ExamService {
 
     async saveCollaboratorExam(exam: Exam, token: string): Promise<void> {
         console.log("Saving exam as collaborator...", { code: exam.code, token });
-        const BUCKET_NAME = 'soal';
         const examCode = exam.code;
 
         const { data: existingExam, error: fetchError } = await supabase
             .from('exams')
-            .select('*')
+            .select('code, config')
             .eq('code', exam.code)
             .single();
 
@@ -1022,114 +1252,28 @@ export class ExamService {
             throw new Error("Akses ditolak. Token kolaborator tidak valid atau Anda hanya memiliki akses 'viewer'.");
         }
 
-        const processedQuestions = exam.questions.map(q => {
-            let qCopy = JSON.parse(JSON.stringify(q));
-            if (typeof cleanupQuestionContent === 'function') {
-                qCopy = cleanupQuestionContent(qCopy);
-            }
-            return qCopy;
-        });
+        const currentVersion = typeof (config as any).version === 'number' ? (config as any).version : 1;
+        const nextVersion = currentVersion + 1;
+        const processedQuestions = await this.prepareQuestionsForSave(exam.questions, examCode);
 
-        const processHtmlString = async (html: string, contextId: string): Promise<string> => {
-            const sanitizedHtml = this.sanitizeHtmlString(html);
-            if (!sanitizedHtml || (!sanitizedHtml.includes('data:image') && !sanitizedHtml.includes('data:audio'))) return sanitizedHtml;
-            const parser = new DOMParser();
-            const doc = parser.parseFromString(sanitizedHtml, 'text/html');
-            
-            const images = doc.getElementsByTagName('img');
-            for (let i = 0; i < images.length; i++) {
-                const img = images[i];
-                const src = img.getAttribute('src');
-                if (src && src.startsWith('data:image')) {
-                    try {
-                        const res = await uploadMediaWithFallback(src, examCode, contextId, 'img', i);
-                        if (res) {
-                            img.setAttribute('src', res.url);
-                            if (res.bucketPath) img.setAttribute('data-bucket-path', res.bucketPath);
-                        }
-                    } catch (e) { console.error("Gagal upload gambar", e); }
-                }
-            }
-
-            const audios = doc.getElementsByTagName('audio');
-            for (let i = 0; i < audios.length; i++) {
-                const audio = audios[i];
-                const src = audio.getAttribute('src');
-                if (src && src.startsWith('data:audio')) {
-                    try {
-                        const res = await uploadMediaWithFallback(src, examCode, contextId, 'audio', i);
-                        if (res) {
-                            audio.setAttribute('src', res.url);
-                            if (res.bucketPath) audio.setAttribute('data-bucket-path', res.bucketPath);
-                        }
-                    } catch (e) { console.error("Gagal upload audio", e); }
-                }
-            }
-
-            return doc.body.innerHTML;
+        const nextConfig = {
+            ...exam.config,
+            collaborators: config.collaborators,
+            version: nextVersion
         };
-
-        for (const q of processedQuestions) {
-            if (q.questionText) q.questionText = this.sanitizeHtmlString(q.questionText);
-            q.questionText = await processHtmlString(q.questionText, q.id);
-            
-            if (q.options) {
-                for (let i = 0; i < q.options.length; i++) {
-                    if (q.options[i]) q.options[i] = this.sanitizeHtmlString(q.options[i]);
-                    q.options[i] = await processHtmlString(q.options[i], `${q.id}_opt_${i}`);
-                }
-            }
-            if (q.trueFalseRows) {
-                q.trueFalseRows = q.trueFalseRows.map((r: { text: string; answer?: boolean }) => ({ ...r, text: this.sanitizeHtmlString(r.text) }));
-            }
-            if (q.categoryLabels && Array.isArray(q.categoryLabels)) {
-                q.categoryLabels = q.categoryLabels.map((l: string) => this.sanitizeHtmlString(String(l)));
-            }
-            if (q.matchingPairs) {
-                q.matchingPairs = q.matchingPairs.map((p: { left: string; right: string }) => ({ left: this.sanitizeHtmlString(p.left), right: this.sanitizeHtmlString(p.right) }));
-            }
-            if (q.correctAnswer && typeof q.correctAnswer === 'string') {
-                if (q.questionType === 'COMPLEX_MULTIPLE_CHOICE') {
-                    const parsed = parseList(q.correctAnswer, q.options);
-                    q.correctAnswer = JSON.stringify(
-                        (parsed || []).map((opt: string) => this.sanitizeHtmlString(opt))
-                    );
-                } else {
-                    q.correctAnswer = this.sanitizeHtmlString(q.correctAnswer);
-                }
-            }
-
-            if (q.imageUrl && q.imageUrl.startsWith('data:image')) {
-                try {
-                    const res = await uploadMediaWithFallback(q.imageUrl, examCode, q.id, 'img');
-                    if (res) {
-                        q.imageUrl = res.url;
-                    }
-                } catch (e) { console.error("Upload image failed", e); }
-            }
-
-            if (q.audioUrl && q.audioUrl.startsWith('data:audio')) {
-                try {
-                    const res = await uploadMediaWithFallback(q.audioUrl, examCode, q.id, 'audio');
-                    if (res) {
-                        q.audioUrl = res.url;
-                    }
-                } catch (e) { console.error("Gagal upload audio", e); }
-            }
-        }
 
         const { error: rpcError } = await supabase.rpc('save_collaborator_exam', {
             p_exam_code: exam.code,
             p_token: token,
-            p_new_config: {
-                ...exam.config,
-                collaborators: config.collaborators
-            },
+            p_new_config: nextConfig,
             p_new_questions: processedQuestions
         });
 
         if (!rpcError) {
             console.log("Collaborator save success (RPC)");
+            try {
+                fetch(`/api/exam-content/${exam.code}/warm?v=${nextVersion}`, { method: 'POST' }).catch(() => {});
+            } catch { /* ignore */ }
             return;
         }
 
@@ -1138,18 +1282,24 @@ export class ExamService {
     }
 
     async deleteExam(code: string): Promise<void> {
-        this.removeLocalTeacherExam(code);
-        await supabase.from('results').delete().eq('exam_code', code);
-        await supabase.from('exams').delete().eq('code', code);
-        const { data: files } = await supabase.storage.from('soal').list(code);
+        const cleanCode = (code || '').trim().toUpperCase();
+        if (!cleanCode) return;
+
+        this.removeLocalTeacherExam(cleanCode);
+        await clearExamLocalCache(cleanCode);
+
+        await supabase.from('registered_students').delete().eq('exam_code', cleanCode);
+        await supabase.from('results').delete().eq('exam_code', cleanCode);
+        await supabase.from('exams').delete().eq('code', cleanCode);
+        const { data: files } = await supabase.storage.from('soal').list(cleanCode);
         if (files && files.length > 0) {
-            const paths = files.map(f => `${code}/${f.name}`);
+            const paths = files.map(f => `${cleanCode}/${f.name}`);
             await supabase.storage.from('soal').remove(paths);
         }
     }
 
     async getExamForArchive(code: string): Promise<Exam | null> {
-        const { data, error } = await supabase.from('exams').select('*').eq('code', code).maybeSingle();
+        const { data, error } = await supabase.from('exams').select('code, author_id, school, config, questions, status, created_at').eq('code', code).maybeSingle();
         if (error || !data) return null;
 
         const examData: Exam = {
@@ -1231,7 +1381,7 @@ export class ExamService {
         // 1. Fetch Exam
         const { data: examData, error: examError } = await supabase
             .from('exams')
-            .select('*')
+            .select('questions, config')
             .eq('code', examCode)
             .single();
         
@@ -1260,28 +1410,47 @@ export class ExamService {
             questions[qIndex].correctAnswer = newCorrectAnswer;
         }
 
+        // Bump version so Edge CDN & active clients pick up changes cleanly
+        const existingConfig = (examData.config || {}) as ExamConfig;
+        const currentVersion = typeof (existingConfig as any).version === 'number' ? (existingConfig as any).version : 1;
+        const nextVersion = currentVersion + 1;
+        const nextConfig: ExamConfig = { ...existingConfig, version: nextVersion };
+
         // 3. Save Exam
         const { error: updateError } = await supabase
             .from('exams')
-            .update({ questions: questions })
+            .update({ questions, config: nextConfig })
             .eq('code', examCode);
 
         if (updateError) throw updateError;
 
-        // 4. Fetch Results
-        const { data: results, error: resultsError } = await supabase
-            .from('results')
-            .select('*')
-            .eq('exam_code', examCode);
+        // Prime Edge CDN in background
+        try {
+            fetch(`/api/exam-content/${examCode}/warm?v=${nextVersion}`, { method: 'POST' }).catch(() => {});
+        } catch { /* ignore */ }
 
-        if (resultsError) throw resultsError;
+        // 4. Fetch All Results with 1000-row range pagination
+        const PAGE_SIZE = 1000;
+        const allResults: Record<string, unknown>[] = [];
+        let from = 0;
+        while (true) {
+            const { data: pageRows, error: resultsError } = await supabase
+                .from('results')
+                .select('*')
+                .eq('exam_code', examCode)
+                .range(from, from + PAGE_SIZE - 1);
+
+            if (resultsError) throw resultsError;
+            if (!pageRows || pageRows.length === 0) break;
+            allResults.push(...(pageRows as Record<string, unknown>[]));
+            if (pageRows.length < PAGE_SIZE) break;
+            from += PAGE_SIZE;
+        }
 
         // 5. Recalculate Scores
-        const updates = results.map((r: unknown) => {
-            const row = r as Record<string, unknown>;
+        const updates = allResults.map((row) => {
             const answers = row.answers as Record<string, string>;
-            
-            const { score, correctAnswers, totalQuestions } = calculateExamScore({ questions } as Exam, answers);
+            const { score, correctAnswers, totalQuestions } = calculateExamScore({ questions, config: nextConfig } as Exam, answers);
 
             return {
                 id: row.id,
@@ -1301,12 +1470,12 @@ export class ExamService {
             };
         });
 
-        // 6. Bulk Update Results
-        if (updates.length > 0) {
+        // 6. Bulk Update Results in safe batches
+        const BATCH_SIZE = 200;
+        for (let i = 0; i < updates.length; i += BATCH_SIZE) {
             const { error: bulkError } = await supabase
                 .from('results')
-                .upsert(updates);
-            
+                .upsert(updates.slice(i, i + BATCH_SIZE));
             if (bulkError) throw bulkError;
         }
     }
@@ -1326,7 +1495,7 @@ export class ExamService {
             config = data.config as ExamConfig;
         }
 
-        const localExams = this.getLocalTeacherExams();
+        const localExams = await this.getLocalTeacherExamsAsync();
         if (localExams[cleanCode]) {
             localExam = localExams[cleanCode];
             if (!config) config = localExam.config;
@@ -1395,7 +1564,7 @@ export class ExamService {
             config = data.config as ExamConfig;
         }
 
-        const localExams = this.getLocalTeacherExams();
+        const localExams = await this.getLocalTeacherExamsAsync();
         if (localExams[cleanCode]) {
             localExam = localExams[cleanCode];
             if (!config) config = localExam.config;
@@ -1427,7 +1596,7 @@ export class ExamService {
 
         const { data } = await supabase
             .from('exams')
-            .select('*')
+            .select('code, author_id, school, config, questions, status')
             .eq('code', cleanCode)
             .maybeSingle();
 
@@ -1443,7 +1612,7 @@ export class ExamService {
                 status: data.status
             };
         } else {
-            const localExams = this.getLocalTeacherExams();
+            const localExams = await this.getLocalTeacherExamsAsync();
             if (localExams[cleanCode]) {
                 exam = localExams[cleanCode];
             }

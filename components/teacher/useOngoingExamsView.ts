@@ -1,5 +1,6 @@
 import { useCallback, useState } from "react";
 import type { Exam } from "../../types";
+import { showToast } from "../../stores/feedbackStore";
 
 interface UseOngoingExamsViewParams {
   onDuplicateExam: (exam: Exam) => void;
@@ -16,7 +17,7 @@ export const useOngoingExamsView = ({
   const handleCopyJoinLink = useCallback((exam: Exam) => {
     const url = `${window.location.origin}/?join=${exam.code}`;
     navigator.clipboard.writeText(url);
-    alert("Link ujian berhasil disalin!");
+    showToast("Link ujian berhasil disalin!", "success");
   }, []);
 
   const handleDuplicate = useCallback(

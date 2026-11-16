@@ -3,17 +3,17 @@ import type { Question } from "../../../types";
 
 interface QuestionnaireViewProps {
   question: Question;
-  answers: Record<string, string>;
+  answerValue: string;
   onAnswerChange: (questionId: string, answer: string) => void;
   optimizeHtml?: (html: string) => string;
 }
 
-export const QuestionnaireView: React.FC<QuestionnaireViewProps> = ({
+export const QuestionnaireView: React.FC<QuestionnaireViewProps> = React.memo(({
   question,
-  answers,
+  answerValue,
   onAnswerChange,
 }) => {
-  const currentAnswer = answers[question.id] || "";
+  const currentAnswer = answerValue || "";
   const format = question.questionnaireFormat || "scale";
   const scaleMin = question.scaleMin ?? 1;
   const scaleMax = question.scaleMax ?? 5;
@@ -180,4 +180,4 @@ export const QuestionnaireView: React.FC<QuestionnaireViewProps> = ({
       )}
     </div>
   );
-};
+});

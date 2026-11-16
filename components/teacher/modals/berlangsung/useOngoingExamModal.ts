@@ -3,7 +3,6 @@ import type { RealtimeChannel } from "@supabase/supabase-js";
 import type { Exam, Result, TeacherProfile } from "../../../../types";
 import { supabase } from "../../../../lib/supabase";
 import { storageService } from "../../../../services/storage";
-import { parseList, normalize, calculateExamScore } from "../../examUtils";
 
 interface UseOngoingExamModalProps {
   exam: Exam | null;
@@ -22,9 +21,10 @@ interface EditingStudentData {
   absentNumber: string;
 }
 
+const PAGE_SIZE = 50;
+
 export const useOngoingExamModal = ({
   exam,
-  teacherProfile,
   onClose,
   onExamFinished,
   isPremium,
@@ -35,6 +35,8 @@ export const useOngoingExamModal = ({
   const [statusFilter, setStatusFilter] = useState<
     "ALL" | "LOCKED" | "ONLINE" | "COMPLETED"
   >("ALL");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
   const [localResults, setLocalResults] = useState<Result[]>([]);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isAddTimeOpen, setIsAddTimeOpen] = useState(false);
@@ -62,6 +64,10 @@ export const useOngoingExamModal = ({
     Record<string, { answered: number; total: number; timestamp: number }>
   >({});
   const resultChannelRef = useRef<RealtimeChannel | null>(null);
+  const localResultsRef = useRef<Result[]>(localResults);
+  useEffect(() => {
+    localResultsRef.current = localResults;
+  }, [localResults]);
 
   useEffect(() => {
     setDisplayExam(exam);
@@ -83,7 +89,7 @@ export const useOngoingExamModal = ({
           .from("exams")
           .select("config")
           .eq("code", displayExam.code)
-          .single();
+          .maybeSingle();
         if (examData && examData.config) {
           setDisplayExam((prev) =>
             prev ? { ...prev, config: examData.config } : null,
@@ -101,87 +107,137 @@ export const useOngoingExamModal = ({
   useEffect(() => {
     fetchLatest();
 
-    const pollInterval = setInterval(async () => {
-      if (!displayExam?.code) return;
+    let isDisposed = false;
+    const runLightweightPoll = async () => {
+      if (!displayExam?.code || isDisposed) return;
+      if (typeof document !== "undefined" && document.hidden) return;
       try {
-        const { data, error } = await supabase
-          .from("results")
-          .select("id, status, score, correct_answers, updated_at")
-          .eq("exam_code", displayExam.code);
+        const PAGE_SIZE = 1000;
+        const allServerRows: { id: number; status: string; score: number | null; correct_answers: number | null; updated_at: string }[] = [];
+        let from = 0;
+        while (true) {
+          const { data, error } = await supabase
+            .from("results")
+            .select("id, status, score, correct_answers, updated_at")
+            .eq("exam_code", displayExam.code)
+            .range(from, from + PAGE_SIZE - 1);
 
-        if (error || !data) return;
+          if (error || !data || data.length === 0) break;
+          allServerRows.push(...(data as any[]));
+          if (data.length < PAGE_SIZE) break;
+          from += PAGE_SIZE;
+        }
 
-        setLocalResults((prev) => {
-          const idsToFetch: number[] = [];
-          const next = [...prev];
+        if (allServerRows.length === 0 || isDisposed) return;
 
-          data.forEach((serverRec) => {
-            const idx = next.findIndex((r) => r.id === serverRec.id);
-            if (idx >= 0) {
-              const localRec = next[idx];
-              if (
-                localRec.status !== serverRec.status &&
-                (serverRec.status === "completed" ||
-                  serverRec.status === "force_closed")
-              ) {
-                idsToFetch.push(serverRec.id);
-              }
+        const currentSnapshot = localResultsRef.current;
+        const localMap = new Map<number, Result>();
+        for (const r of currentSnapshot) {
+          if (typeof r.id === "number") {
+            localMap.set(r.id, r);
+          }
+        }
+        const idsToFetch: number[] = [];
+        const serverMap = new Map(allServerRows.map((row) => [row.id, row]));
 
-              next[idx] = {
-                ...localRec,
-                status: serverRec.status as
-                  | "in_progress"
-                  | "completed"
-                  | "force_closed",
-                score: serverRec.score || 0,
-                correctAnswers: serverRec.correct_answers || 0,
-                timestamp: new Date(serverRec.updated_at).getTime(),
-                answers: localRec.answers || {},
-                completionTime: localRec.completionTime,
-              };
-            } else {
+        for (const serverRec of allServerRows) {
+          const localRec = localMap.get(serverRec.id);
+          if (localRec) {
+            if (
+              localRec.status !== serverRec.status &&
+              (serverRec.status === "completed" ||
+                serverRec.status === "force_closed")
+            ) {
               idsToFetch.push(serverRec.id);
             }
-          });
+          } else {
+            idsToFetch.push(serverRec.id);
+          }
+        }
 
-          if (idsToFetch.length > 0) {
-            supabase
+        setLocalResults((prev) => {
+          let hasAnyChange = false;
+          const next = prev.map((localRec) => {
+            if (typeof localRec.id !== "number") return localRec;
+            const serverRec = serverMap.get(localRec.id);
+            if (!serverRec) return localRec;
+            const nextStatus = serverRec.status as
+              | "in_progress"
+              | "completed"
+              | "force_closed";
+            const nextScore = serverRec.score ?? 0;
+            const nextCorrect = serverRec.correct_answers ?? 0;
+            const nextTimestamp = serverRec.updated_at
+              ? new Date(serverRec.updated_at).getTime()
+              : localRec.timestamp;
+
+            if (
+              localRec.status === nextStatus &&
+              (localRec.score ?? 0) === nextScore &&
+              (localRec.correctAnswers ?? 0) === nextCorrect &&
+              localRec.timestamp === nextTimestamp
+            ) {
+              return localRec;
+            }
+            hasAnyChange = true;
+            return {
+              ...localRec,
+              status: nextStatus,
+              score: nextScore,
+              correctAnswers: nextCorrect,
+              timestamp: nextTimestamp,
+            };
+          });
+          return hasAnyChange ? next : prev;
+        });
+
+        if (idsToFetch.length > 0 && !isDisposed) {
+          const DETAIL_BATCH = 200;
+          const fetchedRows: Record<string, unknown>[] = [];
+          for (let i = 0; i < idsToFetch.length; i += DETAIL_BATCH) {
+            const { data: specificData } = await supabase
               .from("results")
               .select(
                 "id, exam_code, student_id, student_name, class_name, status, score, correct_answers, total_questions, answers, updated_at, location",
               )
-              .in("id", idsToFetch)
-              .then(({ data: specificData }) => {
-                if (specificData) {
-                  setLocalResults((current) => {
-                    const updated = [...current];
-                    specificData.forEach((row) => {
-                      const mapped = storageService.mapRowToResult(row);
-                      const i = updated.findIndex((r) => r.id === mapped.id);
-                      if (i >= 0) updated[i] = mapped;
-                      else updated.push(mapped);
-                    });
-                    return updated;
-                  });
-                }
-              });
+              .in("id", idsToFetch.slice(i, i + DETAIL_BATCH));
+            if (specificData) {
+              fetchedRows.push(...(specificData as Record<string, unknown>[]));
+            }
           }
 
-          return next;
-        });
+          if (fetchedRows.length > 0 && !isDisposed) {
+            setLocalResults((current) => {
+              const updated = [...current];
+              fetchedRows.forEach((row) => {
+                const mapped = storageService.mapRowToResult(row);
+                const idx = updated.findIndex((r) => r.id === mapped.id);
+                if (idx >= 0) updated[idx] = mapped;
+                else updated.push(mapped);
+              });
+              return updated;
+            });
+          }
+        }
       } catch (e) {
         console.error("Lightweight polling error", e);
       }
-    }, 15000);
+    };
 
-    return () => clearInterval(pollInterval);
-  }, [
-    displayExam?.code,
-    selectedClass,
-    selectedSchool,
-    teacherProfile,
-    fetchLatest,
-  ]);
+    const pollInterval = setInterval(runLightweightPoll, 15000);
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        runLightweightPoll();
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      isDisposed = true;
+      clearInterval(pollInterval);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [displayExam?.code, fetchLatest]);
 
   useEffect(() => {
     if (!displayExam?.code) return;
@@ -801,14 +857,6 @@ export const useOngoingExamModal = ({
     return `${Math.floor(diff / 3600)}j lalu`;
   }, []);
 
-  const calculateScore = useCallback(
-    (r: Result) => {
-      if (!displayExam) return 0;
-      return calculateExamScore(displayExam, r.answers || {}).score;
-    },
-    [displayExam],
-  );
-
   const proctorCollab = useMemo(() => {
     const collabs = displayExam?.config?.collaborators || [];
     return collabs.find((c) => c.role === "viewer");
@@ -863,12 +911,56 @@ export const useOngoingExamModal = ({
     [scopedResults],
   );
 
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [selectedClass, selectedSchool, statusFilter, searchQuery, displayExam?.code]);
+
+  const filteredSortedResults = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return sortedResults;
+    return sortedResults.filter((r) => {
+      const name = (r.student.fullName || "").toLowerCase();
+      const sid = (r.student.studentId || "").toLowerCase();
+      const abs = (r.student.absentNumber || "").toLowerCase();
+      const cls = (r.student.class || "").toLowerCase();
+      const sch = (r.student.schoolName || "").toLowerCase();
+      return (
+        name.includes(q) ||
+        sid.includes(q) ||
+        abs.includes(q) ||
+        cls.includes(q) ||
+        sch.includes(q)
+      );
+    });
+  }, [sortedResults, searchQuery]);
+
+  const totalFilteredCount = filteredSortedResults.length;
+  const totalPages = Math.max(1, Math.ceil(totalFilteredCount / PAGE_SIZE));
+  const safeCurrentPage = Math.min(currentPage, totalPages);
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
+
+  const paginatedResults = useMemo(() => {
+    const start = (safeCurrentPage - 1) * PAGE_SIZE;
+    return filteredSortedResults.slice(start, start + PAGE_SIZE);
+  }, [filteredSortedResults, safeCurrentPage]);
+
   return {
     // State
     displayExam,
     selectedClass,
     selectedSchool,
     statusFilter,
+    searchQuery,
+    currentPage: safeCurrentPage,
+    pageSize: PAGE_SIZE,
+    totalPages,
+    totalFilteredCount,
+    paginatedResults,
     localResults,
     schoolScopedResults,
     scopedResults,
@@ -888,6 +980,8 @@ export const useOngoingExamModal = ({
     setSelectedClass,
     setSelectedSchool,
     setStatusFilter,
+    setSearchQuery,
+    setCurrentPage,
     setIsAddTimeOpen,
     setAddTimeValue,
     setIsShareModalOpen,
@@ -913,7 +1007,6 @@ export const useOngoingExamModal = ({
     handleFinishAllExams,
     handleAddTimeSubmit,
     getRelativeTime,
-    calculateScore,
 
     // Cached / Computed
     proctorUrl,

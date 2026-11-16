@@ -7,6 +7,7 @@ import {
   getCaretCharacterOffsetWithin,
   setCaretCharacterOffsetWithin,
 } from "./caretUtils";
+import { showAlertModal } from "../../stores/feedbackStore";
 
 export type WysiwygTab = "FORMAT" | "PARAGRAPH" | "INSERT" | "MATH";
 
@@ -19,7 +20,6 @@ export interface EditorState {
   showGeometry: boolean;
   showAksara: boolean;
   showEmoji: boolean;
-  showAiImage: boolean;
   showLink: boolean;
   selectedTextForLink: string;
 }
@@ -69,7 +69,6 @@ export const useWysiwygEditor = ({
     showGeometry: false,
     showAksara: false,
     showEmoji: false,
-    showAiImage: false,
     showLink: false,
     selectedTextForLink: "",
   });
@@ -111,6 +110,12 @@ export const useWysiwygEditor = ({
       chartNodes.forEach((node) => {
         node.innerHTML = `<span class="chart-placeholder-text">📊 Diagram (Klik untuk mengedit)</span>`;
       });
+      const audioNodes = clone.querySelectorAll('[data-audio="true"]');
+      audioNodes.forEach((node) => {
+        const p = document.createElement("p");
+        p.textContent = "[AUDIO_STIMULUS]";
+        node.parentNode?.replaceChild(p, node);
+      });
       const html = clone.innerHTML;
       const sanitized = sanitizeHtml(html);
       lastEmittedValueRef.current = sanitized;
@@ -150,6 +155,12 @@ export const useWysiwygEditor = ({
       const chartNodes = clone.querySelectorAll('[data-chart="true"]');
       chartNodes.forEach((node) => {
         node.innerHTML = `<span class="chart-placeholder-text">📊 Diagram (Klik untuk mengedit)</span>`;
+      });
+      const audioNodesOnBlur = clone.querySelectorAll('[data-audio="true"]');
+      audioNodesOnBlur.forEach((node) => {
+        const p = document.createElement("p");
+        p.textContent = "[AUDIO_STIMULUS]";
+        node.parentNode?.replaceChild(p, node);
       });
       const html = clone.innerHTML;
       const sanitized = sanitizeHtml(html);
@@ -550,7 +561,11 @@ export const useWysiwygEditor = ({
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
       if (file.size > 1 * 1024 * 1024) {
-        alert("Ukuran file audio terlalu besar (Maks 1MB)");
+        void showAlertModal({
+          title: "File Audio Terlalu Besar",
+          message: "Ukuran file audio terlalu besar (Maksimal 1MB).",
+          tone: "warning",
+        });
         return;
       }
       const reader = new FileReader();
@@ -563,13 +578,6 @@ export const useWysiwygEditor = ({
       reader.readAsDataURL(file);
     }
     e.target.value = "";
-  };
-
-  const insertAiImage = (imageUrl: string, caption?: string) => {
-    const cleanCaption = caption ? caption.replace(/"/g, "&quot;") : "Stimulus Visual AI";
-    const imgTag = `<p style="text-align: center; margin: 8px auto;"><img src="${imageUrl}" alt="${cleanCaption}" loading="lazy" style="max-width: 280px; max-height: 220px; width: auto; height: auto; object-fit: contain; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); display: inline-block; margin: 0 auto; border: 1px solid #e2e8f0; cursor: zoom-in;" /><br/><span style="font-size: 11px; color: #64748b; margin-top: 4px; display: inline-block;">🎨 Stimulus Visual AI (${cleanCaption})</span></p>&nbsp;`;
-    runCmd("insertHTML", imgTag);
-    handleInput();
   };
 
   const openLinkModal = () => {
@@ -698,7 +706,6 @@ export const useWysiwygEditor = ({
     cancelInlineMath,
     activeInlineLatex,
     setActiveInlineLatex,
-    insertAiImage,
     openLinkModal,
     insertLink,
     handlePaste,

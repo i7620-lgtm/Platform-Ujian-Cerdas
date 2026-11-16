@@ -530,3 +530,250 @@ export const findSessionConflicts = (
     conflicts,
   };
 };
+
+/**
+ * Mengembalikan true hanya jika fitur "Izinkan Kerja Lewat Waktu" aktif secara valid:
+ * Mode Ujian (bukan PR), durasi pengerjaan > 0 menit, dan allowOvertime dicentang guru.
+ */
+export const isOvertimeAllowedForExam = (config: ExamConfig): boolean => {
+  const isPR = (config.examMode || "UJIAN").trim().toUpperCase() === "PR";
+  const timeLimitMin = Number(config.timeLimit) || 0;
+  return !isPR && timeLimitMin > 0 && Boolean(config.allowOvertime);
+};
+
+/**
+ * Menghitung timestamp UTC absolut batas akhir global ujian berdasarkan config dan zona waktu guru.
+ */
+export const getGlobalExamEndTimestamp = (config: ExamConfig): number => {
+  const examTz: IndonesianTimezone = config.timezone || "WIB";
+  const rawEndDate = config.endDate || config.date;
+  const endTimeStr = config.endTime || "23:59";
+
+  let absoluteExamEndTime: number;
+  if (rawEndDate && rawEndDate.includes("T")) {
+    absoluteExamEndTime = new Date(rawEndDate).getTime();
+  } else if (rawEndDate) {
+    absoluteExamEndTime = toAbsoluteUtcTimestamp(
+      normalizeDateString(rawEndDate),
+      endTimeStr,
+      examTz,
+      true
+    );
+  } else {
+    absoluteExamEndTime = Infinity;
+  }
+
+  return isNaN(absoluteExamEndTime) ? Infinity : absoluteExamEndTime;
+};
+
+/**
+ * Mencari sesi harian yang aktif pada waktu referensi tertentu (mis. waktu mulai aktual siswa)
+ * dan mengembalikan timestamp UTC berakhirnya sesi tersebut beserta label jam selesainya.
+ */
+export const getActiveSessionEndTimestamp = (
+  config: ExamConfig,
+  studentClass?: string,
+  referenceTimeMs: number = Date.now()
+): {
+  sessionEndTs: number;
+  sessionEndTimeLabel?: string;
+  activeSession?: DailyExamSession;
+} => {
+  const isPR = (config.examMode || "UJIAN").trim().toUpperCase() === "PR";
+  if (isPR || !config.enableDailyWindow) {
+    return { sessionEndTs: Infinity };
+  }
+
+  const allSessions = getNormalizedDailySessions(config);
+  if (allSessions.length === 0) {
+    return { sessionEndTs: Infinity };
+  }
+
+  const applicableSessions = getApplicableSessionsForStudent(allSessions, studentClass);
+  if (applicableSessions.length === 0) {
+    return { sessionEndTs: Infinity };
+  }
+
+  const examTz: IndonesianTimezone = config.timezone || "WIB";
+  const offsetExamMs = getTimezoneOffsetHours(examTz) * 3600000;
+  const examRef = new Date(referenceTimeMs + offsetExamMs);
+  const examYear = examRef.getUTCFullYear();
+  const examMonth = (examRef.getUTCMonth() + 1).toString().padStart(2, "0");
+  const examDay = examRef.getUTCDate().toString().padStart(2, "0");
+  const examRefDateStr = `${examYear}-${examMonth}-${examDay}`;
+  const examRefMinutes = examRef.getUTCHours() * 60 + examRef.getUTCMinutes();
+
+  for (const session of applicableSessions) {
+    const isSpecificDate = session.dateMode === "SPECIFIC_DATE";
+    if (isSpecificDate && session.date) {
+      const cleanSessionDate = normalizeDateString(session.date);
+      if (cleanSessionDate !== examRefDateStr) {
+        continue;
+      }
+    }
+
+    const startMin = parseTimeMinutes(session.startTime);
+    const endMin = parseTimeMinutes(session.endTime);
+
+    if (startMin <= endMin) {
+      if (examRefMinutes >= startMin && examRefMinutes < endMin) {
+        const sessionEndTs = toAbsoluteUtcTimestamp(
+          examRefDateStr,
+          session.endTime,
+          examTz,
+          true
+        );
+        return {
+          sessionEndTs: isNaN(sessionEndTs) ? Infinity : sessionEndTs,
+          sessionEndTimeLabel: session.endTime,
+          activeSession: session,
+        };
+      }
+    } else {
+      // Sesi melewati tengah malam (contoh 22:00 - 02:00)
+      if (examRefMinutes >= startMin) {
+        const nextDay = new Date(Date.UTC(examYear, examRef.getUTCMonth(), examRef.getUTCDate() + 1));
+        const nextDateStr = `${nextDay.getUTCFullYear()}-${(nextDay.getUTCMonth() + 1)
+          .toString()
+          .padStart(2, "0")}-${nextDay.getUTCDate().toString().padStart(2, "0")}`;
+        const sessionEndTs = toAbsoluteUtcTimestamp(nextDateStr, session.endTime, examTz, true);
+        return {
+          sessionEndTs: isNaN(sessionEndTs) ? Infinity : sessionEndTs,
+          sessionEndTimeLabel: session.endTime,
+          activeSession: session,
+        };
+      } else if (examRefMinutes < endMin) {
+        const sessionEndTs = toAbsoluteUtcTimestamp(examRefDateStr, session.endTime, examTz, true);
+        return {
+          sessionEndTs: isNaN(sessionEndTs) ? Infinity : sessionEndTs,
+          sessionEndTimeLabel: session.endTime,
+          activeSession: session,
+        };
+      }
+    }
+  }
+
+  return { sessionEndTs: Infinity };
+};
+
+/**
+ * Menghitung batas akhir (epoch ms) pengerjaan seorang siswa.
+ * - Jika allowOvertime aktif (Mode Ujian & durasi > 0): siswa mendapat durasi penuh sejak actualStartTime.
+ * - Jika allowOvertime nonaktif: sisa waktu disesuaikan agar tidak melewati jam selesai ujian maupun jam selesai sesinya.
+ */
+export const computeStudentExamDeadline = (
+  config: ExamConfig,
+  studentClass: string | undefined,
+  actualStartTimeMs: number
+): number => {
+  const mode = (config.examMode || "UJIAN").trim().toUpperCase();
+  const isPR = mode === "PR";
+  const globalEndTs = getGlobalExamEndTimestamp(config);
+
+  if (isPR) {
+    return globalEndTs;
+  }
+
+  const timeLimitMin = Number(config.timeLimit) || 0;
+  const timeLimitMs = timeLimitMin > 0 ? timeLimitMin * 60 * 1000 : 0;
+  const personalEndTs = timeLimitMs > 0 ? actualStartTimeMs + timeLimitMs : Infinity;
+
+  if (isOvertimeAllowedForExam(config)) {
+    return personalEndTs;
+  }
+
+  const { sessionEndTs } = getActiveSessionEndTimestamp(
+    config,
+    studentClass,
+    actualStartTimeMs
+  );
+  const effectiveWindowEndTs = Math.min(globalEndTs, sessionEndTs);
+
+  if (timeLimitMs > 0) {
+    return Math.min(personalEndTs, effectiveWindowEndTs);
+  }
+  return effectiveWindowEndTs;
+};
+
+/**
+ * Menentukan apakah banner masa perpanjangan (Grace Period) harus ditampilkan.
+ * Aktif hanya ketika "Izinkan Kerja Lewat Waktu" dicentang dan waktu saat ini telah melewati
+ * jam selesai sesi harian atau jam selesai umum ujian.
+ */
+export const getOvertimeGraceStatus = (
+  config: ExamConfig,
+  studentClass: string | undefined,
+  actualStartTimeMs: number,
+  nowMs: number = Date.now()
+): { isGraceActive: boolean; boundaryEndTimeLabel: string } => {
+  if (!isOvertimeAllowedForExam(config) || config.isFinished) {
+    return { isGraceActive: false, boundaryEndTimeLabel: "" };
+  }
+
+  const examTz: IndonesianTimezone = config.timezone || "WIB";
+  const globalEndTs = getGlobalExamEndTimestamp(config);
+  const { sessionEndTs, sessionEndTimeLabel } = getActiveSessionEndTimestamp(
+    config,
+    studentClass,
+    actualStartTimeMs
+  );
+
+  if (sessionEndTs !== Infinity && nowMs > sessionEndTs) {
+    const label = sessionEndTimeLabel || config.dailyEndTime || "";
+    return {
+      isGraceActive: true,
+      boundaryEndTimeLabel: label ? `${label} ${examTz}` : examTz,
+    };
+  }
+
+  if (globalEndTs !== Infinity && nowMs > globalEndTs) {
+    const label = config.endTime || "";
+    return {
+      isGraceActive: true,
+      boundaryEndTimeLabel: label ? `${label} ${examTz}` : examTz,
+    };
+  }
+
+  if (config.enableDailyWindow) {
+    const access = calculateStudentAccess(config, studentClass, new Date(nowMs));
+    if (access.status === "OUTSIDE_DAILY_SESSION") {
+      const fallbackLabel =
+        access.applicableSessions.find((s) => s.endTime)?.endTime ||
+        config.dailyEndTime ||
+        "";
+      return {
+        isGraceActive: true,
+        boundaryEndTimeLabel: fallbackLabel ? `${fallbackLabel} ${examTz}` : examTz,
+      };
+    }
+  }
+
+  return { isGraceActive: false, boundaryEndTimeLabel: "" };
+};
+
+/**
+ * Mengevaluasi apakah siswa yang sudah memulai sebelumnya boleh masuk kembali di masa lewat waktu:
+ * 1) Fitur Izinkan Kerja Lewat Waktu aktif (Mode Ujian + durasi > 0)
+ * 2) Ujian belum ditutup oleh guru (!config.isFinished)
+ * 3) Status peserta masih in_progress atau force_closed (bukan completed)
+ * 4) Sisa durasi pengerjaan pribadi masih tersedia
+ */
+export const canStudentResumeInOvertime = (
+  config: ExamConfig,
+  status?: string,
+  actualStartTimeMs?: number | null,
+  nowMs: number = Date.now()
+): boolean => {
+  if (!isOvertimeAllowedForExam(config) || config.isFinished) {
+    return false;
+  }
+  if (status !== "in_progress" && status !== "force_closed") {
+    return false;
+  }
+  if (typeof actualStartTimeMs !== "number" || isNaN(actualStartTimeMs) || actualStartTimeMs <= 0) {
+    return false;
+  }
+  const timeLimitMs = (Number(config.timeLimit) || 0) * 60 * 1000;
+  return actualStartTimeMs + timeLimitMs > nowMs;
+};
+

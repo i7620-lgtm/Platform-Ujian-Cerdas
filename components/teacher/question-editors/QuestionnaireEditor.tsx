@@ -7,6 +7,7 @@ import {
   SparklesIcon,
   CheckCircleIcon,
 } from "../../Icons";
+import { showAlertModal } from "../../../stores/feedbackStore";
 
 interface QuestionnaireEditorProps {
   q: Question;
@@ -63,7 +64,11 @@ export const QuestionnaireEditor: React.FC<QuestionnaireEditorProps> = ({ q }) =
 
   const handleDeleteOption = (idx: number) => {
     if (options.length <= 2) {
-      alert("Kuisioner pilihan minimal harus memiliki 2 opsi.");
+      void showAlertModal({
+        title: "Batas Minimal Opsi",
+        message: "Kuisioner pilihan minimal harus memiliki 2 opsi.",
+        tone: "warning",
+      });
       return;
     }
     const next = options.filter((_, i) => i !== idx);

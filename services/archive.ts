@@ -4,8 +4,6 @@ import { examService } from './exam';
 import { resultService } from './result';
 import type { Exam, Result, Question, ExamSummary, TeacherProfile, AccountType, ExamConfig } from '../types';
 import { normalize, parseList } from '../components/teacher/examUtils';
-import { generateAIAnalysisClientSide } from './clientAiAnalysis';
-import { generateDeterministicDiagnosticReport } from './diagnosticReportGenerator';
 
 export class ArchiveService {
 
@@ -587,82 +585,7 @@ export class ArchiveService {
   }
 
   // --- GEMINI AI ANALYTICS (HYBRID SMART ENGINE WITH 60S SAFE PROXY FALLBACK) ---
-  async generateAIAnalysis(
-    summaries: ExamSummary[],
-    customPrompt?: string,
-    examQuestions?: Question[],
-    existingAnalyses?: Record<string, string>,
-    onProgress?: (message: string, step: number, totalSteps: number) => void,
-    targetClassTitle?: string,
-  ): Promise<string> {
-      const prompt = this.generateAnalysisPrompt(
-        summaries,
-        customPrompt,
-        examQuestions,
-        existingAnalyses,
-        targetClassTitle,
-      );
-      onProgress?.("Menghubungkan ke server proxy analisis cerdas...", 1, 4);
 
-      let serverFailed = false;
-      let serverErrorDetail = "";
-
-      // Percobaan 1: Coba server proxy utama dengan batas waktu wajar 25 detik
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => {
-        try { controller.abort(); } catch (_) {}
-      }, 25000);
-
-      try {
-          const res = await fetch("/api/generate-analysis", {
-              method: "POST",
-              headers: { "Content-Type": "application/json", "Accept": "application/json" },
-              body: JSON.stringify({ prompt }),
-              signal: controller.signal
-          });
-          clearTimeout(timeoutId);
-
-          if (res.ok) {
-              const contentType = res.headers.get("Content-Type") || "";
-              if (contentType.includes("application/json")) {
-                  const data = await res.json();
-                  if (data?.success && data?.text) {
-                      onProgress?.("Selesai menyusun laporan analisis...", 4, 4);
-                      return data.text;
-                  }
-              }
-          }
-
-          serverFailed = true;
-          const errText = await res.text().catch(() => "");
-          serverErrorDetail = `Server HTTP ${res.status}: ${errText.slice(0, 100)}`;
-      } catch (err: any) {
-          clearTimeout(timeoutId);
-          serverFailed = true;
-          serverErrorDetail = err?.name === 'AbortError' ? "Batas waktu 25 detik terlampaui" : (err?.message || "Koneksi terputus");
-      }
-
-      // Percobaan 2: Safe Fallback Server Proxy Internal & Zero-Fail Diagnostic Engine
-      if (serverFailed) {
-          console.info(`[Safe Proxy Failover] Mengalihkan ke safe fallback server proxy internal (${serverErrorDetail})...`);
-          onProgress?.("Mengalihkan ke safe proxy server internal...", 2, 4);
-
-          try {
-              const clientResult = await generateAIAnalysisClientSide(prompt, onProgress);
-              if (clientResult && clientResult.trim().length > 30) {
-                  return clientResult;
-              }
-          } catch (clientErr: any) {
-              console.warn("[Safe Proxy] Mengaktifkan mesin diagnostik klinis instan:", clientErr?.message);
-          }
-
-          // Fallback Utama: Selalu hasilkan laporan diagnostik klinis lengkap
-          onProgress?.("Menyelesaikan laporan analisis diagnostik & bank soal...", 4, 4);
-          return generateDeterministicDiagnosticReport(prompt);
-      }
-
-      return generateDeterministicDiagnosticReport(prompt);
-  }
 
   // --- COLD DATA (CLOUD ARCHIVE) METHODS ---
 
@@ -790,7 +713,7 @@ export class ArchiveService {
           }
       }
       
-      return data.map((f: {name: string, created_at: string, metadata?: Record<string, unknown>}) => {
+      const mapped = data.map((f: {name: string, created_at: string, metadata?: Record<string, unknown>}) => {
           let metadata: Record<string, unknown> | null = null;
           const fileName = f && typeof f.name === 'string' ? f.name : "";
 

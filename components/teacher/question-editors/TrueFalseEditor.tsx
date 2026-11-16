@@ -4,6 +4,7 @@ import { TrashIcon, PlusCircleIcon, SparklesIcon } from "../../Icons";
 import { WysiwygEditor } from "../WysiwygEditor";
 import { useExamEditorStore } from "../../../stores/examEditorStore";
 import { useExamEditorUIStore } from "../../../stores/examEditorUIStore";
+import { showConfirmModal } from "../../../stores/feedbackStore";
 
 interface TrueFalseEditorProps {
   q: Question;
@@ -254,8 +255,14 @@ export const TrueFalseEditor: React.FC<TrueFalseEditorProps> = ({ q }) => {
               {activeRows.length > 1 && (
                 <button
                   type="button"
-                  onClick={() => {
-                    if (window.confirm("Hapus pernyataan ini?")) {
+                  onClick={async () => {
+                    const confirmed = await showConfirmModal({
+                      title: "Hapus Pernyataan?",
+                      message: "Hapus pernyataan ini dari daftar Benar / Salah?",
+                      tone: "danger",
+                      confirmLabel: "Hapus Pernyataan",
+                    });
+                    if (confirmed) {
                       handleDeleteTrueFalseRow(q.id, rIndex);
                     }
                   }}

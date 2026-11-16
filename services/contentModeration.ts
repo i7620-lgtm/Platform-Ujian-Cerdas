@@ -1,80 +1,131 @@
+import type { Exam } from "../types";
+
 /**
- * Modul Pengawasan & Keamanan Konten Pendidikan (Educational Content Safety Guardrails)
- * Sisi Klien: Menjamin seluruh pembuatan gambar AI 100% aman, bebas dari pornografi, ketelanjangan, dan isu SARA.
+ * Custom error class for content moderation failures.
  */
-
-export interface ModerationResult {
-  isSafe: boolean;
-  reason?: string;
-  category?: "pornography" | "hate_sara" | "violence" | "profanity";
-  sanitizedPrompt: string;
-  isSensitiveEducationalTopic: boolean;
-  educationalSafetyDirective?: string;
+export class ModerationError extends Error {
+  public issues: string[];
+  constructor(issues: string[]) {
+    super(`Konten tidak pantas terdeteksi: ${issues.join(", ")}`);
+    this.name = "ModerationError";
+    this.issues = issues;
+  }
 }
 
-const PROHIBITED_PATTERNS = [
-  // Pornografi, Seksual Vulgar, Ketelanjangan
-  /\b(bokep|porno|porn|pornografi|bugil|telanjang|nude|nudity|naked|erotis|cabul|mesum|syahwat|masturbasi|onani|vagina|penis|kontol|memek|tetek|toket|jembut|ngentot|bersetubuh|seksual|open\s*bo|lendir|hentai|ecchi)\b/i,
-  // Isu SARA, Ujaran Kebencian, Diskriminasi Rasial & Penistaan Agama
-  /\b(cina\s*kafir|pribumi\s*vs|dasar\s*kafir|anti\s*islam|anti\s*kristen|penistaan\s*agama|benci\s*suku|suku\s*biadab|anjing\s*yahudi|teroris\s*islam|kafir\s*laknat|radikalisme\s*teror)\b/i,
-  // Kekerasan Sadis & Konten Berbahaya
-  /\b(mutilasi|pembantaian|potong\s*leher|gorok|darah\s*kental|bunuh\s*diri|suicide|sadis|gore|eksekusi\s*mati|senjata\s*api\s*rakitan|merakit\s*bom)\b/i,
-  // Umpatan Kasar
-  /\b(bajingan|bangsat|tolol|goblok|kampret|brengsek|babi\s*lu|pantek)\b/i,
-];
+/**
+ * ContentModerator provides multi-layer content validation:
+ * 1. Fast local keyword-based filtering.
+ * 2. Context-aware AI-based moderation via server proxy.
+ */
+export class ContentModerator {
+  // Local dictionary for fast blocking of common bad words (Indonesian/English)
+  private static readonly BAD_WORDS_REGEX = new RegExp(
+    "\\b(" +
+    [
+      // Indonesian profanity/slurs
+      "anjing", "babi", "bangsat", "tolol", "goblok", "asu", "kontol", "memek", "jembut", "pelacur", "lonte",
+      "perek", "bejad", "biadab", "pukimak", "ngewe", "entot", "ngocok", "coli", "itil", "ngentot", "crot", "sange",
+      // Hate speech / SARA related (slurs)
+      "cina", "kafir", "murtad", "sesat", "kadrun", "cebong", "kampret", "bencong", "banci", "idiot", "autis",
+      // English common profanity
+      "fuck", "shit", "bitch", "asshole", "pussy", "dick", "cock", "porn", "xxx", "sex",
+    ].join("|") +
+    ")\\b",
+    "gi"
+  );
 
-const EDUCATIONAL_SENSITIVE_PATTERNS = [
-  {
-    regex: /\b(reproduksi|alat\s*reproduksi|ovarium|testis|rahim|uterus|sel\s*sperma|sel\s*telur|pubertas|organ\s*kelamin)\b/i,
-    directive: "Materi ini adalah topik biologi kurikulum sekolah. DILARANG KERAS menampilkan gambar vulgar atau ketelanjangan manusia. WAJIB disajikan dalam bentuk diagram skematis medis formal berlabel ilmiah buku pelajaran sekolah.",
-  },
-  {
-    regex: /\b(suku|adat|pakaian\s*adat|rumah\s*adat|tradisi|upacara\s*adat|budaya\s*daerah|papua|asmat|dayak|toraja|bali|jawa|batak)\b/i,
-    directive: "Materi keragaman suku dan budaya Indonesia wajib disajikan dengan penuh penghormatan, sopan, berpakaian adat lengkap, mencerminkan nilai Bhinneka Tunggal Ika.",
-  },
-  {
-    regex: /\b(agama|tempat\s*ibadah|masjid|gereja|pura|vihara|klenteng|hari\s*raya)\b/i,
-    directive: "Materi keagamaan disajikan dalam bentuk arsitektur tempat ibadah atau infografis toleransi dan kerukunan beragama yang harmonis dan damai.",
-  },
-];
+  /**
+   * Aggregates all text fields from an exam into a single object for validation.
+   */
+  private static aggregateTexts(exam: Exam): string {
+    const texts: string[] = [];
 
-export function validateEducationalSafety(prompt: string): ModerationResult {
-  const cleanPrompt = (prompt || "").trim();
+    // Exam metadata
+    if (exam.config.subject) texts.push(`Judul: ${exam.config.subject}`);
+    if (exam.config.description) texts.push(`Deskripsi: ${exam.config.description}`);
+    if (exam.config.examType) texts.push(`Jenis: ${exam.config.examType}`);
+    if (exam.config.classLevel) texts.push(`Level: ${exam.config.classLevel}`);
 
-  if (!cleanPrompt) {
-    return {
-      isSafe: true,
-      sanitizedPrompt: "",
-      isSensitiveEducationalTopic: false,
-    };
+    // Questions
+    exam.questions.forEach((q, i) => {
+      if (q.questionText) texts.push(`Soal ${i + 1}: ${q.questionText}`);
+      if (q.options) q.options.forEach((opt, j) => texts.push(`Opsi ${j + 1}: ${opt}`));
+      if (q.explanation) texts.push(`Pembahasan: ${q.explanation}`);
+      if (q.solutionSteps) texts.push(`Langkah: ${q.solutionSteps}`);
+      if (q.category) texts.push(`Materi: ${q.category}`);
+      if (q.level) texts.push(`Level Soal: ${q.level}`);
+      if (q.kisiKisi) texts.push(`Kisi-kisi: ${q.kisiKisi}`);
+      if (q.trueFalseRows) q.trueFalseRows.forEach(row => texts.push(`Pernyataan: ${row.text}`));
+      if (q.matchingPairs) q.matchingPairs.forEach(p => texts.push(`Pasangan: ${p.left} - ${p.right}`));
+    });
+
+    return texts.join("\n\n");
   }
 
-  for (const pattern of PROHIBITED_PATTERNS) {
-    if (pattern.test(cleanPrompt)) {
-      return {
-        isSafe: false,
-        reason: "Permintaan mengandung kata atau materi yang tidak memenuhi standar etika pendidikan sekolah (bebas dari pornografi, ketelanjangan, kekerasan, dan SARA). Sistem Ujian Cerdas mewajibkan konten 100% aman dan berfokus pada materi pelajaran sekolah.",
-        category: "pornography",
-        sanitizedPrompt: "",
-        isSensitiveEducationalTopic: false,
-      };
+  /**
+   * Performs quick local validation.
+   */
+  public static validateLocally(content: string): string[] {
+    const issues: string[] = [];
+    const matches = content.match(this.BAD_WORDS_REGEX);
+    if (matches && matches.length > 0) {
+      const uniqueMatches = Array.from(new Set(matches.map(m => m.toLowerCase())));
+      issues.push(`Kata-kata kasar/tidak pantas terdeteksi: ${uniqueMatches.join(", ")}`);
+    }
+    return issues;
+  }
+
+  /**
+   * Performs deep AI validation for complex categories (SARA, Pornography, Bullying).
+   * Calls the server-side API to keep Gemini API key secure.
+   */
+  private static async validateWithAI(content: string): Promise<string[]> {
+    try {
+      const response = await fetch("/api/moderate-content", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content }),
+      });
+      const result = await response.json();
+      return result.isSafe ? [] : result.issues;
+    } catch (err) {
+      console.error("Content Moderation API Error:", err);
+      return []; // Fallback: allow save if API is down
     }
   }
 
-  let educationalSafetyDirective = "";
-  let isSensitiveEducationalTopic = false;
-
-  for (const item of EDUCATIONAL_SENSITIVE_PATTERNS) {
-    if (item.regex.test(cleanPrompt)) {
-      isSensitiveEducationalTopic = true;
-      educationalSafetyDirective += " " + item.directive;
+  /**
+   * Main entry point for exam content moderation.
+   */
+  public static async validateExamContent(exam: Exam): Promise<{ isValid: boolean; issues: string[] }> {
+    const fullContent = this.aggregateTexts(exam);
+    
+    // 1. Local check (Fast)
+    const localIssues = this.validateLocally(fullContent);
+    if (localIssues.length > 0) {
+      return { isValid: false, issues: localIssues };
     }
-  }
 
-  return {
-    isSafe: true,
-    sanitizedPrompt: cleanPrompt,
-    isSensitiveEducationalTopic,
-    educationalSafetyDirective: educationalSafetyDirective.trim(),
-  };
+    // 2. AI check (Deep)
+    const aiIssues = await this.validateWithAI(fullContent);
+    if (aiIssues.length > 0) {
+      return { isValid: false, issues: aiIssues };
+    }
+
+    return { isValid: true, issues: [] };
+  }
 }
+
+/** 
+ * Compatibility export for svgGeneratorService and others.
+ * Validates whether a text prompt is safe for K-12 educational context.
+ */
+export function validateEducationalSafety(text: string): { isSafe: boolean; reason?: string } {
+  const issues = ContentModerator.validateLocally(text);
+  if (issues.length > 0) {
+    return { isSafe: false, reason: issues[0] };
+  }
+  return { isSafe: true };
+}
+
+

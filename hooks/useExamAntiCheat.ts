@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import type { Exam, Student, Result, ResultStatus } from '../types';
 import { storageService } from '../services/storage';
+import { computeStudentExamDeadline } from '../utils/scheduleUtils';
 
 interface UseExamAntiCheatProps {
     student: Student;
@@ -11,6 +12,7 @@ interface UseExamAntiCheatProps {
     logRef: React.MutableRefObject<string[]>;
     timeLeftRef: React.MutableRefObject<number>;
     onForceSubmit: (isAuto: boolean, status: ResultStatus) => void;
+    onTeacherForceStop?: (message: string, status: ResultStatus) => void;
     isSubmitting: boolean;
 }
 
@@ -23,6 +25,7 @@ export const useExamAntiCheat = ({
     logRef,
     timeLeftRef,
     onForceSubmit,
+    onTeacherForceStop,
     isSubmitting,
 }: UseExamAntiCheatProps) => {
     const isSubmittingRef = useRef(isSubmitting);
@@ -44,7 +47,7 @@ export const useExamAntiCheat = ({
         });
     }, [storageKey, answersRef, logRef]);
 
-    // Calculate dynamic deadline (durations and exact dates limits)
+    // Calculate dynamic deadline (respecting allowOvertime, personal timeLimit, daily session end, and global exam end)
     useEffect(() => {
         let calculatedDeadline: number;
 
@@ -57,38 +60,7 @@ export const useExamAntiCheat = ({
         } else {
             const storedStartTime = initialData?.answers?._startTime ? parseInt(initialData.answers._startTime) : null;
             const actualStartTime = storedStartTime || initialData?.timestamp || Date.now();
-            const timeLimitMs = isPR ? 0 : (exam.config.timeLimit || 0) * 60 * 1000;
-
-            const getLocalDateStr = (raw: string) => {
-                if (!raw) return '';
-                if (raw.includes('T')) {
-                    const d = new Date(raw);
-                    return isNaN(d.getTime()) ? '' : d.toLocaleDateString('en-CA');
-                }
-                return raw;
-            };
-
-            const endDateStr = getLocalDateStr(exam.config.endDate || exam.config.date);
-            const endTimeStr = isPR ? (exam.config.endTime || '23:59') : (exam.config.endTime || '23:59');
-
-            let absoluteExamEndTime: number;
-            if (isPR) {
-                absoluteExamEndTime = new Date(`${endDateStr}T${endTimeStr}:59`).getTime();
-            } else if (exam.config.endDate && exam.config.endDate.includes('T')) {
-                absoluteExamEndTime = new Date(exam.config.endDate).getTime();
-            } else {
-                absoluteExamEndTime = new Date(`${endDateStr}T${endTimeStr}:59`).getTime();
-            }
-
-            if (isNaN(absoluteExamEndTime)) {
-                absoluteExamEndTime = Infinity;
-            }
-
-            if (timeLimitMs > 0) {
-                calculatedDeadline = Math.min(actualStartTime + timeLimitMs, absoluteExamEndTime);
-            } else {
-                calculatedDeadline = absoluteExamEndTime;
-            }
+            calculatedDeadline = computeStudentExamDeadline(exam.config, student.class, actualStartTime);
         }
 
         // Defer state update to avoid synchronous cascading renders detection during effects
@@ -226,10 +198,14 @@ export const useExamAntiCheat = ({
     // Handle Exam Force Stopped by Teacher
     useEffect(() => {
         if (exam.config.isFinished && student.class !== 'PREVIEW' && !isSubmittingRef.current) {
-            alert("Ujian telah dihentikan oleh Guru. Jawaban Anda akan dikumpulkan otomatis.");
-            onForceSubmit(true, 'completed');
+            const msg = "Ujian telah dihentikan oleh Guru. Jawaban Anda akan dikumpulkan otomatis.";
+            if (onTeacherForceStop) {
+                onTeacherForceStop(msg, 'completed');
+            } else {
+                onForceSubmit(true, 'completed');
+            }
         }
-    }, [exam.config.isFinished, onForceSubmit, student.class]);
+    }, [exam.config.isFinished, onForceSubmit, onTeacherForceStop, student.class]);
 
     return {
         timeLeft,

@@ -1,5 +1,35 @@
-import { supabase } from '../lib/supabase.ts';
+import { createClient } from '@supabase/supabase-js';
+import { supabase as anonSupabase } from '../lib/supabase.ts';
 import type { Question } from '../types.ts';
+
+function getServerSupabase(): { client: typeof anonSupabase | null; errorStatus?: number; errorCode?: string } {
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const supabaseUrl =
+    process.env.VITE_SUPABASE_URL ||
+    process.env.SUPABASE_URL ||
+    'https://fidxmkjpdlfawagawrrm.supabase.co';
+
+  if (serviceRoleKey && supabaseUrl) {
+    return {
+      client: createClient(supabaseUrl, serviceRoleKey, {
+        auth: { autoRefreshToken: false, persistSession: false },
+      }),
+    };
+  }
+
+  const isProdRuntime = process.env.NODE_ENV === 'production' || Boolean(process.env.VERCEL);
+  if (isProdRuntime) {
+    console.error('[Security Error] SUPABASE_SERVICE_ROLE_KEY tidak dikonfigurasi di server produksi.');
+    return {
+      client: null,
+      errorStatus: 503,
+      errorCode: 'SERVER_SERVICE_ROLE_REQUIRED',
+    };
+  }
+
+  console.warn('[Security Warning] SUPABASE_SERVICE_ROLE_KEY belum disetel; memakai anonSupabase khusus mode dev lokal.');
+  return { client: anonSupabase };
+}
 
 // In-memory origin cache to shield Supabase from simultaneous origin requests
 interface CachedBundle {
@@ -11,6 +41,45 @@ interface CachedBundle {
 
 const memoryBundleCache = new Map<string, CachedBundle>();
 const MEMORY_CACHE_TTL_MS = 60 * 1000; // 1 minute in memory
+const MAX_BUNDLE_CACHE_SIZE = 150;
+
+interface SolutionEntry {
+  correctAnswer?: string;
+  explanation?: string;
+  solutionSteps?: string;
+  trueFalseRows?: { text: string; answer: boolean }[];
+  matchingPairs?: { left: string; right: string }[];
+}
+
+interface CachedSolutionsBundle {
+  solutions: Record<string, SolutionEntry>;
+  timestamp: number;
+}
+
+const memorySolutionsCache = new Map<string, CachedSolutionsBundle>();
+const MAX_SOLUTIONS_CACHE_SIZE = 100;
+
+function setBoundedCache<T extends { timestamp: number }>(
+  cache: Map<string, T>,
+  key: string,
+  value: T,
+  maxSize: number
+) {
+  const now = Date.now();
+  if (cache.size >= maxSize) {
+    for (const [k, v] of cache.entries()) {
+      if (now - v.timestamp >= MEMORY_CACHE_TTL_MS) {
+        cache.delete(k);
+      }
+    }
+    while (cache.size >= maxSize) {
+      const oldestKey = cache.keys().next().value;
+      if (oldestKey === undefined) break;
+      cache.delete(oldestKey);
+    }
+  }
+  cache.set(key, value);
+}
 
 export function stripAnswersFromQuestion(q: Question): Question {
   const sanitizedQ = { ...q } as Question;
@@ -67,7 +136,16 @@ export async function getStudentQuestionBundle(code: string, requestedVersion?: 
     };
   }
 
-  const { data, error } = await supabase
+  const { client: db, errorStatus, errorCode } = getServerSupabase();
+  if (!db) {
+    return {
+      success: false,
+      status: errorStatus || 503,
+      error: errorCode || 'SERVER_SERVICE_ROLE_REQUIRED'
+    };
+  }
+
+  const { data, error } = await db
     .from('exams')
     .select('code, questions, config, status, created_at')
     .eq('code', code)
@@ -93,12 +171,17 @@ export async function getStudentQuestionBundle(code: string, requestedVersion?: 
   const sanitizedQuestions = rawQuestions.map(q => stripAnswersFromQuestion(q));
   const examVersion = (data.config && typeof (data.config as any).version === 'number') ? (data.config as any).version : 1;
 
-  memoryBundleCache.set(cacheKey, {
-    code,
-    version: examVersion,
-    questions: sanitizedQuestions,
-    timestamp: Date.now()
-  });
+  setBoundedCache(
+    memoryBundleCache,
+    cacheKey,
+    {
+      code,
+      version: examVersion,
+      questions: sanitizedQuestions,
+      timestamp: Date.now()
+    },
+    MAX_BUNDLE_CACHE_SIZE
+  );
 
   return {
     success: true,
@@ -109,24 +192,39 @@ export async function getStudentQuestionBundle(code: string, requestedVersion?: 
   };
 }
 
+export interface SolutionOwnershipProof {
+  deviceId?: string;
+  resultId?: string | number;
+}
+
 /**
  * Fetch exam solutions and answer keys with rigorous authorization guards:
  * 1. Checks if teacher enabled showCorrectAnswer / showSolutionSteps / showResultToStudent.
- * 2. Checks if student has already completed the exam (or is authorized proctor).
+ * 2. Checks if student has already completed the exam AND presents matching session ownership proof (no account login required), or is an authorized proctor.
  */
 export async function getAuthorizedExamSolutions(
   code: string,
   studentId?: string,
-  proctorToken?: string
+  proctorToken?: string,
+  proof?: SolutionOwnershipProof
 ) {
   if (!code) {
     return { success: false, status: 400, error: 'EXAM_CODE_REQUIRED' };
   }
 
-  // 1. Fetch exam configuration & full questions
-  const { data: exam, error: examError } = await supabase
+  const { client: db, errorStatus, errorCode } = getServerSupabase();
+  if (!db) {
+    return {
+      success: false,
+      status: errorStatus || 503,
+      error: errorCode || 'SERVER_SERVICE_ROLE_REQUIRED'
+    };
+  }
+
+  // 1. Fetch lightweight exam config only (avoid downloading full questions JSONB until authorized & cache miss)
+  const { data: exam, error: examError } = await db
     .from('exams')
-    .select('code, questions, config, status')
+    .select('code, config, status')
     .eq('code', code)
     .maybeSingle();
 
@@ -136,7 +234,7 @@ export async function getAuthorizedExamSolutions(
 
   const config = exam.config || {};
   const isSolutionsAllowed = Boolean(
-    config.showCorrectAnswer || config.showSolutionSteps || config.showResultToStudent
+    config.showCorrectAnswer || config.showHints || config.showSolutionSteps || config.showResultToStudent
   );
 
   // 2. Authorization check
@@ -152,7 +250,7 @@ export async function getAuthorizedExamSolutions(
     if (isProctor) isAuthorized = true;
   }
 
-  // If student requesting, verify student result has completed status in database
+  // If student requesting, verify student result is completed and session ownership proof matches
   if (!isAuthorized && studentId && studentId !== 'monitor') {
     if (!isSolutionsAllowed) {
       return {
@@ -162,14 +260,33 @@ export async function getAuthorizedExamSolutions(
       };
     }
 
-    const { data: result } = await supabase
+    const { data: result } = await db
       .from('results')
-      .select('status')
+      .select('id, status, device_id, answers')
       .eq('exam_code', code)
       .eq('student_id', studentId)
       .maybeSingle();
 
     if (result && (result.status === 'completed' || result.status === 'force_closed')) {
+      const dbDeviceId = String(result.device_id || (result.answers as Record<string, unknown> | null)?._deviceId || '').trim();
+      const dbResultId = result.id ? String(result.id) : '';
+      const providedDeviceId = String(proof?.deviceId || '').trim();
+      const providedResultId =
+        proof?.resultId !== undefined && proof?.resultId !== null
+          ? String(proof.resultId).trim()
+          : '';
+
+      const hasValidProof = dbDeviceId
+        ? Boolean(providedDeviceId) && providedDeviceId === dbDeviceId
+        : Boolean(dbResultId) && Boolean(providedResultId) && providedResultId === dbResultId;
+
+      if (!hasValidProof) {
+        return {
+          success: false,
+          status: 403,
+          error: 'ACCESS_DENIED_OWNERSHIP_PROOF'
+        };
+      }
       isAuthorized = true;
     }
   }
@@ -182,15 +299,31 @@ export async function getAuthorizedExamSolutions(
     };
   }
 
+  // 3. Check bounded in-memory solutions cache keyed by (code, version)
+  const examVersion = typeof (config as any).version === 'number' ? (config as any).version : 1;
+  const solCacheKey = `${code}:v${examVersion}`;
+  const cachedSolutions = memorySolutionsCache.get(solCacheKey);
+  if (cachedSolutions && Date.now() - cachedSolutions.timestamp < MEMORY_CACHE_TTL_MS) {
+    return {
+      success: true,
+      code,
+      solutions: cachedSolutions.solutions
+    };
+  }
+
+  const { data: qRow, error: qErr } = await db
+    .from('exams')
+    .select('questions')
+    .eq('code', code)
+    .maybeSingle();
+
+  if (qErr || !qRow) {
+    return { success: false, status: 404, error: 'EXAM_NOT_FOUND' };
+  }
+
   // Extract solutions map keyed by question ID
-  const rawQuestions: Question[] = Array.isArray(exam.questions) ? exam.questions : [];
-  const solutions: Record<string, {
-    correctAnswer?: string;
-    explanation?: string;
-    solutionSteps?: string;
-    trueFalseRows?: { text: string; answer: boolean }[];
-    matchingPairs?: { left: string; right: string }[];
-  }> = {};
+  const rawQuestions: Question[] = Array.isArray(qRow.questions) ? qRow.questions : [];
+  const solutions: Record<string, SolutionEntry> = {};
 
   rawQuestions.forEach(q => {
     solutions[q.id] = {
@@ -201,6 +334,16 @@ export async function getAuthorizedExamSolutions(
       matchingPairs: q.matchingPairs?.map(m => ({ left: m.left, right: m.right }))
     };
   });
+
+  setBoundedCache(
+    memorySolutionsCache,
+    solCacheKey,
+    {
+      solutions,
+      timestamp: Date.now()
+    },
+    MAX_SOLUTIONS_CACHE_SIZE
+  );
 
   return {
     success: true,

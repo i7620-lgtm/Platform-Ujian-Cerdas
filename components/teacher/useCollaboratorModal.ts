@@ -1,6 +1,7 @@
 import { useCallback, useState } from "react";
 import type { Exam } from "../../types";
 import { storageService } from "../../services/storage";
+import { showAlertModal, showConfirmModal, showToast } from "../../stores/feedbackStore";
 
 interface UseCollaboratorModalParams {
   exam: Exam;
@@ -49,7 +50,11 @@ export const useCollaboratorModal = ({
         await storageService.addCollaborator(exam.code, label, role);
         onUpdate();
       } catch {
-        alert("Gagal membuat link.");
+        await showAlertModal({
+          title: "Gagal Membuat Tautan",
+          message: "Gagal membuat link kolaborator.",
+          tone: "danger",
+        });
       } finally {
         setIsLoading(false);
       }
@@ -59,18 +64,26 @@ export const useCollaboratorModal = ({
 
   const handleResetLink = useCallback(
     async (role: "viewer" | "editor" | "public", oldToken: string) => {
-      if (
-        !confirm("Link lama akan hangus dan link baru akan dibuat. Lanjutkan?")
-      )
-        return;
+      const confirmed = await showConfirmModal({
+        title: "Reset Tautan Kolaborator?",
+        message: "Link lama akan hangus dan link baru akan dibuat. Lanjutkan?",
+        tone: "danger",
+        confirmLabel: "Reset Tautan",
+      });
+      if (!confirmed) return;
       setIsLoading(true);
       try {
         await storageService.removeCollaborator(exam.code, oldToken);
         const label = getRoleLabel(role);
         await storageService.addCollaborator(exam.code, label, role);
         onUpdate();
+        showToast("Link baru berhasil dibuat.", "success");
       } catch {
-        alert("Gagal mereset link.");
+        await showAlertModal({
+          title: "Gagal Mereset Tautan",
+          message: "Gagal mereset link kolaborator.",
+          tone: "danger",
+        });
       } finally {
         setIsLoading(false);
       }
@@ -80,13 +93,24 @@ export const useCollaboratorModal = ({
 
   const handleDeleteLink = useCallback(
     async (token: string) => {
-      if (!confirm("Link ini akan dinonaktifkan. Lanjutkan?")) return;
+      const confirmed = await showConfirmModal({
+        title: "Nonaktifkan Tautan?",
+        message: "Link ini akan dinonaktifkan dan tidak dapat diakses lagi. Lanjutkan?",
+        tone: "danger",
+        confirmLabel: "Nonaktifkan",
+      });
+      if (!confirmed) return;
       setIsLoading(true);
       try {
         await storageService.removeCollaborator(exam.code, token);
         onUpdate();
+        showToast("Tautan kolaborator berhasil dinonaktifkan.", "success");
       } catch {
-        alert("Gagal menghapus link.");
+        await showAlertModal({
+          title: "Gagal Menghapus Tautan",
+          message: "Gagal menghapus link kolaborator.",
+          tone: "danger",
+        });
       } finally {
         setIsLoading(false);
       }

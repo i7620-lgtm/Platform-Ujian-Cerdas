@@ -6,7 +6,7 @@ import { archiveService } from "../../../services/archive";
 import { storageService } from "../../../services/storage";
 import { useArchiveViewer } from "../useArchiveViewer";
 import type { AnalysisTargetItem } from "../archive/AiAnalysisTargetModal";
-import type { QueueItemState } from "../archive/AiAnalysisProgressModal";
+import { showAlertModal, showConfirmModal, showToast } from "../../../stores/feedbackStore";
 
 interface UseArchiveViewerLogicProps {
   archiveViewer: any;
@@ -15,17 +15,10 @@ interface UseArchiveViewerLogicProps {
 }
 
 export const useArchiveViewerLogic = ({ archiveViewer, teacherProfile }: UseArchiveViewerLogicProps) => {
-  const [isGeneratingAI, setIsGeneratingAI] = React.useState(false);
   const [aiAnalysisResult, setAiAnalysisResult] = React.useState<string | null>(null);
-  const [aiProgressStatus, setAiProgressStatus] = React.useState<{ message: string; step: number; total: number } | null>(null);
-  const [aiProgressMessage, setAiProgressMessage] = React.useState<string>("");
   const [activeAiSubTab, setActiveAiSubTab] = React.useState<string>("OVERALL");
   const [isTargetModalOpen, setIsTargetModalOpen] = React.useState(false);
-  const [isProgressModalOpen, setIsProgressModalOpen] = React.useState(false);
   const [analysisTargets, setAnalysisTargets] = React.useState<AnalysisTargetItem[]>([]);
-  const [aiQueue, setAiQueue] = React.useState<QueueItemState[]>([]);
-  const [aiCurrentQueueIndex, setAiCurrentQueueIndex] = React.useState<number>(0);
-  const [aiFailedItem, setAiFailedItem] = React.useState<QueueItemState | null>(null);
 
   const {
     archiveData,
@@ -458,11 +451,19 @@ export const useArchiveViewerLogic = ({ archiveViewer, teacherProfile }: UseArch
 
   const handleOpenAiTargetModal = React.useCallback(() => {
     if (!teacherProfile?.isPremium) {
-      alert("Fitur ini khusus untuk akun Premium. Silakan upgrade akun Anda.");
+      void showAlertModal({
+        title: "Fitur Akun Premium",
+        message: "Fitur ini khusus untuk akun Premium. Silakan upgrade akun Anda.",
+        tone: "warning",
+      });
       return;
     }
     if (!archiveData || !archiveData.results || archiveData.results.length === 0) {
-      alert("Tidak ada data hasil siswa pada arsip ini untuk dianalisis.");
+      void showAlertModal({
+        title: "Data Siswa Kosong",
+        message: "Tidak ada data hasil siswa pada arsip ini untuk dianalisis.",
+        tone: "info",
+      });
       return;
     }
 
@@ -517,144 +518,6 @@ export const useArchiveViewerLogic = ({ archiveViewer, teacherProfile }: UseArch
     setIsTargetModalOpen(true);
   }, [teacherProfile, archiveData]);
 
-  // Sequential queue processor
-  const processQueue = React.useCallback(async (
-    startIndex: number,
-    queueList: QueueItemState[],
-    initialAnalyses: Record<string, string>,
-    targetsRef: AnalysisTargetItem[]
-  ) => {
-    if (!archiveData) return;
-
-    setIsGeneratingAI(true);
-    setIsProgressModalOpen(true);
-    setAiFailedItem(null);
-
-    const workingAnalyses = { ...initialAnalyses };
-    let currentQueue = [...queueList];
-
-    for (let i = startIndex; i < currentQueue.length; i++) {
-      const currentItem = currentQueue[i];
-
-      // Mark current item as processing
-      currentQueue = currentQueue.map((item, idx) =>
-        idx === i ? { ...item, status: "processing" as const } : item
-      );
-      setAiQueue(currentQueue);
-      setAiCurrentQueueIndex(i);
-      setAiProgressMessage(`Menganalisis ${currentItem.label} (${i + 1}/${currentQueue.length})...`);
-      setAiProgressStatus({
-        message: `Menganalisis ${currentItem.label}...`,
-        step: i + 1,
-        total: currentQueue.length,
-      });
-
-      try {
-        const targetMeta = targetsRef.find((t) => t.key === currentItem.key);
-        const isOverall = currentItem.key === "OVERALL" || targetMeta?.isOverall;
-        const targetClassName = targetMeta?.className;
-
-        let targetResults = archiveData.results;
-        if (!isOverall && targetClassName) {
-          targetResults = archiveData.results.filter(
-            (r) => String(r.student.class || r.student.className || "").trim() === targetClassName
-          );
-        }
-
-        const summaries = archiveService.calculateExamStatistics(
-          archiveData.exam,
-          targetResults
-        ) as any[];
-
-        const analysis = await archiveService.generateAIAnalysis(
-          summaries,
-          isOverall ? undefined : targetClassName,
-          archiveData.exam.questions,
-          workingAnalyses,
-          (msg, step, total) => {
-            setAiProgressMessage(`${currentItem.label}: ${msg} (${step}/${total})`);
-          }
-        );
-
-        workingAnalyses[currentItem.key] = analysis;
-
-        // Mark item as completed
-        currentQueue = currentQueue.map((item, idx) =>
-          idx === i ? { ...item, status: "completed" as const } : item
-        );
-        setAiQueue(currentQueue);
-
-        // Save progress immediately so partial work is never lost
-        const updatedData: ArchiveData = {
-          ...archiveData,
-          ai_analyses: { ...workingAnalyses },
-        };
-        setArchiveData(updatedData);
-        saveArchiveToCloudSilently(updatedData);
-      } catch (err: any) {
-        console.error(`Gagal menganalisis target ${currentItem.label}:`, err);
-        const failedItemState: QueueItemState = {
-          ...currentItem,
-          status: "failed",
-          error: err?.message || "Waktu respons server terlampaui (timeout) atau gangguan koneksi.",
-        };
-
-        currentQueue = currentQueue.map((item, idx) =>
-          idx === i ? failedItemState : item
-        );
-        setAiQueue(currentQueue);
-        setAiFailedItem(failedItemState);
-        setIsGeneratingAI(false);
-        // Pause execution and keep modal open with resume / finish actions
-        return;
-      }
-    }
-
-    // All queued items finished successfully
-    setIsGeneratingAI(false);
-    setIsProgressModalOpen(false);
-    archiveViewer.setActiveTab("AI_ANALYSIS");
-    if (currentQueue[0]?.key) {
-      setActiveAiSubTab(currentQueue[0].key);
-    }
-  }, [archiveData, archiveViewer, saveArchiveToCloudSilently, setArchiveData]);
-
-  const handleStartBatchAiAnalysis = React.useCallback(async (selectedKeys: string[]) => {
-    const selectedTargets = analysisTargets.filter((t) => selectedKeys.includes(t.key));
-    if (selectedTargets.length === 0) return;
-
-    const newQueue: QueueItemState[] = selectedTargets.map((t) => ({
-      key: t.key,
-      label: t.label,
-      status: "pending",
-    }));
-
-    setAiQueue(newQueue);
-    setAiCurrentQueueIndex(0);
-    setAiFailedItem(null);
-    setIsTargetModalOpen(false);
-
-    await processQueue(0, newQueue, archiveData?.ai_analyses || {}, analysisTargets);
-  }, [analysisTargets, archiveData, processQueue]);
-
-  const handleResumeAiAnalysis = React.useCallback(async () => {
-    if (!aiFailedItem) return;
-    setAiFailedItem(null);
-    await processQueue(aiCurrentQueueIndex, aiQueue, archiveData?.ai_analyses || {}, analysisTargets);
-  }, [aiFailedItem, aiCurrentQueueIndex, aiQueue, archiveData, analysisTargets, processQueue]);
-
-  const handleFinishAiAnalysis = React.useCallback(() => {
-    setIsProgressModalOpen(false);
-    setIsGeneratingAI(false);
-    setAiFailedItem(null);
-
-    const completed = aiQueue.filter((q) => q.status === "completed");
-    if (completed.length > 0) {
-      archiveViewer.setActiveTab("AI_ANALYSIS");
-      setActiveAiSubTab(completed[0].key);
-    }
-  }, [aiQueue, archiveViewer]);
-
   const handleGenerateAI = React.useCallback(() => {
     handleOpenAiTargetModal();
   }, [handleOpenAiTargetModal]);
@@ -670,7 +533,13 @@ export const useArchiveViewerLogic = ({ archiveViewer, teacherProfile }: UseArch
       targetLabel = match ? `Analisis Kelas ${match[1]}` : `Analisis ${keyToDelete}`;
     }
 
-    if (!confirm(`Apakah Anda yakin ingin menghapus ${targetLabel} ini dari arsip?`)) return;
+    const confirmed = await showConfirmModal({
+      title: "Hapus Analisis AI?",
+      message: `Apakah Anda yakin ingin menghapus ${targetLabel} ini dari arsip?`,
+      tone: "danger",
+      confirmLabel: "Hapus Analisis",
+    });
+    if (!confirmed) return;
 
     const updatedAnalyses = { ...archiveData.ai_analyses };
     delete updatedAnalyses[keyToDelete];
@@ -694,6 +563,7 @@ export const useArchiveViewerLogic = ({ archiveViewer, teacherProfile }: UseArch
     }
 
     saveArchiveToCloudSilently(updatedData);
+    showToast(`${targetLabel} berhasil dihapus dari arsip.`, "success");
   };
 
   const handleSaveImportedAnalysisBatch = React.useCallback(
@@ -728,26 +598,15 @@ export const useArchiveViewerLogic = ({ archiveViewer, teacherProfile }: UseArch
   );
 
   return {
-    isGeneratingAI,
-    aiProgressStatus,
     handleSaveImportedAnalysis,
     handleSaveImportedAnalysisBatch,
-    aiProgressMessage,
     aiAnalysisResult,
     activeAiSubTab,
     setActiveAiSubTab,
     isTargetModalOpen,
     setIsTargetModalOpen,
-    isProgressModalOpen,
-    setIsProgressModalOpen,
     analysisTargets,
-    aiQueue,
-    aiCurrentQueueIndex,
-    aiFailedItem,
     handleOpenAiTargetModal,
-    handleStartBatchAiAnalysis,
-    handleResumeAiAnalysis,
-    handleFinishAiAnalysis,
     archiveViewer,
     sortedResults,
     uniqueSchools,

@@ -17,6 +17,7 @@ import {
   getTimezoneLabel,
   detectUserIndonesianTimezone,
 } from "../../../../../utils/timezoneUtils";
+import { showConfirmModal } from "../../../../../stores/feedbackStore";
 
 interface DailySessionsSettingsProps {
   config: ExamConfig;
@@ -134,11 +135,14 @@ export const DailySessionsSettings: React.FC<DailySessionsSettingsProps> = ({
     }
   };
 
-  const handleRemoveSession = (id: string) => {
+  const handleRemoveSession = async (id: string) => {
     if (sessions.length <= 1) {
-      const confirmRemove = window.confirm(
-        "Menghapus sesi terakhir akan menonaktifkan pembatasan jam pengerjaan harian. Lanjutkan?"
-      );
+      const confirmRemove = await showConfirmModal({
+        title: "Nonaktifkan Pembatasan Sesi Harian?",
+        message: "Menghapus sesi terakhir akan menonaktifkan pembatasan jam pengerjaan harian. Lanjutkan?",
+        tone: "danger",
+        confirmLabel: "Hapus & Nonaktifkan",
+      });
       if (!confirmRemove) return;
       store.handleConfigChangeManual((prev) => ({
         ...prev,

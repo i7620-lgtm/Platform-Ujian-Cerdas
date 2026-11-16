@@ -19,6 +19,7 @@ import { supabase } from "../../lib/supabase";
 import { StudentInvitationCard } from "./StudentInvitationCard";
 import { useStudentScheduleStore } from "../../stores/studentScheduleStore";
 import { calculateStudentAccess } from "../../utils/scheduleUtils";
+import { StudentDialogModal } from "./StudentDialogModal";
 
 interface StudentEntryFormProps {
   onLoginSuccess: (examCode: string, student: Student) => void;
@@ -54,6 +55,9 @@ export const StudentEntryForm: React.FC<StudentEntryFormProps> = ({
     setAbsentNumber,
     isCheckingCode,
     error,
+    unlockError,
+    setUnlockError,
+    isUnlocking,
     isFocused,
     setIsFocused,
     examCodeInputRef,
@@ -95,6 +99,7 @@ export const StudentEntryForm: React.FC<StudentEntryFormProps> = ({
     student: Student;
   } | null>(null);
   const [isEnteringExam, setIsEnteringExam] = useState(false);
+  const [scheduleNotice, setScheduleNotice] = useState<string | null>(null);
   const liveAccessResult = useStudentScheduleStore((s) => s.accessResult);
 
   const handleEnterFromInvitation = () => {
@@ -105,7 +110,7 @@ export const StudentEntryForm: React.FC<StudentEntryFormProps> = ({
       new Date()
     );
     if (!check.canAccess) {
-      alert(check.message);
+      setScheduleNotice(check.message);
       return;
     }
     setIsEnteringExam(true);
@@ -122,14 +127,24 @@ export const StudentEntryForm: React.FC<StudentEntryFormProps> = ({
 
   if (invitationData && liveAccessResult) {
     return (
-      <StudentInvitationCard
-        exam={invitationData.exam}
-        student={invitationData.student}
-        accessResult={liveAccessResult}
-        onEnterExam={handleEnterFromInvitation}
-        onBack={handleBackFromInvitation}
-        isEntering={isEnteringExam}
-      />
+      <>
+        <StudentInvitationCard
+          exam={invitationData.exam}
+          student={invitationData.student}
+          accessResult={liveAccessResult}
+          onEnterExam={handleEnterFromInvitation}
+          onBack={handleBackFromInvitation}
+          isEntering={isEnteringExam}
+        />
+        <StudentDialogModal
+          isOpen={!!scheduleNotice}
+          variant="warning"
+          title="Jadwal Sesi Belum Dibuka"
+          message={scheduleNotice || ""}
+          confirmLabel="Mengerti"
+          onClose={() => setScheduleNotice(null)}
+        />
+      </>
     );
   }
 
@@ -158,7 +173,11 @@ export const StudentEntryForm: React.FC<StudentEntryFormProps> = ({
             </p>
             <UnlockForm
               onUnlock={handleUnlockAndResume}
+              errorMessage={unlockError}
+              onClearError={() => setUnlockError("")}
+              isSubmitting={isUnlocking}
               onCancel={() => {
+                setUnlockError("");
                 setIsLocked(false);
                 setIsLoading(false);
               }}
@@ -710,7 +729,7 @@ export const StudentEntryForm: React.FC<StudentEntryFormProps> = ({
               <button
                 id="btn-ya-data-benar-modal"
                 onClick={() => {
-                  if (pendingStudentData.config) {
+                  if (pendingStudentData.config && !pendingStudentData.canResumeOvertime) {
                     const check = calculateStudentAccess(
                       pendingStudentData.config,
                       pendingStudentData.studentData.class,
