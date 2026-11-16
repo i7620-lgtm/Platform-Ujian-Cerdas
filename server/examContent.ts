@@ -41,6 +41,45 @@ interface CachedBundle {
 
 const memoryBundleCache = new Map<string, CachedBundle>();
 const MEMORY_CACHE_TTL_MS = 60 * 1000; // 1 minute in memory
+const MAX_BUNDLE_CACHE_SIZE = 150;
+
+interface SolutionEntry {
+  correctAnswer?: string;
+  explanation?: string;
+  solutionSteps?: string;
+  trueFalseRows?: { text: string; answer: boolean }[];
+  matchingPairs?: { left: string; right: string }[];
+}
+
+interface CachedSolutionsBundle {
+  solutions: Record<string, SolutionEntry>;
+  timestamp: number;
+}
+
+const memorySolutionsCache = new Map<string, CachedSolutionsBundle>();
+const MAX_SOLUTIONS_CACHE_SIZE = 100;
+
+function setBoundedCache<T extends { timestamp: number }>(
+  cache: Map<string, T>,
+  key: string,
+  value: T,
+  maxSize: number
+) {
+  const now = Date.now();
+  if (cache.size >= maxSize) {
+    for (const [k, v] of cache.entries()) {
+      if (now - v.timestamp >= MEMORY_CACHE_TTL_MS) {
+        cache.delete(k);
+      }
+    }
+    while (cache.size >= maxSize) {
+      const oldestKey = cache.keys().next().value;
+      if (oldestKey === undefined) break;
+      cache.delete(oldestKey);
+    }
+  }
+  cache.set(key, value);
+}
 
 export function stripAnswersFromQuestion(q: Question): Question {
   const sanitizedQ = { ...q } as Question;
@@ -132,12 +171,17 @@ export async function getStudentQuestionBundle(code: string, requestedVersion?: 
   const sanitizedQuestions = rawQuestions.map(q => stripAnswersFromQuestion(q));
   const examVersion = (data.config && typeof (data.config as any).version === 'number') ? (data.config as any).version : 1;
 
-  memoryBundleCache.set(cacheKey, {
-    code,
-    version: examVersion,
-    questions: sanitizedQuestions,
-    timestamp: Date.now()
-  });
+  setBoundedCache(
+    memoryBundleCache,
+    cacheKey,
+    {
+      code,
+      version: examVersion,
+      questions: sanitizedQuestions,
+      timestamp: Date.now()
+    },
+    MAX_BUNDLE_CACHE_SIZE
+  );
 
   return {
     success: true,
@@ -177,10 +221,10 @@ export async function getAuthorizedExamSolutions(
     };
   }
 
-  // 1. Fetch exam configuration & full questions
+  // 1. Fetch lightweight exam config only (avoid downloading full questions JSONB until authorized & cache miss)
   const { data: exam, error: examError } = await db
     .from('exams')
-    .select('code, questions, config, status')
+    .select('code, config, status')
     .eq('code', code)
     .maybeSingle();
 
@@ -255,15 +299,31 @@ export async function getAuthorizedExamSolutions(
     };
   }
 
+  // 3. Check bounded in-memory solutions cache keyed by (code, version)
+  const examVersion = typeof (config as any).version === 'number' ? (config as any).version : 1;
+  const solCacheKey = `${code}:v${examVersion}`;
+  const cachedSolutions = memorySolutionsCache.get(solCacheKey);
+  if (cachedSolutions && Date.now() - cachedSolutions.timestamp < MEMORY_CACHE_TTL_MS) {
+    return {
+      success: true,
+      code,
+      solutions: cachedSolutions.solutions
+    };
+  }
+
+  const { data: qRow, error: qErr } = await db
+    .from('exams')
+    .select('questions')
+    .eq('code', code)
+    .maybeSingle();
+
+  if (qErr || !qRow) {
+    return { success: false, status: 404, error: 'EXAM_NOT_FOUND' };
+  }
+
   // Extract solutions map keyed by question ID
-  const rawQuestions: Question[] = Array.isArray(exam.questions) ? exam.questions : [];
-  const solutions: Record<string, {
-    correctAnswer?: string;
-    explanation?: string;
-    solutionSteps?: string;
-    trueFalseRows?: { text: string; answer: boolean }[];
-    matchingPairs?: { left: string; right: string }[];
-  }> = {};
+  const rawQuestions: Question[] = Array.isArray(qRow.questions) ? qRow.questions : [];
+  const solutions: Record<string, SolutionEntry> = {};
 
   rawQuestions.forEach(q => {
     solutions[q.id] = {
@@ -274,6 +334,16 @@ export async function getAuthorizedExamSolutions(
       matchingPairs: q.matchingPairs?.map(m => ({ left: m.left, right: m.right }))
     };
   });
+
+  setBoundedCache(
+    memorySolutionsCache,
+    solCacheKey,
+    {
+      solutions,
+      timestamp: Date.now()
+    },
+    MAX_SOLUTIONS_CACHE_SIZE
+  );
 
   return {
     success: true,
