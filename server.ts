@@ -24,11 +24,15 @@ async function startServer() {
 
   app.post("/api/moderate-content", async (req, res) => {
     try {
-      const { content } = req.body || {};
+      const { content, subject, examType, classLevel } = req.body || {};
       if (!content || typeof content !== "string") {
         return res.json({ isSafe: true, issues: [] });
       }
-      const result = moderateExamContentOnServer(content);
+      const result = moderateExamContentOnServer(content, {
+        subject: typeof subject === "string" ? subject : "",
+        examType: typeof examType === "string" ? examType : "",
+        classLevel: typeof classLevel === "string" ? classLevel : "",
+      });
       res.json(result);
     } catch (error: any) {
       console.error("Moderation API Error:", error.message);
