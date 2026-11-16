@@ -2,8 +2,7 @@ import express from "express";
 import path from "path";
 import cors from "cors";
 import { getStudentQuestionBundle, getAuthorizedExamSolutions } from "./server/examContent.ts";
-import { validateContentWithAIOnServer } from "./server/contentModeration.ts";
-import { getAI } from "./server/ai.ts";
+import { moderateExamContentOnServer } from "./server/contentModeration.ts";
 
 async function startServer() {
   const app = express();
@@ -20,11 +19,11 @@ async function startServer() {
 
   app.post("/api/moderate-content", async (req, res) => {
     try {
-      const { content } = req.body;
+      const { content } = req.body || {};
       if (!content || typeof content !== "string") {
         return res.json({ isSafe: true, issues: [] });
       }
-      const result = await validateContentWithAIOnServer(content, getAI);
+      const result = moderateExamContentOnServer(content);
       res.json(result);
     } catch (error: any) {
       console.error("Moderation API Error:", error.message);
