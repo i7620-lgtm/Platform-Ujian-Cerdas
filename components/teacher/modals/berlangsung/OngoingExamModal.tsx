@@ -19,6 +19,7 @@ import {
   TableCellsIcon,
   SunIcon,
   MoonIcon,
+  MagnifyingGlassIcon,
 } from "../../../Icons";
 import { RemainingTime } from "../../DashboardViews";
 
@@ -55,6 +56,12 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
     selectedClass,
     selectedSchool,
     statusFilter,
+    searchQuery,
+    currentPage,
+    pageSize,
+    totalPages,
+    totalFilteredCount,
+    paginatedResults,
     localResults,
     schoolScopedResults,
     totalScopedCount,
@@ -75,6 +82,8 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
     setSelectedClass,
     setSelectedSchool,
     setStatusFilter,
+    setSearchQuery,
+    setCurrentPage,
     setIsAddTimeOpen,
     setAddTimeValue,
     setIsShareModalOpen,
@@ -86,6 +95,7 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
     setAlertDialog,
     setEditingStudent,
     setGeneratedTokenData,
+    fetchLatest,
     handleGenerateToken,
     handleUpdateStudentSubmit,
     handleDeleteStudent,
@@ -93,15 +103,12 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
     handleFinishAllExams,
     handleAddTimeSubmit,
     getRelativeTime,
-    calculateScore,
     proctorUrl,
     liveUrl,
     joinUrl,
-    isLargeScale,
     lockedCount,
     onlineCount,
     completedCount,
-    sortedResults,
     uniqueClassesInResults,
     uniqueSchoolsInResults,
   } = useOngoingExamModal({ exam, teacherProfile, onClose, onExamFinished, isPremium });
@@ -137,6 +144,20 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
   const lastTimeRef = React.useRef<number | null>(null);
   const directionRef = React.useRef<"down" | "up">("down");
   const pauseUntilRef = React.useRef<number>(0);
+  const pageSwitchPendingRef = React.useRef(false);
+
+  const scorableQuestionCount = React.useMemo(
+    () => (displayExam?.questions || []).filter((q) => q.questionType !== "INFO").length,
+    [displayExam?.questions],
+  );
+
+  const handlePageChange = (nextPage: number) => {
+    pageSwitchPendingRef.current = false;
+    setCurrentPage(nextPage);
+    if (scrollContainerRef.current) {
+      scrollContainerRef.current.scrollTop = 0;
+    }
+  };
 
   React.useEffect(() => {
     const el = scrollContainerRef.current;
@@ -145,11 +166,13 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
         cancelAnimationFrame(animFrameRef.current);
         animFrameRef.current = null;
       }
+      pageSwitchPendingRef.current = false;
       return;
     }
 
     lastTimeRef.current = performance.now();
     pauseUntilRef.current = performance.now() + 1500; // brief initial reading pause
+    pageSwitchPendingRef.current = false;
 
     const speed = 26; // comfortable, gentle scrolling speed (px/sec)
 
@@ -160,14 +183,24 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
 
       if (autoScrollEnabled && !isHoveredRef.current && el) {
         const maxScroll = el.scrollHeight - el.clientHeight;
-        if (maxScroll > 15) {
-          if (now >= pauseUntilRef.current) {
+        if (now >= pauseUntilRef.current) {
+          if (pageSwitchPendingRef.current) {
+            pageSwitchPendingRef.current = false;
+            el.scrollTop = 0;
+            pauseUntilRef.current = now + 1500;
+            setCurrentPage((p) => (p >= totalPages ? 1 : p + 1));
+          } else if (maxScroll > 15) {
             if (directionRef.current === "down") {
               el.scrollTop += speed * dt;
               if (el.scrollTop >= maxScroll - 1) {
                 el.scrollTop = maxScroll;
-                directionRef.current = "up";
-                pauseUntilRef.current = now + 2000; // pause 2s at bottom
+                if (totalPages > 1) {
+                  pageSwitchPendingRef.current = true;
+                  pauseUntilRef.current = now + 2000;
+                } else {
+                  directionRef.current = "up";
+                  pauseUntilRef.current = now + 2000; // pause 2s at bottom
+                }
               }
             } else {
               el.scrollTop -= speed * dt;
@@ -177,6 +210,9 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                 pauseUntilRef.current = now + 2000; // pause 2s at top
               }
             }
+          } else if (totalPages > 1) {
+            pageSwitchPendingRef.current = true;
+            pauseUntilRef.current = now + 3500;
           }
         }
       }
@@ -192,7 +228,7 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
         animFrameRef.current = null;
       }
     };
-  }, [autoScrollEnabled, sortedResults]);
+  }, [autoScrollEnabled, paginatedResults, totalPages, setCurrentPage]);
 
   if (!displayExam) return null;
 
@@ -230,6 +266,14 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
               </div>
 
               <div className="flex items-center gap-1.5 shrink-0">
+                <button
+                  onClick={() => fetchLatest(false)}
+                  disabled={isRefreshing}
+                  className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 transition-all shadow-xs flex items-center justify-center disabled:opacity-50"
+                  title="Perbarui Data Pantauan"
+                >
+                  <ArrowPathIcon className={`w-4 h-4 ${isRefreshing ? "animate-spin text-indigo-600" : ""}`} />
+                </button>
                 <button
                   onClick={handleToggleTheme}
                   className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 transition-all shadow-xs flex items-center justify-center"
@@ -452,6 +496,40 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
           <div className="flex-1 overflow-auto p-4 sm:p-6 bg-slate-50/50 dark:bg-slate-900/50 flex flex-col gap-6 font-sans">
             {/* Main Student List Board */}
             <div className="bg-white dark:bg-slate-800 rounded-3xl border border-slate-100 dark:border-slate-700 shadow-sm flex-1 min-h-0 overflow-hidden flex flex-col">
+              {/* Instant Search Toolbar */}
+              <div className="px-4 sm:px-6 py-2.5 border-b border-slate-100 dark:border-slate-700/70 bg-slate-50/60 dark:bg-slate-900/40 flex flex-wrap items-center justify-between gap-2">
+                <div className="relative flex-1 min-w-[200px] max-w-md">
+                  <MagnifyingGlassIcon className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Cari nama siswa, absen, kelas, atau sekolah..."
+                    className="w-full pl-9 pr-8 py-1.5 text-xs font-medium rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 placeholder:text-slate-400 outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400 transition-all"
+                  />
+                  {searchQuery && (
+                    <button
+                      type="button"
+                      onClick={() => setSearchQuery("")}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                      title="Hapus pencarian"
+                    >
+                      <XMarkIcon className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+                <div className="text-[11px] font-bold text-slate-400 dark:text-slate-500">
+                  {totalFilteredCount > 0 ? (
+                    <>
+                      Menampilkan {(currentPage - 1) * pageSize + 1}–
+                      {Math.min(currentPage * pageSize, totalFilteredCount)} dari{" "}
+                      {totalFilteredCount} siswa
+                    </>
+                  ) : (
+                    "0 siswa"
+                  )}
+                </div>
+              </div>
               <div
                 ref={scrollContainerRef}
                 onMouseEnter={() => {
@@ -505,8 +583,8 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 dark:divide-slate-700/50">
-                    {sortedResults.length > 0 ? (
-                      sortedResults.map((r) => {
+                    {paginatedResults.length > 0 ? (
+                      paginatedResults.map((r) => {
                         const isPlaceholder = !!r.isPlaceholder || !r.student.fullName;
                         const cleanClass = r.student.class
                           ? r.student.class.includes("-")
@@ -572,14 +650,10 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                         }
 
                         const totalQuestions =
-                          r.totalQuestions ||
-                          displayExam.questions.filter(
-                            (q) => q.questionType !== "INFO",
-                          ).length;
+                          r.totalQuestions || scorableQuestionCount;
                         const answeredCount = Object.keys(
                           r.answers || {},
                         ).filter((k) => !k.startsWith("_")).length;
-                        const computedScore = calculateScore(r);
                         const isOnline = onlineStudents[r.student.studentId];
 
                         return (
@@ -651,9 +725,10 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                             <td className="px-6 py-4 whitespace-nowrap text-center">
                               {(() => {
                                 const isOlympiad = !!displayExam?.config?.isOlympiadMode;
-                                const liveScore = typeof r.score === "number" && (isOlympiad ? !isNaN(r.score) : r.score > 0)
-                                  ? r.score
-                                  : computedScore;
+                                const liveScore =
+                                  typeof r.score === "number" && !isNaN(r.score)
+                                    ? r.score
+                                    : 0;
                                 return (
                                   <span className={`text-sm font-black font-mono px-2 py-1 rounded ${
                                     isOlympiad
@@ -772,11 +847,13 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                       })
                     ) : (
                       <tr>
-                        <td colSpan={5} className="px-6 py-20 text-center">
+                        <td colSpan={canShowActionColumn ? 6 : 5} className="px-6 py-20 text-center">
                           <div className="flex flex-col items-center justify-center text-slate-300 dark:text-slate-600 gap-2">
                             <UserIcon className="w-8 h-8 opacity-20" />
                             <span className="text-sm font-medium italic">
-                              Belum ada siswa yang bergabung...
+                              {searchQuery.trim()
+                                ? `Tidak ada siswa yang cocok dengan "${searchQuery.trim()}"`
+                                : "Belum ada siswa yang bergabung..."}
                             </span>
                           </div>
                         </td>
@@ -786,9 +863,9 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                 </table>
               </div>
               <div className="px-5 py-3 bg-slate-50 dark:bg-slate-900 border-t border-slate-100 dark:border-slate-800 text-[10px] text-slate-400 dark:text-slate-500 font-medium flex flex-wrap justify-between items-center gap-2 sticky bottom-0">
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 flex-wrap">
                   <span>Total: {totalScopedCount} Siswa</span>
-                  {sortedResults.length > 5 && (
+                  {totalFilteredCount > 5 && (
                     <button
                       type="button"
                       onClick={() => setAutoScrollEnabled(!autoScrollEnabled)}
@@ -826,7 +903,35 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                     </button>
                   )}
                 </div>
-                <span>Updated: {new Date().toLocaleTimeString()}</span>
+
+                <div className="flex items-center gap-3 flex-wrap">
+                  {totalPages > 1 && (
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => handlePageChange(Math.max(1, currentPage - 1))}
+                        disabled={currentPage <= 1}
+                        className="px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-bold hover:bg-slate-100 dark:hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                      >
+                        Sebelumnya
+                      </button>
+                      <span className="px-2 font-bold text-slate-600 dark:text-slate-300">
+                        Hal {currentPage} / {totalPages}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          handlePageChange(Math.min(totalPages, currentPage + 1))
+                        }
+                        disabled={currentPage >= totalPages}
+                        className="px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-bold hover:bg-slate-100 dark:hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                      >
+                        Berikutnya
+                      </button>
+                    </div>
+                  )}
+                  <span>Updated: {new Date().toLocaleTimeString()}</span>
+                </div>
               </div>
             </div>
           </div>
