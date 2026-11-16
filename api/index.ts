@@ -1,23 +1,27 @@
-import healthHandler from "./health.ts";
-import examContentHandler from "./exam-content.ts";
-import moderateContentHandler from "./moderate-content.ts";
-
 export const config = {
   maxDuration: 60,
 };
 
 export default async function handler(req: any, res: any) {
-  // Normalize pathname from req.url or Vercel proxy headers
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  res.setHeader("Content-Type", "application/json");
+
+  if (req.method === "OPTIONS") {
+    return res.status(200).end();
+  }
+
   const rawUrl = (req.headers && (req.headers["x-invoke-path"] || req.headers["x-matched-path"])) || req.url || "/";
-  const url = new URL(rawUrl, "http://localhost");
+  const url = new URL(String(rawUrl), "http://localhost");
   const pathname = url.pathname.replace(/\/+$/, "") || "/";
 
   if (pathname === "/api/health" || pathname === "/health" || pathname === "/api" || pathname === "") {
-    return healthHandler(req, res);
-  }
-
-  if (pathname === "/api/moderate-content" || pathname === "/moderate-content") {
-    return moderateContentHandler(req, res);
+    return res.status(200).json({
+      status: "ok",
+      service: "Platform Ujian Cerdas API (Vercel Native Serverless)",
+      timestamp: Date.now(),
+    });
   }
 
   if (
@@ -36,12 +40,8 @@ export default async function handler(req: any, res: any) {
     });
   }
 
-  if (pathname.startsWith("/api/exam-content")) {
-    return examContentHandler(req, res);
-  }
-
   return res.status(404).json({
     success: false,
-    error: `Endpoint not found: ${pathname}`
+    error: `Endpoint not found: ${pathname}`,
   });
 }

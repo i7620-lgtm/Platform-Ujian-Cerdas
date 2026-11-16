@@ -37,16 +37,27 @@ function getServerSupabase(): { client: typeof anonSupabase; isServiceRole: bool
   return { client: anonSupabase, isServiceRole: false };
 }
 
-// In-memory origin cache to shield Supabase from simultaneous origin requests
-interface CachedBundle {
+interface CachedMetaBundle {
   code: string;
+  authorId?: string;
+  authorName: string;
+  authorSchool?: string;
+  status: string;
   version: number;
-  questions: Question[];
+  config: Record<string, any>;
   timestamp: number;
 }
 
+interface CachedBundle extends CachedMetaBundle {
+  questions: Question[];
+}
+
+const memoryMetaCache = new Map<string, CachedMetaBundle>();
 const memoryBundleCache = new Map<string, CachedBundle>();
-const MEMORY_CACHE_TTL_MS = 60 * 1000; // 1 minute in memory
+
+const META_CACHE_TTL_MS = 10 * 1000;
+const BUNDLE_CACHE_TTL_MS = 10 * 60 * 1000;
+const SOLUTIONS_CACHE_TTL_MS = 60 * 1000;
 const MAX_BUNDLE_CACHE_SIZE = 150;
 
 interface SolutionEntry {
@@ -69,12 +80,13 @@ function setBoundedCache<T extends { timestamp: number }>(
   cache: Map<string, T>,
   key: string,
   value: T,
-  maxSize: number
+  maxSize: number,
+  ttlMs = BUNDLE_CACHE_TTL_MS
 ) {
   const now = Date.now();
   if (cache.size >= maxSize) {
     for (const [k, v] of cache.entries()) {
-      if (now - v.timestamp >= MEMORY_CACHE_TTL_MS) {
+      if (now - v.timestamp >= ttlMs) {
         cache.delete(k);
       }
     }
@@ -87,15 +99,33 @@ function setBoundedCache<T extends { timestamp: number }>(
   cache.set(key, value);
 }
 
+export function sanitizeConfigForStudent(config: any, status?: string): Record<string, any> {
+  const clean: Record<string, any> = config && typeof config === 'object' ? { ...config } : {};
+
+  if (Array.isArray(clean.collaborators)) {
+    clean.collaborators = clean.collaborators.map((c: any) => ({
+      label: c?.label,
+      role: c?.role,
+      createdAt: c?.createdAt,
+    }));
+  }
+
+  if (status === 'closed') {
+    clean.isFinished = true;
+  }
+
+  return clean;
+}
+
 export function stripAnswersFromQuestion(q: Question): Question {
-  const sanitizedQ = { ...q } as Question;
+  const sanitizedQ = { ...q, options: q.options ? [...q.options] : undefined } as Question;
 
   // STRICT FAILSAFE: Delete correct answers and detailed solution steps from student package
   delete sanitizedQ.correctAnswer;
   delete sanitizedQ.solutionSteps;
 
   if (sanitizedQ.trueFalseRows) {
-    sanitizedQ.trueFalseRows = sanitizedQ.trueFalseRows.map(row => {
+    sanitizedQ.trueFalseRows = sanitizedQ.trueFalseRows.map((row) => {
       const newRow = { ...row };
       delete newRow.answer;
       return newRow;
@@ -103,10 +133,9 @@ export function stripAnswersFromQuestion(q: Question): Question {
   }
 
   if (sanitizedQ.matchingPairs) {
-    // Shuffle right options so they cannot be deduced by array index
-    const rightList = sanitizedQ.matchingPairs.map(p => ({
+    const rightList = sanitizedQ.matchingPairs.map((p) => ({
       right: p.right,
-      rightChart: p.rightChart
+      rightChart: p.rightChart,
     }));
     for (let i = rightList.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
@@ -117,28 +146,131 @@ export function stripAnswersFromQuestion(q: Question): Question {
       left: pair.left,
       leftChart: pair.leftChart,
       right: rightList[idx].right,
-      rightChart: rightList[idx].rightChart
+      rightChart: rightList[idx].rightChart,
+      weight: pair.weight,
     }));
   }
 
   return sanitizedQ;
 }
 
+export async function getExamMetaBundle(code: string, isPreview = false) {
+  const metaCacheKey = `${code}:${isPreview ? 'preview' : 'std'}`;
+  const cachedMeta = memoryMetaCache.get(metaCacheKey);
+  if (cachedMeta && Date.now() - cachedMeta.timestamp < META_CACHE_TTL_MS) {
+    return {
+      success: true,
+      code: cachedMeta.code,
+      authorId: cachedMeta.authorId,
+      authorName: cachedMeta.authorName,
+      authorSchool: cachedMeta.authorSchool,
+      status: cachedMeta.status,
+      version: cachedMeta.version,
+      config: cachedMeta.config,
+      source: 'memory_edge_meta',
+    };
+  }
+
+  if (!isPreview) {
+    const warmedBundle = memoryBundleCache.get(`${code}:latest:std`);
+    if (warmedBundle && Date.now() - warmedBundle.timestamp < BUNDLE_CACHE_TTL_MS) {
+      return {
+        success: true,
+        code: warmedBundle.code,
+        authorId: warmedBundle.authorId,
+        authorName: warmedBundle.authorName,
+        authorSchool: warmedBundle.authorSchool,
+        status: warmedBundle.status,
+        version: warmedBundle.version,
+        config: warmedBundle.config,
+        source: 'memory_edge_bundle',
+      };
+    }
+  }
+
+  const { client: primaryDb, isServiceRole } = getServerSupabase();
+  let db = primaryDb;
+
+  let { data, error } = await db
+    .from('exams')
+    .select('code, author_id, school, config, status, created_at')
+    .eq('code', code)
+    .maybeSingle();
+
+  if (error && isServiceRole) {
+    db = anonSupabase;
+    const retryRes = await db
+      .from('exams')
+      .select('code, author_id, school, config, status, created_at')
+      .eq('code', code)
+      .maybeSingle();
+    data = retryRes.data;
+    error = retryRes.error;
+  }
+
+  if (error || !data) {
+    return { success: false, status: 404, error: 'EXAM_NOT_FOUND' };
+  }
+
+  if (data.status === 'DRAFT' && !isPreview) {
+    return { success: false, status: 403, error: 'EXAM_IS_DRAFT' };
+  }
+
+  const sanitizedConfig = sanitizeConfigForStudent(data.config, data.status);
+  const version = typeof sanitizedConfig.version === 'number' ? sanitizedConfig.version : 1;
+  const authorName = String(sanitizedConfig.authorName || 'Pengajar');
+
+  const entry: CachedMetaBundle = {
+    code: data.code,
+    authorId: data.author_id,
+    authorName,
+    authorSchool: data.school || '',
+    status: data.status,
+    version,
+    config: sanitizedConfig,
+    timestamp: Date.now(),
+  };
+
+  setBoundedCache(memoryMetaCache, metaCacheKey, entry, 200, META_CACHE_TTL_MS);
+
+  return {
+    success: true,
+    code: entry.code,
+    authorId: entry.authorId,
+    authorName: entry.authorName,
+    authorSchool: entry.authorSchool,
+    status: entry.status,
+    version: entry.version,
+    config: entry.config,
+    source: 'origin_database',
+  };
+}
+
 /**
- * Fetch and prepare the sanitized student question package.
- * Answers and solution steps are 100% stripped before return.
+ * Fetch and prepare the sanitized student question package + student-allowed config.
+ * Answers, solution steps, and collaborator secret tokens are 100% stripped before return.
  */
 export async function getStudentQuestionBundle(code: string, requestedVersion?: number, isPreview = false) {
-  const cacheKey = `${code}:${requestedVersion || 'latest'}:${isPreview ? 'preview' : 'std'}`;
-  const cached = memoryBundleCache.get(cacheKey);
+  const modeKey = isPreview ? 'preview' : 'std';
+  const cacheKey = `${code}:${requestedVersion || 'latest'}:${modeKey}`;
+  const cached = memoryBundleCache.get(cacheKey) || (!isPreview ? memoryBundleCache.get(`${code}:latest:std`) : undefined);
 
-  if (cached && Date.now() - cached.timestamp < MEMORY_CACHE_TTL_MS) {
+  if (
+    cached &&
+    Date.now() - cached.timestamp < BUNDLE_CACHE_TTL_MS &&
+    (!requestedVersion || cached.version === requestedVersion)
+  ) {
     return {
       success: true,
       code: cached.code,
+      authorId: cached.authorId,
+      authorName: cached.authorName,
+      authorSchool: cached.authorSchool,
+      status: cached.status,
       version: cached.version,
+      config: cached.config,
       questions: cached.questions,
-      source: 'memory_edge_origin'
+      source: 'memory_edge_origin',
     };
   }
 
@@ -147,7 +279,7 @@ export async function getStudentQuestionBundle(code: string, requestedVersion?: 
 
   let { data, error } = await db
     .from('exams')
-    .select('code, questions, config, status, created_at')
+    .select('code, author_id, school, questions, config, status, created_at')
     .eq('code', code)
     .maybeSingle();
 
@@ -155,7 +287,7 @@ export async function getStudentQuestionBundle(code: string, requestedVersion?: 
     db = anonSupabase;
     const retryRes = await db
       .from('exams')
-      .select('code, questions, config, status, created_at')
+      .select('code, author_id, school, questions, config, status, created_at')
       .eq('code', code)
       .maybeSingle();
     data = retryRes.data;
@@ -166,7 +298,7 @@ export async function getStudentQuestionBundle(code: string, requestedVersion?: 
     return {
       success: false,
       status: 404,
-      error: 'EXAM_NOT_FOUND'
+      error: 'EXAM_NOT_FOUND',
     };
   }
 
@@ -174,33 +306,84 @@ export async function getStudentQuestionBundle(code: string, requestedVersion?: 
     return {
       success: false,
       status: 403,
-      error: 'EXAM_IS_DRAFT'
+      error: 'EXAM_IS_DRAFT',
     };
   }
 
   const rawQuestions: Question[] = Array.isArray(data.questions) ? data.questions : [];
-  const sanitizedQuestions = rawQuestions.map(q => stripAnswersFromQuestion(q));
-  const examVersion = (data.config && typeof (data.config as any).version === 'number') ? (data.config as any).version : 1;
+  const sanitizedQuestions = rawQuestions.map((q) => stripAnswersFromQuestion(q));
+  const sanitizedConfig = sanitizeConfigForStudent(data.config, data.status);
+  const examVersion = typeof sanitizedConfig.version === 'number' ? sanitizedConfig.version : 1;
+  const authorName = String(sanitizedConfig.authorName || 'Pengajar');
 
-  setBoundedCache(
-    memoryBundleCache,
-    cacheKey,
-    {
-      code,
-      version: examVersion,
-      questions: sanitizedQuestions,
-      timestamp: Date.now()
-    },
-    MAX_BUNDLE_CACHE_SIZE
-  );
+  const bundleEntry: CachedBundle = {
+    code: data.code,
+    authorId: data.author_id,
+    authorName,
+    authorSchool: data.school || '',
+    status: data.status,
+    version: examVersion,
+    config: sanitizedConfig,
+    questions: sanitizedQuestions,
+    timestamp: Date.now(),
+  };
+
+  setBoundedCache(memoryBundleCache, cacheKey, bundleEntry, MAX_BUNDLE_CACHE_SIZE, BUNDLE_CACHE_TTL_MS);
+  if (!isPreview) {
+    setBoundedCache(memoryBundleCache, `${code}:latest:std`, bundleEntry, MAX_BUNDLE_CACHE_SIZE, BUNDLE_CACHE_TTL_MS);
+    setBoundedCache(memoryBundleCache, `${code}:v${examVersion}:std`, bundleEntry, MAX_BUNDLE_CACHE_SIZE, BUNDLE_CACHE_TTL_MS);
+    setBoundedCache(memoryMetaCache, `${code}:std`, bundleEntry, 200, META_CACHE_TTL_MS);
+  }
 
   return {
     success: true,
-    code: data.code,
-    version: examVersion,
-    questions: sanitizedQuestions,
-    source: 'origin_database'
+    code: bundleEntry.code,
+    authorId: bundleEntry.authorId,
+    authorName: bundleEntry.authorName,
+    authorSchool: bundleEntry.authorSchool,
+    status: bundleEntry.status,
+    version: bundleEntry.version,
+    config: bundleEntry.config,
+    questions: bundleEntry.questions,
+    source: 'origin_database',
   };
+}
+
+export function storeWarmBundleInMemory(code: string, rawBundle: any) {
+  const bundleStatus = String(rawBundle?.status || 'PUBLISHED');
+  if (bundleStatus === 'DRAFT') return null;
+
+  const sanitizedConfig = sanitizeConfigForStudent(rawBundle?.config, bundleStatus);
+  const version =
+    typeof rawBundle?.version === 'number'
+      ? rawBundle.version
+      : typeof sanitizedConfig.version === 'number'
+        ? sanitizedConfig.version
+        : 1;
+  sanitizedConfig.version = version;
+
+  const rawQuestions: Question[] = Array.isArray(rawBundle?.questions) ? rawBundle.questions : [];
+  const sanitizedQuestions = rawQuestions.map((q) => stripAnswersFromQuestion(q));
+  const authorName = String(rawBundle?.authorName || sanitizedConfig.authorName || 'Pengajar');
+
+  const entry: CachedBundle = {
+    code,
+    authorId: rawBundle?.authorId,
+    authorName,
+    authorSchool: rawBundle?.authorSchool || '',
+    status: bundleStatus,
+    version,
+    config: sanitizedConfig,
+    questions: sanitizedQuestions,
+    timestamp: Date.now(),
+  };
+
+  setBoundedCache(memoryBundleCache, `${code}:latest:std`, entry, MAX_BUNDLE_CACHE_SIZE, BUNDLE_CACHE_TTL_MS);
+  setBoundedCache(memoryBundleCache, `${code}:${version}:std`, entry, MAX_BUNDLE_CACHE_SIZE, BUNDLE_CACHE_TTL_MS);
+  setBoundedCache(memoryBundleCache, `${code}:v${version}:std`, entry, MAX_BUNDLE_CACHE_SIZE, BUNDLE_CACHE_TTL_MS);
+  setBoundedCache(memoryMetaCache, `${code}:std`, entry, 200, META_CACHE_TTL_MS);
+
+  return entry;
 }
 
 export interface SolutionOwnershipProof {
@@ -208,11 +391,6 @@ export interface SolutionOwnershipProof {
   resultId?: string | number;
 }
 
-/**
- * Fetch exam solutions and answer keys with rigorous authorization guards:
- * 1. Checks if teacher enabled showCorrectAnswer / showSolutionSteps / showResultToStudent.
- * 2. Checks if student has already completed the exam AND presents matching session ownership proof (no account login required), or is an authorized proctor.
- */
 export async function getAuthorizedExamSolutions(
   code: string,
   studentId?: string,
@@ -226,7 +404,6 @@ export async function getAuthorizedExamSolutions(
   const { client: primaryDb, isServiceRole } = getServerSupabase();
   let db = primaryDb;
 
-  // 1. Fetch lightweight exam config only (avoid downloading full questions JSONB until authorized & cache miss)
   let { data: exam, error: examError } = await db
     .from('exams')
     .select('code, config, status')
@@ -253,10 +430,8 @@ export async function getAuthorizedExamSolutions(
     config.showCorrectAnswer || config.showHints || config.showSolutionSteps || config.showResultToStudent
   );
 
-  // 2. Authorization check
   let isAuthorized = false;
 
-  // Proctor / monitor bypass with matching token
   if (studentId === 'monitor' && config.enablePublicStream) {
     isAuthorized = true;
   } else if (proctorToken && Array.isArray(config.collaborators)) {
@@ -266,13 +441,12 @@ export async function getAuthorizedExamSolutions(
     if (isProctor) isAuthorized = true;
   }
 
-  // If student requesting, verify student result is completed and session ownership proof matches
   if (!isAuthorized && studentId && studentId !== 'monitor') {
     if (!isSolutionsAllowed) {
       return {
         success: false,
         status: 403,
-        error: 'SOLUTIONS_DISABLED_BY_TEACHER'
+        error: 'SOLUTIONS_DISABLED_BY_TEACHER',
       };
     }
 
@@ -300,7 +474,7 @@ export async function getAuthorizedExamSolutions(
         return {
           success: false,
           status: 403,
-          error: 'ACCESS_DENIED_OWNERSHIP_PROOF'
+          error: 'ACCESS_DENIED_OWNERSHIP_PROOF',
         };
       }
       isAuthorized = true;
@@ -311,19 +485,18 @@ export async function getAuthorizedExamSolutions(
     return {
       success: false,
       status: 403,
-      error: 'ACCESS_DENIED_EXAM_NOT_COMPLETED'
+      error: 'ACCESS_DENIED_EXAM_NOT_COMPLETED',
     };
   }
 
-  // 3. Check bounded in-memory solutions cache keyed by (code, version)
   const examVersion = typeof (config as any).version === 'number' ? (config as any).version : 1;
   const solCacheKey = `${code}:v${examVersion}`;
   const cachedSolutions = memorySolutionsCache.get(solCacheKey);
-  if (cachedSolutions && Date.now() - cachedSolutions.timestamp < MEMORY_CACHE_TTL_MS) {
+  if (cachedSolutions && Date.now() - cachedSolutions.timestamp < SOLUTIONS_CACHE_TTL_MS) {
     return {
       success: true,
       code,
-      solutions: cachedSolutions.solutions
+      solutions: cachedSolutions.solutions,
     };
   }
 
@@ -337,17 +510,16 @@ export async function getAuthorizedExamSolutions(
     return { success: false, status: 404, error: 'EXAM_NOT_FOUND' };
   }
 
-  // Extract solutions map keyed by question ID
   const rawQuestions: Question[] = Array.isArray(qRow.questions) ? qRow.questions : [];
   const solutions: Record<string, SolutionEntry> = {};
 
-  rawQuestions.forEach(q => {
+  rawQuestions.forEach((q) => {
     solutions[q.id] = {
       correctAnswer: q.correctAnswer,
       explanation: q.explanation,
       solutionSteps: q.solutionSteps,
-      trueFalseRows: q.trueFalseRows?.map(r => ({ text: r.text, answer: r.answer })),
-      matchingPairs: q.matchingPairs?.map(m => ({ left: m.left, right: m.right }))
+      trueFalseRows: q.trueFalseRows?.map((r) => ({ text: r.text, answer: r.answer })),
+      matchingPairs: q.matchingPairs?.map((m) => ({ left: m.left, right: m.right })),
     };
   });
 
@@ -356,14 +528,15 @@ export async function getAuthorizedExamSolutions(
     solCacheKey,
     {
       solutions,
-      timestamp: Date.now()
+      timestamp: Date.now(),
     },
-    MAX_SOLUTIONS_CACHE_SIZE
+    MAX_SOLUTIONS_CACHE_SIZE,
+    SOLUTIONS_CACHE_TTL_MS
   );
 
   return {
     success: true,
     code,
-    solutions
+    solutions,
   };
 }
