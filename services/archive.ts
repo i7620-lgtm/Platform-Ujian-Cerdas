@@ -713,7 +713,7 @@ export class ArchiveService {
           }
       }
       
-      return data.map((f: {name: string, created_at: string, metadata?: Record<string, unknown>}) => {
+      const mapped = data.map((f: {name: string, created_at: string, metadata?: Record<string, unknown>}) => {
           let metadata: Record<string, unknown> | null = null;
           const fileName = f && typeof f.name === 'string' ? f.name : "";
 
