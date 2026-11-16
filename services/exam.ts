@@ -1070,6 +1070,20 @@ export class ExamService {
         return processedQuestions;
     }
 
+    /**
+     * Prime origin memory cache and Vercel Edge CDN GET cache only for non-DRAFT exams.
+     */
+    private warmExamEdgeCache(examCode: string, version: number, status?: string): void {
+        const cleanCode = (examCode || '').trim().toUpperCase();
+        if (!cleanCode || status === 'DRAFT') {
+            return;
+        }
+        try {
+            fetch(`/api/exam-content/${cleanCode}/warm?v=${version}`, { method: 'POST' }).catch(() => {});
+            fetch(`/api/exam-content/${cleanCode}/test?v=${version}&preview=false`, { method: 'GET' }).catch(() => {});
+        } catch { /* ignore */ }
+    }
+
     async saveExam(exam: Exam): Promise<void> {
         // Content Moderation Check (SARA, Pornography, Bullying, etc.)
         const moderation = await ContentModerator.validateExamContent(exam);
@@ -1133,9 +1147,7 @@ export class ExamService {
             if (partialData && partialData.length > 0) {
                 console.log("Partial update successful!");
                 await this.syncRegisteredStudents(exam);
-                try {
-                    fetch(`/api/exam-content/${exam.code}/warm?v=${nextVersion}`, { method: 'POST' }).catch(() => {});
-                } catch { /* ignore */ }
+                this.warmExamEdgeCache(exam.code, nextVersion, exam.status || 'PUBLISHED');
                 return;
             }
 
@@ -1172,10 +1184,8 @@ export class ExamService {
 
         await this.syncRegisteredStudents(exam);
 
-        // Prime the Vercel Edge CDN cache in the background
-        try {
-            fetch(`/api/exam-content/${exam.code}/warm?v=${nextVersion}`, { method: 'POST' }).catch(() => {});
-        } catch { /* ignore */ }
+        // Prime the Vercel Edge CDN cache in the background (published/active exams only)
+        this.warmExamEdgeCache(exam.code, nextVersion, exam.status || 'PUBLISHED');
     }
 
     private async syncRegisteredStudents(exam: Exam): Promise<void> {
@@ -1235,7 +1245,7 @@ export class ExamService {
 
         const { data: existingExam, error: fetchError } = await supabase
             .from('exams')
-            .select('code, config')
+            .select('code, config, status')
             .eq('code', exam.code)
             .single();
 
@@ -1271,9 +1281,8 @@ export class ExamService {
 
         if (!rpcError) {
             console.log("Collaborator save success (RPC)");
-            try {
-                fetch(`/api/exam-content/${exam.code}/warm?v=${nextVersion}`, { method: 'POST' }).catch(() => {});
-            } catch { /* ignore */ }
+            const resolvedStatus = exam.status || (existingExam as { status?: string }).status || 'PUBLISHED';
+            this.warmExamEdgeCache(exam.code, nextVersion, resolvedStatus);
             return;
         }
 
@@ -1381,7 +1390,7 @@ export class ExamService {
         // 1. Fetch Exam
         const { data: examData, error: examError } = await supabase
             .from('exams')
-            .select('questions, config')
+            .select('questions, config, status')
             .eq('code', examCode)
             .single();
         
@@ -1424,10 +1433,8 @@ export class ExamService {
 
         if (updateError) throw updateError;
 
-        // Prime Edge CDN in background
-        try {
-            fetch(`/api/exam-content/${examCode}/warm?v=${nextVersion}`, { method: 'POST' }).catch(() => {});
-        } catch { /* ignore */ }
+        // Prime Edge CDN in background (published/active exams only)
+        this.warmExamEdgeCache(examCode, nextVersion, (examData as { status?: string }).status || 'PUBLISHED');
 
         // 4. Fetch All Results with 1000-row range pagination
         const PAGE_SIZE = 1000;
