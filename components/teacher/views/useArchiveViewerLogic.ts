@@ -6,6 +6,7 @@ import { archiveService } from "../../../services/archive";
 import { storageService } from "../../../services/storage";
 import { useArchiveViewer } from "../useArchiveViewer";
 import type { AnalysisTargetItem } from "../archive/AiAnalysisTargetModal";
+import { showAlertModal, showConfirmModal, showToast } from "../../../stores/feedbackStore";
 
 interface UseArchiveViewerLogicProps {
   archiveViewer: any;
@@ -450,11 +451,19 @@ export const useArchiveViewerLogic = ({ archiveViewer, teacherProfile }: UseArch
 
   const handleOpenAiTargetModal = React.useCallback(() => {
     if (!teacherProfile?.isPremium) {
-      alert("Fitur ini khusus untuk akun Premium. Silakan upgrade akun Anda.");
+      void showAlertModal({
+        title: "Fitur Akun Premium",
+        message: "Fitur ini khusus untuk akun Premium. Silakan upgrade akun Anda.",
+        tone: "warning",
+      });
       return;
     }
     if (!archiveData || !archiveData.results || archiveData.results.length === 0) {
-      alert("Tidak ada data hasil siswa pada arsip ini untuk dianalisis.");
+      void showAlertModal({
+        title: "Data Siswa Kosong",
+        message: "Tidak ada data hasil siswa pada arsip ini untuk dianalisis.",
+        tone: "info",
+      });
       return;
     }
 
@@ -524,7 +533,13 @@ export const useArchiveViewerLogic = ({ archiveViewer, teacherProfile }: UseArch
       targetLabel = match ? `Analisis Kelas ${match[1]}` : `Analisis ${keyToDelete}`;
     }
 
-    if (!confirm(`Apakah Anda yakin ingin menghapus ${targetLabel} ini dari arsip?`)) return;
+    const confirmed = await showConfirmModal({
+      title: "Hapus Analisis AI?",
+      message: `Apakah Anda yakin ingin menghapus ${targetLabel} ini dari arsip?`,
+      tone: "danger",
+      confirmLabel: "Hapus Analisis",
+    });
+    if (!confirmed) return;
 
     const updatedAnalyses = { ...archiveData.ai_analyses };
     delete updatedAnalyses[keyToDelete];
@@ -548,6 +563,7 @@ export const useArchiveViewerLogic = ({ archiveViewer, teacherProfile }: UseArch
     }
 
     saveArchiveToCloudSilently(updatedData);
+    showToast(`${targetLabel} berhasil dihapus dari arsip.`, "success");
   };
 
   const handleSaveImportedAnalysisBatch = React.useCallback(
