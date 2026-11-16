@@ -1,5 +1,5 @@
 import { useEffect, useRef, useCallback, useState } from "react";
-import type { Question } from "../../types";
+import type { Question, QuizConfig } from "../../types";
 import { parsePdfAndAutoCrop, convertPdfToImages } from "./examUtils";
 
 interface UseCreationViewParams {
