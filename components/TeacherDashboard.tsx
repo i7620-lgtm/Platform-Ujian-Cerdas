@@ -79,8 +79,8 @@ interface TeacherDashboardProps {
   exams: Record<string, Exam>;
   results: Result[];
   onLogout: () => void;
-  onRefreshExams: (force?: boolean) => Promise<void>;
-  onRefreshResults: (force?: boolean) => Promise<void>;
+  onRefreshExams: () => Promise<void>;
+  onRefreshResults: () => Promise<void>;
   isDarkMode: boolean;
   toggleTheme: () => void;
   onUpdateProfile?: (updatedProfile: TeacherProfile) => void;
@@ -341,7 +341,6 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
             teacherProfile={teacherProfile}
             onDeleteDraft={handleDeleteExam}
             onContinueDraft={handleContinueDraft}
-            onRefresh={() => onRefreshExams(true)}
           />
         )}
         {view === "ONGOING" && (
@@ -349,9 +348,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
             exams={ongoingExams}
             results={results}
             onDuplicateExam={handleDuplicateExam}
-            onRefresh={async () => {
-              await Promise.all([onRefreshExams(true), onRefreshResults(true)]);
-            }}
+            onRefresh={onRefreshExams}
             setSelectedOngoingExam={setSelectedOngoingExam}
           />
         )}
@@ -360,7 +357,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
             exams={upcomingExams}
             teacherProfile={teacherProfile}
             onDeleteExam={handleDeleteExam}
-            onRefresh={() => onRefreshExams(true)}
+            onRefresh={onRefreshExams}
             onEditExam={handleEditExamModal}
             onDuplicateExam={handleDuplicateExam}
           />
@@ -372,7 +369,6 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
             onArchiveExam={handleArchiveExam}
             onDuplicateExam={handleDuplicateExam}
             onViewResults={setSelectedFinishedExam}
-            onRefresh={() => onRefreshExams(true)}
           />
         )}
         {view === "ARCHIVE_VIEWER" && (
@@ -386,7 +382,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
             exams={exams}
             results={results}
             teacherProfile={teacherProfile}
-            onRefreshData={() => onRefreshResults(true)}
+            onRefreshData={onRefreshResults}
           />
         )}
         {view === "ADMIN_USERS" && accountType === "super_admin" && (
@@ -419,14 +415,14 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
           teacherProfile={teacherProfile}
           onClose={() => {
             setSelectedOngoingExam(null);
-            onRefreshExams(false);
+            onRefreshExams();
           }}
           onExamFinished={(finishedExam) => {
             updateExam(finishedExam);
             setSelectedOngoingExam(null);
             setView("FINISHED_EXAMS");
-            onRefreshExams(true);
-            onRefreshResults(true);
+            onRefreshExams();
+            onRefreshResults();
           }}
           isPremium={teacherProfile.isPremium || false}
         />
@@ -438,7 +434,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
           teacherProfile={teacherProfile}
           onClose={() => {
             setSelectedFinishedExam(null);
-            onRefreshExams(false);
+            onRefreshExams();
           }}
         />
       )}
