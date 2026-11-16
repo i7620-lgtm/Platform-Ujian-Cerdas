@@ -6,6 +6,7 @@ import { storageService } from "../services/storage";
 import { LogoIcon, MoonIcon, SunIcon, LogoutIcon } from "./Icons";
 import { sanitizeHtml, parseList } from "./teacher/examUtils";
 import { useExamEditorStore } from "../stores/examEditorStore";
+import { showAlertModal, showToast } from "../stores/feedbackStore";
 
 interface CollaboratorViewProps {
   exam: Exam;
@@ -81,12 +82,16 @@ export const CollaboratorView: React.FC<CollaboratorViewProps> = ({
       } else {
         throw new Error("Token kolaborator hilang. Silakan refresh halaman.");
       }
-      alert("Perubahan berhasil disimpan!");
+      showToast("Perubahan berhasil disimpan!", "success");
     } catch (e: unknown) {
       console.error(e);
       const errorMessage =
         e instanceof Error ? e.message : "Gagal menyimpan perubahan.";
-      alert(errorMessage);
+      await showAlertModal({
+        title: "Gagal Menyimpan Perubahan",
+        message: errorMessage,
+        tone: "danger",
+      });
     }
   };
 

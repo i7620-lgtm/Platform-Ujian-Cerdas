@@ -10,6 +10,7 @@ import {
   ChevronUp,
   Settings2,
 } from "lucide-react";
+import { showAlertModal } from "../stores/feedbackStore";
 
 export interface AudioPlayerProps {
   src?: string;
@@ -76,7 +77,11 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
   const togglePlay = () => {
     if (isSpeechMode) {
       if (typeof window === "undefined" || !("speechSynthesis" in window)) {
-        alert("Browser Anda tidak mendukung pemutaran suara Web Speech.");
+        void showAlertModal({
+          title: "Browser Tidak Mendukung",
+          message: "Browser Anda tidak mendukung pemutaran suara Web Speech.",
+          tone: "warning",
+        });
         return;
       }
 
