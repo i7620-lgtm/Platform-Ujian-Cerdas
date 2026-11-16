@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import type { UserProfile, AccountType } from "../../types";
 import { storageService } from "../../services/storage";
 import { supabase } from "../../lib/supabase";
+import { showAlertModal, showToast } from "../../stores/feedbackStore";
 
 export const useUserManagementView = () => {
   const [users, setUsers] = useState<any[]>([]);
@@ -194,7 +195,11 @@ export const useUserManagementView = () => {
       setUsers(usersWithStats);
     } catch (e) {
       console.error("Gagal memuat pengguna:", e);
-      alert("Gagal memuat daftar pengguna.");
+      await showAlertModal({
+        title: "Gagal Memuat Pengguna",
+        message: "Gagal memuat daftar pengguna.",
+        tone: "danger",
+      });
     } finally {
       setIsLoading(false);
     }
@@ -218,10 +223,14 @@ export const useUserManagementView = () => {
       );
       setEditingUser(null);
       fetchUsers();
-      alert("Pengguna berhasil diperbarui.");
+      showToast("Pengguna berhasil diperbarui.", "success");
     } catch (e) {
       console.error(e);
-      alert("Gagal memperbarui pengguna.");
+      await showAlertModal({
+        title: "Gagal Memperbarui Pengguna",
+        message: "Gagal memperbarui data pengguna.",
+        tone: "danger",
+      });
     }
   };
 

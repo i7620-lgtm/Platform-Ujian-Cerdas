@@ -13,6 +13,7 @@ import { useExamEditorStore, DEFAULT_EXAM_CONFIG } from "../../stores/examEditor
 import { useTeacherDashboardStore } from "../../stores/teacherDashboardStore";
 import { useArchiveExam } from "./useArchiveExam";
 import { getExamDates } from "./timeUtils";
+import { showAlertModal, showConfirmModal, showToast } from "../../stores/feedbackStore";
 
 export type { TeacherView };
 
@@ -158,7 +159,11 @@ export const useTeacherDashboard = ({
   // 5. Form saving logic (DRAFT / PUBLISHED)
   const handleSaveExam = async (status: "PUBLISHED" | "DRAFT") => {
     if (status === "PUBLISHED" && questions.length === 0) {
-      alert("Tidak ada soal.");
+      await showAlertModal({
+        title: "Tidak Ada Soal",
+        message: "Tambahkan minimal satu soal sebelum menerbitkan ujian.",
+        tone: "warning",
+      });
       return;
     }
 
@@ -335,18 +340,30 @@ export const useTeacherDashboard = ({
       }
     } catch (err) {
       console.error("Gagal menyimpan ujian:", err);
-      alert(
-        "Terjadi kendala saat menyimpan ujian ke server. Data Anda tetap tersimpan di editor, silakan coba lagi.",
-      );
+      await showAlertModal({
+        title: "Gagal Menyimpan Ujian",
+        message: "Terjadi kendala saat menyimpan ujian ke server. Data Anda tetap tersimpan di editor, silakan coba lagi.",
+        tone: "danger",
+      });
     } finally {
       setIsSavingExam(false);
     }
   };
 
   // 6. Delete Exam Action
-  const handleDeleteExam = (exam: Exam) => {
-    if (confirm("Hapus ujian?")) {
-      deleteExam(exam.code);
+  const handleDeleteExam = async (exam: Exam) => {
+    const examTitle = exam.config?.subject
+      ? `${exam.config.subject} (${exam.code})`
+      : exam.code;
+    const confirmed = await showConfirmModal({
+      title: "Hapus Ujian?",
+      message: `Hapus ujian "${examTitle}" secara permanen? Semua data terkait ujian ini akan ikut terhapus.`,
+      tone: "danger",
+      confirmLabel: "Hapus Ujian",
+    });
+    if (confirmed) {
+      await deleteExam(exam.code);
+      showToast(`Ujian "${examTitle}" berhasil dihapus.`, "success");
     }
   };
 

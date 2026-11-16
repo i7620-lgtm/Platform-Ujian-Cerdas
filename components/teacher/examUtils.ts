@@ -2,6 +2,7 @@ import type { Question, QuestionType, Exam, Result, ChartData } from "../../type
 import { generateGeometrySVG, parseGeometryLabels } from "./geometryUtils";
 import { renderLatexToString, renderMathInHtml, normalizeLatex } from "../../utils/mathRenderer";
 import { convertLlmFormattingToHtml } from "../../utils/llmTextFormatter";
+import { showAlertModal } from "../../stores/feedbackStore";
 
 export { convertLlmFormattingToHtml };
 
@@ -2977,9 +2978,11 @@ export const generateQuestionsPDF = async (exam: Exam): Promise<void> => {
   try {
     const printWindow = window.open("", "_blank");
     if (!printWindow) {
-      alert(
-        "Pop-up blocker mencegah pembukaan tab baru. Mohon izinkan pop-up untuk situs ini.",
-      );
+      await showAlertModal({
+        title: "Pop-up Diblokir",
+        message: "Pop-up blocker mencegah pembukaan tab baru. Mohon izinkan pop-up untuk situs ini.",
+        tone: "warning",
+      });
       return;
     }
 
@@ -3717,7 +3720,11 @@ export const generateQuestionsPDF = async (exam: Exam): Promise<void> => {
     printWindow.document.close();
   } catch (e) {
     console.error("Gagal membuat naskah soal", e);
-    alert("Terjadi kesalahan saat membuat dokumen soal.");
+    await showAlertModal({
+      title: "Gagal Membuat Dokumen",
+      message: "Terjadi kesalahan saat membuat dokumen soal.",
+      tone: "danger",
+    });
   }
 };
 

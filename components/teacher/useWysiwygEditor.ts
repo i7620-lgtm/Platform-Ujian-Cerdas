@@ -7,6 +7,7 @@ import {
   getCaretCharacterOffsetWithin,
   setCaretCharacterOffsetWithin,
 } from "./caretUtils";
+import { showAlertModal } from "../../stores/feedbackStore";
 
 export type WysiwygTab = "FORMAT" | "PARAGRAPH" | "INSERT" | "MATH";
 
@@ -560,7 +561,11 @@ export const useWysiwygEditor = ({
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
       if (file.size > 1 * 1024 * 1024) {
-        alert("Ukuran file audio terlalu besar (Maks 1MB)");
+        void showAlertModal({
+          title: "File Audio Terlalu Besar",
+          message: "Ukuran file audio terlalu besar (Maksimal 1MB).",
+          tone: "warning",
+        });
         return;
       }
       const reader = new FileReader();

@@ -22,6 +22,7 @@ import { QuestionnaireEditor } from "./question-editors/QuestionnaireEditor";
 import { AudioPlayer } from "../AudioPlayer";
 import { Volume2 } from "lucide-react";
 import { QuestionAudioModal } from "./modals/QuestionAudioModal";
+import { showConfirmModal } from "../../stores/feedbackStore";
 
 interface QuestionCardProps {
   q: Question;
@@ -152,11 +153,15 @@ export const QuestionCard = React.memo(
 
               <button
                 type="button"
-                onClick={(e) => {
+                onClick={async (e) => {
                   e.stopPropagation();
-                  if (
-                    window.confirm("Apakah Anda yakin ingin menghapus soal ini?")
-                  ) {
+                  const confirmed = await showConfirmModal({
+                    title: "Hapus Soal?",
+                    message: "Apakah Anda yakin ingin menghapus soal ini? Perubahan ini belum dapat dibatalkan setelah disimpan.",
+                    tone: "danger",
+                    confirmLabel: "Hapus Soal",
+                  });
+                  if (confirmed) {
                     handleDeleteQuestion(q.id);
                   }
                 }}

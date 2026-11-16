@@ -19,6 +19,7 @@ import { RegisterSchoolModal } from "./RegisterSchoolModal";
 import { ParticipatingSchoolsModal } from "./ParticipatingSchoolsModal";
 import { useInvitationModal } from "./useInvitationModal";
 import { getParticipatingSchoolsWithSessions } from "./schoolSessionUtils";
+import { showAlertModal } from "../../stores/feedbackStore";
 
 interface InvitationModalProps {
   isOpen: boolean;
@@ -98,9 +99,11 @@ export const InvitationModal: React.FC<InvitationModalProps> = ({
         window.location.href = joinUrl;
       }
     } else {
-      alert(
-        `Ujian belum dimulai.\nJadwal Pelaksanaan: ${getFormattedStartDate()}.\n\nSilakan bersiap dan masuk saat jadwal pelaksanaan tiba.`
-      );
+      void showAlertModal({
+        title: "Ujian Belum Dimulai",
+        message: `Jadwal Pelaksanaan: ${getFormattedStartDate()}.\n\nSilakan bersiap dan masuk saat jadwal pelaksanaan tiba.`,
+        tone: "info",
+      });
     }
   };
 

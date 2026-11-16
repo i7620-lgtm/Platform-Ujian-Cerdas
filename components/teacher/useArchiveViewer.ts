@@ -13,6 +13,7 @@ import type {
   TeacherProfile,
   ArchiveTab,
 } from "../../types";
+import { showAlertModal, showConfirmModal, showToast } from "../../stores/feedbackStore";
 
 interface UseArchiveViewerParams {
   teacherProfile: TeacherProfile;
@@ -89,12 +90,13 @@ export const useArchiveViewer = ({
 
   const handleDeleteArchive = async (filename: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (
-      !confirm(
-        `Apakah Anda yakin ingin menghapus arsip "${filename}" secara permanen dari Cloud Storage?`,
-      )
-    )
-      return;
+    const confirmed = await showConfirmModal({
+      title: "Hapus Arsip Cloud?",
+      message: `Apakah Anda yakin ingin menghapus arsip "${filename}" secara permanen dari Cloud Storage?`,
+      tone: "danger",
+      confirmLabel: "Hapus Arsip",
+    });
+    if (!confirmed) return;
 
     setIsLoadingCloud(true);
     setLoadingMessage("Menghapus arsip...");
@@ -118,9 +120,14 @@ export const useArchiveViewer = ({
       ) {
         resetView();
       }
+      showToast(`Arsip "${filename}" berhasil dihapus.`, "success");
     } catch (err) {
       console.error(err);
-      alert("Gagal menghapus arsip.");
+      await showAlertModal({
+        title: "Gagal Menghapus Arsip",
+        message: "Gagal menghapus arsip dari Cloud Storage.",
+        tone: "danger",
+      });
     } finally {
       setIsLoadingCloud(false);
     }
@@ -130,12 +137,13 @@ export const useArchiveViewer = ({
     const currentData = dataToUpload || archiveData;
     if (!currentData) return;
 
-    if (
-      !confirm(
-        "Arsip ini akan diunggah ke Cloud Storage. Sistem akan mengoptimalkan ukuran gambar secara otomatis (Resize + WebP) agar hemat kuota.\n\nLanjutkan?",
-      )
-    )
-      return;
+    const confirmed = await showConfirmModal({
+      title: "Unggah Arsip ke Cloud?",
+      message: "Arsip ini akan diunggah ke Cloud Storage. Sistem akan mengoptimalkan ukuran gambar secara otomatis (Resize + WebP) agar hemat kuota.\n\nLanjutkan?",
+      tone: "info",
+      confirmLabel: "Unggah Sekarang",
+    });
+    if (!confirmed) return;
 
     setIsLoadingCloud(true);
     setLoadingMessage("Mengoptimalkan gambar...");
@@ -219,12 +227,17 @@ export const useArchiveViewer = ({
       setSourceType("CLOUD");
       setArchiveData(fixArchiveDataSorting(finalPayload, teacherProfile));
       setCurrentCloudFilename(newFilename);
-      alert(
-        "Berhasil! Arsip lokal telah dioptimalkan dan disimpan ke Cloud Storage.",
+      showToast(
+        "Arsip lokal berhasil dioptimalkan dan disimpan ke Cloud Storage.",
+        "success",
       );
     } catch (e) {
       console.error(e);
-      alert("Gagal mengunggah ke Cloud.");
+      await showAlertModal({
+        title: "Gagal Mengunggah ke Cloud",
+        message: "Gagal mengunggah arsip ke Cloud Storage.",
+        tone: "danger",
+      });
     } finally {
       setIsLoadingCloud(false);
     }
@@ -232,12 +245,13 @@ export const useArchiveViewer = ({
 
   const handleReclaimArchive = async () => {
     if (!archiveData) return;
-    if (
-      !confirm(
-        "Ambil alih arsip ini? Anda akan ditetapkan sebagai pemilik arsip ini dan statistik akan dicatat atas nama Anda.",
-      )
-    )
-      return;
+    const confirmed = await showConfirmModal({
+      title: "Ambil Alih Arsip?",
+      message: "Ambil alih arsip ini? Anda akan ditetapkan sebagai pemilik arsip ini dan statistik akan dicatat atas nama Anda.",
+      tone: "warning",
+      confirmLabel: "Ambil Alih",
+    });
+    if (!confirmed) return;
 
     setIsLoadingCloud(true);
     setLoadingMessage("Menyimpan ulang arsip...");
@@ -301,10 +315,14 @@ export const useArchiveViewer = ({
       setSourceType("CLOUD");
       setArchiveData(fixArchiveDataSorting(finalPayload, teacherProfile));
       setCurrentCloudFilename(newFilename);
-      alert("Berhasil! Arsip telah diperbarui dan kini menjadi milik Anda.");
+      showToast("Arsip berhasil diperbarui dan kini menjadi milik Anda.", "success");
     } catch (e) {
       console.error(e);
-      alert("Gagal mengambil alih arsip.");
+      await showAlertModal({
+        title: "Gagal Mengambil Alih Arsip",
+        message: "Gagal mengambil alih arsip.",
+        tone: "danger",
+      });
     } finally {
       setIsLoadingCloud(false);
     }
@@ -348,9 +366,13 @@ export const useArchiveViewer = ({
   const handleUpdateKey = async (qId: string, newKey: string) => {
     if (!archiveData) return;
 
-    const confirmMsg =
-      "Apakah Anda yakin ingin mengganti kunci jawaban soal ini?\n\nSemua jawaban siswa akan diperiksa ulang dan nilai rapor siswa akan di-recalculasi secara real-time.";
-    if (!confirm(confirmMsg)) return;
+    const confirmed = await showConfirmModal({
+      title: "Ganti Kunci Jawaban?",
+      message: "Apakah Anda yakin ingin mengganti kunci jawaban soal ini?\n\nSemua jawaban siswa akan diperiksa ulang dan nilai rapor siswa akan di-recalculasi secara real-time.",
+      tone: "warning",
+      confirmLabel: "Ganti Kunci",
+    });
+    if (!confirmed) return;
 
     const updatedQuestions = archiveData.exam.questions.map((q) => {
       if (q.id === qId) {
@@ -404,8 +426,9 @@ export const useArchiveViewer = ({
     };
 
     setArchiveData(finalArchiveData);
-    alert(
-      "Kunci jawaban berhasil diubah. Nilai siswa otomatis terkalibrasi ulang.",
+    showToast(
+      "Kunci jawaban berhasil diubah dan nilai siswa otomatis terkalibrasi ulang.",
+      "success",
     );
 
     if (sourceType === "CLOUD" && currentCloudFilename) {
