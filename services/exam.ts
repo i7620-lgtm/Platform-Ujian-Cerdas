@@ -343,11 +343,28 @@ export class ExamService {
         }
     }
 
+    sanitizeConfigForStudent(config: ExamConfig, status?: string): ExamConfig {
+        const clean = { ...(config || {}) } as ExamConfig;
+        if (Array.isArray(clean.collaborators)) {
+            clean.collaborators = clean.collaborators.map((c) => ({
+                label: c.label,
+                role: c.role,
+                createdAt: c.createdAt,
+                token: '',
+            }));
+        }
+        if (status === 'closed') {
+            clean.isFinished = true;
+        }
+        return clean;
+    }
+
     stripAnswersFromQuestion(q: Question): Question {
-        const sanitizedQ = { ...q } as Question;
+        const sanitizedQ = { ...q, options: q.options ? [...q.options] : undefined } as Question;
         
-        // SECURITY FIX: Remove correct answers before sending to client
+        // SECURITY FIX: Remove correct answers & detailed solution steps before sending to client
         delete sanitizedQ.correctAnswer;
+        delete sanitizedQ.solutionSteps;
         
         if (sanitizedQ.trueFalseRows) {
             sanitizedQ.trueFalseRows = sanitizedQ.trueFalseRows.map(row => {
@@ -358,15 +375,88 @@ export class ExamService {
         }
         
         if (sanitizedQ.matchingPairs) {
-            const rightOptions = sanitizedQ.matchingPairs.map(p => p.right);
-            const shuffledRight = shuffleArray(rightOptions);
+            const rightList = sanitizedQ.matchingPairs.map(p => ({
+                right: p.right,
+                rightChart: p.rightChart
+            }));
+            const shuffledRight = shuffleArray(rightList);
             sanitizedQ.matchingPairs = sanitizedQ.matchingPairs.map((pair, idx) => ({
                 left: pair.left,
-                right: shuffledRight[idx]
+                leftChart: pair.leftChart,
+                right: shuffledRight[idx]?.right ?? pair.right,
+                rightChart: shuffledRight[idx]?.rightChart,
+                weight: pair.weight
             }));
         }
         
         return sanitizedQ;
+    }
+
+    buildStudentEdgeBundle(exam: Exam, version: number) {
+        const cleanStatus = exam.status || 'PUBLISHED';
+        const sanitizedConfig = this.sanitizeConfigForStudent(exam.config, cleanStatus);
+        (sanitizedConfig as any).version = version;
+        return {
+            code: (exam.code || '').trim().toUpperCase(),
+            authorId: exam.authorId,
+            authorName: exam.authorName || (sanitizedConfig as any)?.authorName || 'Pengajar',
+            authorSchool: exam.authorSchool || '',
+            status: cleanStatus,
+            version,
+            config: sanitizedConfig,
+            questions: (exam.questions || []).map(q => this.stripAnswersFromQuestion(q)),
+        };
+    }
+
+    private async fetchEdgeMeta(
+        code: string,
+        isPreview = false
+    ): Promise<{
+        ok: boolean;
+        statusCode: number;
+        data?: {
+            code: string;
+            authorId?: string;
+            authorName?: string;
+            authorSchool?: string;
+            status: string;
+            version: number;
+            config: ExamConfig;
+        };
+        errorCode?: string;
+        networkError?: boolean;
+    }> {
+        try {
+            const response = await fetch(`/api/exam-content/${code}/meta?preview=${isPreview}`);
+            const contentType = response.headers.get('content-type') || '';
+            if (!contentType.includes('application/json')) {
+                return { ok: false, statusCode: response.status, networkError: true };
+            }
+            const json = await response.json();
+            if (response.ok && json?.success && json?.config) {
+                return {
+                    ok: true,
+                    statusCode: response.status,
+                    data: {
+                        code: json.code || code,
+                        authorId: json.authorId,
+                        authorName: json.authorName || json.config?.authorName || 'Pengajar',
+                        authorSchool: json.authorSchool || '',
+                        status: json.status || 'PUBLISHED',
+                        version: typeof json.version === 'number' ? json.version : (json.config?.version || 1),
+                        config: json.config as ExamConfig,
+                    },
+                };
+            }
+            return {
+                ok: false,
+                statusCode: response.status,
+                errorCode: json?.error,
+                networkError: response.status >= 500,
+            };
+        } catch {
+            return { ok: false, statusCode: 0, networkError: true };
+        }
     }
 
     sanitizeExamForStudent(exam: Exam, studentId?: string, includeAnswers = false): Exam {
@@ -652,28 +742,41 @@ export class ExamService {
             }
         }
 
-        // 1. FAST PATH: Check Schedule / Pre-login (Zero questions payload, saves 100% egress)
+        // 1. FAST PATH: Check Schedule / Pre-login (Vercel Edge meta first, zero questions payload)
         if (studentId === 'check_schedule') {
+            const edgeMeta = await this.fetchEdgeMeta(cleanCode, isPreview);
+            if (edgeMeta.errorCode === 'EXAM_IS_DRAFT' && !isPreview) {
+                throw new Error("EXAM_IS_DRAFT");
+            }
+            if (edgeMeta.ok && edgeMeta.data) {
+                if (edgeMeta.data.status === 'DRAFT' && !isPreview) {
+                    throw new Error("EXAM_IS_DRAFT");
+                }
+                return {
+                    code: edgeMeta.data.code,
+                    authorId: edgeMeta.data.authorId,
+                    authorName: edgeMeta.data.authorName || 'Pengajar',
+                    authorSchool: edgeMeta.data.authorSchool,
+                    config: edgeMeta.data.config,
+                    questions: [],
+                    status: edgeMeta.data.status as 'DRAFT' | 'PUBLISHED',
+                    version: edgeMeta.data.version
+                };
+            }
+
+            // Fallback to Supabase/local cache only if Edge meta was unavailable or missed
             let scheduleData: any = null;
             let scheduleError: any = null;
-
-            const res = await supabase
-                .from('exams')
-                .select('code, author_id, school, config, status, created_at')
-                .eq('code', cleanCode)
-                .maybeSingle();
-
-            scheduleData = res.data;
-            scheduleError = res.error;
-
-            if (scheduleError) {
-                const fallbackRes = await supabase
+            try {
+                const res = await supabase
                     .from('exams')
                     .select('code, author_id, school, config, status, created_at')
                     .eq('code', cleanCode)
                     .maybeSingle();
-                scheduleData = fallbackRes.data;
-                scheduleError = fallbackRes.error;
+                scheduleData = res.data;
+                scheduleError = res.error;
+            } catch (e) {
+                scheduleError = e;
             }
 
             if (scheduleError || !scheduleData) {
@@ -700,38 +803,64 @@ export class ExamService {
                 authorId: scheduleData.author_id,
                 authorName: scheduleData.author_name || scheduleData.config?.authorName || 'Pengajar',
                 authorSchool: scheduleData.school,
-                config: scheduleData.config,
+                config: this.sanitizeConfigForStudent(scheduleData.config, scheduleData.status),
                 questions: [],
                 status: scheduleData.status,
                 version: scheduleData.config?.version || 1
             };
         }
 
-        // 2. Fetch lightweight exam metadata from Supabase (excludes heavy questions column!)
-        let metaData: any = null;
-        let metaError: any = null;
+        // 2. Fetch exam metadata & allowed config directly from Vercel Edge first
+        let metaData: {
+            code: string;
+            authorId?: string;
+            authorName?: string;
+            authorSchool?: string;
+            config: ExamConfig;
+            status: 'DRAFT' | 'PUBLISHED';
+            version: number;
+        } | null = null;
 
-        const metaRes = await supabase
-            .from('exams')
-            .select('code, author_id, school, config, status, created_at')
-            .eq('code', cleanCode)
-            .maybeSingle();
+        const edgeMeta = await this.fetchEdgeMeta(cleanCode, isPreview);
+        if (edgeMeta.errorCode === 'EXAM_IS_DRAFT' && !isPreview) {
+            throw new Error("EXAM_IS_DRAFT");
+        }
+        if (edgeMeta.ok && edgeMeta.data) {
+            metaData = {
+                code: edgeMeta.data.code,
+                authorId: edgeMeta.data.authorId,
+                authorName: edgeMeta.data.authorName || 'Pengajar',
+                authorSchool: edgeMeta.data.authorSchool,
+                config: edgeMeta.data.config,
+                status: edgeMeta.data.status as 'DRAFT' | 'PUBLISHED',
+                version: edgeMeta.data.version
+            };
+        } else {
+            // Fallback: Query safe metadata columns from Supabase if Edge meta did not succeed
+            try {
+                const metaRes = await supabase
+                    .from('exams')
+                    .select('code, author_id, school, config, status, created_at')
+                    .eq('code', cleanCode)
+                    .maybeSingle();
 
-        metaData = metaRes.data;
-        metaError = metaRes.error;
-
-        if (metaError) {
-            const fallbackRes = await supabase
-                .from('exams')
-                .select('code, author_id, school, config, status, created_at')
-                .eq('code', cleanCode)
-                .maybeSingle();
-            metaData = fallbackRes.data;
-            metaError = fallbackRes.error;
+                if (!metaRes.error && metaRes.data) {
+                    metaData = {
+                        code: metaRes.data.code,
+                        authorId: metaRes.data.author_id,
+                        authorName: (metaRes.data.config as any)?.authorName || 'Pengajar',
+                        authorSchool: metaRes.data.school,
+                        config: this.sanitizeConfigForStudent(metaRes.data.config, metaRes.data.status),
+                        status: metaRes.data.status,
+                        version: (metaRes.data.config && typeof (metaRes.data.config as any).version === 'number')
+                            ? (metaRes.data.config as any).version
+                            : 1,
+                    };
+                }
+            } catch { /* ignore */ }
         }
 
-        if (metaError || !metaData) {
-            // Check preview cache
+        if (!metaData) {
             try {
                 if (typeof window !== 'undefined') {
                     const rawPreview = localStorage.getItem(`ujiancerdas_preview_exam_${cleanCode}`);
@@ -742,12 +871,10 @@ export class ExamService {
                 }
             } catch { /* ignore */ }
 
-            // Check if student has offline saved exam in IndexedDB
             const offlineExam = await offlineService.getLocalProgress(`offline_exam_${cleanCode}`) as Exam | null;
             if (offlineExam) {
                 return this.sanitizeExamForStudent(offlineExam, studentId, isPreview);
             }
-            // Check local teacher exam cache (for drafts or unsynced exams)
             const localExams = await this.getLocalTeacherExamsAsync();
             if (localExams[cleanCode]) {
                 return this.sanitizeExamForStudent(localExams[cleanCode], studentId, isPreview);
@@ -757,17 +884,25 @@ export class ExamService {
 
         if (metaData.status === 'DRAFT' && !isPreview) throw new Error("EXAM_IS_DRAFT");
 
-        const examVersion = (metaData.config && typeof (metaData.config as any).version === 'number') ? (metaData.config as any).version : 1;
+        const examVersion = metaData.version || 1;
         let loadedQuestions: Question[] = [];
+        let resolvedConfig: ExamConfig = metaData.config;
 
         // 3. Check IndexedDB local cache matching current version
         const localCacheKey = `edge_bundle_${cleanCode}`;
-        const localCached = await offlineService.getLocalProgress(localCacheKey) as { version: number; questions: Question[] } | null;
+        const localCached = await offlineService.getLocalProgress(localCacheKey) as {
+            version: number;
+            config?: ExamConfig;
+            questions: Question[];
+        } | null;
 
         if (localCached && localCached.version === examVersion && Array.isArray(localCached.questions) && localCached.questions.length > 0) {
             loadedQuestions = localCached.questions;
+            if (!resolvedConfig && localCached.config) {
+                resolvedConfig = localCached.config;
+            }
         } else {
-            // 4. Download question package from Vercel Edge Network CDN (s-maxage=86400)
+            // 4. Download complete student package (allowed config + stripped questions) directly from Vercel Edge CDN
             try {
                 const response = await fetch(`/api/exam-content/${cleanCode}/test?v=${examVersion}&preview=${isPreview}`);
                 const contentType = response.headers.get('content-type') || '';
@@ -775,19 +910,22 @@ export class ExamService {
                     const json = await response.json();
                     if (json.success && Array.isArray(json.questions)) {
                         loadedQuestions = json.questions;
-                        // Save to IndexedDB for offline resilience
+                        if (json.config) {
+                            resolvedConfig = json.config as ExamConfig;
+                        }
                         await offlineService.saveLocalProgress(localCacheKey, {
                             version: examVersion,
+                            config: resolvedConfig,
                             questions: loadedQuestions,
                             savedAt: Date.now()
                         });
                     }
                 }
             } catch (edgeErr) {
-                console.warn("Edge CDN fetch error, checking local/DB fallback:", edgeErr);
+                console.warn("Edge CDN fetch error, checking fallback caches:", edgeErr);
             }
 
-            // Fallback 1: Direct Supabase query (if online) + strict client-side answer stripping
+            // Fallback 1: Direct Supabase query ONLY if Edge failed (will gracefully no-op for restricted anon role)
             if (loadedQuestions.length === 0 && (typeof navigator === 'undefined' || navigator.onLine !== false)) {
                 try {
                     const { data: directExam, error: directErr } = await supabase
@@ -808,6 +946,7 @@ export class ExamService {
                         if (loadedQuestions.length > 0) {
                             await offlineService.saveLocalProgress(localCacheKey, {
                                 version: examVersion,
+                                config: resolvedConfig,
                                 questions: loadedQuestions,
                                 savedAt: Date.now()
                             });
@@ -844,10 +983,10 @@ export class ExamService {
 
         const exam: Exam = {
             code: metaData.code,
-            authorId: metaData.author_id,
-            authorName: (metaData.author_name as string) || (metaData.config as any)?.authorName || 'Pengajar',
-            authorSchool: metaData.school,
-            config: metaData.config,
+            authorId: metaData.authorId,
+            authorName: metaData.authorName || (resolvedConfig as any)?.authorName || 'Pengajar',
+            authorSchool: metaData.authorSchool,
+            config: resolvedConfig,
             questions: loadedQuestions,
             status: metaData.status,
             version: examVersion
@@ -1033,11 +1172,20 @@ export class ExamService {
                 .subscribe()
             : null;
 
-        // 2. Normal Mode Fallback: Staggered Periodic Check (every 3 minutes + random jitter, <50 bytes)
+        // 2. Normal Mode Fallback: Staggered Periodic Check (Vercel Edge meta first, <500 bytes, fallback Supabase)
         const jitterMs = Math.floor(Math.random() * 20000) + 180000;
         const timerId = setInterval(async () => {
             if (!active) return;
             try {
+                const edgeMeta = await this.fetchEdgeMeta(cleanCode, false);
+                if (edgeMeta.ok && edgeMeta.data) {
+                    const ver = edgeMeta.data.version;
+                    if (typeof ver === 'number' && ver > currentVersion) {
+                        onUpdate(ver);
+                    }
+                    return;
+                }
+
                 const { data } = await supabase
                     .from('exams')
                     .select('config')
@@ -1063,9 +1211,14 @@ export class ExamService {
     }
 
     async getExamConfig(code: string): Promise<ExamConfig | null> {
-        const { data, error } = await supabase.from('exams').select('config').eq('code', code).maybeSingle();
+        const cleanCode = (code || '').trim().toUpperCase();
+        const edgeMeta = await this.fetchEdgeMeta(cleanCode, false);
+        if (edgeMeta.ok && edgeMeta.data?.config) {
+            return edgeMeta.data.config;
+        }
+        const { data, error } = await supabase.from('exams').select('config').eq('code', cleanCode).maybeSingle();
         if (error || !data) return null;
-        return data.config;
+        return this.sanitizeConfigForStudent(data.config);
     }
 
     async getExamConfigStatus(code: string): Promise<{ config: ExamConfig | null; isNetworkError: boolean }> {
@@ -1075,6 +1228,19 @@ export class ExamService {
             return { config: offlineExam?.config || null, isNetworkError: true };
         }
         try {
+            // Primary: Read allowed exam config directly from Vercel Edge
+            const edgeMeta = await this.fetchEdgeMeta(cleanCode, false);
+            if (edgeMeta.ok && edgeMeta.data?.config) {
+                const resolvedConfig: ExamConfig = edgeMeta.data.status === 'closed'
+                    ? { ...edgeMeta.data.config, isFinished: true }
+                    : edgeMeta.data.config;
+                return { config: resolvedConfig, isNetworkError: false };
+            }
+            if (edgeMeta.errorCode === 'EXAM_IS_DRAFT') {
+                return { config: null, isNetworkError: false };
+            }
+
+            // Fallback: Query Supabase safe config column if Edge missed/unavailable
             const { data, error } = await supabase.from('exams').select('config, status').eq('code', cleanCode).maybeSingle();
             if (error) {
                 const msg = String(error.message || '').toLowerCase();
@@ -1088,9 +1254,7 @@ export class ExamService {
             if (!data?.config) {
                 return { config: null, isNetworkError: false };
             }
-            const resolvedConfig: ExamConfig = data.status === 'closed'
-                ? { ...data.config, isFinished: true }
-                : data.config;
+            const resolvedConfig = this.sanitizeConfigForStudent(data.config, data.status);
             return { config: resolvedConfig, isNetworkError: false };
         } catch {
             const offlineExam = await offlineService.getLocalProgress(`offline_exam_${cleanCode}`) as Exam | null;
@@ -1204,16 +1368,33 @@ export class ExamService {
     }
 
     /**
-     * Prime origin memory cache and Vercel Edge CDN GET cache only for non-DRAFT exams.
+     * Push sanitized student-allowed exam bundle to Vercel Edge origin and prime CDN GET caches
+     * whenever a teacher publishes or updates a non-DRAFT exam.
      */
-    private warmExamEdgeCache(examCode: string, version: number, status?: string): void {
-        const cleanCode = (examCode || '').trim().toUpperCase();
+    private async warmExamEdgeCache(examOrCode: Exam | string, version: number, status?: string): Promise<void> {
+        const cleanCode = (typeof examOrCode === 'string' ? examOrCode : examOrCode?.code || '').trim().toUpperCase();
         if (!cleanCode || status === 'DRAFT') {
             return;
         }
         try {
-            fetch(`/api/exam-content/${cleanCode}/warm?v=${version}`, { method: 'POST' }).catch(() => {});
-            fetch(`/api/exam-content/${cleanCode}/test?v=${version}&preview=false`, { method: 'GET' }).catch(() => {});
+            const examBundle = typeof examOrCode === 'string' ? undefined : this.buildStudentEdgeBundle(examOrCode, version);
+            const warmTask = (async () => {
+                await fetch(`/api/exam-content/${cleanCode}/warm?v=${version}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(examBundle ? { code: cleanCode, examBundle } : { code: cleanCode }),
+                }).catch(() => {});
+
+                await Promise.allSettled([
+                    fetch(`/api/exam-content/${cleanCode}/meta?preview=false`, { method: 'GET' }),
+                    fetch(`/api/exam-content/${cleanCode}/test?v=${version}&preview=false`, { method: 'GET' }),
+                ]);
+            })();
+
+            await Promise.race([
+                warmTask,
+                new Promise<void>((resolve) => setTimeout(resolve, 2500)),
+            ]);
         } catch { /* ignore */ }
     }
 
@@ -1258,12 +1439,21 @@ export class ExamService {
         }
 
         const processedQuestions = await this.prepareQuestionsForSave(exam.questions, examCode);
+        const resolvedStatus = exam.status || 'PUBLISHED';
+        const publishedExamSnapshot: Exam = {
+            ...exam,
+            authorId: finalAuthorId,
+            questions: processedQuestions,
+            status: resolvedStatus,
+            version: nextVersion,
+        };
+        this.saveLocalTeacherExam(publishedExamSnapshot);
 
         const { data, error } = await supabase.from('exams').update({
             school: exam.authorSchool || "",
             config: exam.config, 
             questions: processedQuestions, 
-            status: exam.status || 'PUBLISHED'
+            status: resolvedStatus
         }).eq('code', exam.code).select();
 
         if (error) throw error;
@@ -1280,7 +1470,7 @@ export class ExamService {
             if (partialData && partialData.length > 0) {
                 console.log("Partial update successful!");
                 await this.syncRegisteredStudents(exam);
-                this.warmExamEdgeCache(exam.code, nextVersion, exam.status || 'PUBLISHED');
+                await this.warmExamEdgeCache(publishedExamSnapshot, nextVersion, resolvedStatus);
                 return;
             }
 
@@ -1306,7 +1496,7 @@ export class ExamService {
                 author_id: existingExam.author_id,
                 config: exam.config,
                 questions: processedQuestions,
-                status: exam.status || 'PUBLISHED'
+                status: resolvedStatus
             }, { onConflict: 'code' });
 
             if (upsertError) {
@@ -1317,8 +1507,8 @@ export class ExamService {
 
         await this.syncRegisteredStudents(exam);
 
-        // Prime the Vercel Edge CDN cache in the background (published/active exams only)
-        this.warmExamEdgeCache(exam.code, nextVersion, exam.status || 'PUBLISHED');
+        // Push sanitized student bundle & warm Vercel Edge CDN cache (published/active exams only)
+        await this.warmExamEdgeCache(publishedExamSnapshot, nextVersion, resolvedStatus);
     }
 
     private async syncRegisteredStudents(exam: Exam): Promise<void> {
@@ -1414,8 +1604,12 @@ export class ExamService {
 
         if (!rpcError) {
             console.log("Collaborator save success (RPC)");
-            const resolvedStatus = exam.status || (existingExam as { status?: string }).status || 'PUBLISHED';
-            this.warmExamEdgeCache(exam.code, nextVersion, resolvedStatus);
+            const resolvedStatus = (exam.status || (existingExam as { status?: string }).status || 'PUBLISHED') as 'DRAFT' | 'PUBLISHED';
+            await this.warmExamEdgeCache(
+                { ...exam, config: nextConfig, questions: processedQuestions, status: resolvedStatus },
+                nextVersion,
+                resolvedStatus
+            );
             return;
         }
 
@@ -1566,8 +1760,19 @@ export class ExamService {
 
         if (updateError) throw updateError;
 
-        // Prime Edge CDN in background (published/active exams only)
-        this.warmExamEdgeCache(examCode, nextVersion, (examData as { status?: string }).status || 'PUBLISHED');
+        // Push updated bundle & prime Edge CDN (published/active exams only)
+        const resolvedStatus = ((examData as { status?: string }).status || 'PUBLISHED') as 'DRAFT' | 'PUBLISHED';
+        await this.warmExamEdgeCache(
+            {
+                code: examCode,
+                config: nextConfig,
+                questions,
+                status: resolvedStatus,
+                version: nextVersion,
+            },
+            nextVersion,
+            resolvedStatus
+        );
 
         // 4. Fetch All Results with 1000-row range pagination
         const PAGE_SIZE = 1000;
@@ -1734,27 +1939,59 @@ export class ExamService {
     async getExamByCollaboratorToken(code: string, token: string): Promise<{ exam: Exam, role: 'editor' | 'viewer' | 'public' } | null> {
         const cleanCode = (code || '').trim().toUpperCase();
 
-        const { data } = await supabase
+        const { data, error } = await supabase
             .from('exams')
             .select('code, author_id, school, config, questions, status')
             .eq('code', cleanCode)
             .maybeSingle();
 
         let exam: Exam | null = null;
-        if (data) {
+        if (data && !error) {
             exam = {
                 code: data.code,
                 authorId: data.author_id,
-                authorName: 'Pengajar Utama',
+                authorName: (data.config as any)?.authorName || 'Pengajar Utama',
                 authorSchool: data.school,
                 config: data.config,
                 questions: data.questions,
                 status: data.status
             };
         } else {
-            const localExams = await this.getLocalTeacherExamsAsync();
-            if (localExams[cleanCode]) {
-                exam = localExams[cleanCode];
+            // Anon column permissions revoke SELECT on `questions`: query safe columns and hydrate questions from Vercel Edge
+            const { data: metaRow } = await supabase
+                .from('exams')
+                .select('code, author_id, school, config, status')
+                .eq('code', cleanCode)
+                .maybeSingle();
+
+            if (metaRow) {
+                const version = (metaRow.config as any)?.version || 1;
+                let fetchedQuestions: Question[] = [];
+                try {
+                    const edgeRes = await fetch(`/api/exam-content/${cleanCode}/test?v=${version}&preview=${metaRow.status === 'DRAFT'}`);
+                    const ct = edgeRes.headers.get('content-type') || '';
+                    if (edgeRes.ok && ct.includes('application/json')) {
+                        const json = await edgeRes.json();
+                        if (json.success && Array.isArray(json.questions)) {
+                            fetchedQuestions = json.questions;
+                        }
+                    }
+                } catch { /* ignore */ }
+
+                exam = {
+                    code: metaRow.code,
+                    authorId: metaRow.author_id,
+                    authorName: (metaRow.config as any)?.authorName || 'Pengajar Utama',
+                    authorSchool: metaRow.school,
+                    config: metaRow.config,
+                    questions: fetchedQuestions,
+                    status: metaRow.status
+                };
+            } else {
+                const localExams = await this.getLocalTeacherExamsAsync();
+                if (localExams[cleanCode]) {
+                    exam = localExams[cleanCode];
+                }
             }
         }
 
