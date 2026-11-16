@@ -13,7 +13,7 @@ import {
   CheckCircleIcon,
   BuildingOfficeIcon,
 } from "../Icons";
-import type { Exam } from "../../types";
+import type { Exam, TeacherProfile } from "../../types";
 import { KisiKisiModal } from "./KisiKisiModal";
 import { RegisterSchoolModal } from "./RegisterSchoolModal";
 import { ParticipatingSchoolsModal } from "./ParticipatingSchoolsModal";
