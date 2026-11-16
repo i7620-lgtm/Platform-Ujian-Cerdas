@@ -71,6 +71,8 @@ const App: React.FC = () => {
     examsRef.current = exams;
   }, [exams]);
   const [results, setResults] = useState<Result[]>([]);
+  const lastExamsFetchRef = useRef<{ teacherId: string; ts: number }>({ teacherId: '', ts: 0 });
+  const lastResultsFetchRef = useRef<{ teacherId: string; ts: number }>({ teacherId: '', ts: 0 });
   const [isSyncing, setIsSyncing] = useState(false);
   const [isOnline, setIsOnline] = useState(typeof navigator !== 'undefined' && navigator.onLine !== undefined ? navigator.onLine : true);
   const [isLoadingSession, setIsLoadingSession] = useState(true);
@@ -189,10 +191,11 @@ const App: React.FC = () => {
     // Initial hydration
     hydrateMathInContainer(document.body);
 
-    // Observe changes for dynamic rendering with intelligent node filtering
+    // Observe changes for dynamic rendering with intelligent node filtering & scoped root hydration
     let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+    const pendingRoots = new Set<HTMLElement>();
     const observer = new MutationObserver((mutations) => {
-      let shouldRender = false;
+      let hasNewRoots = false;
       for (const m of mutations) {
         if (m.addedNodes.length > 0) {
           for (let i = 0; i < m.addedNodes.length; i++) {
@@ -207,21 +210,36 @@ const App: React.FC = () => {
               ) {
                 continue;
               }
-              // Ignore inputs and form controls
-              if (node.tagName === 'INPUT' || node.tagName === 'TEXTAREA' || node.tagName === 'SELECT') {
+              // Ignore inputs, form controls, and editable containers
+              if (
+                node.tagName === 'INPUT' ||
+                node.tagName === 'TEXTAREA' ||
+                node.tagName === 'SELECT' ||
+                node.isContentEditable ||
+                node.closest?.('[contenteditable="true"]')
+              ) {
                 continue;
               }
-              shouldRender = true;
-              break;
+              pendingRoots.add(node);
+              hasNewRoots = true;
             }
           }
-          if (shouldRender) break;
         }
       }
-      if (shouldRender) {
+      if (hasNewRoots) {
         if (debounceTimer) clearTimeout(debounceTimer);
         debounceTimer = setTimeout(() => {
-          hydrateMathInContainer(document.body);
+          const roots = Array.from(pendingRoots);
+          pendingRoots.clear();
+          if (roots.length > 15) {
+            hydrateMathInContainer(document.body);
+          } else {
+            for (const root of roots) {
+              if (root.isConnected) {
+                hydrateMathInContainer(root);
+              }
+            }
+          }
         }, 120);
       }
     });
@@ -230,6 +248,7 @@ const App: React.FC = () => {
     
     return () => {
       observer.disconnect();
+      pendingRoots.clear();
       if (debounceTimer) clearTimeout(debounceTimer);
     };
   }, []);
@@ -747,18 +766,37 @@ const App: React.FC = () => {
     };
   }, []);
 
-  const refreshExams = useCallback(async () => {
+  const DASHBOARD_CACHE_TTL_MS = 45_000;
+
+  const refreshExams = useCallback(async (force = false) => {
     if (!teacherProfile) return;
+    const now = Date.now();
+    if (
+      !force &&
+      lastExamsFetchRef.current.teacherId === teacherProfile.id &&
+      now - lastExamsFetchRef.current.ts < DASHBOARD_CACHE_TTL_MS
+    ) {
+      return;
+    }
     setIsSyncing(true);
     try {
         const examMap = await storageService.getExams(teacherProfile);
         examsRef.current = examMap;
         setExams(examMap);
+        lastExamsFetchRef.current = { teacherId: teacherProfile.id, ts: Date.now() };
     } finally { setIsSyncing(false); }
   }, [teacherProfile]);
 
-  const refreshResults = useCallback(async () => {
+  const refreshResults = useCallback(async (force = false) => {
     if (!teacherProfile) return;
+    const now = Date.now();
+    if (
+      !force &&
+      lastResultsFetchRef.current.teacherId === teacherProfile.id &&
+      now - lastResultsFetchRef.current.ts < DASHBOARD_CACHE_TTL_MS
+    ) {
+      return;
+    }
     setIsSyncing(true);
     try {
         let examCodes = Object.keys(examsRef.current);
@@ -766,16 +804,19 @@ const App: React.FC = () => {
             const examMap = await storageService.getExams(teacherProfile);
             examsRef.current = examMap;
             examCodes = Object.keys(examMap);
+            lastExamsFetchRef.current = { teacherId: teacherProfile.id, ts: Date.now() };
             if (examCodes.length > 0) {
                 setExams(examMap);
             }
         }
         if (examCodes.length === 0) {
             setResults([]);
+            lastResultsFetchRef.current = { teacherId: teacherProfile.id, ts: Date.now() };
             return;
         }
         const data = await storageService.getResults(examCodes);
         setResults(data);
+        lastResultsFetchRef.current = { teacherId: teacherProfile.id, ts: Date.now() };
     } finally { setIsSyncing(false); }
   }, [teacherProfile]);
 
@@ -889,6 +930,8 @@ const App: React.FC = () => {
     setPrefillCode('');
     setCollaboratorData(null);
     // FIX: Clear shared state to prevent data leakage/ghosting between sessions
+    lastExamsFetchRef.current = { teacherId: '', ts: 0 };
+    lastResultsFetchRef.current = { teacherId: '', ts: 0 };
     setExams({});
     setResults([]);
     window.history.replaceState({}, '', '/');
@@ -1130,7 +1173,7 @@ const App: React.FC = () => {
                                 console.error("Gagal simpan ujian ke database, data aman di lokal:", err);
                             }
                         }
-                        await refreshExams(); 
+                        await refreshExams(true); 
                     }}
                     updateExam={async (e) => { 
                         const examWithAuthor: Exam = { ...e, authorId: teacherProfile.id, authorSchool: teacherProfile.school };
@@ -1145,7 +1188,7 @@ const App: React.FC = () => {
                                 console.error("Gagal perbarui ujian ke database, data aman di lokal:", err);
                             }
                         }
-                        await refreshExams(); 
+                        await refreshExams(true); 
                     }}
                     deleteExam={async (c) => { 
                         setExams((prev) => {
@@ -1158,7 +1201,7 @@ const App: React.FC = () => {
                         } catch (err) {
                             console.error("Gagal menghapus ujian di server:", err);
                         }
-                        await refreshExams(); 
+                        await refreshExams(true); 
                     }}
                     onLogout={handleLogout}
                     onRefreshExams={refreshExams}
