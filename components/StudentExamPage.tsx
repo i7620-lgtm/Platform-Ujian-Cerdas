@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import type { Exam, Student, Result, ResultStatus } from "../types";
 import { ClockIcon, CheckIcon } from "./Icons";
 import { useStudentExamLogic } from "./student/useStudentExamLogic";
@@ -87,6 +87,20 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({
   const toggleHint = useCallback((questionId: string) => {
     setExpandedHints((prev) => ({ ...prev, [questionId]: !prev[questionId] }));
   }, []);
+
+  const numberedQuestions = useMemo(() => {
+    const list: { q: Exam["questions"][number]; num: number }[] = [];
+    let counter = 0;
+    for (const q of activeExam.questions) {
+      if (q.questionType !== "INFO") {
+        counter += 1;
+        list.push({ q, num: counter });
+      } else {
+        list.push({ q, num: counter + 1 });
+      }
+    }
+    return list;
+  }, [activeExam.questions]);
 
   const [fontStep, setFontStep] = useState<number>(() => {
     try {
@@ -468,11 +482,7 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({
           </div>
         )}
 
-        {activeExam.questions.map((q, idx) => {
-          const num =
-            activeExam.questions
-              .slice(0, idx)
-              .filter((i) => i.questionType !== "INFO").length + 1;
+        {numberedQuestions.map(({ q, num }) => {
           const answered = isAnswered(q, answers);
           const isMissing =
             hasAttemptedSubmit && !answered && q.questionType !== "INFO";
@@ -484,7 +494,7 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({
               questionNumber={num}
               answered={answered}
               isMissing={isMissing}
-              answers={answers}
+              answerValue={answers[q.id] || ""}
               rightOptions={matchingOptionsMap[q.id] || []}
               showHints={activeExam.config?.showHints}
               isHintExpanded={!!expandedHints[q.id]}
