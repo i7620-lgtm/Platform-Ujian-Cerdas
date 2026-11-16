@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useMemo } from "react";
 import type { Question } from "../../../types";
 import {
   PencilIcon,
@@ -19,7 +19,7 @@ interface StudentExamQuestionCardProps {
   questionNumber: number;
   answered: boolean;
   isMissing: boolean;
-  answers: Record<string, string>;
+  answerValue: string;
   rightOptions: string[];
   showHints?: boolean;
   isHintExpanded: boolean;
@@ -28,12 +28,12 @@ interface StudentExamQuestionCardProps {
   optimizeHtml: (html: string) => string;
 }
 
-export const StudentExamQuestionCard: React.FC<StudentExamQuestionCardProps> = ({
+export const StudentExamQuestionCard: React.FC<StudentExamQuestionCardProps> = React.memo(({
   question: q,
   questionNumber,
   answered,
   isMissing,
-  answers,
+  answerValue,
   rightOptions,
   showHints,
   isHintExpanded,
@@ -41,6 +41,30 @@ export const StudentExamQuestionCard: React.FC<StudentExamQuestionCardProps> = (
   onAnswerChange,
   optimizeHtml,
 }) => {
+  const renderedStimulus = useMemo(
+    () =>
+      renderQuestionTextWithChart(
+        q.questionText,
+        q.chartData,
+        q.audioUrl,
+        q.listeningScript,
+        optimizeHtml,
+      ),
+    [q.questionText, q.chartData, q.audioUrl, q.listeningScript, optimizeHtml],
+  );
+
+  const sanitizedHintHtml = useMemo(() => {
+    if (!showHints || !isHintExpanded || !q.hint) return "";
+    return sanitizeHtml(optimizeHtml(q.hint));
+  }, [showHints, isHintExpanded, q.hint, optimizeHtml]);
+
+  const hasInlineAudioMarker = useMemo(
+    () =>
+      /\[AUDIO_STIMULUS\]/i.test(q.questionText) ||
+      /data-audio="true"/i.test(q.questionText),
+    [q.questionText],
+  );
+
   return (
     <div
       id={q.id}
@@ -56,12 +80,11 @@ export const StudentExamQuestionCard: React.FC<StudentExamQuestionCardProps> = (
             </span>
           </div>
           <div className="flex-1 min-w-0">
-            {(q.audioUrl || q.listeningScript) &&
-              !(/\[AUDIO_STIMULUS\]/i.test(q.questionText) || /data-audio="true"/i.test(q.questionText)) && (
-                <div className="mb-4">
-                  <AudioPlayer src={q.audioUrl} script={q.listeningScript} isTeacher={false} />
-                </div>
-              )}
+            {(q.audioUrl || q.listeningScript) && !hasInlineAudioMarker && (
+              <div className="mb-4">
+                <AudioPlayer src={q.audioUrl} script={q.listeningScript} isTeacher={false} />
+              </div>
+            )}
             {q.videoUrl && (
               <div className="mb-4 rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-700 bg-black aspect-video max-w-xl">
                 {q.videoUrl.includes("youtube.com") || q.videoUrl.includes("youtu.be") ? (
@@ -71,24 +94,24 @@ export const StudentExamQuestionCard: React.FC<StudentExamQuestionCardProps> = (
                         ? q.videoUrl.replace("watch?v=", "embed/")
                         : q.videoUrl.replace("youtu.be/", "www.youtube.com/embed/")
                     }
+                    loading="lazy"
                     className="w-full h-full"
                     title="Video Stimulus Soal"
                     allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                     allowFullScreen
                   />
                 ) : (
-                  <video src={q.videoUrl} controls className="w-full h-full object-contain" />
+                  <video
+                    src={q.videoUrl}
+                    controls
+                    preload="metadata"
+                    className="w-full h-full object-contain"
+                  />
                 )}
               </div>
             )}
             <div className="student-question-text prose prose-slate dark:prose-invert max-w-none font-medium mb-6">
-              {renderQuestionTextWithChart(
-                q.questionText,
-                q.chartData,
-                q.audioUrl,
-                q.listeningScript,
-                optimizeHtml,
-              )}
+              {renderedStimulus}
             </div>
 
             <div className="space-y-4">
@@ -96,7 +119,7 @@ export const StudentExamQuestionCard: React.FC<StudentExamQuestionCardProps> = (
                 q.questionType === "COMPLEX_MULTIPLE_CHOICE") && (
                 <MultipleChoiceView
                   question={q}
-                  answers={answers}
+                  answerValue={answerValue}
                   onAnswerChange={onAnswerChange}
                   optimizeHtml={optimizeHtml}
                 />
@@ -105,7 +128,7 @@ export const StudentExamQuestionCard: React.FC<StudentExamQuestionCardProps> = (
               {q.questionType === "TRUE_FALSE" && (
                 <TrueFalseView
                   question={q}
-                  answers={answers}
+                  answerValue={answerValue}
                   onAnswerChange={onAnswerChange}
                   optimizeHtml={optimizeHtml}
                 />
@@ -114,7 +137,7 @@ export const StudentExamQuestionCard: React.FC<StudentExamQuestionCardProps> = (
               {q.questionType === "MATCHING" && (
                 <MatchingView
                   question={q}
-                  answers={answers}
+                  answerValue={answerValue}
                   rightOptions={rightOptions}
                   onAnswerChange={onAnswerChange}
                   optimizeHtml={optimizeHtml}
@@ -123,7 +146,7 @@ export const StudentExamQuestionCard: React.FC<StudentExamQuestionCardProps> = (
 
               {q.questionType === "ESSAY" && (
                 <textarea
-                  value={answers[q.id] || ""}
+                  value={answerValue}
                   onChange={(e) => onAnswerChange(q.id, e.target.value)}
                   onCopy={(e) => e.preventDefault()}
                   onCut={(e) => e.preventDefault()}
@@ -141,7 +164,7 @@ export const StudentExamQuestionCard: React.FC<StudentExamQuestionCardProps> = (
                   </div>
                   <input
                     type="text"
-                    value={answers[q.id] || ""}
+                    value={answerValue}
                     onChange={(e) => onAnswerChange(q.id, e.target.value)}
                     onCopy={(e) => e.preventDefault()}
                     onCut={(e) => e.preventDefault()}
@@ -156,7 +179,7 @@ export const StudentExamQuestionCard: React.FC<StudentExamQuestionCardProps> = (
               {q.questionType === "QUESTIONNAIRE" && (
                 <QuestionnaireView
                   question={q}
-                  answers={answers}
+                  answerValue={answerValue}
                   onAnswerChange={onAnswerChange}
                   optimizeHtml={optimizeHtml}
                 />
@@ -189,7 +212,7 @@ export const StudentExamQuestionCard: React.FC<StudentExamQuestionCardProps> = (
                     <div
                       className="prose prose-sm dark:prose-invert max-w-none text-slate-700 dark:text-slate-200 [&_p]:my-1"
                       dangerouslySetInnerHTML={{
-                        __html: sanitizeHtml(optimizeHtml(q.hint)),
+                        __html: sanitizedHintHtml,
                       }}
                     />
                   </div>
@@ -201,4 +224,4 @@ export const StudentExamQuestionCard: React.FC<StudentExamQuestionCardProps> = (
       </div>
     </div>
   );
-};
+});
