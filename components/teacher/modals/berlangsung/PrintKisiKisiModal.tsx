@@ -4,7 +4,7 @@ import { Exam, Question, TeacherProfile } from "../../../../types";
 import { XMarkIcon, PrinterIcon, TableCellsIcon } from "../../../Icons";
 import { sanitizeHtml } from "../../examUtils";
 import { renderMathInHtml } from "../../../../utils/mathRenderer";
-import { SchoolLetterhead } from "../../SchoolLetterhead";
+import { FormalPrintDocHeader } from "../../FormalPrintDocHeader";
 import { storageService } from "../../../../services/storage";
 
 interface PrintKisiKisiModalProps {
@@ -347,37 +347,29 @@ export const PrintKisiKisiModal: React.FC<PrintKisiKisiModalProps> = ({
         {/* Render Kop Sekolah Resmi jika mode "kop", atau Kop Dokumen Standar jika mode "default" */}
         {headerMode === "kop" ? (
           <div className="print-kisi-kisi-header mb-5 pb-2">
-            <SchoolLetterhead profile={profile} />
-
-            <div className="text-center my-2">
-              <h1 className="text-base font-black uppercase tracking-wider text-black">
-                KISI-KISI PENULISAN SOAL ASESMEN {exam.config?.examType ? `- ${exam.config.examType}` : ""}
-              </h1>
-              <p className="text-xs font-semibold text-slate-700">
-                TAHUN PELAJARAN {currentYear}/{currentYear + 1}
-              </p>
-            </div>
-
-            <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-left text-xs font-medium border-t border-b border-black py-2 mt-2">
-              <div>
-                <span className="font-bold">Mata Pelajaran:</span> {exam.config?.subject || "-"}
-              </div>
-              <div>
-                <span className="font-bold">Kelas / Tingkat:</span> {exam.config?.grade || exam.config?.class || "-"}
-              </div>
-              <div>
-                <span className="font-bold">Alokasi Waktu:</span> {exam.config?.durationMinutes || 90} Menit
-              </div>
-              <div>
-                <span className="font-bold">Jumlah Soal:</span> {actualQuestionsCount} Butir
-              </div>
-              <div>
-                <span className="font-bold">Guru Pengampu:</span> {exam.author || profile?.fullName || "-"}
-              </div>
-              <div>
-                <span className="font-bold">Total Bobot Skor:</span> {totalScoreWeight}
-              </div>
-            </div>
+            <FormalPrintDocHeader
+              profile={profile}
+              examType={exam.config?.examType}
+              documentTitle="KISI-KISI PENULISAN SOAL"
+              identityFields={[
+                { label: "MATA PELAJARAN", value: exam.config?.subject || "-" },
+                {
+                  label: "KELAS / JENJANG",
+                  value:
+                    exam.config?.classLevel ||
+                    (exam.config as any)?.grade ||
+                    (exam.config as any)?.class ||
+                    "-",
+                },
+                { label: "HARI, TANGGAL", value: "" },
+                { label: "WAKTU", value: "" },
+                { label: "JUMLAH SOAL", value: `${actualQuestionsCount} Butir Soal` },
+                {
+                  label: "PENYUSUN",
+                  value: exam.authorName || (exam as any).author || profile?.fullName || "-",
+                },
+              ]}
+            />
           </div>
         ) : (
           /* Official Indonesian School Exam Header (Kop Dokumen Resmi) */
