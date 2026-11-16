@@ -1,10 +1,16 @@
 export const EXAM_TYPES = [
-  "Kuis",
-  "Lainnya",
-  "Latihan",
-  "Olimpiade",
+  "SAS",
+  "STS",
+  "UAS",
+  "UTS",
   "PAS",
   "PTS",
-  "TKA",
   "Ulangan Harian",
+  "Kuis",
+  "Latihan",
+  "Tugas",
+  "Olimpiade",
+  "TKA",
+  "Lainnya",
 ];
+

@@ -95,8 +95,8 @@ class StorageService {
       return examService.getExamConfigStatus(code);
   }
 
-  async saveExam(exam: Exam): Promise<void> {
-      return examService.saveExam(exam);
+  async saveExam(exam: Exam, options?: { bypassConfirmation?: boolean }): Promise<void> {
+      return examService.saveExam(exam, options);
   }
 
   async updateStudentData(resultId: number, oldStudentId: string, newData: { fullName: string, schoolName?: string, class: string, absentNumber: string }): Promise<void> {

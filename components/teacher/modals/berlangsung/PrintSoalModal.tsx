@@ -4,7 +4,8 @@ import { Exam, ChartData, TeacherProfile } from "../../../../types";
 import { XMarkIcon, PrinterIcon } from "../../../Icons";
 import { sanitizeHtml } from "../../examUtils";
 import { renderMathInHtml } from "../../../../utils/mathRenderer";
-import { SchoolLetterhead } from "../../SchoolLetterhead";
+import { FormalPrintDocHeader } from "../../FormalPrintDocHeader";
+import { generateDynamicPetunjukUmum } from "../../printDocumentUtils";
 import { storageService } from "../../../../services/storage";
 import {
   BarChart,
@@ -682,6 +683,7 @@ export const PrintSoalModal: React.FC<PrintSoalModalProps> = ({
   const allQuestions = exam.questions || [];
   const actualQuestionsCount = allQuestions.filter((q) => !isInfoItem(q)).length;
   const infoCount = allQuestions.filter((q) => isInfoItem(q)).length;
+  const dynamicPetunjuk = generateDynamicPetunjukUmum(allQuestions);
 
   return createPortal(
     <div className="print-soal-modal-wrapper fixed inset-0 bg-white z-[9999] overflow-y-auto">
@@ -768,77 +770,84 @@ export const PrintSoalModal: React.FC<PrintSoalModalProps> = ({
       >
         {/* Render Kop Sekolah Resmi jika mode "kop", atau Kop Soal Standar jika mode "default" */}
         {headerMode === "kop" ? (
-          <div className="print-soal-header mb-5 pb-2">
-            <SchoolLetterhead profile={profile} />
+          <>
+            <div className="print-soal-header mb-4 pb-1">
+              <FormalPrintDocHeader
+                profile={profile}
+                examType={exam.config?.examType}
+                documentTitle="LEMBAR SOAL"
+                identityFields={[
+                  { label: "MATA PELAJARAN", value: exam.config?.subject || "-" },
+                  { label: "KELAS", value: exam.config?.classLevel || "-" },
+                  { label: "HARI, TANGGAL", value: "" },
+                  { label: "WAKTU", value: "" },
+                ]}
+              />
+            </div>
 
-            <div className="text-center my-2">
-              <h1 className="text-base font-black uppercase tracking-wider text-black">
-                {exam.config?.examType || "PENILAIAN AKHIR SEMESTER"} - {exam.config?.subject || ""}
-              </h1>
-              <p className="text-xs font-semibold text-slate-700">
-                TAHUN PELAJARAN {currentYear}/{currentYear + 1}
+            {/* Dynamic General Instructions (Baku tanpa kotak latar) */}
+            <div className="mb-4 text-xs sm:text-[13px] text-black leading-relaxed">
+              <h2 className="text-center font-bold uppercase tracking-wider mb-1.5">
+                PETUNJUK UMUM
+              </h2>
+              <ol className="list-decimal pl-6 space-y-0.5 max-w-3xl mx-auto">
+                {dynamicPetunjuk.map((item, idx) => (
+                  <li key={idx} className="pl-1">
+                    {item}
+                  </li>
+                ))}
+              </ol>
+              <p className="text-center font-semibold mt-4 mb-2 tracking-wide">
+                ------Selamat Bekerja------
               </p>
             </div>
-
-            <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-left text-xs font-medium border-t border-b border-black py-2 mt-2">
-              <div>
-                <span className="font-bold">Mata Pelajaran:</span> {exam.config?.subject || "-"}
-              </div>
-              <div>
-                <span className="font-bold">Alokasi Waktu:</span> {exam.config?.timeLimit ? `${exam.config.timeLimit} Menit` : "Sesuai Jadwal"}
-              </div>
-              <div>
-                <span className="font-bold">Kelas / Jenjang:</span> {exam.config?.classLevel || "-"}
-              </div>
-              <div>
-                <span className="font-bold">Jumlah Soal:</span> {actualQuestionsCount} Butir ({exam.code})
-              </div>
-            </div>
-          </div>
+          </>
         ) : (
-          /* Official Indonesian School Exam Header (Kop Soal Standar) */
-          <div className="print-soal-header mb-5 border-b-2 border-black pb-3">
-            <div className="flex items-center justify-between border-b border-black pb-2 mb-2">
-              <div className="text-left">
-                <h2 className="text-sm font-extrabold uppercase tracking-wide text-black leading-tight">
-                  {exam.authorSchool || profile?.school || "UJIAN SEKOLAH / ASESMEN AKADEMIK"}
-                </h2>
-                <p className="text-[11px] font-semibold text-slate-700">
-                  TAHUN PELAJARAN {currentYear}/{currentYear + 1}
-                </p>
+          <>
+            {/* Official Indonesian School Exam Header (Kop Soal Standar) */}
+            <div className="print-soal-header mb-5 border-b-2 border-black pb-3">
+              <div className="flex items-center justify-between border-b border-black pb-2 mb-2">
+                <div className="text-left">
+                  <h2 className="text-sm font-extrabold uppercase tracking-wide text-black leading-tight">
+                    {exam.authorSchool || profile?.school || "UJIAN SEKOLAH / ASESMEN AKADEMIK"}
+                  </h2>
+                  <p className="text-[11px] font-semibold text-slate-700">
+                    TAHUN PELAJARAN {currentYear}/{currentYear + 1}
+                  </p>
+                </div>
+                <div className="text-right">
+                  <span className="inline-block px-2.5 py-0.5 border border-black font-bold text-[11px] uppercase tracking-wider">
+                    NASKAH SOAL
+                  </span>
+                </div>
               </div>
-              <div className="text-right">
-                <span className="inline-block px-2.5 py-0.5 border border-black font-bold text-[11px] uppercase tracking-wider">
-                  NASKAH SOAL
-                </span>
+
+              <h1 className="text-base font-black uppercase tracking-wider text-black text-center my-1.5">
+                {exam.config?.examType || "PENILAIAN AKHIR SEMESTER"} - {exam.config?.subject || ""}
+              </h1>
+
+              <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-left text-xs font-medium border-t border-slate-300 pt-2 mt-2">
+                <div>
+                  <span className="font-bold">Mata Pelajaran:</span> {exam.config?.subject || "-"}
+                </div>
+                <div>
+                  <span className="font-bold">Alokasi Waktu:</span> {exam.config?.timeLimit ? `${exam.config.timeLimit} Menit` : "Sesuai Jadwal"}
+                </div>
+                <div>
+                  <span className="font-bold">Kelas / Jenjang:</span> {exam.config?.classLevel || "-"}
+                </div>
+                <div>
+                  <span className="font-bold">Jumlah Soal:</span> {actualQuestionsCount} Butir ({exam.code})
+                </div>
               </div>
             </div>
 
-            <h1 className="text-base font-black uppercase tracking-wider text-black text-center my-1.5">
-              {exam.config?.examType || "PENILAIAN AKHIR SEMESTER"} - {exam.config?.subject || ""}
-            </h1>
-
-            <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-left text-xs font-medium border-t border-slate-300 pt-2 mt-2">
-              <div>
-                <span className="font-bold">Mata Pelajaran:</span> {exam.config?.subject || "-"}
-              </div>
-              <div>
-                <span className="font-bold">Alokasi Waktu:</span> {exam.config?.timeLimit ? `${exam.config.timeLimit} Menit` : "Sesuai Jadwal"}
-              </div>
-              <div>
-                <span className="font-bold">Kelas / Jenjang:</span> {exam.config?.classLevel || "-"}
-              </div>
-              <div>
-                <span className="font-bold">Jumlah Soal:</span> {actualQuestionsCount} Butir ({exam.code})
-              </div>
+            {/* General Instruction */}
+            <div className="mb-4 p-2 bg-slate-50 border border-slate-300 rounded text-[11px] leading-tight text-slate-800">
+              <span className="font-bold">PETUNJUK UMUM:</span> Periksa dan bacalah lembar soal dengan teliti sebelum menjawab. Laporkan kepada pengawas jika terdapat butir soal yang kurang jelas atau tidak lengkap.
             </div>
-          </div>
+          </>
         )}
-
-        {/* General Instruction */}
-        <div className="mb-4 p-2 bg-slate-50 border border-slate-300 rounded text-[11px] leading-tight text-slate-800">
-          <span className="font-bold">PETUNJUK UMUM:</span> Periksa dan bacalah lembar soal dengan teliti sebelum menjawab. Laporkan kepada pengawas jika terdapat butir soal yang kurang jelas atau tidak lengkap.
-        </div>
 
         {/* Questions List */}
         <div className="space-y-4">

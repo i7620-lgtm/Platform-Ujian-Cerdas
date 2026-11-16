@@ -474,6 +474,9 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
           store.handleConfigChangeManual((prev) => ({ ...prev, examType: val }))
         }
         searchPlaceholder="Cari jenis evaluasi..."
+        allowCustomOnOption="Lainnya"
+        customInputLabel="Nama Jenis Evaluasi Kustom"
+        customInputPlaceholder="Contoh: Sumatif Tengah Semester Ganjil"
       />
 
       {store.editingChartTarget && (

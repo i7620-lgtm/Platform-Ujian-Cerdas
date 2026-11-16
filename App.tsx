@@ -23,7 +23,7 @@ import { calculateStudentAccess, canStudentResumeInOvertime } from './utils/sche
 import { measureClientBandwidthBytes, detectClientDevice, countIntegrityViolations } from './utils/telemetryUtils';
 import { cleanupExpiredExamCaches } from './utils/cacheHygiene';
 import { FeedbackHost } from './components/FeedbackHost';
-import { showAlertModal } from './stores/feedbackStore';
+import { showAlertModal, showConfirmModal, showToast } from './stores/feedbackStore';
 import { PWAInstallButton } from './components/PWAInstallButton';
 
 function lazyWithRetry<T extends React.ComponentType<any>>(
@@ -1170,15 +1170,33 @@ const App: React.FC = () => {
                             await storageService.saveExam(examWithAuthor); 
                             // Optimistic UI update only AFTER successful server validation
                             setExams((prev) => ({ ...prev, [examWithAuthor.code]: examWithAuthor }));
+                            showToast({ message: "Ujian berhasil disimpan.", tone: "success" });
                         } catch (err) {
                             if (err instanceof ModerationError) {
-                                void showAlertModal({
-                                  title: 'Penyimpanan Diblokir',
-                                  message: `Sistem mendeteksi konten yang tidak pantas:\n- ${err.issues.join('\n- ')}\n\nMohon perbaiki konten ujian Anda sebelum menyimpan.`,
-                                  tone: 'danger',
+                                const confirmed = await showConfirmModal({
+                                    title: 'Konfirmasi Konten Soal',
+                                    message: `Sistem mendeteksi istilah yang berpotensi sensitif pada naskah soal:\n- ${err.issues.join('\n- ')}\n\nApakah ini merupakan istilah resmi untuk keperluan pembelajaran / naskah ilmiah dan Anda ingin tetap menyimpannya?`,
+                                    confirmLabel: 'Tetap Simpan',
+                                    cancelLabel: 'Perbaiki Soal',
+                                    tone: 'warning',
                                 });
+                                if (confirmed) {
+                                    try {
+                                        await storageService.saveExam(examWithAuthor, { bypassConfirmation: true });
+                                        setExams((prev) => ({ ...prev, [examWithAuthor.code]: examWithAuthor }));
+                                        showToast({ message: "Ujian berhasil disimpan.", tone: "success" });
+                                    } catch (saveErr) {
+                                        console.error("Gagal simpan ujian setelah konfirmasi:", saveErr);
+                                        showToast({ message: "Gagal menyimpan ujian ke database.", tone: "danger" });
+                                        throw saveErr;
+                                    }
+                                } else {
+                                    showToast({ message: "Penyimpanan dibatalkan. Silakan periksa kembali konten soal Anda.", tone: "info" });
+                                    throw new Error("Penyimpanan dibatalkan oleh pengguna");
+                                }
                             } else {
                                 console.error("Gagal simpan ujian ke database, data aman di lokal:", err);
+                                throw err;
                             }
                         }
                         await refreshExams(true); 
@@ -1189,15 +1207,33 @@ const App: React.FC = () => {
                             await storageService.saveExam(examWithAuthor); 
                             // Optimistic UI update only AFTER successful server validation
                             setExams((prev) => ({ ...prev, [examWithAuthor.code]: examWithAuthor }));
+                            showToast({ message: "Perubahan ujian berhasil disimpan.", tone: "success" });
                         } catch (err) {
                             if (err instanceof ModerationError) {
-                                void showAlertModal({
-                                  title: 'Perubahan Diblokir',
-                                  message: `Sistem mendeteksi konten yang tidak pantas:\n- ${err.issues.join('\n- ')}\n\nMohon perbaiki konten ujian Anda sebelum menyimpan.`,
-                                  tone: 'danger',
+                                const confirmed = await showConfirmModal({
+                                    title: 'Konfirmasi Konten Soal',
+                                    message: `Sistem mendeteksi istilah yang berpotensi sensitif pada naskah soal:\n- ${err.issues.join('\n- ')}\n\nApakah ini merupakan istilah resmi untuk keperluan pembelajaran / naskah ilmiah dan Anda ingin tetap menyimpannya?`,
+                                    confirmLabel: 'Tetap Simpan',
+                                    cancelLabel: 'Perbaiki Soal',
+                                    tone: 'warning',
                                 });
+                                if (confirmed) {
+                                    try {
+                                        await storageService.saveExam(examWithAuthor, { bypassConfirmation: true });
+                                        setExams((prev) => ({ ...prev, [examWithAuthor.code]: examWithAuthor }));
+                                        showToast({ message: "Perubahan ujian berhasil disimpan.", tone: "success" });
+                                    } catch (saveErr) {
+                                        console.error("Gagal perbarui ujian setelah konfirmasi:", saveErr);
+                                        showToast({ message: "Gagal menyimpan perubahan ke database.", tone: "danger" });
+                                        throw saveErr;
+                                    }
+                                } else {
+                                    showToast({ message: "Perubahan dibatalkan. Silakan periksa kembali konten soal Anda.", tone: "info" });
+                                    throw new Error("Penyimpanan dibatalkan oleh pengguna");
+                                }
                             } else {
                                 console.error("Gagal perbarui ujian ke database, data aman di lokal:", err);
+                                throw err;
                             }
                         }
                         await refreshExams(true); 

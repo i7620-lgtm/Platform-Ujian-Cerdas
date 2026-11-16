@@ -4,7 +4,7 @@ import { Exam, Question, TeacherProfile, ChartData } from "../../../../types";
 import { XMarkIcon, PrinterIcon, CheckCircleIcon } from "../../../Icons";
 import { sanitizeHtml, parseList, isAnswerMatch } from "../../examUtils";
 import { renderMathInHtml } from "../../../../utils/mathRenderer";
-import { SchoolLetterhead } from "../../SchoolLetterhead";
+import { FormalPrintDocHeader } from "../../FormalPrintDocHeader";
 import { storageService } from "../../../../services/storage";
 import {
   BarChart,
@@ -719,21 +719,24 @@ export const PrintKunciJawabanModal: React.FC<PrintKunciJawabanModalProps> = ({
         ref={printContainerRef}
       >
         {/* Render Kop Sekolah Resmi jika mode "kop", atau Kop Resmi Standar jika mode "default" */}
-        <div className="print-kunci-header mb-5 border-b-2 border-black pb-3">
-          {headerMode === "kop" ? (
-            <div className="mb-2">
-              <SchoolLetterhead profile={profile} />
-
-              <div className="text-center my-2">
-                <h3 className="text-sm font-extrabold uppercase tracking-wider text-black underline underline-offset-4">
-                  KUNCI JAWABAN & PEDOMAN PENILAIAN
-                </h3>
-                <p className="text-xs font-bold text-gray-800 uppercase mt-1">
-                  TAHUN PELAJARAN {currentYear}/{currentYear + 1}
-                </p>
-              </div>
-            </div>
-          ) : (
+        {headerMode === "kop" ? (
+          <div className="print-kunci-header mb-5 pb-2">
+            <FormalPrintDocHeader
+              profile={profile}
+              examType={exam.config?.examType}
+              documentTitle="KUNCI JAWABAN DAN PEDOMAN PENILAIAN"
+              identityFields={[
+                { label: "MATA PELAJARAN", value: exam.config?.subject || "-" },
+                { label: "KELAS / JENJANG", value: exam.config?.classLevel || "-" },
+                { label: "HARI, TANGGAL", value: "" },
+                { label: "WAKTU", value: "" },
+                { label: "KODE NASKAH", value: exam.code },
+                { label: "JUMLAH SOAL", value: `${actualQuestions.length} Butir Soal` },
+              ]}
+            />
+          </div>
+        ) : (
+          <div className="print-kunci-header mb-5 border-b-2 border-black pb-3">
             <div className="mb-2">
               <div className="flex items-center justify-between border-b border-black pb-2 mb-2">
                 <div className="text-left">
@@ -757,45 +760,45 @@ export const PrintKunciJawabanModal: React.FC<PrintKunciJawabanModalProps> = ({
                 </h3>
               </div>
             </div>
-          )}
 
-          <table className="w-full text-xs font-semibold mt-2 border-t border-black pt-2">
-            <tbody>
-              <tr>
-                <td className="w-28 py-0.5">Mata Pelajaran</td>
-                <td className="w-3">:</td>
-                <td className="font-bold">{exam.config?.subject || "-"}</td>
-                <td className="w-24 py-0.5">Kelas / Jenjang</td>
-                <td className="w-3">:</td>
-                <td className="font-bold">{exam.config?.classLevel || "-"}</td>
-              </tr>
-              <tr>
-                <td className="py-0.5">Bentuk Evaluasi</td>
-                <td>:</td>
-                <td>{exam.config?.examType || "Evaluasi"}</td>
-                <td className="py-0.5">Kode Soal</td>
-                <td>:</td>
-                <td className="font-mono font-bold">{exam.code}</td>
-              </tr>
-              <tr>
-                <td className="py-0.5">Jumlah Soal</td>
-                <td>:</td>
-                <td>{actualQuestions.length} Butir Soal</td>
-                <td className="py-0.5">Tanggal Draf</td>
-                <td>:</td>
-                <td>
-                  {exam.config?.date
-                    ? new Date(exam.config.date).toLocaleDateString("id-ID", {
-                        day: "numeric",
-                        month: "long",
-                        year: "numeric",
-                      })
-                    : "-"}
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+            <table className="w-full text-xs font-semibold mt-2 border-t border-black pt-2">
+              <tbody>
+                <tr>
+                  <td className="w-28 py-0.5">Mata Pelajaran</td>
+                  <td className="w-3">:</td>
+                  <td className="font-bold">{exam.config?.subject || "-"}</td>
+                  <td className="w-24 py-0.5">Kelas / Jenjang</td>
+                  <td className="w-3">:</td>
+                  <td className="font-bold">{exam.config?.classLevel || "-"}</td>
+                </tr>
+                <tr>
+                  <td className="py-0.5">Bentuk Evaluasi</td>
+                  <td>:</td>
+                  <td>{exam.config?.examType || "Evaluasi"}</td>
+                  <td className="py-0.5">Kode Soal</td>
+                  <td>:</td>
+                  <td className="font-mono font-bold">{exam.code}</td>
+                </tr>
+                <tr>
+                  <td className="py-0.5">Jumlah Soal</td>
+                  <td>:</td>
+                  <td>{actualQuestions.length} Butir Soal</td>
+                  <td className="py-0.5">Tanggal Draf</td>
+                  <td>:</td>
+                  <td>
+                    {exam.config?.date
+                      ? new Date(exam.config.date).toLocaleDateString("id-ID", {
+                          day: "numeric",
+                          month: "long",
+                          year: "numeric",
+                        })
+                      : "-"}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        )}
 
         {/* SEKSI 1: TABEL MATRIKS RINGKASAN KUNCI JAWABAN */}
         <div className="mb-6 avoid-break">

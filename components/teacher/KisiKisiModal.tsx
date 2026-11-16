@@ -3,13 +3,15 @@ import { createPortal } from "react-dom";
 import { PrinterIcon, XMarkIcon } from "../Icons";
 import { Question, TeacherProfile, NipType } from "../../types";
 import { renderMathInHtml } from "../../utils/mathRenderer";
-import { SchoolLetterhead } from "./SchoolLetterhead";
+import { FormalPrintDocHeader } from "./FormalPrintDocHeader";
 
 export const KisiKisiModal: React.FC<{
   isOpen: boolean;
   onClose: () => void;
   questions: Question[];
   subject: string;
+  examType?: string;
+  classLevel?: string;
   schoolName?: string;
   teacherName?: string;
   teacherProfile?: TeacherProfile;
@@ -24,6 +26,8 @@ export const KisiKisiModal: React.FC<{
   onClose,
   questions,
   subject,
+  examType,
+  classLevel,
   schoolName,
   teacherName,
   teacherProfile,
@@ -43,6 +47,8 @@ export const KisiKisiModal: React.FC<{
   }, [isOpen]);
 
   if (!isOpen) return null;
+
+  const nonInfoQuestions = questions.filter((q) => q.questionType !== "INFO");
 
   const formatType = (type: string) => {
     switch (type) {
@@ -208,24 +214,26 @@ export const KisiKisiModal: React.FC<{
       <div className="print-only-document hidden">
         {headerMode === "kop" ? (
           <div className="mb-4">
-            <SchoolLetterhead
+            <FormalPrintDocHeader
               profile={teacherProfile}
               overrideData={{
                 school: schoolName || teacherProfile?.school,
                 regency: regency || teacherProfile?.regency,
               }}
+              examType={examType}
+              documentTitle="KISI-KISI PENULISAN SOAL"
+              identityFields={[
+                { label: "MATA PELAJARAN", value: subject || "-" },
+                { label: "KELAS / JENJANG", value: classLevel || "-" },
+                { label: "HARI, TANGGAL", value: "" },
+                { label: "WAKTU", value: "" },
+                { label: "JUMLAH SOAL", value: `${nonInfoQuestions.length} Butir Soal` },
+                {
+                  label: "PENYUSUN",
+                  value: teacherName || teacherProfile?.fullName || "-",
+                },
+              ]}
             />
-            <div className="text-center my-2">
-              <h1 className="text-xl font-bold uppercase underline">
-                KISI-KISI PENULISAN SOAL ASESMEN
-              </h1>
-              <p className="text-sm font-bold mt-1">{subject}</p>
-              {teacherName && (
-                <p className="text-xs text-slate-700 mt-0.5">
-                  Guru Pengampu: {teacherName}
-                </p>
-              )}
-            </div>
           </div>
         ) : (
           <div className="text-center mb-6 border-b-2 border-black pb-4">
