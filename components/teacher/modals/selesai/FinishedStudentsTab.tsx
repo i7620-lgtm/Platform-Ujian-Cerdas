@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import type { Exam, Result, Question } from "../../../../types";
 import {
   ChevronDownIcon,
@@ -7,6 +7,7 @@ import {
   XMarkIcon,
   ExclamationTriangleIcon,
   FileExcelIcon,
+  MagnifyingGlassIcon,
 } from "../../../Icons";
 import { QuestionResultDetailPopover } from "../../../QuestionResultDetailPopover";
 
@@ -62,10 +63,52 @@ export const FinishedStudentsTab: React.FC<FinishedStudentsTabProps> = ({
   formatDuration,
   checkAnswerStatus,
 }) => {
+  const PAGE_SIZE = 50;
+  const [searchQuery, setSearchQuery] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [selectedClass, searchQuery]);
+
+  const searchFilteredResults = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return filteredResults;
+    return filteredResults.filter((r) => {
+      const name = (r.student.fullName || "").toLowerCase();
+      const sid = (r.student.studentId || "").toLowerCase();
+      const abs = (r.student.absentNumber || "").toLowerCase();
+      const cls = (r.student.class || "").toLowerCase();
+      const sch = (r.student.schoolName || "").toLowerCase();
+      return (
+        name.includes(q) ||
+        sid.includes(q) ||
+        abs.includes(q) ||
+        cls.includes(q) ||
+        sch.includes(q)
+      );
+    });
+  }, [filteredResults, searchQuery]);
+
+  const totalFilteredCount = searchFilteredResults.length;
+  const totalPages = Math.max(1, Math.ceil(totalFilteredCount / PAGE_SIZE));
+  const safeCurrentPage = Math.min(currentPage, totalPages);
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
+
+  const paginatedResults = useMemo(() => {
+    const start = (safeCurrentPage - 1) * PAGE_SIZE;
+    return searchFilteredResults.slice(start, start + PAGE_SIZE);
+  }, [searchFilteredResults, safeCurrentPage]);
+
   const handleExportExcel = async () => {
     try {
       const { downloadArchiveExcel } = await import("../../archive/archiveExcelExporter");
-      downloadArchiveExcel(displayExam, filteredResults);
+      downloadArchiveExcel(displayExam, searchFilteredResults);
     } catch (e) {
       console.error("Gagal mengekspor Excel", e);
       alert("Gagal mengunduh file Excel.");
@@ -74,8 +117,8 @@ export const FinishedStudentsTab: React.FC<FinishedStudentsTabProps> = ({
 
   return (
     <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm overflow-hidden flex flex-col font-sans">
-      <div className="p-4 border-b border-slate-100 dark:border-slate-700 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-slate-50/50 dark:bg-slate-700/30">
-        <div className="flex flex-wrap items-center gap-3">
+      <div className="p-4 border-b border-slate-100 dark:border-slate-700 flex flex-col lg:flex-row justify-between items-stretch lg:items-center gap-3 bg-slate-50/50 dark:bg-slate-700/30">
+        <div className="flex flex-wrap items-center gap-3 flex-1">
           {uniqueClasses.length > 1 && (
             <div className="flex items-center gap-2">
               <span className="text-xs font-bold text-slate-500 uppercase">
@@ -95,14 +138,42 @@ export const FinishedStudentsTab: React.FC<FinishedStudentsTabProps> = ({
               </select>
             </div>
           )}
+          <div className="relative flex-1 min-w-[200px] max-w-sm">
+            <MagnifyingGlassIcon className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Cari nama siswa, absen, kelas..."
+              className="w-full pl-9 pr-8 py-2 text-xs font-medium rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 placeholder:text-slate-400 outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400 transition-all"
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery("")}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                title="Hapus pencarian"
+              >
+                <XMarkIcon className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
           <div className="text-xs font-bold text-slate-400">
-            Menampilkan {filteredResults.length} Siswa
+            {totalFilteredCount > 0 ? (
+              <>
+                Menampilkan {(safeCurrentPage - 1) * PAGE_SIZE + 1}–
+                {Math.min(safeCurrentPage * PAGE_SIZE, totalFilteredCount)} dari{" "}
+                {totalFilteredCount} Siswa
+              </>
+            ) : (
+              "Menampilkan 0 Siswa"
+            )}
           </div>
         </div>
         <button
           type="button"
           onClick={handleExportExcel}
-          className="flex items-center gap-2 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-sm transition-all transform active:scale-95 shrink-0 cursor-pointer"
+          className="flex items-center justify-center gap-2 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-sm transition-all transform active:scale-95 shrink-0 cursor-pointer"
           title="Unduh data rekap ke format Excel (.xlsx)"
         >
           <FileExcelIcon className="w-4 h-4" />
@@ -143,7 +214,24 @@ export const FinishedStudentsTab: React.FC<FinishedStudentsTabProps> = ({
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-50 dark:divide-slate-700/50">
-            {filteredResults.map((r) => {
+            {paginatedResults.length === 0 ? (
+              <tr>
+                <td
+                  colSpan={
+                    displayExam.config.trackLocation &&
+                    displayExam.config.examMode !== "PR"
+                      ? 8
+                      : 7
+                  }
+                  className="px-6 py-14 text-center text-sm font-medium text-slate-400 dark:text-slate-500 italic"
+                >
+                  {searchQuery.trim()
+                    ? `Tidak ada siswa yang cocok dengan "${searchQuery.trim()}".`
+                    : "Belum ada data siswa."}
+                </td>
+              </tr>
+            ) : (
+            paginatedResults.map((r) => {
               const stats = getCalculatedStats(r);
               const { correct, wrong, empty, score } = stats;
               return (
@@ -451,10 +539,38 @@ export const FinishedStudentsTab: React.FC<FinishedStudentsTabProps> = ({
                   )}
                 </React.Fragment>
               );
-            })}
+            })
+            )}
           </tbody>
         </table>
       </div>
+      {totalPages > 1 && (
+        <div className="px-4 py-3 border-t border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/70 flex flex-wrap items-center justify-between gap-2 text-xs">
+          <span className="font-bold text-slate-400">
+            Halaman {safeCurrentPage} dari {totalPages} ({totalFilteredCount} siswa)
+          </span>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setCurrentPage(Math.max(1, safeCurrentPage - 1))}
+              disabled={safeCurrentPage <= 1}
+              className="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-bold hover:bg-slate-100 dark:hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
+            >
+              Sebelumnya
+            </button>
+            <button
+              type="button"
+              onClick={() =>
+                setCurrentPage(Math.min(totalPages, safeCurrentPage + 1))
+              }
+              disabled={safeCurrentPage >= totalPages}
+              className="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-bold hover:bg-slate-100 dark:hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
+            >
+              Berikutnya
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
