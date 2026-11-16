@@ -125,8 +125,19 @@ export const EditMetadataModal: React.FC<EditMetadataModalProps> = ({
               </label>
               <select
                 name="examType"
-                value={formData.examType}
-                onChange={handleChange}
+                value={
+                  formData.examType &&
+                  (formData.examType === "Lainnya" ||
+                    !EXAM_TYPES.filter((t) => t !== "Lainnya").includes(
+                      formData.examType,
+                    ))
+                    ? "Lainnya"
+                    : formData.examType
+                }
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setFormData({ ...formData, examType: val });
+                }}
                 className="w-full px-3 py-2 border rounded-lg text-sm dark:bg-slate-900 dark:border-slate-700 dark:text-white"
               >
                 <option value="">Pilih...</option>
@@ -136,6 +147,28 @@ export const EditMetadataModal: React.FC<EditMetadataModalProps> = ({
                   </option>
                 ))}
               </select>
+              {formData.examType &&
+                (formData.examType === "Lainnya" ||
+                  !EXAM_TYPES.filter((t) => t !== "Lainnya").includes(
+                    formData.examType,
+                  )) && (
+                  <input
+                    type="text"
+                    value={
+                      formData.examType === "Lainnya" ? "" : formData.examType
+                    }
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        examType:
+                          e.target.value === "" ? "Lainnya" : e.target.value,
+                      })
+                    }
+                    placeholder="Tulis nama jenis evaluasi kustom..."
+                    autoFocus
+                    className="mt-2 w-full px-3 py-2 border border-indigo-300 rounded-lg text-xs dark:bg-slate-900 dark:border-indigo-700 dark:text-white focus:ring-2 focus:ring-indigo-500/30 outline-none"
+                  />
+                )}
             </div>
             <div>
               <label className="block text-xs font-bold text-slate-500 uppercase mb-1">
