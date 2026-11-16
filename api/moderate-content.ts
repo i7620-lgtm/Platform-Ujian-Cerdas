@@ -1,51 +1,176 @@
-// Pola kata kunci terlarang (Pornografi, Seksual Vulgar, Ketelanjangan, SARA Negatif, Kekerasan Sadis, Perundungan)
-const PROHIBITED_PATTERNS = [
-  /\b(bokep|porno|porn|pornografi|bugil|telanjang|nude|nudity|naked|erotis|cabul|mesum|syahwat|masturbasi|onani|vagina|penis|kontol|memek|tetek|toket|jembut|ngentot|bersetubuh|seksual|open\s*bo|lendir|hentai|ecchi|crot|sange)\b/i,
-  /\b(cina\s*kafir|pribumi\s*vs|dasar\s*kafir|anti\s*islam|anti\s*kristen|penistaan\s*agama|benci\s*suku|suku\s*biadab|anjing\s*yahudi|teroris\s*islam|kafir\s*laknat|radikalisme\s*teror|kadrun|cebong|kampret|pk\s*i)\b/i,
-  /\b(mutilasi|pembantaian|potong\s*leher|gorok|darah\s*kental|bunuh\s*diri|suicide|sadis|gore|eksekusi\s*mati|senjata\s*api\s*rakitan|merakit\s*bom|racun\s*mematikan)\b/i,
-  /\b(bajingan|bangsat|tolol|goblok|kampret|brengsek|babi\s*lu|kontol|pantek|anjing|asu|perek|lonte|pelacur|bencong|banci|idiot|autis|cacat\s*mental)\b/i,
+// Self-contained Vercel ESM Serverless Handler (Zero relative .ts imports)
+
+interface ModerationContext {
+  subject?: string;
+  examType?: string;
+  classLevel?: string;
+}
+
+function extractCleanModerationText(raw: string): string {
+  if (!raw || typeof raw !== "string") return "";
+  return raw
+    .replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, " ")
+    .replace(/<style[\s\S]*?>[\s\S]*?<\/style>/gi, " ")
+    .replace(/<svg[\s\S]*?>[\s\S]*?<\/svg>/gi, " ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'")
+    .replace(/https?:\/\/[^\s"'<>)]+/gi, " ")
+    .replace(/data:[^\s"'<>)]+/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+const GLOBAL_SCIENTIFIC_WHITELIST: RegExp[] = [
+  /\be(?:scherichia)?[\s._-]*coli\b/gi,
+  /\b(?:bakteri|koloni|kuman|uji|indeks|cemaran|infeksi|spesies)\s+coli\b/gi,
+  /\b(?:fecal|faecal|total)?\s*(?:coliform|koliform)\b/gi,
+  /\b(?:reproduksi|perkembangbiakan|berkembang\s*biak|pembuahan|fertilisasi|penyerbukan|polinasi|siklus|fase|tahap|organ|sel|hormon|ciri(?:[\s-]+ciri)?|kesehatan|edukasi|pendidikan|transmisi|penularan|penyakit(?:\s+menular)?)\s+(?:secara\s+)?seksual\b/gi,
+  /\bseksual\s+(?:primer|sekunder|sehat|pada\s+(?:tumbuhan|hewan|manusia|bunga))\b/gi,
+  /\b(?:a|bi|homo|hetero|inter)seksual(?:itas)?\b/gi,
+  /\bkromosom\s+sex\b/gi,
+  /\b(?:laut|selat|daratan|negara|negeri|kerajaan|kekaisaran|dinasti|bangsa|etnis|pedagang|kebudayaan|budaya|keramik|tembok(?:\s+besar)?|republik(?:\s+rakyat)?|perairan|wilayah|kawasan|sejarah|peradaban)\s+cina\b/gi,
+  /\bcina\s+(?:selatan|utara|barat|timur|daratan|kuno|modern|perantauan|benteng)\b/gi,
+  /\b(?:surah|surat|qs\.?|ayat)\s+al[\s-]*kafirun\b/gi,
+  /\bal[\s-]*kafirun\b/gi,
+  /\b(?:kaum|orang|golongan|masyarakat|pasukan|pemuka|suku)\s+(?:kafir\s+)?quraisy\b/gi,
+  /\bkafir\s+(?:quraisy|zimmi|harbi|mu'ahad|muahad|musta'man)\b/gi,
+  /\b(?:aliran|ajaran|paham|sekte|keyakinan)\s+sesat\b/gi,
+  /\b(?:hukum|pengertian|definisi|larangan|konsekuensi)\s+murtad\b/gi,
+  /\b(?:cacing\s+pita|daging|minyak|lemak|kulit|ternak|kandang|hutan|rusa|guling|liar|hewan|binatang|mamalia|seekor|ekor|berat|haram|najis)\s+babi\b/gi,
+  /\bbabi\s+(?:hutan|rusa|ternak|guling|panggang|liar|air|tanah|betina|jantan)\b/gi,
+  /\b(?:hewan|binatang|mamalia|anak|suara|gonggongan|indera|penciuman|pelacak|gembala|penjaga|liar|laut|tanah|seekor|ekor|najis)\s+anjing\b/gi,
+  /\banjing\s+(?:laut|tanah|pelacak|penjaga|gembala|liar|kampung|hutan|herder|bulldog|pudel|menggonggong|berlari)\b/gi,
+  /\b(?:anak|penyandang|spektrum|gangguan|terapi|siswa)\s+autis(?:me)?\b/gi,
+  /\bautis\s+(?:spectrum|disorder)\b/gi,
 ];
 
-const SERVER_BAD_WORDS_REGEX = new RegExp(
-  "\\b(" +
-    [
-      "anjing", "babi", "bangsat", "tolol", "goblok", "asu", "kontol", "memek", "jembut", "pelacur", "lonte",
-      "perek", "bejad", "biadab", "pukimak", "ngewe", "entot", "ngocok", "coli", "itil", "ngentot", "crot", "sange",
-      "cina", "kafir", "murtad", "sesat", "kadrun", "cebong", "kampret", "bencong", "banci", "idiot", "autis",
-      "fuck", "shit", "bitch", "asshole", "pussy", "dick", "cock", "porn", "xxx", "sex",
-    ].join("|") +
-    ")\\b",
-  "gi"
-);
+function detectSubjectDomains(subject = "", cleanText = "") {
+  const s = subject.toLowerCase();
+  const t = cleanText.toLowerCase();
 
-function moderateExamContentOnServer(content: string): { isSafe: boolean; issues: string[] } {
-  const cleanContent = (content || "").trim();
-  if (!cleanContent) {
+  const isScience =
+    /\b(ipa|biologi|ipas|sains|kimia|fisika|kesehatan|pjok|penjas|penjaskes|mikrobiologi|ekologi|kedokteran|keperawatan|farmasi|agribisnis|peternakan)\b/i.test(s) ||
+    (!s && /\b(bakteri|mikroorganisme|escherichia|ekosistem|fotosintesis|sistem\s+reproduksi|reproduksi\s+manusia|sel\s+sperma|sel\s+telur|ovarium|testis|taenia)\b/i.test(t));
+
+  const isSocialHistory =
+    /\b(ips|sejarah|geografi|sosiologi|ekonomi|antropologi|ppkn|pkn|kewarganegaraan|ilmu\s+pengetahuan\s+sosial)\b/i.test(s);
+
+  const isReligionCivics =
+    /\b(agama|pai|pabp|budi\s*pekerti|akidah|akhlak|fiqih|fikih|quran|hadis|tarikh|ski|kristen|katolik|hindu|buddha|konghucu|ppkn|pkn)\b/i.test(s);
+
+  const isLanguageOrElementary =
+    /\b(bahasa|indonesia|inggris|sastra|literasi|tematik|fabel|dongeng|sd|mi)\b/i.test(s) ||
+    /\b(fabel|dongeng|tokoh\s+cerita|cerita\s+rakyat|seekor\s+(?:anjing|babi))\b/i.test(t);
+
+  return { isScience, isSocialHistory, isReligionCivics, isLanguageOrElementary };
+}
+
+function buildStrictPhraseRegex(words: string[]): RegExp {
+  return new RegExp(`(?<![a-z0-9_-])(${words.join("|")})(?![a-z0-9_-])`, "gi");
+}
+
+function maskAllowedTerms(cleanText: string): string {
+  let masked = cleanText;
+  for (const pattern of GLOBAL_SCIENTIFIC_WHITELIST) {
+    masked = masked.replace(pattern, " ");
+  }
+  return masked.replace(/\s+/g, " ").trim();
+}
+
+const ALWAYS_PROHIBITED_PATTERNS: RegExp[] = [
+  buildStrictPhraseRegex([
+    "bokep", "porno", "porn", "pornografi", "bugil", "telanjang", "nude", "nudity", "naked",
+    "erotis", "cabul", "mesum", "syahwat", "masturbasi", "onani", "kontol", "memek", "tetek",
+    "toket", "jembut", "ngentot", "ngewe", "entot", "ngocok", "itil", "crot", "sange", "open\\s*bo",
+    "lendir", "hentai", "ecchi", "bersetubuh", "fuck", "shit", "bitch", "asshole", "pussy",
+    "dick", "cock", "xxx", "pelacur", "lonte", "perek",
+  ]),
+  buildStrictPhraseRegex([
+    "cina\\s*kafir", "dasar\\s*cina", "cina\\s*bangsat", "pribumi\\s*vs", "dasar\\s*kafir",
+    "anti\\s*islam", "anti\\s*kristen", "penistaan\\s*agama", "benci\\s*suku", "suku\\s*biadab",
+    "anjing\\s*yahudi", "teroris\\s*islam", "kafir\\s*laknat", "radikalisme\\s*teror",
+    "kadrun", "cebong", "pk\\s*i", "bajingan", "bangsat", "tolol", "goblok", "kampret",
+    "brengsek", "asu", "pantek", "bejad", "biadab", "pukimak", "bencong", "banci",
+    "idiot", "cacat\\s*mental", "dasar\\s*anjing", "anjing\\s*(?:lu|lo|kau|kamu|banget)",
+    "dasar\\s*babi", "babi\\s*(?:lu|lo|kau|kamu)", "muka\\s*babi", "otak\\s*anjing", "dasar\\s*autis",
+  ]),
+  buildStrictPhraseRegex([
+    "mutilasi", "pembantaian", "potong\\s*leher", "gorok", "darah\\s*kental",
+    "bunuh\\s*diri", "suicide", "sadis", "gore", "eksekusi\\s*mati",
+    "senjata\\s*api\\s*rakitan", "merakit\\s*bom", "racun\\s*mematikan",
+  ]),
+];
+
+const CONTEXT_COLI_REGEX = buildStrictPhraseRegex(["coli"]);
+const CONTEXT_SEX_BIO_REGEX = buildStrictPhraseRegex(["seksual", "vagina", "penis", "sex"]);
+const CONTEXT_SOCIAL_CINA_REGEX = buildStrictPhraseRegex(["cina"]);
+const CONTEXT_RELIGION_REGEX = buildStrictPhraseRegex(["kafir", "murtad", "sesat"]);
+const CONTEXT_ANIMAL_REGEX = buildStrictPhraseRegex(["anjing", "babi"]);
+const CONTEXT_AUTIS_REGEX = buildStrictPhraseRegex(["autis"]);
+
+function moderateExamContentOnServer(
+  content: string,
+  context?: ModerationContext
+): { isSafe: boolean; issues: string[] } {
+  const cleanText = extractCleanModerationText(content);
+  if (!cleanText) {
     return { isSafe: true, issues: [] };
   }
 
-  const issues: string[] = [];
+  const maskedText = maskAllowedTerms(cleanText);
+  const { isScience, isSocialHistory, isReligionCivics, isLanguageOrElementary } = detectSubjectDomains(
+    context?.subject || "",
+    cleanText
+  );
 
-  for (const pattern of PROHIBITED_PATTERNS) {
-    const match = cleanContent.match(pattern);
-    if (match && match.length > 0) {
-      issues.push(
-        `Konten mengandung unsur tidak pantas atau melanggar etika pendidikan K-12 (${match[0].trim()}).`
-      );
-      break;
-    }
+  const matchedWords = new Set<string>();
+
+  for (const pattern of ALWAYS_PROHIBITED_PATTERNS) {
+    const m = maskedText.match(pattern);
+    if (m) m.forEach((w) => matchedWords.add(w.toLowerCase()));
   }
 
-  const badWordMatches = cleanContent.match(SERVER_BAD_WORDS_REGEX);
-  if (badWordMatches && badWordMatches.length > 0) {
-    const uniqueMatches = Array.from(new Set(badWordMatches.map((m) => m.toLowerCase())));
-    issues.push(`Kata-kata kasar/tidak pantas terdeteksi: ${uniqueMatches.join(", ")}`);
+  if (!isScience) {
+    const coliMatch = maskedText.match(CONTEXT_COLI_REGEX);
+    if (coliMatch) coliMatch.forEach((w) => matchedWords.add(w.toLowerCase()));
+
+    const sexBioMatch = maskedText.match(CONTEXT_SEX_BIO_REGEX);
+    if (sexBioMatch) sexBioMatch.forEach((w) => matchedWords.add(w.toLowerCase()));
   }
 
-  return {
-    isSafe: issues.length === 0,
-    issues,
-  };
+  if (!isSocialHistory && !isLanguageOrElementary) {
+    const cinaMatch = maskedText.match(CONTEXT_SOCIAL_CINA_REGEX);
+    if (cinaMatch) cinaMatch.forEach((w) => matchedWords.add(w.toLowerCase()));
+  }
+
+  if (!isReligionCivics && !isSocialHistory) {
+    const religionMatch = maskedText.match(CONTEXT_RELIGION_REGEX);
+    if (religionMatch) religionMatch.forEach((w) => matchedWords.add(w.toLowerCase()));
+  }
+
+  if (!isScience && !isLanguageOrElementary && !isReligionCivics) {
+    const animalMatch = maskedText.match(CONTEXT_ANIMAL_REGEX);
+    if (animalMatch) animalMatch.forEach((w) => matchedWords.add(w.toLowerCase()));
+  }
+
+  if (!isScience) {
+    const autisMatch = maskedText.match(CONTEXT_AUTIS_REGEX);
+    if (autisMatch) autisMatch.forEach((w) => matchedWords.add(w.toLowerCase()));
+  }
+
+  if (matchedWords.size > 0) {
+    return {
+      isSafe: false,
+      issues: [`Kata-kata kasar/tidak pantas terdeteksi: ${Array.from(matchedWords).join(", ")}`],
+    };
+  }
+
+  return { isSafe: true, issues: [] };
 }
 
 export default async function handler(req: any, res: any) {
@@ -82,7 +207,13 @@ export default async function handler(req: any, res: any) {
       return res.status(200).json({ isSafe: true, issues: [] });
     }
 
-    const result = moderateExamContentOnServer(content);
+    const context: ModerationContext = {
+      subject: body && typeof body.subject === "string" ? body.subject : "",
+      examType: body && typeof body.examType === "string" ? body.examType : "",
+      classLevel: body && typeof body.classLevel === "string" ? body.classLevel : "",
+    };
+
+    const result = moderateExamContentOnServer(content, context);
     return res.status(200).json(result);
   } catch (error: any) {
     console.error("Server Content Moderation Error:", error?.message || error);
