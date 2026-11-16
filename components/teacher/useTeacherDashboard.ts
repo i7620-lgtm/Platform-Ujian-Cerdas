@@ -23,8 +23,8 @@ interface UseTeacherDashboardParams {
   deleteExam: (code: string) => Promise<void>;
   exams: Record<string, Exam>;
   results: Result[];
-  onRefreshExams: () => Promise<void>;
-  onRefreshResults: () => Promise<void>;
+  onRefreshExams: (force?: boolean) => Promise<void>;
+  onRefreshResults: (force?: boolean) => Promise<void>;
 }
 
 export const useTeacherDashboard = ({
@@ -80,7 +80,7 @@ export const useTeacherDashboard = ({
 
   const accountType = teacherProfile.accountType || "guru";
 
-  // 1. Automatic data refreshing when tab / view changes
+  // 1. Automatic data refreshing when tab / view changes (respects 45s TTL cache)
   useEffect(() => {
     if (
       view === "ONGOING" ||
@@ -88,10 +88,10 @@ export const useTeacherDashboard = ({
       view === "FINISHED_EXAMS" ||
       view === "DRAFTS"
     ) {
-      onRefreshExams();
+      onRefreshExams(false);
     }
-    if (view === "ONGOING" || view === "FINISHED_EXAMS") {
-      onRefreshResults();
+    if (view === "ONGOING" || view === "ANALYTICS") {
+      onRefreshResults(false);
     }
   }, [view, onRefreshExams, onRefreshResults]);
 
