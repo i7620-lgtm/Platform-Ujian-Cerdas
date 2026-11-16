@@ -47,6 +47,17 @@ const GLOBAL_SCIENTIFIC_WHITELIST: RegExp[] = [
   /\banjing\s+(?:laut|tanah|pelacak|penjaga|gembala|liar|kampung|hutan|herder|bulldog|pudel|menggonggong|berlari)\b/gi,
   /\b(?:anak|penyandang|spektrum|gangguan|terapi|siswa)\s+autis(?:me)?\b/gi,
   /\bautis\s+(?:spectrum|disorder)\b/gi,
+  // Fisiologi & Anatomi (selaput lendir, kelenjar lendir, dsb)
+  /\b(?:selaput|kelenjar|lapisan|cairan|produksi|pengeluaran|sekresi|saluran|membran|dinding)\s+lendir\b/gi,
+  /\blendir\s+(?:lambung|pernapasan|hidung|usus|tenggorokan|bekicot|siput|katak|ikan|kulit|leher\s+rahim)\b/gi,
+  /\b(?:biji|mata)\s+telanjang\b/gi,
+  /\bdarah\s+kental\b/gi,
+  // Matematika, angka Romawi, variabel aljabar
+  /\b(?:angka|bilangan|nomor|bab|tingkat|kelas|abad)\s+[ivxlcdm]+\b/gi,
+  /\b(?:romawi\s+dari\s+\d+|tiga\s+puluh\s+dalam\s+romawi)\b/gi,
+  /\b(?:nilai|variabel|persamaan|fungsi|koordinat)\s+[a-z]{1,4}\b/gi,
+  /\bxxx\b/gi,
+  /\blendir\b/gi,
 ];
 
 function detectSubjectDomains(subject = "", cleanText = "") {
@@ -55,7 +66,11 @@ function detectSubjectDomains(subject = "", cleanText = "") {
 
   const isScience =
     /\b(ipa|biologi|ipas|sains|kimia|fisika|kesehatan|pjok|penjas|penjaskes|mikrobiologi|ekologi|kedokteran|keperawatan|farmasi|agribisnis|peternakan)\b/i.test(s) ||
-    (!s && /\b(bakteri|mikroorganisme|escherichia|ekosistem|fotosintesis|sistem\s+reproduksi|reproduksi\s+manusia|sel\s+sperma|sel\s+telur|ovarium|testis|taenia)\b/i.test(t));
+    (!s && /\b(bakteri|mikroorganisme|escherichia|ekosistem|fotosintesis|sistem\s+reproduksi|reproduksi\s+manusia|sel\s+sperma|sel\s+telur|ovarium|testis|taenia|lendir)\b/i.test(t));
+
+  const isMath =
+    /\b(matematika|mtk|math|aljabar|aritmetika|geometri|kalkulus|trigonometri|statistik)\b/i.test(s) ||
+    /\b(angka\s+romawi|bilangan\s+romawi|persamaan|koordinat|segitiga|persegi|lingkaran|variabel)\b/i.test(t);
 
   const isSocialHistory =
     /\b(ips|sejarah|geografi|sosiologi|ekonomi|antropologi|ppkn|pkn|kewarganegaraan|ilmu\s+pengetahuan\s+sosial)\b/i.test(s);
@@ -67,7 +82,7 @@ function detectSubjectDomains(subject = "", cleanText = "") {
     /\b(bahasa|indonesia|inggris|sastra|literasi|tematik|fabel|dongeng|sd|mi)\b/i.test(s) ||
     /\b(fabel|dongeng|tokoh\s+cerita|cerita\s+rakyat|seekor\s+(?:anjing|babi))\b/i.test(t);
 
-  return { isScience, isSocialHistory, isReligionCivics, isLanguageOrElementary };
+  return { isScience, isMath, isSocialHistory, isReligionCivics, isLanguageOrElementary };
 }
 
 function buildStrictPhraseRegex(words: string[]): RegExp {
@@ -83,12 +98,14 @@ function maskAllowedTerms(cleanText: string): string {
 }
 
 const ALWAYS_PROHIBITED_PATTERNS: RegExp[] = [
+  // Pornografi eksplisit & slang seksual vulgar ekstrem (HANYA frasa ekstrem nyata)
   buildStrictPhraseRegex([
-    "bokep", "porno", "porn", "pornografi", "bugil", "telanjang", "nude", "nudity", "naked",
+    "bokep", "porno", "porn", "pornografi", "foto\\s*bugil", "video\\s*bugil", "pose\\s*bugil",
+    "foto\\s*telanjang", "video\\s*telanjang", "nude", "nudity", "naked",
     "erotis", "cabul", "mesum", "syahwat", "masturbasi", "onani", "kontol", "memek", "tetek",
     "toket", "jembut", "ngentot", "ngewe", "entot", "ngocok", "itil", "crot", "sange", "open\\s*bo",
-    "lendir", "hentai", "ecchi", "bersetubuh", "fuck", "shit", "bitch", "asshole", "pussy",
-    "dick", "cock", "xxx", "pelacur", "lonte", "perek",
+    "hentai", "ecchi", "fuck", "shit", "bitch", "asshole", "pussy",
+    "pelacur", "lonte", "perek",
   ]),
   buildStrictPhraseRegex([
     "cina\\s*kafir", "dasar\\s*cina", "cina\\s*bangsat", "pribumi\\s*vs", "dasar\\s*kafir",
@@ -100,14 +117,14 @@ const ALWAYS_PROHIBITED_PATTERNS: RegExp[] = [
     "dasar\\s*babi", "babi\\s*(?:lu|lo|kau|kamu)", "muka\\s*babi", "otak\\s*anjing", "dasar\\s*autis",
   ]),
   buildStrictPhraseRegex([
-    "mutilasi", "pembantaian", "potong\\s*leher", "gorok", "darah\\s*kental",
+    "mutilasi", "pembantaian", "potong\\s*leher", "gorok",
     "bunuh\\s*diri", "suicide", "sadis", "gore", "eksekusi\\s*mati",
     "senjata\\s*api\\s*rakitan", "merakit\\s*bom", "racun\\s*mematikan",
   ]),
 ];
 
 const CONTEXT_COLI_REGEX = buildStrictPhraseRegex(["coli"]);
-const CONTEXT_SEX_BIO_REGEX = buildStrictPhraseRegex(["seksual", "vagina", "penis", "sex"]);
+const CONTEXT_SEX_BIO_REGEX = buildStrictPhraseRegex(["seksual", "vagina", "penis", "sex", "bersetubuh"]);
 const CONTEXT_SOCIAL_CINA_REGEX = buildStrictPhraseRegex(["cina"]);
 const CONTEXT_RELIGION_REGEX = buildStrictPhraseRegex(["kafir", "murtad", "sesat"]);
 const CONTEXT_ANIMAL_REGEX = buildStrictPhraseRegex(["anjing", "babi"]);
