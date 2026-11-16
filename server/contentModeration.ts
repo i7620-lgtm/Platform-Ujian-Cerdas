@@ -4,6 +4,8 @@
  * serta memandu penyajian materi biologi & sosial ke standar kurikulum sekolah K-12 yang bermartabat.
  */
 
+import { Type } from "@google/genai";
+
 export interface ModerationResult {
   isSafe: boolean;
   reason?: string;
