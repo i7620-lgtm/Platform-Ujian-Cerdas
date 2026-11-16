@@ -1398,11 +1398,13 @@ export class ExamService {
         } catch { /* ignore */ }
     }
 
-    async saveExam(exam: Exam): Promise<void> {
+    async saveExam(exam: Exam, options?: { bypassConfirmation?: boolean }): Promise<void> {
         // Content Moderation Check (SARA, Pornography, Bullying, etc.)
-        const moderation = await ContentModerator.validateExamContent(exam);
-        if (!moderation.isValid) {
-            throw new ModerationError(moderation.issues);
+        if (!options?.bypassConfirmation) {
+            const moderation = await ContentModerator.validateExamContent(exam);
+            if (!moderation.isValid) {
+                throw new ModerationError(moderation.issues);
+            }
         }
 
         // Immediate local cache save to prevent data loss or UI disappearance
