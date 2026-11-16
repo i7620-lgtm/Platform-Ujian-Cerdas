@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import type { Exam, Student, Result, Question, ResultStatus } from "../../types";
 import { storageService } from "../../services/storage";
 import { supabase } from "../../lib/supabase";
@@ -989,16 +989,26 @@ export const useStudentExamLogic = ({
       : `${m}:${sec.toString().padStart(2, "0")}`;
   };
 
-  const totalQuestions = activeExam.questions.filter(
-    (q) => q.questionType !== "INFO",
-  ).length;
-  const answeredCount = activeExam.questions.filter(
-    (q) => q.questionType !== "INFO" && isAnswered(q, answers),
-  ).length;
+  const totalQuestions = useMemo(
+    () => activeExam.questions.filter((q) => q.questionType !== "INFO").length,
+    [activeExam.questions],
+  );
+  const answeredCount = useMemo(
+    () =>
+      activeExam.questions.filter(
+        (q) => q.questionType !== "INFO" && isAnswered(q, answers),
+      ).length,
+    [activeExam.questions, answers, isAnswered],
+  );
   const progress =
     totalQuestions > 0 ? Math.round((answeredCount / totalQuestions) * 100) : 0;
-  const optimizeHtml = (html: string) => {
+
+  const optimizeHtmlCacheRef = useRef<Map<string, string>>(new Map());
+  const optimizeHtml = useCallback((html: string) => {
     if (!html) return "";
+    const cached = optimizeHtmlCacheRef.current.get(html);
+    if (cached !== undefined) return cached;
+
     let cleaned = sanitizeHtml(html);
     cleaned = cleaned.replace(
       /(?:<p[^>]*>)?\s*\\?\[\s*ai_svg(?::\s*[^\]]*)?\s*\\?\]\s*(?:<\/p>)?/gi,
@@ -1013,11 +1023,21 @@ export const useStudentExamLogic = ({
       /(?:<p[^>]*>(?:\s|&nbsp;|<br\s*\/?>)*<\/p>\s*|<br\s*\/?>\s*)+$/gi,
       "",
     );
-    return cleaned.replace(
+    cleaned = cleaned.replace(
       /<img /g,
       '<img loading="lazy" class="rounded-lg shadow-sm border border-slate-100 dark:border-slate-700 max-w-full max-h-[50vh] object-contain h-auto" ',
     );
-  };
+    cleaned = cleaned.replace(
+      /<video(?![^>]*\bpreload=)/gi,
+      '<video preload="metadata"',
+    );
+    if (optimizeHtmlCacheRef.current.size >= 600) {
+      const oldestKey = optimizeHtmlCacheRef.current.keys().next().value;
+      if (oldestKey !== undefined) optimizeHtmlCacheRef.current.delete(oldestKey);
+    }
+    optimizeHtmlCacheRef.current.set(html, cleaned);
+    return cleaned;
+  }, []);
 
   // Activate Grace Period info banner ONLY when teacher enabled "Izinkan Kerja Lewat Waktu"
   // AND current time has passed either the daily session end time or global exam end time
