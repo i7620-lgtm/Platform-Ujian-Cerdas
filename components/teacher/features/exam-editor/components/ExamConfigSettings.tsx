@@ -20,6 +20,7 @@ import {
   detectUserIndonesianTimezone,
   getTimezoneLabel,
 } from "../../../../../utils/timezoneUtils";
+import { showAlertModal } from "../../../../../stores/feedbackStore";
 
 interface ExamConfigSettingsProps {
   config: ExamConfig;
@@ -128,11 +129,19 @@ export const ExamConfigSettings: React.FC<ExamConfigSettingsProps> = ({
           `Berhasil! ${schoolMsg}${parsed.classes.length} kelas & ${parsed.students.length} siswa berhasil dimuat dan terdaftar.`
         );
       } else {
-        alert("File Excel dibaca, namun tidak ditemukan data kelas atau siswa.");
+        await showAlertModal({
+          title: "Data Excel Kosong",
+          message: "File Excel dibaca, namun tidak ditemukan data kelas atau siswa.",
+          tone: "warning",
+        });
       }
     } catch (err) {
       console.error("Gagal membaca file Excel:", err);
-      alert("Format file Excel tidak sesuai. Silakan gunakan template yang telah disediakan.");
+      await showAlertModal({
+        title: "Format Excel Tidak Sesuai",
+        message: "Format file Excel tidak sesuai. Silakan gunakan template yang telah disediakan.",
+        tone: "danger",
+      });
     } finally {
       setIsUploading(false);
       if (fileInputRef.current) {
