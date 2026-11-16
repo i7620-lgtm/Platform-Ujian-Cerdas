@@ -22,6 +22,8 @@ import { hydrateMathInContainer } from './utils/mathRenderer';
 import { calculateStudentAccess, canStudentResumeInOvertime } from './utils/scheduleUtils';
 import { measureClientBandwidthBytes, detectClientDevice, countIntegrityViolations } from './utils/telemetryUtils';
 import { cleanupExpiredExamCaches } from './utils/cacheHygiene';
+import { FeedbackHost } from './components/FeedbackHost';
+import { showAlertModal } from './stores/feedbackStore';
 
 function lazyWithRetry<T extends React.ComponentType<any>>(
   componentImport: () => Promise<{ default: T }>
@@ -1168,7 +1170,11 @@ const App: React.FC = () => {
                             setExams((prev) => ({ ...prev, [examWithAuthor.code]: examWithAuthor }));
                         } catch (err) {
                             if (err instanceof ModerationError) {
-                                alert(`PENYIMPANAN DIBLOKIR!\n\nSistem mendeteksi konten yang tidak pantas:\n- ${err.issues.join('\n- ')}\n\nMohon perbaiki konten ujian Anda sebelum menyimpan.`);
+                                void showAlertModal({
+                                  title: 'Penyimpanan Diblokir',
+                                  message: `Sistem mendeteksi konten yang tidak pantas:\n- ${err.issues.join('\n- ')}\n\nMohon perbaiki konten ujian Anda sebelum menyimpan.`,
+                                  tone: 'danger',
+                                });
                             } else {
                                 console.error("Gagal simpan ujian ke database, data aman di lokal:", err);
                             }
@@ -1183,7 +1189,11 @@ const App: React.FC = () => {
                             setExams((prev) => ({ ...prev, [examWithAuthor.code]: examWithAuthor }));
                         } catch (err) {
                             if (err instanceof ModerationError) {
-                                alert(`PERUBAHAN DIBLOKIR!\n\nSistem mendeteksi konten yang tidak pantas:\n- ${err.issues.join('\n- ')}\n\nMohon perbaiki konten ujian Anda sebelum menyimpan.`);
+                                void showAlertModal({
+                                  title: 'Perubahan Diblokir',
+                                  message: `Sistem mendeteksi konten yang tidak pantas:\n- ${err.issues.join('\n- ')}\n\nMohon perbaiki konten ujian Anda sebelum menyimpan.`,
+                                  tone: 'danger',
+                                });
                             } else {
                                 console.error("Gagal perbarui ujian ke database, data aman di lokal:", err);
                             }
@@ -1319,6 +1329,8 @@ const App: React.FC = () => {
             onClose={closeAppDialog}
           />
         )}
+        {/* Global Feedback Modals & Toasts */}
+        <FeedbackHost />
     </div>
   );
 };
