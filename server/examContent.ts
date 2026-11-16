@@ -2,33 +2,39 @@ import { createClient } from '@supabase/supabase-js';
 import { supabase as anonSupabase } from '../lib/supabase.ts';
 import type { Question } from '../types.ts';
 
-function getServerSupabase(): { client: typeof anonSupabase | null; errorStatus?: number; errorCode?: string } {
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  const supabaseUrl =
-    process.env.VITE_SUPABASE_URL ||
-    process.env.SUPABASE_URL ||
-    'https://fidxmkjpdlfawagawrrm.supabase.co';
+const DEFAULT_SUPABASE_URL = 'https://fidxmkjpdlfawagawrrm.supabase.co';
 
-  if (serviceRoleKey && supabaseUrl) {
-    return {
-      client: createClient(supabaseUrl, serviceRoleKey, {
-        auth: { autoRefreshToken: false, persistSession: false },
-      }),
-    };
+function isValidHttpUrl(val?: string): val is string {
+  if (!val) return false;
+  const trimmed = val.trim();
+  return /^https?:\/\/[a-z0-9.-]+/i.test(trimmed) && !/your_.*here/i.test(trimmed);
+}
+
+function isValidSupabaseKey(val?: string): val is string {
+  if (!val) return false;
+  const trimmed = val.trim();
+  return trimmed.length > 30 && !/your_.*here/i.test(trimmed) && !/\s/.test(trimmed);
+}
+
+function getServerSupabase(): { client: typeof anonSupabase; isServiceRole: boolean } {
+  const rawServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const rawUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
+  const supabaseUrl = isValidHttpUrl(rawUrl) ? rawUrl.trim() : DEFAULT_SUPABASE_URL;
+
+  if (isValidSupabaseKey(rawServiceKey)) {
+    try {
+      return {
+        client: createClient(supabaseUrl, rawServiceKey.trim(), {
+          auth: { autoRefreshToken: false, persistSession: false },
+        }),
+        isServiceRole: true,
+      };
+    } catch (err) {
+      console.warn('[ExamContent] Gagal membuat service role client, beralih ke anonSupabase:', err);
+    }
   }
 
-  const isProdRuntime = process.env.NODE_ENV === 'production' || Boolean(process.env.VERCEL);
-  if (isProdRuntime) {
-    console.error('[Security Error] SUPABASE_SERVICE_ROLE_KEY tidak dikonfigurasi di server produksi.');
-    return {
-      client: null,
-      errorStatus: 503,
-      errorCode: 'SERVER_SERVICE_ROLE_REQUIRED',
-    };
-  }
-
-  console.warn('[Security Warning] SUPABASE_SERVICE_ROLE_KEY belum disetel; memakai anonSupabase khusus mode dev lokal.');
-  return { client: anonSupabase };
+  return { client: anonSupabase, isServiceRole: false };
 }
 
 // In-memory origin cache to shield Supabase from simultaneous origin requests
@@ -136,20 +142,25 @@ export async function getStudentQuestionBundle(code: string, requestedVersion?: 
     };
   }
 
-  const { client: db, errorStatus, errorCode } = getServerSupabase();
-  if (!db) {
-    return {
-      success: false,
-      status: errorStatus || 503,
-      error: errorCode || 'SERVER_SERVICE_ROLE_REQUIRED'
-    };
-  }
+  const { client: primaryDb, isServiceRole } = getServerSupabase();
+  let db = primaryDb;
 
-  const { data, error } = await db
+  let { data, error } = await db
     .from('exams')
     .select('code, questions, config, status, created_at')
     .eq('code', code)
     .maybeSingle();
+
+  if (error && isServiceRole) {
+    db = anonSupabase;
+    const retryRes = await db
+      .from('exams')
+      .select('code, questions, config, status, created_at')
+      .eq('code', code)
+      .maybeSingle();
+    data = retryRes.data;
+    error = retryRes.error;
+  }
 
   if (error || !data) {
     return {
@@ -212,21 +223,26 @@ export async function getAuthorizedExamSolutions(
     return { success: false, status: 400, error: 'EXAM_CODE_REQUIRED' };
   }
 
-  const { client: db, errorStatus, errorCode } = getServerSupabase();
-  if (!db) {
-    return {
-      success: false,
-      status: errorStatus || 503,
-      error: errorCode || 'SERVER_SERVICE_ROLE_REQUIRED'
-    };
-  }
+  const { client: primaryDb, isServiceRole } = getServerSupabase();
+  let db = primaryDb;
 
   // 1. Fetch lightweight exam config only (avoid downloading full questions JSONB until authorized & cache miss)
-  const { data: exam, error: examError } = await db
+  let { data: exam, error: examError } = await db
     .from('exams')
     .select('code, config, status')
     .eq('code', code)
     .maybeSingle();
+
+  if (examError && isServiceRole) {
+    db = anonSupabase;
+    const retryRes = await db
+      .from('exams')
+      .select('code, config, status')
+      .eq('code', code)
+      .maybeSingle();
+    exam = retryRes.data;
+    examError = retryRes.error;
+  }
 
   if (examError || !exam) {
     return { success: false, status: 404, error: 'EXAM_NOT_FOUND' };
