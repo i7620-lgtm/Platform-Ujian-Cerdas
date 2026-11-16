@@ -2568,7 +2568,7 @@ export const sanitizeHtml = (html: string): string => {
   });
 
   const result = doc.body.innerHTML;
-  const finalHtml = repairGeometrySvgInHtml(cleanOrphanedSvgMarkup(withoutAiSvg));
+  const finalHtml = repairGeometrySvgInHtml(cleanOrphanedSvgMarkup(result));
   if (SANITIZE_HTML_CACHE.size >= SANITIZE_HTML_CACHE_MAX) {
     const oldestKey = SANITIZE_HTML_CACHE.keys().next().value;
     if (oldestKey !== undefined) SANITIZE_HTML_CACHE.delete(oldestKey);
