@@ -12,6 +12,7 @@ import {
   AlertCircle,
   HelpCircle,
 } from "lucide-react";
+import { showAlertModal, showConfirmModal } from "../../../stores/feedbackStore";
 
 export interface QuestionAudioModalProps {
   isOpen: boolean;
@@ -61,7 +62,11 @@ export const QuestionAudioModal: React.FC<QuestionAudioModalProps> = ({
     if (!file) return;
 
     if (file.size > 3 * 1024 * 1024) {
-      alert("Ukuran berkas audio terlalu besar (maksimal 3MB).");
+      void showAlertModal({
+        title: "Berkas Audio Terlalu Besar",
+        message: "Ukuran berkas audio terlalu besar (maksimal 3MB).",
+        tone: "warning",
+      });
       return;
     }
 
@@ -76,7 +81,11 @@ export const QuestionAudioModal: React.FC<QuestionAudioModalProps> = ({
 
   const handleTestSpeech = () => {
     if (typeof window === "undefined" || !("speechSynthesis" in window)) {
-      alert("Browser Anda tidak mendukung Web Speech Synthesis.");
+      void showAlertModal({
+        title: "Browser Tidak Mendukung",
+        message: "Browser Anda tidak mendukung Web Speech Synthesis.",
+        tone: "warning",
+      });
       return;
     }
 
@@ -87,7 +96,11 @@ export const QuestionAudioModal: React.FC<QuestionAudioModalProps> = ({
       window.speechSynthesis.cancel();
       const textToSpeak = script.trim();
       if (!textToSpeak) {
-        alert("Silakan ketik atau tempel naskah teks yang ingin dibacakan terlebih dahulu.");
+        void showAlertModal({
+          title: "Naskah Belum Diisi",
+          message: "Silakan ketik atau tempel naskah teks yang ingin dibacakan terlebih dahulu.",
+          tone: "warning",
+        });
         return;
       }
 
@@ -112,7 +125,11 @@ export const QuestionAudioModal: React.FC<QuestionAudioModalProps> = ({
     if (activeTab === "upload") {
       const cleanUrl = audioUrl.trim();
       if (!cleanUrl) {
-        alert("Silakan unggah berkas audio atau masukkan tautan URL audio terlebih dahulu.");
+        void showAlertModal({
+          title: "Audio Belum Dipilih",
+          message: "Silakan unggah berkas audio atau masukkan tautan URL audio terlebih dahulu.",
+          tone: "warning",
+        });
         return;
       }
       onSave({
@@ -122,7 +139,11 @@ export const QuestionAudioModal: React.FC<QuestionAudioModalProps> = ({
     } else {
       const cleanScript = script.trim();
       if (!cleanScript) {
-        alert("Silakan ketik naskah teks percakapan atau cerita narasi listening terlebih dahulu.");
+        void showAlertModal({
+          title: "Naskah Belum Diisi",
+          message: "Silakan ketik naskah teks percakapan atau cerita narasi listening terlebih dahulu.",
+          tone: "warning",
+        });
         return;
       }
       onSave({
@@ -133,8 +154,14 @@ export const QuestionAudioModal: React.FC<QuestionAudioModalProps> = ({
     onClose();
   };
 
-  const handleRemoveAudio = () => {
-    if (window.confirm("Apakah Anda yakin ingin menghapus stimulus audio dari soal ini?")) {
+  const handleRemoveAudio = async () => {
+    const confirmed = await showConfirmModal({
+      title: "Hapus Stimulus Audio?",
+      message: "Apakah Anda yakin ingin menghapus stimulus audio dari soal ini?",
+      tone: "danger",
+      confirmLabel: "Hapus Audio",
+    });
+    if (confirmed) {
       if (typeof window !== "undefined" && "speechSynthesis" in window) {
         window.speechSynthesis.cancel();
       }
