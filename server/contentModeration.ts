@@ -89,6 +89,53 @@ export function validateEducationalSafety(prompt: string): ModerationResult {
   };
 }
 
+// Daftar kata terlarang terpadu (Indonesia & Inggris) selaras dengan filter cepat klien
+const SERVER_BAD_WORDS_REGEX = new RegExp(
+  "\\b(" +
+    [
+      "anjing", "babi", "bangsat", "tolol", "goblok", "asu", "kontol", "memek", "jembut", "pelacur", "lonte",
+      "perek", "bejad", "biadab", "pukimak", "ngewe", "entot", "ngocok", "coli", "itil", "ngentot", "crot", "sange",
+      "cina", "kafir", "murtad", "sesat", "kadrun", "cebong", "kampret", "bencong", "banci", "idiot", "autis",
+      "fuck", "shit", "bitch", "asshole", "pussy", "dick", "cock", "porn", "xxx", "sex",
+    ].join("|") +
+    ")\\b",
+  "gi"
+);
+
+/**
+ * Validasi konten soal ujian di sisi server berbasis aturan kata terlarang deterministik (tanpa panggilan AI).
+ * Menjamin respons instan (<5 ms), hemat kuota, dan selalu mengembalikan JSON valid.
+ */
+export function moderateExamContentOnServer(content: string): { isSafe: boolean; issues: string[] } {
+  const cleanContent = (content || "").trim();
+  if (!cleanContent) {
+    return { isSafe: true, issues: [] };
+  }
+
+  const issues: string[] = [];
+
+  for (const pattern of PROHIBITED_PATTERNS) {
+    const match = cleanContent.match(pattern);
+    if (match && match.length > 0) {
+      issues.push(
+        `Konten mengandung unsur tidak pantas atau melanggar etika pendidikan K-12 (${match[0].trim()}).`
+      );
+      break;
+    }
+  }
+
+  const badWordMatches = cleanContent.match(SERVER_BAD_WORDS_REGEX);
+  if (badWordMatches && badWordMatches.length > 0) {
+    const uniqueMatches = Array.from(new Set(badWordMatches.map((m) => m.toLowerCase())));
+    issues.push(`Kata-kata kasar/tidak pantas terdeteksi: ${uniqueMatches.join(", ")}`);
+  }
+
+  return {
+    isSafe: issues.length === 0,
+    issues,
+  };
+}
+
 /**
  * Validasi mendalam menggunakan AI untuk mendeteksi konten tidak pantas yang tersamar.
  */

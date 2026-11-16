@@ -7,6 +7,8 @@
     }
   },
   "rewrites": [
+    { "source": "/api/exam-content/:code/:action", "destination": "/api/exam-content?code=:code&action=:action" },
+    { "source": "/api/exam-content/warm", "destination": "/api/exam-content?action=warm" },
     { "source": "/((?!api/|.*\\.[\\w]+$).*)", "destination": "/index.html" }
   ],
   "headers": [

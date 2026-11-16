@@ -770,7 +770,8 @@ export class ExamService {
             // 4. Download question package from Vercel Edge Network CDN (s-maxage=86400)
             try {
                 const response = await fetch(`/api/exam-content/${cleanCode}/test?v=${examVersion}&preview=${isPreview}`);
-                if (response.ok) {
+                const contentType = response.headers.get('content-type') || '';
+                if (response.ok && contentType.includes('application/json')) {
                     const json = await response.json();
                     if (json.success && Array.isArray(json.questions)) {
                         loadedQuestions = json.questions;
@@ -786,7 +787,41 @@ export class ExamService {
                 console.warn("Edge CDN fetch error, checking local/DB fallback:", edgeErr);
             }
 
-            // Fallback: If edge endpoint was unreachable, check local cached/teacher questions without querying exams.questions directly
+            // Fallback 1: Direct Supabase query (if online) + strict client-side answer stripping
+            if (loadedQuestions.length === 0 && (typeof navigator === 'undefined' || navigator.onLine !== false)) {
+                try {
+                    const { data: directExam, error: directErr } = await supabase
+                        .from('exams')
+                        .select('questions, status')
+                        .eq('code', cleanCode)
+                        .maybeSingle();
+
+                    if (!directErr && directExam && Array.isArray(directExam.questions)) {
+                        if (directExam.status === 'DRAFT' && !isPreview) {
+                            throw new Error("EXAM_IS_DRAFT");
+                        }
+                        const rawQs = directExam.questions as Question[];
+                        loadedQuestions = isPreview
+                            ? rawQs
+                            : rawQs.map(q => this.stripAnswersFromQuestion(q));
+
+                        if (loadedQuestions.length > 0) {
+                            await offlineService.saveLocalProgress(localCacheKey, {
+                                version: examVersion,
+                                questions: loadedQuestions,
+                                savedAt: Date.now()
+                            });
+                        }
+                    }
+                } catch (directFallbackErr: any) {
+                    if (directFallbackErr?.message === 'EXAM_IS_DRAFT') {
+                        throw directFallbackErr;
+                    }
+                    console.warn("Supabase direct fallback error, checking local caches:", directFallbackErr);
+                }
+            }
+
+            // Fallback 2: Check local cached/teacher questions if both Edge & direct DB failed
             if (loadedQuestions.length === 0) {
                 const localExams = await this.getLocalTeacherExamsAsync();
                 if (localExams[cleanCode] && Array.isArray(localExams[cleanCode].questions) && localExams[cleanCode].questions.length > 0) {
@@ -830,7 +865,44 @@ export class ExamService {
     }
 
     /**
-     * Fetch solutions and explanations with server-side authorization and zero-login ownership proof
+     * Fetch latest sanitized question bundle for live mid-exam updates (Edge CDN + Supabase fallback)
+     */
+    async fetchLatestQuestionsBundleForStudent(code: string, version: number): Promise<Question[] | null> {
+        const cleanCode = (code || '').trim().toUpperCase();
+        if (!cleanCode) return null;
+
+        try {
+            const response = await fetch(`/api/exam-content/${cleanCode}/test?v=${version}`);
+            const contentType = response.headers.get('content-type') || '';
+            if (response.ok && contentType.includes('application/json')) {
+                const json = await response.json();
+                if (json.success && Array.isArray(json.questions)) {
+                    return json.questions as Question[];
+                }
+            }
+        } catch {
+            // Fall through to Supabase fallback
+        }
+
+        try {
+            const { data, error } = await supabase
+                .from('exams')
+                .select('questions, status')
+                .eq('code', cleanCode)
+                .maybeSingle();
+            if (!error && data && data.status !== 'DRAFT' && Array.isArray(data.questions)) {
+                return (data.questions as Question[]).map(q => this.stripAnswersFromQuestion(q));
+            }
+        } catch {
+            // ignore
+        }
+
+        return null;
+    }
+
+    /**
+     * Fetch solutions and explanations with server-side authorization and zero-login ownership proof,
+     * with guarded Supabase fallback if Edge endpoint is unavailable.
      */
     async getExamSolutions(
         code: string,
@@ -850,16 +922,77 @@ export class ExamService {
             }
             const url = `/api/exam-content/${cleanCode}/solutions?${params.toString()}`;
             const res = await fetch(url);
-            if (!res.ok) {
+            const contentType = res.headers.get('content-type') || '';
+            if (res.ok && contentType.includes('application/json')) {
+                const json = await res.json();
+                if (json.success && json.solutions) {
+                    return json.solutions;
+                }
+            } else if (res.status === 403) {
                 return null;
             }
-            const json = await res.json();
-            if (json.success && json.solutions) {
-                return json.solutions;
-            }
-            return null;
         } catch (e) {
-            console.warn("Failed to fetch solutions from edge endpoint:", e);
+            console.warn("Failed to fetch solutions from edge endpoint, trying Supabase fallback:", e);
+        }
+
+        // Guarded Supabase fallback when edge endpoint is unreachable/404/503
+        try {
+            const { data: examRow, error: examErr } = await supabase
+                .from('exams')
+                .select('config, questions')
+                .eq('code', cleanCode)
+                .maybeSingle();
+
+            if (examErr || !examRow) return null;
+
+            const cfg = (examRow.config || {}) as ExamConfig;
+            const isSolutionsAllowed = Boolean(
+                cfg.showCorrectAnswer || cfg.showHints || cfg.showSolutionSteps || cfg.showResultToStudent
+            );
+
+            let authorized = false;
+            if (studentId === 'monitor' && cfg.enablePublicStream) {
+                authorized = true;
+            } else if (proctorToken && Array.isArray(cfg.collaborators)) {
+                authorized = cfg.collaborators.some(
+                    c => c.token === proctorToken && (c.role === 'editor' || c.role === 'viewer')
+                );
+            } else if (studentId && studentId !== 'monitor' && isSolutionsAllowed) {
+                const { data: resultRow } = await supabase
+                    .from('results')
+                    .select('id, status, device_id, answers')
+                    .eq('exam_code', cleanCode)
+                    .eq('student_id', studentId)
+                    .maybeSingle();
+
+                if (resultRow && (resultRow.status === 'completed' || resultRow.status === 'force_closed')) {
+                    const dbDeviceId = String(resultRow.device_id || (resultRow.answers as Record<string, unknown> | null)?._deviceId || '').trim();
+                    const dbResultId = resultRow.id ? String(resultRow.id) : '';
+                    const providedDeviceId = String(proof?.deviceId || '').trim();
+                    const providedResultId = proof?.resultId !== undefined && proof?.resultId !== null ? String(proof.resultId).trim() : '';
+
+                    authorized = dbDeviceId
+                        ? Boolean(providedDeviceId) && providedDeviceId === dbDeviceId
+                        : Boolean(dbResultId) && Boolean(providedResultId) && providedResultId === dbResultId;
+                }
+            }
+
+            if (!authorized || !Array.isArray(examRow.questions)) {
+                return null;
+            }
+
+            const solutions: Record<string, any> = {};
+            (examRow.questions as Question[]).forEach(q => {
+                solutions[q.id] = {
+                    correctAnswer: q.correctAnswer,
+                    explanation: q.explanation,
+                    solutionSteps: q.solutionSteps,
+                    trueFalseRows: q.trueFalseRows?.map(r => ({ text: r.text, answer: r.answer })),
+                    matchingPairs: q.matchingPairs?.map(m => ({ left: m.left, right: m.right })),
+                };
+            });
+            return solutions;
+        } catch {
             return null;
         }
     }
@@ -1070,6 +1203,20 @@ export class ExamService {
         return processedQuestions;
     }
 
+    /**
+     * Prime origin memory cache and Vercel Edge CDN GET cache only for non-DRAFT exams.
+     */
+    private warmExamEdgeCache(examCode: string, version: number, status?: string): void {
+        const cleanCode = (examCode || '').trim().toUpperCase();
+        if (!cleanCode || status === 'DRAFT') {
+            return;
+        }
+        try {
+            fetch(`/api/exam-content/${cleanCode}/warm?v=${version}`, { method: 'POST' }).catch(() => {});
+            fetch(`/api/exam-content/${cleanCode}/test?v=${version}&preview=false`, { method: 'GET' }).catch(() => {});
+        } catch { /* ignore */ }
+    }
+
     async saveExam(exam: Exam): Promise<void> {
         // Content Moderation Check (SARA, Pornography, Bullying, etc.)
         const moderation = await ContentModerator.validateExamContent(exam);
@@ -1133,9 +1280,7 @@ export class ExamService {
             if (partialData && partialData.length > 0) {
                 console.log("Partial update successful!");
                 await this.syncRegisteredStudents(exam);
-                try {
-                    fetch(`/api/exam-content/${exam.code}/warm?v=${nextVersion}`, { method: 'POST' }).catch(() => {});
-                } catch { /* ignore */ }
+                this.warmExamEdgeCache(exam.code, nextVersion, exam.status || 'PUBLISHED');
                 return;
             }
 
@@ -1172,10 +1317,8 @@ export class ExamService {
 
         await this.syncRegisteredStudents(exam);
 
-        // Prime the Vercel Edge CDN cache in the background
-        try {
-            fetch(`/api/exam-content/${exam.code}/warm?v=${nextVersion}`, { method: 'POST' }).catch(() => {});
-        } catch { /* ignore */ }
+        // Prime the Vercel Edge CDN cache in the background (published/active exams only)
+        this.warmExamEdgeCache(exam.code, nextVersion, exam.status || 'PUBLISHED');
     }
 
     private async syncRegisteredStudents(exam: Exam): Promise<void> {
@@ -1235,7 +1378,7 @@ export class ExamService {
 
         const { data: existingExam, error: fetchError } = await supabase
             .from('exams')
-            .select('code, config')
+            .select('code, config, status')
             .eq('code', exam.code)
             .single();
 
@@ -1271,9 +1414,8 @@ export class ExamService {
 
         if (!rpcError) {
             console.log("Collaborator save success (RPC)");
-            try {
-                fetch(`/api/exam-content/${exam.code}/warm?v=${nextVersion}`, { method: 'POST' }).catch(() => {});
-            } catch { /* ignore */ }
+            const resolvedStatus = exam.status || (existingExam as { status?: string }).status || 'PUBLISHED';
+            this.warmExamEdgeCache(exam.code, nextVersion, resolvedStatus);
             return;
         }
 
@@ -1381,7 +1523,7 @@ export class ExamService {
         // 1. Fetch Exam
         const { data: examData, error: examError } = await supabase
             .from('exams')
-            .select('questions, config')
+            .select('questions, config, status')
             .eq('code', examCode)
             .single();
         
@@ -1424,10 +1566,8 @@ export class ExamService {
 
         if (updateError) throw updateError;
 
-        // Prime Edge CDN in background
-        try {
-            fetch(`/api/exam-content/${examCode}/warm?v=${nextVersion}`, { method: 'POST' }).catch(() => {});
-        } catch { /* ignore */ }
+        // Prime Edge CDN in background (published/active exams only)
+        this.warmExamEdgeCache(examCode, nextVersion, (examData as { status?: string }).status || 'PUBLISHED');
 
         // 4. Fetch All Results with 1000-row range pagination
         const PAGE_SIZE = 1000;

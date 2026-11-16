@@ -1,5 +1,6 @@
 import healthHandler from "./health.ts";
 import examContentHandler from "./exam-content.ts";
+import moderateContentHandler from "./moderate-content.ts";
 
 export const config = {
   maxDuration: 60,
@@ -13,6 +14,10 @@ export default async function handler(req: any, res: any) {
 
   if (pathname === "/api/health" || pathname === "/health" || pathname === "/api" || pathname === "") {
     return healthHandler(req, res);
+  }
+
+  if (pathname === "/api/moderate-content" || pathname === "/moderate-content") {
+    return moderateContentHandler(req, res);
   }
 
   if (
