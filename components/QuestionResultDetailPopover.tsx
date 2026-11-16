@@ -2,10 +2,11 @@ import React, { useState } from "react";
 import { createPortal } from "react-dom";
 import type { Question } from "../types";
 import {
+  CheckCircleIcon,
   XMarkIcon,
   CheckIcon,
   LightBulbIcon,
-  AcademicCapIcon,
+  SparklesIcon,
 } from "./Icons";
 import {
   isAnswerMatch,
@@ -14,7 +15,6 @@ import {
   sanitizeHtml,
 } from "./teacher/examUtils";
 import { renderMathInHtml } from "../utils/mathRenderer";
-import { openVisualLightbox } from "../utils/lightboxUtils";
 
 interface QuestionResultDetailPopoverProps {
   question: Question;
@@ -25,25 +25,8 @@ interface QuestionResultDetailPopoverProps {
   isGraded?: boolean | string;
   showCorrectAnswer?: boolean;
   showSolutionSteps?: boolean;
-  showHints?: boolean;
   size?: "sm" | "md";
 }
-
-const hasQuestionAnswer = (q: Question, ans: string): boolean => {
-  if (!ans || ans.trim().length === 0) return false;
-  if (q.questionType === "COMPLEX_MULTIPLE_CHOICE") {
-    return parseList(ans, q.options).length > 0;
-  }
-  if (q.questionType === "TRUE_FALSE" || q.questionType === "MATCHING") {
-    try {
-      const parsed = JSON.parse(ans);
-      return Boolean(parsed && typeof parsed === "object" && Object.keys(parsed).length > 0);
-    } catch {
-      return false;
-    }
-  }
-  return true;
-};
 
 export const QuestionResultDetailPopover: React.FC<
   QuestionResultDetailPopoverProps
@@ -56,20 +39,17 @@ export const QuestionResultDetailPopover: React.FC<
   isGraded = false,
   showCorrectAnswer = true,
   showSolutionSteps = true,
-  showHints,
   size = "sm",
 }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   const studentAns = answers[question.id] || "";
   const correctAns = question.correctAnswer || "";
-  const isAnsweredByStudent = hasQuestionAnswer(question, studentAns);
-  const canShowHints = showHints ?? showSolutionSteps;
 
   // Hitung poin dan status terpadu
   const maxPoints = question.points ?? question.scoreWeight ?? 1;
   let statusText = "Kosong (Tidak Dijawab)";
-  let pointsText = showCorrectAnswer ? `0/${maxPoints} Poin` : "Tidak Diisi";
+  let pointsText = `0/${maxPoints} Poin`;
   let statusBadgeStyle =
     "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border-slate-200 dark:border-slate-700";
 
@@ -78,7 +58,7 @@ export const QuestionResultDetailPopover: React.FC<
     "bg-slate-200 dark:bg-slate-700 text-slate-800 dark:text-slate-200 hover:bg-slate-300 dark:hover:bg-slate-600";
 
   if (question.questionType === "QUESTIONNAIRE") {
-    if (isAnsweredByStudent) {
+    if (studentAns && studentAns.trim().length > 0) {
       badgeColorClass =
         "bg-indigo-500 dark:bg-indigo-600 text-white font-black hover:bg-indigo-600";
       statusText = "Respon Tercatat";
@@ -93,23 +73,7 @@ export const QuestionResultDetailPopover: React.FC<
       statusBadgeStyle =
         "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border-slate-200 dark:border-slate-700";
     }
-  } else if (!showCorrectAnswer) {
-    if (isAnsweredByStudent) {
-      badgeColorClass =
-        "bg-indigo-500 dark:bg-indigo-600 text-white font-black hover:bg-indigo-600";
-      statusText = "Sudah Dijawab";
-      pointsText = "Tercatat";
-      statusBadgeStyle =
-        "bg-indigo-50 text-indigo-800 dark:bg-indigo-950/60 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800";
-    } else {
-      badgeColorClass =
-        "bg-slate-200 dark:bg-slate-700 text-slate-800 dark:text-slate-200 hover:bg-slate-300 dark:hover:bg-slate-600";
-      statusText = "Kosong (Tidak Dijawab)";
-      pointsText = "Belum Diisi";
-      statusBadgeStyle =
-        "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border-slate-200 dark:border-slate-700";
-    }
-  } else if (isManual && !isGraded && question.questionType === "ESSAY") {
+  } else if (isManual && !isGraded) {
     badgeColorClass =
       "bg-amber-300 dark:bg-amber-500 text-slate-900 font-black hover:bg-amber-400";
     statusText = "Belum Dinilai";
@@ -142,8 +106,6 @@ export const QuestionResultDetailPopover: React.FC<
     setIsModalOpen(true);
   };
 
-  const solutionContent = question.solutionSteps || question.explanation || "";
-
   // Helper render konten soal
   const renderDetailContent = (onClose?: () => void) => {
     return (
@@ -167,7 +129,7 @@ export const QuestionResultDetailPopover: React.FC<
             <button
               type="button"
               onClick={onClose}
-              className="w-9 h-9 flex items-center justify-center rounded-xl text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors shrink-0 -mt-1 -mr-1 cursor-pointer"
+              className="w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center rounded-xl text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors shrink-0 -mt-1 -mr-1 cursor-pointer"
               aria-label="Tutup Detail Soal"
             >
               <XMarkIcon className="w-5 h-5" />
@@ -194,16 +156,9 @@ export const QuestionResultDetailPopover: React.FC<
                 className="max-w-full max-h-64 sm:max-h-72 object-contain rounded-lg shadow-2xs cursor-pointer hover:opacity-95"
                 loading="lazy"
                 referrerPolicy="no-referrer"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  openVisualLightbox({
-                    src: question.imageUrl!,
-                    alt: `Stimulus Soal #${questionIndex + 1}`,
-                    title: `Gambar Stimulus Soal #${questionIndex + 1}`,
-                  });
-                }}
+                onClick={() => window.open(question.imageUrl, "_blank")}
               />
-              <span className="text-[10px] text-slate-400 mt-1">Klik gambar untuk memperbesar</span>
+              <span className="text-[10px] text-slate-400 mt-1">Klik gambar untuk membuka ukuran penuh</span>
             </div>
           )}
         </div>
@@ -218,54 +173,46 @@ export const QuestionResultDetailPopover: React.FC<
               {question.options.map((opt, oIdx) => {
                 const optLetter = String.fromCharCode(65 + oIdx);
                 const isSelectedByStudent =
-                  isAnsweredByStudent &&
-                  (studentAns === opt ||
-                    isAnswerMatch(studentAns, opt, "MULTIPLE_CHOICE", question.options));
+                  studentAns.trim().toLowerCase() ===
+                    optLetter.toLowerCase() ||
+                  studentAns.trim().toLowerCase() === opt.trim().toLowerCase();
                 const isCorrectOption =
-                  showCorrectAnswer &&
-                  Boolean(correctAns) &&
-                  isAnswerMatch(correctAns, opt, "MULTIPLE_CHOICE", question.options);
+                  correctAns.trim().toLowerCase() ===
+                    optLetter.toLowerCase() ||
+                  correctAns.trim().toLowerCase() === opt.trim().toLowerCase();
 
                 let cardStyle =
                   "bg-white dark:bg-slate-800/80 border-slate-200/80 dark:border-slate-700 text-slate-700 dark:text-slate-300";
-                let badgeNode: React.ReactNode = null;
+                let badgeNode = null;
 
-                if (showCorrectAnswer) {
+                if (showCorrectAnswer && isCorrectOption) {
+                  cardStyle =
+                    "bg-emerald-50/90 dark:bg-emerald-950/40 border-emerald-300 dark:border-emerald-700 text-emerald-900 dark:text-emerald-200 font-bold ring-1 ring-emerald-400/30";
+                  badgeNode = (
+                    <span className="text-[9px] bg-emerald-600 text-white font-extrabold px-1.5 py-0.5 rounded ml-auto shrink-0 flex items-center gap-0.5">
+                      <CheckIcon className="w-2.5 h-2.5" /> Kunci Benar
+                    </span>
+                  );
+                }
+
+                if (isSelectedByStudent) {
                   if (isCorrectOption) {
-                    cardStyle =
-                      "bg-emerald-50/90 dark:bg-emerald-950/40 border-emerald-300 dark:border-emerald-700 text-emerald-900 dark:text-emerald-200 font-bold ring-1 ring-emerald-400/30";
                     badgeNode = (
                       <span className="text-[9px] bg-emerald-600 text-white font-extrabold px-1.5 py-0.5 rounded ml-auto shrink-0 flex items-center gap-0.5">
-                        <CheckIcon className="w-2.5 h-2.5" /> Kunci Benar
+                        <CheckIcon className="w-2.5 h-2.5" /> Jawaban Siswa
+                        (Benar)
+                      </span>
+                    );
+                  } else {
+                    cardStyle =
+                      "bg-rose-50/90 dark:bg-rose-950/40 border-rose-300 dark:border-rose-700 text-rose-900 dark:text-rose-200 font-bold ring-1 ring-rose-400/30";
+                    badgeNode = (
+                      <span className="text-[9px] bg-rose-600 text-white font-extrabold px-1.5 py-0.5 rounded ml-auto shrink-0 flex items-center gap-0.5">
+                        <XMarkIcon className="w-2.5 h-2.5" /> Jawaban Siswa
+                        (Salah)
                       </span>
                     );
                   }
-
-                  if (isSelectedByStudent) {
-                    if (isCorrectOption) {
-                      badgeNode = (
-                        <span className="text-[9px] bg-emerald-600 text-white font-extrabold px-1.5 py-0.5 rounded ml-auto shrink-0 flex items-center gap-0.5">
-                          <CheckIcon className="w-2.5 h-2.5" /> Jawaban Siswa (Benar)
-                        </span>
-                      );
-                    } else {
-                      cardStyle =
-                        "bg-rose-50/90 dark:bg-rose-950/40 border-rose-300 dark:border-rose-700 text-rose-900 dark:text-rose-200 font-bold ring-1 ring-rose-400/30";
-                      badgeNode = (
-                        <span className="text-[9px] bg-rose-600 text-white font-extrabold px-1.5 py-0.5 rounded ml-auto shrink-0 flex items-center gap-0.5">
-                          <XMarkIcon className="w-2.5 h-2.5" /> Jawaban Siswa (Salah)
-                        </span>
-                      );
-                    }
-                  }
-                } else if (isSelectedByStudent) {
-                  cardStyle =
-                    "bg-indigo-50/90 dark:bg-indigo-950/40 border-indigo-300 dark:border-indigo-700 text-indigo-900 dark:text-indigo-200 font-bold ring-1 ring-indigo-400/30";
-                  badgeNode = (
-                    <span className="text-[9px] bg-indigo-600 text-white font-extrabold px-1.5 py-0.5 rounded ml-auto shrink-0 flex items-center gap-0.5">
-                      <CheckIcon className="w-2.5 h-2.5" /> Pilihan Siswa
-                    </span>
-                  );
                 }
 
                 return (
@@ -279,7 +226,7 @@ export const QuestionResultDetailPopover: React.FC<
                     <div className="flex-1 min-w-0 flex flex-col gap-1">
                       <span
                         className="[&_img]:max-h-20 [&_img]:max-w-full [&_img]:object-contain"
-                        dangerouslySetInnerHTML={{ __html: renderMathInHtml(sanitizeHtml(opt)) }}
+                        dangerouslySetInnerHTML={{ __html: renderMathInHtml(opt) }}
                       />
                       {question.optionImages?.[oIdx] && (
                         <img
@@ -290,11 +237,7 @@ export const QuestionResultDetailPopover: React.FC<
                           referrerPolicy="no-referrer"
                           onClick={(e) => {
                             e.stopPropagation();
-                            openVisualLightbox({
-                              src: question.optionImages![oIdx]!,
-                              alt: `Gambar Opsi ${optLetter}`,
-                              title: `Gambar Pilihan ${optLetter}`,
-                            });
+                            window.open(question.optionImages![oIdx]!, "_blank");
                           }}
                         />
                       )}
@@ -316,37 +259,24 @@ export const QuestionResultDetailPopover: React.FC<
               </p>
               <div className="space-y-1.5">
                 {question.options.map((opt, oIdx) => {
-                  const studentChoices = parseList(studentAns, question.options);
-                  const correctChoices = parseList(correctAns, question.options);
-                  const isSelected = studentChoices.some(
-                    (s) =>
-                      normalize(s, "COMPLEX_MULTIPLE_CHOICE") ===
-                        normalize(opt, "COMPLEX_MULTIPLE_CHOICE") ||
-                      isAnswerMatch(s, opt, "COMPLEX_MULTIPLE_CHOICE", question.options),
+                  const studentChoices = parseList(studentAns).map((s) =>
+                    normalize(s),
                   );
-                  const isCorrect =
-                    showCorrectAnswer &&
-                    correctChoices.some(
-                      (c) =>
-                        normalize(c, "COMPLEX_MULTIPLE_CHOICE") ===
-                          normalize(opt, "COMPLEX_MULTIPLE_CHOICE") ||
-                        isAnswerMatch(c, opt, "COMPLEX_MULTIPLE_CHOICE", question.options),
-                    );
+                  const correctChoices = parseList(correctAns).map((c) =>
+                    normalize(c),
+                  );
+                  const isSelected = studentChoices.includes(normalize(opt));
+                  const isCorrect = correctChoices.includes(normalize(opt));
 
                   let cardStyle =
-                    "bg-white dark:bg-slate-800/80 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300";
-
-                  if (showCorrectAnswer) {
-                    if (isCorrect) {
-                      cardStyle =
-                        "bg-emerald-50 dark:bg-emerald-950/40 border-emerald-300 dark:border-emerald-700 text-emerald-900 dark:text-emerald-200 font-bold";
-                    } else if (isSelected) {
-                      cardStyle =
-                        "bg-rose-50 dark:bg-rose-950/40 border-rose-300 dark:border-rose-700 text-rose-900 dark:text-rose-200 font-bold";
-                    }
-                  } else if (isSelected) {
+                    "bg-white dark:bg-slate-800/80 border-slate-200 dark:border-slate-700";
+                  if (showCorrectAnswer && isCorrect) {
                     cardStyle =
-                      "bg-indigo-50/90 dark:bg-indigo-950/40 border-indigo-300 dark:border-indigo-700 text-indigo-900 dark:text-indigo-200 font-bold";
+                      "bg-emerald-50 dark:bg-emerald-950/40 border-emerald-300 dark:border-emerald-700 text-emerald-900 dark:text-emerald-200 font-bold";
+                  }
+                  if (isSelected && !isCorrect) {
+                    cardStyle =
+                      "bg-rose-50 dark:bg-rose-950/40 border-rose-300 dark:border-rose-700 text-rose-900 dark:text-rose-200 font-bold";
                   }
 
                   return (
@@ -362,7 +292,7 @@ export const QuestionResultDetailPopover: React.FC<
                       <div className="flex-1 min-w-0 flex flex-col gap-1">
                         <span
                           className="[&_img]:max-h-20 [&_img]:max-w-full [&_img]:object-contain"
-                          dangerouslySetInnerHTML={{ __html: renderMathInHtml(sanitizeHtml(opt)) }}
+                          dangerouslySetInnerHTML={{ __html: renderMathInHtml(opt) }}
                         />
                         {question.optionImages?.[oIdx] && (
                           <img
@@ -373,11 +303,7 @@ export const QuestionResultDetailPopover: React.FC<
                             referrerPolicy="no-referrer"
                             onClick={(e) => {
                               e.stopPropagation();
-                              openVisualLightbox({
-                                src: question.optionImages![oIdx]!,
-                                alt: `Gambar Opsi ${String.fromCharCode(65 + oIdx)}`,
-                                title: `Gambar Pilihan ${String.fromCharCode(65 + oIdx)}`,
-                              });
+                              window.open(question.optionImages![oIdx]!, "_blank");
                             }}
                           />
                         )}
@@ -385,13 +311,7 @@ export const QuestionResultDetailPopover: React.FC<
                       <div className="flex gap-1 shrink-0">
                         {isSelected && (
                           <span
-                            className={`text-[9px] font-bold px-1.5 py-0.5 rounded text-white ${
-                              !showCorrectAnswer
-                                ? "bg-indigo-600"
-                                : isCorrect
-                                  ? "bg-emerald-600"
-                                  : "bg-rose-600"
-                            }`}
+                            className={`text-[9px] font-bold px-1.5 py-0.5 rounded text-white ${isCorrect ? "bg-emerald-600" : "bg-rose-600"}`}
                           >
                             Pilihan Siswa
                           </span>
@@ -413,30 +333,19 @@ export const QuestionResultDetailPopover: React.FC<
         {question.questionType === "TRUE_FALSE" && question.trueFalseRows && (
           <div className="space-y-1.5">
             <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
-              Pernyataan {(question.categoryLabels && question.categoryLabels[0]) || "Benar"} / {(question.categoryLabels && question.categoryLabels[1]) || "Salah"}:
+              Pernyataan Benar / Salah:
             </p>
             <div className="divide-y divide-slate-100 dark:divide-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden bg-white dark:bg-slate-800/80">
               {question.trueFalseRows.map((row, rIdx) => {
-                const trueLabel = (question.categoryLabels && question.categoryLabels[0]) || "Benar";
-                const falseLabel = (question.categoryLabels && question.categoryLabels[1]) || "Salah";
-                let rawStudentVal: boolean | undefined = undefined;
+                let studentRowAns = "-";
                 try {
                   const parsed = JSON.parse(studentAns);
-                  if (parsed && typeof parsed === "object" && parsed[rIdx] !== undefined) {
-                    rawStudentVal = Boolean(parsed[rIdx]);
-                  }
+                  studentRowAns = parsed[rIdx] ?? "-";
                 } catch {
                   /* ignore */
                 }
-                const studentRowLabel =
-                  rawStudentVal === true ? trueLabel : rawStudentVal === false ? falseLabel : "-";
-                const correctRowLabel = row.answer ? trueLabel : falseLabel;
-                const isRowMatch =
-                  showCorrectAnswer &&
-                  rawStudentVal !== undefined &&
-                  rawStudentVal === row.answer;
-                const statementHtml =
-                  row.text || (row as { statement?: string }).statement || "-";
+                const correctRowAns = row.answer;
+                const isRowMatch = String(studentRowAns) === String(correctRowAns);
 
                 return (
                   <div
@@ -445,27 +354,17 @@ export const QuestionResultDetailPopover: React.FC<
                   >
                     <span
                       className="flex-1 font-medium text-slate-700 dark:text-slate-200"
-                      dangerouslySetInnerHTML={{
-                        __html: renderMathInHtml(sanitizeHtml(statementHtml)),
-                      }}
+                      dangerouslySetInnerHTML={{ __html: row.statement }}
                     />
                     <div className="flex items-center gap-2 shrink-0">
                       <span
-                        className={`px-2 py-0.5 rounded text-[10px] font-black ${
-                          !showCorrectAnswer
-                            ? rawStudentVal !== undefined
-                              ? "bg-indigo-50 text-indigo-800 dark:bg-indigo-950/60 dark:text-indigo-300"
-                              : "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400"
-                            : isRowMatch
-                              ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300"
-                              : "bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300"
-                        }`}
+                        className={`px-2 py-0.5 rounded text-[10px] font-black ${isRowMatch ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300" : "bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300"}`}
                       >
-                        Siswa: {studentRowLabel}
+                        Siswa: {studentRowAns}
                       </span>
                       {showCorrectAnswer && (
                         <span className="px-2 py-0.5 rounded text-[10px] font-black bg-emerald-50 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
-                          Kunci: {correctRowLabel}
+                          Kunci: {correctRowAns}
                         </span>
                       )}
                     </div>
@@ -487,59 +386,31 @@ export const QuestionResultDetailPopover: React.FC<
                 let studentPairRight = "-";
                 try {
                   const parsed = JSON.parse(studentAns);
-                  const val = parsed?.[pIdx] ?? parsed?.[pair.left];
-                  if (val !== undefined && val !== null && String(val).trim() !== "") {
-                    studentPairRight = String(val);
-                  }
+                  studentPairRight = parsed[pair.left] ?? "-";
                 } catch {
                   /* ignore */
                 }
-                const hasPairAnswer = studentPairRight !== "-";
                 const isPairMatch =
-                  showCorrectAnswer &&
-                  hasPairAnswer &&
-                  isAnswerMatch(studentPairRight, pair.right, "MATCHING");
+                  studentPairRight.trim().toLowerCase() ===
+                  pair.right.trim().toLowerCase();
 
                 return (
                   <div
                     key={pIdx}
                     className="p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/80 text-xs flex flex-col gap-1"
                   >
-                    <div
-                      className="font-bold text-slate-800 dark:text-slate-200"
-                      dangerouslySetInnerHTML={{
-                        __html: renderMathInHtml(sanitizeHtml(pair.left)),
-                      }}
-                    />
+                    <div className="font-bold text-slate-800 dark:text-slate-200">
+                      {pair.left}
+                    </div>
                     <div className="flex flex-wrap items-center gap-2 text-[11px] pt-1 border-t border-slate-100 dark:border-slate-800">
                       <span
-                        className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                          !showCorrectAnswer
-                            ? hasPairAnswer
-                              ? "bg-indigo-50 text-indigo-800 dark:bg-indigo-950/60 dark:text-indigo-300"
-                              : "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400"
-                            : isPairMatch
-                              ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300"
-                              : "bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300"
-                        }`}
+                        className={`px-2 py-0.5 rounded text-[10px] font-bold ${isPairMatch ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300" : "bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300"}`}
                       >
-                        Pasangan Siswa:{" "}
-                        <span
-                          className="inline [&_p]:inline"
-                          dangerouslySetInnerHTML={{
-                            __html: renderMathInHtml(sanitizeHtml(studentPairRight)),
-                          }}
-                        />
+                        Pasangan Siswa: {studentPairRight}
                       </span>
                       {showCorrectAnswer && (
                         <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
-                          Kunci:{" "}
-                          <span
-                            className="inline [&_p]:inline"
-                            dangerouslySetInnerHTML={{
-                              __html: renderMathInHtml(sanitizeHtml(pair.right)),
-                            }}
-                          />
+                          Kunci: {pair.right}
                         </span>
                       )}
                     </div>
@@ -558,7 +429,7 @@ export const QuestionResultDetailPopover: React.FC<
               <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 block mb-1">
                 Jawaban Siswa:
               </span>
-              <p className="font-medium text-slate-800 dark:text-slate-200 whitespace-pre-wrap">
+              <p className="font-medium text-slate-800 dark:text-slate-200">
                 {studentAns || "(Kosong)"}
               </p>
             </div>
@@ -569,7 +440,7 @@ export const QuestionResultDetailPopover: React.FC<
                 </span>
                 <div
                   className="font-bold text-emerald-900 dark:text-emerald-200 prose prose-xs max-w-none dark:prose-invert"
-                  dangerouslySetInnerHTML={{ __html: renderMathInHtml(sanitizeHtml(correctAns)) }}
+                  dangerouslySetInnerHTML={{ __html: correctAns }}
                 />
               </div>
             )}
@@ -603,37 +474,24 @@ export const QuestionResultDetailPopover: React.FC<
           </div>
         )}
 
-        {/* Petunjuk Pengerjaan (Jika Diizinkan & Tersedia) */}
-        {canShowHints && question.hint && question.hint.trim() !== "" && (
-          <div className="mt-3 p-3 rounded-2xl bg-amber-50/80 dark:bg-amber-950/40 border border-amber-200/80 dark:border-amber-800/80">
-            <div className="flex items-center gap-1.5 text-amber-800 dark:text-amber-300 font-black text-xs mb-1.5">
-              <LightBulbIcon className="w-4 h-4 shrink-0 text-amber-500" />
-              <span>Petunjuk Pengerjaan:</span>
+        {/* Pembahasan / Langkah Penyelesaian (Jika Tersedia) */}
+        {showSolutionSteps &&
+          (question.solutionSteps || question.hints) && (
+            <div className="mt-3 p-3 rounded-2xl bg-indigo-50/80 dark:bg-indigo-950/50 border border-indigo-200/80 dark:border-indigo-800/80">
+              <div className="flex items-center gap-1.5 text-indigo-700 dark:text-indigo-300 font-black text-xs mb-1.5">
+                <LightBulbIcon className="w-4 h-4 shrink-0 text-amber-500" />
+                <span>Pembahasan Soal:</span>
+              </div>
+              <div
+                className="text-xs text-indigo-950 dark:text-indigo-200 leading-relaxed prose prose-xs max-w-none dark:prose-invert"
+                dangerouslySetInnerHTML={{
+                  __html: sanitizeHtml(
+                    question.solutionSteps || question.hints || "",
+                  ),
+                }}
+              />
             </div>
-            <div
-              className="text-xs text-amber-950 dark:text-amber-100 leading-relaxed prose prose-xs max-w-none dark:prose-invert"
-              dangerouslySetInnerHTML={{
-                __html: renderMathInHtml(sanitizeHtml(question.hint)),
-              }}
-            />
-          </div>
-        )}
-
-        {/* Pembahasan / Langkah Penyelesaian (Jika Diizinkan & Tersedia) */}
-        {showSolutionSteps && solutionContent.trim() !== "" && (
-          <div className="mt-3 p-3 rounded-2xl bg-indigo-50/80 dark:bg-indigo-950/50 border border-indigo-200/80 dark:border-indigo-800/80">
-            <div className="flex items-center gap-1.5 text-indigo-700 dark:text-indigo-300 font-black text-xs mb-1.5">
-              <AcademicCapIcon className="w-4 h-4 shrink-0 text-indigo-500" />
-              <span>Pembahasan Soal:</span>
-            </div>
-            <div
-              className="text-xs text-indigo-950 dark:text-indigo-200 leading-relaxed prose prose-xs max-w-none dark:prose-invert"
-              dangerouslySetInnerHTML={{
-                __html: renderMathInHtml(sanitizeHtml(solutionContent)),
-              }}
-            />
-          </div>
-        )}
+          )}
       </div>
     );
   };
@@ -645,8 +503,8 @@ export const QuestionResultDetailPopover: React.FC<
         type="button"
         onClick={handleTriggerClick}
         className={`${
-          size === "md" ? "w-9 h-9 text-xs" : "w-7 h-7 text-[10px]"
-        } flex items-center justify-center rounded-lg font-bold cursor-pointer transition-all duration-150 transform hover:scale-105 active:scale-95 shadow-2xs select-none ${badgeColorClass}`}
+          size === "md" ? "w-8 h-8 text-xs" : "w-6 h-6 text-[10px]"
+        } flex items-center justify-center rounded font-bold cursor-pointer transition-all duration-150 transform hover:scale-110 active:scale-95 shadow-2xs select-none ${badgeColorClass}`}
         title={`Soal #${questionIndex + 1}: ${statusText} · ${pointsText} (Klik untuk rincian)`}
         aria-label={`Rincian Soal #${questionIndex + 1}`}
       >
@@ -670,7 +528,7 @@ export const QuestionResultDetailPopover: React.FC<
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="min-h-[44px] px-5 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-bold text-xs rounded-xl transition-colors cursor-pointer"
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-bold text-xs rounded-xl transition-colors cursor-pointer"
                 >
                   Tutup
                 </button>
