@@ -4,14 +4,14 @@ import { parseList } from "../../teacher/examUtils";
 
 interface MultipleChoiceViewProps {
   question: Question;
-  answers: Record<string, string>;
+  answerValue: string;
   onAnswerChange: (qId: string, value: string) => void;
   optimizeHtml: (html: string) => string;
 }
 
-export const MultipleChoiceView: React.FC<MultipleChoiceViewProps> = ({
+export const MultipleChoiceView: React.FC<MultipleChoiceViewProps> = React.memo(({
   question,
-  answers,
+  answerValue,
   onAnswerChange,
   optimizeHtml,
 }) => {
@@ -23,7 +23,7 @@ export const MultipleChoiceView: React.FC<MultipleChoiceViewProps> = ({
     return (
       <div className="grid grid-cols-1 gap-3">
         {options.map((opt, i) => {
-          const isSelected = answers[qId] === opt;
+          const isSelected = answerValue === opt;
           return (
             <button
               key={i}
@@ -56,10 +56,10 @@ export const MultipleChoiceView: React.FC<MultipleChoiceViewProps> = ({
   }
 
   if (questionType === "COMPLEX_MULTIPLE_CHOICE") {
+    const currentAns = parseList(answerValue);
     return (
       <div className="grid grid-cols-1 gap-3">
         {options.map((opt, i) => {
-          const currentAns = parseList(answers[qId]);
           const isSelected = currentAns.includes(opt);
           return (
             <button
@@ -102,4 +102,4 @@ export const MultipleChoiceView: React.FC<MultipleChoiceViewProps> = ({
   }
 
   return null;
-};
+});
