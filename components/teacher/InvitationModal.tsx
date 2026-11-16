@@ -198,9 +198,9 @@ export const InvitationModal: React.FC<InvitationModalProps> = ({
 
   const getExamTypeBadge = (type: string) => {
     const t = type.toLowerCase();
-    if (t.includes("pas") || t.includes("akhir"))
+    if (t.includes("pas") || t.includes("sas") || t.includes("uas") || t.includes("akhir"))
       return "bg-indigo-600 text-white";
-    if (t.includes("harian") || t.includes("pts"))
+    if (t.includes("harian") || t.includes("pts") || t.includes("sts") || t.includes("uts") || t.includes("tugas"))
       return "bg-amber-500 text-white";
     return "bg-blue-600 text-white";
   };
@@ -714,6 +714,8 @@ export const InvitationModal: React.FC<InvitationModalProps> = ({
         onClose={() => setShowKisiKisi(false)}
         questions={exam?.questions || []}
         subject={exam?.config.subject || ""}
+        examType={effectiveExam?.config.examType}
+        classLevel={effectiveExam?.config.classLevel}
         schoolName={schoolName}
         teacherName={teacherName}
         teacherProfile={teacherProfile}
