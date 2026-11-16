@@ -24,6 +24,7 @@ import { measureClientBandwidthBytes, detectClientDevice, countIntegrityViolatio
 import { cleanupExpiredExamCaches } from './utils/cacheHygiene';
 import { FeedbackHost } from './components/FeedbackHost';
 import { showAlertModal } from './stores/feedbackStore';
+import { PWAInstallButton } from './components/PWAInstallButton';
 
 function lazyWithRetry<T extends React.ComponentType<any>>(
   componentImport: () => Promise<{ default: T }>
@@ -1042,7 +1043,7 @@ const App: React.FC = () => {
                 </div>
 
                 {/* Tombol Melayang Pojok Kiri Atas (Tidak memakan tinggi alur dokumen) */}
-                <div className="absolute top-3.5 sm:top-5 left-3.5 sm:left-6 z-20">
+                <div className="absolute top-3.5 sm:top-5 left-3.5 sm:left-6 z-20 flex items-center gap-2">
                     <button
                         onClick={() => setIsInviteOpen(true)}
                         className="flex items-center gap-2 px-3.5 sm:px-4 py-2 sm:py-2.5 rounded-full bg-white/90 dark:bg-slate-800/90 text-slate-600 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-white dark:hover:bg-slate-800 transition-all shadow-md shadow-slate-200/50 dark:shadow-none border border-slate-200/60 dark:border-slate-700 backdrop-blur-sm group active:scale-95"
@@ -1051,6 +1052,7 @@ const App: React.FC = () => {
                         <QrCodeIcon className="w-4 h-4 group-hover:scale-110 transition-transform shrink-0" />
                         <span className="text-xs font-bold uppercase tracking-wider">Bagikan App</span>
                     </button>
+                    <PWAInstallButton />
                 </div>
 
                 {/* Tombol Melayang Pojok Kanan Atas (Theme Toggle & Status Jaringan) */}
