@@ -21,6 +21,7 @@ import {
   getTimezoneLabel,
 } from "../../../../../utils/timezoneUtils";
 import { showAlertModal } from "../../../../../stores/feedbackStore";
+import { EXAM_TYPES } from "../../../constants";
 
 interface ExamConfigSettingsProps {
   config: ExamConfig;
@@ -219,12 +220,33 @@ export const ExamConfigSettings: React.FC<ExamConfigSettingsProps> = ({
                   : "text-gray-400"
               }
             >
-              {config.examType === "Lainnya" || !config.examType
-                ? "Pilih Jenis..."
-                : config.examType}
+              {config.examType === "Lainnya"
+                ? "Lainnya (Kustom)"
+                : !config.examType
+                  ? "Pilih Jenis..."
+                  : config.examType}
             </span>
             <ArrowPathIcon className="w-4 h-4 text-gray-400 rotate-90" />
           </div>
+          {config.examType &&
+            (config.examType === "Lainnya" ||
+              !EXAM_TYPES.filter((t) => t !== "Lainnya").includes(config.examType)) && (
+              <div className="mt-2">
+                <input
+                  type="text"
+                  value={config.examType === "Lainnya" ? "" : config.examType}
+                  onChange={(e) => {
+                    const nextVal = e.target.value;
+                    store.handleConfigChangeManual((prev: ExamConfig) => ({
+                      ...prev,
+                      examType: nextVal === "" ? "Lainnya" : nextVal,
+                    }));
+                  }}
+                  placeholder="Tulis nama jenis evaluasi (misal: Sumatif Tengah Semester Ganjil)"
+                  className="w-full p-2.5 bg-white dark:bg-slate-900 border border-indigo-200 dark:border-indigo-700 rounded-xl focus:ring-2 focus:ring-primary text-xs font-medium shadow-sm text-slate-800 dark:text-slate-200"
+                />
+              </div>
+            )}
         </div>
 
         <div>
