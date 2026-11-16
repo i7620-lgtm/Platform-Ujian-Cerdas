@@ -34,6 +34,9 @@ export const SelectionModal: React.FC<{
   onClose: () => void;
   onSelect: (value: string) => void;
   searchPlaceholder?: string;
+  allowCustomOnOption?: string;
+  customInputLabel?: string;
+  customInputPlaceholder?: string;
 }> = ({
   isOpen,
   title,
@@ -42,13 +45,36 @@ export const SelectionModal: React.FC<{
   onClose,
   onSelect,
   searchPlaceholder = "Cari...",
+  allowCustomOnOption,
+  customInputLabel = "Masukkan Nama Kustom",
+  customInputPlaceholder = "Ketik nama kustom...",
 }) => {
   const [searchTerm, setSearchTerm] = useState("");
+  const isCustomSelectedInitially = Boolean(
+    allowCustomOnOption &&
+      selectedValue &&
+      (selectedValue === allowCustomOnOption || !options.includes(selectedValue)),
+  );
+  const [showCustomInput, setShowCustomInput] = useState(isCustomSelectedInitially);
+  const [customValue, setCustomValue] = useState(
+    selectedValue && selectedValue !== allowCustomOnOption && !options.includes(selectedValue)
+      ? selectedValue
+      : "",
+  );
+
   const filteredOptions = useMemo(
     () =>
       options.filter((s) => s.toLowerCase().includes(searchTerm.toLowerCase())),
     [searchTerm, options],
   );
+
+  const handleSaveCustom = () => {
+    const trimmed = customValue.trim();
+    if (!trimmed) return;
+    onSelect(trimmed);
+    onClose();
+  };
+
   if (!isOpen) return null;
   return (
     <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-fade-in">
@@ -76,31 +102,74 @@ export const SelectionModal: React.FC<{
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="w-full p-3 pl-4 rounded-xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none text-sm transition-all shadow-sm"
-            autoFocus
+            autoFocus={!showCustomInput}
           />
         </div>
-        <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
+        <div className="flex-1 overflow-y-auto p-4 custom-scrollbar space-y-4">
           {filteredOptions.length > 0 ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              {filteredOptions.map((opt) => (
-                <button
-                  key={opt}
-                  onClick={() => {
-                    onSelect(opt);
-                    onClose();
-                  }}
-                  className={`text-left px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 border flex items-center justify-between group ${selectedValue === opt ? "bg-primary text-white border-primary shadow-md shadow-primary/20" : "bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-gray-100 dark:border-slate-700 hover:border-primary/30 hover:bg-slate-50 dark:hover:bg-slate-700 hover:shadow-sm"}`}
-                >
-                  <span>{opt}</span>
-                  {selectedValue === opt && (
-                    <CheckIcon className="w-4 h-4 text-white" />
-                  )}
-                </button>
-              ))}
+              {filteredOptions.map((opt) => {
+                const isCustomTrigger = allowCustomOnOption && opt === allowCustomOnOption;
+                const isActive =
+                  selectedValue === opt ||
+                  (isCustomTrigger &&
+                    (showCustomInput ||
+                      Boolean(selectedValue && !options.includes(selectedValue))));
+                return (
+                  <button
+                    key={opt}
+                    type="button"
+                    onClick={() => {
+                      if (isCustomTrigger) {
+                        setShowCustomInput(true);
+                      } else {
+                        onSelect(opt);
+                        onClose();
+                      }
+                    }}
+                    className={`text-left px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 border flex items-center justify-between group ${isActive ? "bg-primary text-white border-primary shadow-md shadow-primary/20" : "bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-gray-100 dark:border-slate-700 hover:border-primary/30 hover:bg-slate-50 dark:hover:bg-slate-700 hover:shadow-sm"}`}
+                  >
+                    <span>{opt}</span>
+                    {isActive && <CheckIcon className="w-4 h-4 text-white" />}
+                  </button>
+                );
+              })}
             </div>
           ) : (
             <div className="text-center py-10 text-slate-400 dark:text-slate-500">
               <p className="text-sm">Opsi tidak ditemukan.</p>
+            </div>
+          )}
+
+          {allowCustomOnOption && showCustomInput && (
+            <div className="p-4 rounded-xl border border-indigo-200 dark:border-indigo-800 bg-indigo-50/70 dark:bg-indigo-950/30 space-y-2.5">
+              <label className="block text-xs font-bold text-indigo-900 dark:text-indigo-200">
+                {customInputLabel}
+              </label>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={customValue}
+                  onChange={(e) => setCustomValue(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      handleSaveCustom();
+                    }
+                  }}
+                  placeholder={customInputPlaceholder}
+                  autoFocus
+                  className="flex-1 px-3 py-2 rounded-lg border border-indigo-200 dark:border-indigo-700 bg-white dark:bg-slate-800 text-sm text-slate-800 dark:text-slate-100 focus:ring-2 focus:ring-primary/30 focus:border-primary outline-none"
+                />
+                <button
+                  type="button"
+                  onClick={handleSaveCustom}
+                  disabled={!customValue.trim()}
+                  className="px-4 py-2 rounded-lg bg-primary text-white text-xs font-bold hover:opacity-90 disabled:opacity-40 transition-all cursor-pointer shrink-0"
+                >
+                  Terapkan
+                </button>
+              </div>
             </div>
           )}
         </div>
