@@ -1,7 +1,7 @@
 import { supabase } from '../lib/supabase';
 import { offlineService } from './offline';
 import type { RealtimeChannel } from '@supabase/supabase-js';
-import type { Result, ResultStatus } from '../types';
+import type { Result, ResultStatus, Exam, ExamConfig } from '../types';
 import { examService } from './exam';
 
 export class ResultService {
@@ -590,8 +590,9 @@ export class ResultService {
               ? 'code, author_id, school, config, status'
               : 'code, author_id, school, config, questions, status';
           const { data } = await supabase.from('exams').select(selectCols).eq('code', cleanCode).maybeSingle();
-          if (data) {
-              const existingConfig = (data.config || {}) as ExamConfig;
+          const rawExamData = data as any;
+          if (rawExamData) {
+              const existingConfig = (rawExamData.config || {}) as ExamConfig;
               const newConfig: ExamConfig = {
                   ...existingConfig,
                   isFinished: true,
@@ -612,12 +613,12 @@ export class ResultService {
 
               if (!updatedExam) {
                   updatedExam = {
-                      code: data.code,
-                      authorId: data.author_id,
-                      authorSchool: data.school,
+                      code: rawExamData.code,
+                      authorId: rawExamData.author_id,
+                      authorSchool: rawExamData.school,
                       config: newConfig,
-                      questions: (data as any).questions || [],
-                      status: data.status,
+                      questions: rawExamData.questions || [],
+                      status: rawExamData.status,
                       version: newVer
                   };
                   examService.saveLocalTeacherExam(updatedExam);
