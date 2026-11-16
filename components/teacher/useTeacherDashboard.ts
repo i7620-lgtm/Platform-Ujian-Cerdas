@@ -338,7 +338,10 @@ export const useTeacherDashboard = ({
         }
         resetForm();
       }
-    } catch (err) {
+    } catch (err: any) {
+      if (err?.message === "Penyimpanan dibatalkan oleh pengguna") {
+        return;
+      }
       console.error("Gagal menyimpan ujian:", err);
       await showAlertModal({
         title: "Gagal Menyimpan Ujian",
