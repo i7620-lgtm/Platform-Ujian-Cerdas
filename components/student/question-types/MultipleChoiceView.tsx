@@ -29,7 +29,7 @@ export const MultipleChoiceView: React.FC<MultipleChoiceViewProps> = React.memo(
               key={i}
               type="button"
               onClick={() => onAnswerChange(qId, opt)}
-              className={`w-full text-left p-3.5 sm:p-4 rounded-xl border-2 transition-all flex items-start gap-3.5 sm:gap-4 ${
+              className={`w-full text-left p-3 sm:p-4 min-h-[44px] rounded-xl border-2 transition-all flex items-start gap-2.5 sm:gap-4 ${
                 isSelected
                   ? "border-indigo-600 dark:border-indigo-500 bg-indigo-50/30 dark:bg-indigo-900/20"
                   : "border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800"
@@ -75,7 +75,7 @@ export const MultipleChoiceView: React.FC<MultipleChoiceViewProps> = React.memo(
                 );
                 onAnswerChange(qId, JSON.stringify(newAns));
               }}
-              className={`w-full text-left p-3.5 sm:p-4 rounded-xl border-2 transition-all flex items-start gap-3.5 sm:gap-4 ${
+              className={`w-full text-left p-3 sm:p-4 min-h-[44px] rounded-xl border-2 transition-all flex items-start gap-2.5 sm:gap-4 ${
                 isSelected
                   ? "border-indigo-600 dark:border-indigo-500 bg-indigo-50/30 dark:bg-indigo-900/20"
                   : "border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800"
