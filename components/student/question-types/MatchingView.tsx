@@ -51,7 +51,7 @@ export const MatchingView: React.FC<MatchingViewProps> = React.memo(({
         return (
           <div
             key={i}
-            className="flex flex-col sm:flex-row sm:items-stretch gap-3 sm:gap-4 p-4 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700"
+            className="flex flex-col sm:flex-row sm:items-stretch gap-2.5 sm:gap-4 p-3 sm:p-4 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700"
           >
             <div className="flex-1 min-w-0 font-bold text-slate-700 dark:text-slate-300 text-sm flex items-center option-content">
               <div
@@ -82,7 +82,7 @@ export const MatchingView: React.FC<MatchingViewProps> = React.memo(({
                   isOpen
                     ? "border-indigo-500 ring-1 ring-indigo-500"
                     : "border-slate-200 dark:border-slate-700"
-                } text-slate-700 dark:text-slate-200 py-3 px-4 rounded-lg text-sm font-bold transition-all shadow-sm flex items-center justify-between min-h-[46px]`}
+                } text-slate-700 dark:text-slate-200 py-2.5 px-3 sm:py-3 sm:px-4 rounded-lg text-sm font-bold transition-all shadow-sm flex items-center justify-between min-h-[46px]`}
               >
                 <div className="truncate flex-1">
                   {selectedValue ? (
