@@ -104,8 +104,8 @@ export const SchoolLetterhead: React.FC<SchoolLetterheadProps> = ({
 
   // Dynamic logo container & style based on isAksaraBali active status
   const logoContainerClass = isAksaraBali
-    ? "w-16 h-16 sm:w-20 sm:h-20 shrink-0 self-center flex items-center justify-center"
-    : "w-12 h-12 sm:w-14 sm:h-14 shrink-0 self-center flex items-center justify-center";
+    ? "school-letterhead-logo-container w-16 h-16 sm:w-20 sm:h-20 shrink-0 self-center flex items-center justify-center"
+    : "school-letterhead-logo-container w-12 h-12 sm:w-14 sm:h-14 shrink-0 self-center flex items-center justify-center";
 
   const logoImgClass = isAksaraBali
     ? "school-letterhead-logo max-h-16 sm:max-h-20 max-w-full object-contain"
@@ -142,58 +142,58 @@ export const SchoolLetterhead: React.FC<SchoolLetterheadProps> = ({
           {/* Baris 1: Pemda */}
           {isAksaraBali && aksaraPemda && (
             <p
-              className="aksara-bali text-xs sm:text-sm text-black leading-snug font-normal tracking-wide"
+              className="aksara-bali kop-text-aksara kop-aksara-pemda text-xs sm:text-sm text-black leading-snug font-normal tracking-wide"
               style={{ fontFamily: "'Noto Sans Balinese', sans-serif" }}
             >
               {aksaraPemda}
             </p>
           )}
-          <h3 className="text-xs sm:text-[13px] font-extrabold uppercase tracking-wide text-black">
+          <h3 className="kop-text-pemda text-xs sm:text-[13px] font-extrabold uppercase tracking-wide text-black">
             {pemdaText}
           </h3>
 
           {/* Baris 2: Dinas */}
           {isAksaraBali && aksaraDinas && (
             <p
-              className="aksara-bali text-xs sm:text-sm text-black leading-snug font-normal tracking-wide pt-0.5"
+              className="aksara-bali kop-text-aksara kop-aksara-dinas text-xs sm:text-sm text-black leading-snug font-normal tracking-wide pt-0.5"
               style={{ fontFamily: "'Noto Sans Balinese', sans-serif" }}
             >
               {aksaraDinas}
             </p>
           )}
-          <h2 className="text-xs sm:text-sm font-extrabold uppercase tracking-normal text-black">
+          <h2 className="kop-text-dinas text-xs sm:text-sm font-extrabold uppercase tracking-normal text-black">
             {dinasText}
           </h2>
 
           {/* Baris 3: Nama Sekolah */}
           {isAksaraBali && aksaraSekolah && (
             <p
-              className="aksara-bali text-sm sm:text-base text-black leading-snug font-normal tracking-wide pt-0.5"
+              className="aksara-bali kop-text-aksara kop-aksara-sekolah text-sm sm:text-base text-black leading-snug font-normal tracking-wide pt-0.5"
               style={{ fontFamily: "'Noto Sans Balinese', sans-serif" }}
             >
               {aksaraSekolah}
             </p>
           )}
-          <h1 className="text-sm sm:text-base font-black uppercase tracking-wider text-black">
+          <h1 className="kop-text-sekolah text-sm sm:text-base font-black uppercase tracking-wider text-black">
             {schoolText}
           </h1>
 
           {/* Baris 4 (Kedua paling bawah): Alamat Utama Sekolah (Dengan Aksara Bali 1 baris) */}
           {isAksaraBali && aksaraAlamat && (
             <p
-              className="aksara-bali text-[10px] sm:text-xs text-black leading-snug font-normal tracking-tight pt-0.5"
+              className="aksara-bali kop-text-aksara kop-aksara-alamat text-[10px] sm:text-xs text-black leading-snug font-normal tracking-tight pt-0.5"
               style={{ fontFamily: "'Noto Sans Balinese', sans-serif" }}
             >
               {aksaraAlamat}
             </p>
           )}
-          <p className="text-[10px] sm:text-[11px] text-slate-800 font-medium leading-tight pt-0.5">
+          <p className="kop-text-alamat text-[10px] sm:text-[11px] text-slate-800 font-medium leading-tight pt-0.5">
             {alamatText}
           </p>
 
           {/* Baris 5 (Paling bawah): Overflow Alamat + Kontak & Identitas Digital (TANPA Aksara Bali) */}
           {kontakText && (
-            <p className="text-[9.5px] sm:text-[10.5px] text-slate-700 font-medium leading-tight pt-0.5">
+            <p className="kop-text-kontak text-[9.5px] sm:text-[10.5px] text-slate-700 font-medium leading-tight pt-0.5">
               {kontakText}
             </p>
           )}
@@ -217,21 +217,26 @@ export const SchoolLetterhead: React.FC<SchoolLetterheadProps> = ({
         </div>
       </div>
 
-      {/* Official Indonesian Government Double Line Divider */}
+      {/* Official Indonesian Government Double Line Divider (Anti-collapse single element) */}
       {dividerStyle === "double" && (
-        <div className="letterhead-divider w-full mt-1 mb-4 print:mb-3">
-          <div className="border-t-[3px] border-black w-full" />
-          <div className="h-[2px]" />
-          <div className="border-t border-black w-full" />
-        </div>
+        <div
+          className="letterhead-divider letterhead-divider-double w-full mt-1.5 mb-3 print:my-2"
+          style={{
+            borderTop: "2.5pt solid black",
+            borderBottom: "0.75pt solid black",
+            height: "3.5pt",
+            background: "transparent",
+            boxSizing: "content-box",
+          }}
+        />
       )}
 
       {dividerStyle === "single" && (
-        <div className="letterhead-divider w-full border-t border-black mt-1 mb-4 print:mb-3" />
+        <div className="letterhead-divider letterhead-divider-single w-full border-t border-black mt-1.5 mb-3 print:my-2" />
       )}
 
       {dividerStyle === "bold" && (
-        <div className="letterhead-divider w-full border-t-2 border-black mt-1 mb-4 print:mb-3" />
+        <div className="letterhead-divider letterhead-divider-bold w-full border-t-2 border-black mt-1.5 mb-3 print:my-2" />
       )}
     </div>
   );
