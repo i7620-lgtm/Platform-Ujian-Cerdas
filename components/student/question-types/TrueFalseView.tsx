@@ -40,15 +40,15 @@ export const TrueFalseView: React.FC<TrueFalseViewProps> = React.memo(({
         return (
           <div
             key={i}
-            className="p-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50"
+            className="p-3 sm:p-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50"
           >
-            <div className="mb-4 font-medium text-slate-700 dark:text-slate-300 option-content min-w-0">
+            <div className="mb-3 sm:mb-4 font-medium text-slate-700 dark:text-slate-300 option-content min-w-0">
               <div
                 className="option-content"
                 dangerouslySetInnerHTML={{ __html: optimizeHtml(row.text) }}
               />
             </div>
-            <div className="flex gap-3">
+            <div className="flex gap-2 sm:gap-3">
               <button
                 type="button"
                 onClick={() => {
@@ -62,7 +62,7 @@ export const TrueFalseView: React.FC<TrueFalseViewProps> = React.memo(({
                     });
                   onAnswerChange(qId, JSON.stringify(sortedAnsObj));
                 }}
-                className={`flex-1 py-2.5 px-4 rounded-lg border font-bold text-sm transition-all flex items-center justify-center gap-2 ${
+                className={`flex-1 min-h-[44px] py-2.5 px-3 sm:px-4 rounded-lg border font-bold text-sm transition-all flex items-center justify-center gap-2 ${
                   isTrue
                     ? "bg-indigo-600 border-indigo-600 text-white shadow-md shadow-indigo-200 dark:shadow-none"
                     : "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700"
@@ -84,7 +84,7 @@ export const TrueFalseView: React.FC<TrueFalseViewProps> = React.memo(({
                     });
                   onAnswerChange(qId, JSON.stringify(sortedAnsObj));
                 }}
-                className={`flex-1 py-2.5 px-4 rounded-lg border font-bold text-sm transition-all flex items-center justify-center gap-2 ${
+                className={`flex-1 min-h-[44px] py-2.5 px-3 sm:px-4 rounded-lg border font-bold text-sm transition-all flex items-center justify-center gap-2 ${
                   isFalse
                     ? "bg-rose-600 border-rose-600 text-white shadow-md shadow-rose-200 dark:shadow-none"
                     : "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700"

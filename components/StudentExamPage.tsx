@@ -393,7 +393,7 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({
       />
 
       <main
-        className={`w-full max-w-full mx-auto px-4 sm:px-6 pt-24 space-y-8 exam-content-scalable exam-font-step-${fontStep}`}
+        className={`w-full max-w-full mx-auto px-2.5 sm:px-6 pt-20 sm:pt-24 space-y-4 sm:space-y-8 exam-content-scalable exam-font-step-${fontStep}`}
         style={
           {
             "--exam-prose-size": `${currentFontConfig.qSizeRem}rem`,

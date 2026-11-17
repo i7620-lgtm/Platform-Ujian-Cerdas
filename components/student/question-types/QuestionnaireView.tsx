@@ -31,7 +31,7 @@ export const QuestionnaireView: React.FC<QuestionnaireViewProps> = React.memo(({
   );
 
   return (
-    <div className="mt-4 p-4 sm:p-5 rounded-2xl bg-indigo-50/40 dark:bg-indigo-950/20 border border-indigo-100 dark:border-indigo-900/50 space-y-4">
+    <div className="mt-3 sm:mt-4 p-3 sm:p-5 rounded-2xl bg-indigo-50/40 dark:bg-indigo-950/20 border border-indigo-100 dark:border-indigo-900/50 space-y-3.5 sm:space-y-4">
       {/* Badge Penjelasan Non-Skor untuk Siswa */}
       <div className="flex items-center justify-between gap-2 pb-2.5 border-b border-indigo-100/70 dark:border-indigo-900/40 text-xs">
         <div className="flex items-center gap-2 text-indigo-900 dark:text-indigo-200 font-bold">
@@ -138,7 +138,7 @@ export const QuestionnaireView: React.FC<QuestionnaireViewProps> = React.memo(({
               <label
                 key={i}
                 onClick={() => onAnswerChange(question.id, opt)}
-                className={`flex items-center gap-3.5 p-3 sm:p-3.5 rounded-xl border transition-all cursor-pointer ${
+                className={`flex items-center gap-2.5 sm:gap-3.5 min-h-[44px] p-3 sm:p-3.5 rounded-xl border transition-all cursor-pointer ${
                   isSelected
                     ? "bg-indigo-50 dark:bg-indigo-900/30 border-indigo-500 ring-1 ring-indigo-500 text-indigo-950 dark:text-indigo-100 shadow-xs"
                     : "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:border-indigo-300 hover:bg-slate-50 dark:hover:bg-slate-700/60 text-slate-700 dark:text-slate-200"

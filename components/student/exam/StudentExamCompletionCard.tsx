@@ -26,7 +26,7 @@ export const StudentExamCompletionCard: React.FC<StudentExamCompletionCardProps>
   onSubmit,
 }) => {
   return (
-    <div className="mt-10 mb-28 p-6 sm:p-10 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xl transition-all">
+    <div className="mt-6 sm:mt-10 mb-24 sm:mb-28 p-4 sm:p-10 rounded-2xl sm:rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xl transition-all">
       <div className="max-w-2xl mx-auto flex flex-col items-center text-center">
         {answeredCount === totalQuestions ? (
           <div className="w-14 h-14 rounded-2xl bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/80 flex items-center justify-center mb-4 shadow-xs">
