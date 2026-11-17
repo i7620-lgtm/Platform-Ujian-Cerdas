@@ -531,16 +531,16 @@ export const PrintKunciJawabanModal: React.FC<PrintKunciJawabanModalProps> = ({
             width: auto !important;
             height: auto !important;
           }
-          /* Uniform School Letterhead Print Styling (Identical across screen & paper) */
+          /* Uniform School Letterhead Print Styling (Calibrated to match Screen Preview) */
           .school-letterhead-root {
             width: 100% !important;
             margin-bottom: 0 !important;
           }
           .school-letterhead-root .school-letterhead-logo-container {
-            width: 58pt !important;
-            height: 58pt !important;
-            max-width: 58pt !important;
-            max-height: 58pt !important;
+            width: 46pt !important;
+            height: 46pt !important;
+            max-width: 46pt !important;
+            max-height: 46pt !important;
             flex-shrink: 0 !important;
             display: flex !important;
             align-items: center !important;
@@ -548,8 +548,8 @@ export const PrintKunciJawabanModal: React.FC<PrintKunciJawabanModalProps> = ({
           }
           .school-letterhead-root img.school-letterhead-logo,
           .school-letterhead-root .school-letterhead-logo {
-            max-width: 56pt !important;
-            max-height: 56pt !important;
+            max-width: 45pt !important;
+            max-height: 45pt !important;
             width: auto !important;
             height: auto !important;
             object-fit: contain !important;
@@ -557,53 +557,53 @@ export const PrintKunciJawabanModal: React.FC<PrintKunciJawabanModalProps> = ({
           }
           .school-letterhead-root .kop-aksara-pemda,
           .school-letterhead-root .kop-aksara-dinas {
-            font-size: 9.5pt !important;
+            font-size: 8pt !important;
             line-height: 1.25 !important;
           }
           .school-letterhead-root .kop-text-pemda {
-            font-size: 10pt !important;
+            font-size: 8.5pt !important;
             font-weight: 800 !important;
             line-height: 1.25 !important;
-            margin-bottom: 1pt !important;
+            margin-bottom: 0.5pt !important;
           }
           .school-letterhead-root .kop-text-dinas {
-            font-size: 10.5pt !important;
+            font-size: 9pt !important;
             font-weight: 800 !important;
             line-height: 1.25 !important;
-            margin-bottom: 1pt !important;
+            margin-bottom: 0.5pt !important;
           }
           .school-letterhead-root .kop-aksara-sekolah {
-            font-size: 10.5pt !important;
+            font-size: 9.25pt !important;
             line-height: 1.25 !important;
           }
           .school-letterhead-root .kop-text-sekolah {
-            font-size: 12pt !important;
+            font-size: 10.5pt !important;
             font-weight: 900 !important;
-            letter-spacing: 0.5px !important;
+            letter-spacing: 0.4px !important;
             line-height: 1.25 !important;
-            margin-bottom: 2pt !important;
+            margin-bottom: 1.5pt !important;
           }
           .school-letterhead-root .kop-aksara-alamat {
-            font-size: 8.5pt !important;
+            font-size: 7.5pt !important;
             line-height: 1.2 !important;
           }
           .school-letterhead-root .kop-text-alamat {
-            font-size: 8.5pt !important;
+            font-size: 7.5pt !important;
             line-height: 1.25 !important;
             color: #000000 !important;
           }
           .school-letterhead-root .kop-text-kontak {
-            font-size: 8pt !important;
+            font-size: 7pt !important;
             line-height: 1.2 !important;
             color: #1e293b !important;
           }
           .school-letterhead-root .letterhead-divider-double {
-            border-top: 2.5pt solid #000000 !important;
+            border-top: 2pt solid #000000 !important;
             border-bottom: 0.75pt solid #000000 !important;
-            height: 3pt !important;
+            height: 2.5pt !important;
             background: transparent !important;
             box-sizing: content-box !important;
-            margin: 3pt 0 6pt 0 !important;
+            margin: 3pt 0 5pt 0 !important;
             padding: 0 !important;
           }
 
@@ -612,24 +612,24 @@ export const PrintKunciJawabanModal: React.FC<PrintKunciJawabanModalProps> = ({
             margin: 2pt 0 4pt 0 !important;
           }
           .formal-title-eval {
-            font-size: 11pt !important;
+            font-size: 9.75pt !important;
             font-weight: 800 !important;
             line-height: 1.3 !important;
           }
           .formal-title-year {
-            font-size: 9.5pt !important;
+            font-size: 8.5pt !important;
             font-weight: 700 !important;
             line-height: 1.3 !important;
           }
           .formal-title-doc {
-            font-size: 11.5pt !important;
+            font-size: 10.25pt !important;
             font-weight: 900 !important;
             line-height: 1.3 !important;
           }
           .formal-id-block {
-            font-size: 9pt !important;
+            font-size: 8.5pt !important;
             line-height: 1.35 !important;
-            max-width: 480px !important;
+            max-width: 440px !important;
             margin: 3pt auto 6pt auto !important;
           }
           .formal-id-row {
@@ -672,12 +672,38 @@ export const PrintKunciJawabanModal: React.FC<PrintKunciJawabanModalProps> = ({
             max-height: 190px !important;
             overflow: hidden !important;
           }
+          .print-kunci-content .table-responsive-wrapper {
+            border: none !important;
+            border-radius: 0 !important;
+            box-shadow: none !important;
+            overflow: visible !important;
+            margin: 4pt 0 !important;
+            padding: 0 !important;
+            max-width: 100% !important;
+          }
           .print-kunci-content table {
             width: 100% !important;
             max-width: 100% !important;
             border-collapse: collapse !important;
+            border-spacing: 0 !important;
             table-layout: auto !important;
-            word-break: break-word !important;
+            word-break: normal !important;
+            overflow-wrap: break-word !important;
+            border: 1px solid #000000 !important;
+          }
+          .print-kunci-content th,
+          .print-kunci-content td {
+            border: 1px solid #000000 !important;
+            padding: 4px 7px !important;
+            vertical-align: top !important;
+            color: #000000 !important;
+          }
+          .print-kunci-content th,
+          .print-kunci-content thead th {
+            background-color: #f1f5f9 !important;
+            font-weight: 700 !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
           }
           .page-break-before {
             break-before: page !important;
@@ -695,12 +721,40 @@ export const PrintKunciJawabanModal: React.FC<PrintKunciJawabanModalProps> = ({
         /* Screen Preview Rules for Print Kunci Modal Container */
         .school-letterhead-root img,
         .school-letterhead-logo {
-          max-width: 78px !important;
-          max-height: 78px !important;
+          max-width: 62px !important;
+          max-height: 60px !important;
           width: auto !important;
           height: auto !important;
           object-fit: contain !important;
           margin: 0 auto !important;
+        }
+        .print-kunci-content .table-responsive-wrapper {
+          border: none !important;
+          border-radius: 0 !important;
+          box-shadow: none !important;
+          margin: 0.4rem 0 !important;
+          padding: 0 !important;
+          overflow-x: auto !important;
+          max-width: 100% !important;
+        }
+        .print-kunci-content table {
+          width: 100% !important;
+          max-width: 100% !important;
+          border-collapse: collapse !important;
+          border-spacing: 0 !important;
+          border: 1px solid #000000 !important;
+        }
+        .print-kunci-content th,
+        .print-kunci-content td {
+          border: 1px solid #000000 !important;
+          padding: 5px 8px !important;
+          vertical-align: top !important;
+          color: #000000 !important;
+        }
+        .print-kunci-content th,
+        .print-kunci-content thead th {
+          background-color: #f1f5f9 !important;
+          font-weight: 700 !important;
         }
 
         .print-kunci-content .geometry-shape {
@@ -808,9 +862,9 @@ export const PrintKunciJawabanModal: React.FC<PrintKunciJawabanModalProps> = ({
         </div>
       </div>
 
-      {/* Printable Sheet */}
+      {/* Printable Sheet (Calibrated A4 Width 794px with 14mm padding) */}
       <div
-        className="print-kunci-content max-w-4xl mx-auto bg-white p-6 sm:p-10 text-black"
+        className="print-kunci-content max-w-[794px] mx-auto bg-white px-5 py-6 sm:px-[14mm] sm:py-[12mm] text-black"
         ref={printContainerRef}
       >
         {/* Render Kop Sekolah Resmi jika mode "kop", atau Kop Resmi Standar jika mode "default" */}
