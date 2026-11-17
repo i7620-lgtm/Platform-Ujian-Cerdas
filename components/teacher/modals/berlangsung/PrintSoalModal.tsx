@@ -846,7 +846,7 @@ export const PrintSoalModal: React.FC<PrintSoalModalProps> = ({
         const existingStyle = document.getElementById("print-style");
         if (existingStyle) existingStyle.remove();
         const existingRoot = document.getElementById("print-portal-root");
-        if (existingRoot && existingRoot.parentNode) {
+        if (existingRoot && existingRoot.parentNode && existingRoot.childElementCount === 0) {
           existingRoot.parentNode.removeChild(existingRoot);
         }
       };
