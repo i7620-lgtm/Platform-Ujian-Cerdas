@@ -5,6 +5,8 @@ import {
   ChevronDownIcon,
   ChevronUpIcon,
   LightBulbIcon,
+  CheckCircleIcon,
+  ExclamationTriangleIcon,
 } from "../../Icons";
 import { sanitizeHtml } from "../../teacher/examUtils";
 import { AudioPlayer } from "../../AudioPlayer";
@@ -68,16 +70,46 @@ export const StudentExamQuestionCard: React.FC<StudentExamQuestionCardProps> = R
   return (
     <div
       id={q.id}
-      className={`scroll-mt-24 sm:scroll-mt-28 animate-fade-in transition-all duration-500 ${isMissing ? "ring-2 ring-rose-400 rounded-[1.5rem]" : ""}`}
+      className={`scroll-mt-20 sm:scroll-mt-28 animate-fade-in transition-all duration-500 ${isMissing ? "ring-2 ring-rose-400 rounded-2xl sm:rounded-[1.5rem]" : ""}`}
     >
-      <div className="bg-white dark:bg-slate-900 rounded-[1.5rem] border border-slate-100 dark:border-slate-800 shadow-sm p-6 sm:p-8">
-        <div className="flex gap-4 sm:gap-5 items-start">
-          <div className="shrink-0 pt-0.5">
-            <span
-              className={`text-sm font-black w-8 h-8 flex items-center justify-center rounded-xl transition-all shadow-sm ${isMissing ? "bg-rose-100 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400" : answered ? "text-white bg-indigo-600 dark:bg-indigo-500 shadow-indigo-200 dark:shadow-none" : "text-slate-400 dark:text-slate-500 bg-slate-100 dark:bg-slate-800"}`}
-            >
-              {q.questionType === "INFO" ? "i" : questionNumber}
-            </span>
+      <div className="bg-white dark:bg-slate-900 rounded-2xl sm:rounded-[1.5rem] border border-slate-100 dark:border-slate-800 shadow-sm px-3.5 py-4 sm:p-8">
+        <div className="flex flex-col sm:flex-row gap-3 sm:gap-5 items-stretch sm:items-start">
+          <div className="shrink-0 flex items-center justify-between gap-2.5 pb-2.5 sm:pb-0 sm:pt-0.5 border-b border-slate-100 dark:border-slate-800/80 sm:border-b-0">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <span
+                className={`text-sm font-black w-8 h-8 flex items-center justify-center rounded-xl transition-all shadow-sm shrink-0 tabular-nums ${
+                  isMissing
+                    ? "bg-rose-100 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400"
+                    : answered
+                      ? "text-white bg-indigo-600 dark:bg-indigo-500 shadow-indigo-200 dark:shadow-none"
+                      : "text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800"
+                }`}
+              >
+                {q.questionType === "INFO" ? "i" : questionNumber}
+              </span>
+
+              <div className="sm:hidden flex items-center gap-1.5 text-xs font-bold tracking-tight min-w-0">
+                {q.questionType === "INFO" ? (
+                  <span className="text-slate-500 dark:text-slate-400 font-semibold">
+                    Informasi Soal
+                  </span>
+                ) : isMissing ? (
+                  <span className="inline-flex items-center gap-1 text-rose-600 dark:text-rose-400">
+                    <ExclamationTriangleIcon className="w-3.5 h-3.5 shrink-0" />
+                    <span>Belum Dijawab</span>
+                  </span>
+                ) : answered ? (
+                  <span className="inline-flex items-center gap-1 text-indigo-600 dark:text-indigo-400">
+                    <CheckCircleIcon className="w-3.5 h-3.5 shrink-0" />
+                    <span>Sudah Dijawab</span>
+                  </span>
+                ) : (
+                  <span className="text-slate-400 dark:text-slate-500 font-semibold">
+                    Belum Dijawab
+                  </span>
+                )}
+              </div>
+            </div>
           </div>
           <div className="flex-1 min-w-0">
             {(q.audioUrl || q.listeningScript) && !hasInlineAudioMarker && (
@@ -110,7 +142,7 @@ export const StudentExamQuestionCard: React.FC<StudentExamQuestionCardProps> = R
                 )}
               </div>
             )}
-            <div className="student-question-text prose prose-slate dark:prose-invert max-w-none font-medium mb-6">
+            <div className="student-question-text prose prose-slate dark:prose-invert max-w-none font-medium mb-4 sm:mb-6">
               {renderedStimulus}
             </div>
 
@@ -152,7 +184,7 @@ export const StudentExamQuestionCard: React.FC<StudentExamQuestionCardProps> = R
                   onCut={(e) => e.preventDefault()}
                   onPaste={(e) => e.preventDefault()}
                   onContextMenu={(e) => e.preventDefault()}
-                  className="w-full p-5 bg-slate-50 dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 rounded-xl focus:bg-white dark:focus:bg-slate-900 focus:border-indigo-500 dark:focus:border-indigo-500 outline-none min-h-[160px] text-slate-700 dark:text-slate-200 transition-all resize-y placeholder:text-slate-400 dark:placeholder:text-slate-600 leading-relaxed exam-input-secure"
+                  className="w-full p-3.5 sm:p-5 bg-slate-50 dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 rounded-xl focus:bg-white dark:focus:bg-slate-900 focus:border-indigo-500 dark:focus:border-indigo-500 outline-none min-h-[160px] text-slate-700 dark:text-slate-200 transition-all resize-y placeholder:text-slate-400 dark:placeholder:text-slate-600 leading-relaxed exam-input-secure"
                   placeholder="Tulis jawaban lengkap Anda..."
                 />
               )}
@@ -170,7 +202,7 @@ export const StudentExamQuestionCard: React.FC<StudentExamQuestionCardProps> = R
                     onCut={(e) => e.preventDefault()}
                     onPaste={(e) => e.preventDefault()}
                     onContextMenu={(e) => e.preventDefault()}
-                    className="w-full pl-12 pr-4 py-4 bg-slate-50 dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 rounded-xl focus:bg-white dark:focus:bg-slate-900 focus:border-indigo-500 dark:focus:border-indigo-500 outline-none font-bold text-slate-800 dark:text-slate-200 placeholder:text-slate-400 dark:placeholder:text-slate-600 transition-all exam-input-secure"
+                    className="w-full pl-11 pr-3.5 py-3.5 sm:pl-12 sm:pr-4 sm:py-4 bg-slate-50 dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 rounded-xl focus:bg-white dark:focus:bg-slate-900 focus:border-indigo-500 dark:focus:border-indigo-500 outline-none font-bold text-slate-800 dark:text-slate-200 placeholder:text-slate-400 dark:placeholder:text-slate-600 transition-all exam-input-secure"
                     placeholder="Ketik jawaban singkat..."
                   />
                 </div>
