@@ -803,21 +803,12 @@ export const useStudentEntryForm = ({ initialCode, onLoginSuccess }: UseStudentE
         const lockKey = `exam_lock_${pendingStudentData.cleanExamCode}_${pendingStudentData.studentData.studentId}`;
         localStorage.removeItem(lockKey);
 
-        try {
-          await storageService.unlockStudentExam(
-            pendingStudentData.cleanExamCode,
-            pendingStudentData.studentData.studentId,
-          );
-        } catch (unlockErr) {
-          console.warn("Error unlocking student session:", unlockErr);
-        }
-
         onLoginSuccess(
           pendingStudentData.cleanExamCode,
           pendingStudentData.studentData,
         );
       } else {
-        setUnlockError("Token tidak valid atau sudah kadaluarsa.");
+        setUnlockError("Token tidak valid. Periksa kembali 4 angka token dari pengawas.");
       }
     } catch {
       setUnlockError("Gagal verifikasi token. Periksa koneksi internet Anda.");
