@@ -414,31 +414,54 @@ export const PrintSoalModal: React.FC<PrintSoalModalProps> = ({
           .print-soal-header {
             break-after: avoid !important;
             page-break-after: avoid !important;
-            margin-bottom: 16px !important;
-            padding-bottom: 8px !important;
+            margin-bottom: 8px !important;
+            padding-bottom: 4px !important;
           }
 
-          /* Prevent individual question cards and info cards from breaking awkwardly across pages */
-          .print-question-card,
-          .print-info-card {
-            break-inside: avoid !important;
-            page-break-inside: avoid !important;
-            -webkit-column-break-inside: avoid !important;
-            margin-bottom: 14px !important;
-            padding-bottom: 4px !important;
+          /* Question pagination & sensible breaking */
+          .print-question-card {
+            break-inside: auto !important;
+            page-break-inside: auto !important;
+            margin-bottom: 12px !important;
+            padding-bottom: 2px !important;
             display: block !important;
             position: static !important;
             width: 100% !important;
           }
 
+          .print-question-stem {
+            break-inside: avoid !important;
+            page-break-inside: avoid !important;
+            break-after: auto !important;
+            page-break-after: auto !important;
+          }
+
+          .print-question-answer-area,
+          .print-question-options {
+            break-inside: auto !important;
+            page-break-inside: auto !important;
+          }
+
+          .print-option-row {
+            break-inside: avoid !important;
+            page-break-inside: avoid !important;
+          }
+
           .print-info-card {
+            break-inside: avoid !important;
+            page-break-inside: avoid !important;
+            -webkit-column-break-inside: avoid !important;
+            margin-bottom: 12px !important;
+            padding-bottom: 4px !important;
+            display: block !important;
+            position: static !important;
+            width: 100% !important;
             background-color: #f0f7ff !important;
             border: 1px solid #bfdbfe !important;
             border-left: 4px solid #2563eb !important;
             padding: 10px 14px !important;
             border-radius: 6px !important;
-            margin-top: 8px !important;
-            margin-bottom: 14px !important;
+            margin-top: 6px !important;
           }
 
           /* KaTeX print protection - prevent square root lines and formulas from stretching across page */
@@ -545,14 +568,134 @@ export const PrintSoalModal: React.FC<PrintSoalModalProps> = ({
             height: auto !important;
           }
 
-          .school-letterhead-root img,
-          .school-letterhead-logo {
-            max-width: 78px !important;
-            max-height: 78px !important;
+          /* Uniform School Letterhead Print Styling (Identical across screen & paper) */
+          .school-letterhead-root {
+            width: 100% !important;
+            margin-bottom: 0 !important;
+          }
+          .school-letterhead-root .school-letterhead-logo-container {
+            width: 58pt !important;
+            height: 58pt !important;
+            max-width: 58pt !important;
+            max-height: 58pt !important;
+            flex-shrink: 0 !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+          }
+          .school-letterhead-root img.school-letterhead-logo,
+          .school-letterhead-root .school-letterhead-logo {
+            max-width: 56pt !important;
+            max-height: 56pt !important;
             width: auto !important;
             height: auto !important;
             object-fit: contain !important;
             margin: 0 auto !important;
+          }
+          .school-letterhead-root .kop-aksara-pemda,
+          .school-letterhead-root .kop-aksara-dinas {
+            font-size: 9.5pt !important;
+            line-height: 1.25 !important;
+          }
+          .school-letterhead-root .kop-text-pemda {
+            font-size: 10pt !important;
+            font-weight: 800 !important;
+            line-height: 1.25 !important;
+            margin-bottom: 1pt !important;
+          }
+          .school-letterhead-root .kop-text-dinas {
+            font-size: 10.5pt !important;
+            font-weight: 800 !important;
+            line-height: 1.25 !important;
+            margin-bottom: 1pt !important;
+          }
+          .school-letterhead-root .kop-aksara-sekolah {
+            font-size: 10.5pt !important;
+            line-height: 1.25 !important;
+          }
+          .school-letterhead-root .kop-text-sekolah {
+            font-size: 12pt !important;
+            font-weight: 900 !important;
+            letter-spacing: 0.5px !important;
+            line-height: 1.25 !important;
+            margin-bottom: 2pt !important;
+          }
+          .school-letterhead-root .kop-aksara-alamat {
+            font-size: 8.5pt !important;
+            line-height: 1.2 !important;
+          }
+          .school-letterhead-root .kop-text-alamat {
+            font-size: 8.5pt !important;
+            line-height: 1.25 !important;
+            color: #000000 !important;
+          }
+          .school-letterhead-root .kop-text-kontak {
+            font-size: 8pt !important;
+            line-height: 1.2 !important;
+            color: #1e293b !important;
+          }
+          .school-letterhead-root .letterhead-divider-double {
+            border-top: 2.5pt solid #000000 !important;
+            border-bottom: 0.75pt solid #000000 !important;
+            height: 3pt !important;
+            background: transparent !important;
+            box-sizing: content-box !important;
+            margin: 3pt 0 6pt 0 !important;
+            padding: 0 !important;
+          }
+
+          /* Formal Title & Identity Block in Print */
+          .formal-title-container {
+            margin: 2pt 0 4pt 0 !important;
+          }
+          .formal-title-eval {
+            font-size: 11pt !important;
+            font-weight: 800 !important;
+            line-height: 1.3 !important;
+          }
+          .formal-title-year {
+            font-size: 9.5pt !important;
+            font-weight: 700 !important;
+            line-height: 1.3 !important;
+          }
+          .formal-title-doc {
+            font-size: 11.5pt !important;
+            font-weight: 900 !important;
+            line-height: 1.3 !important;
+          }
+          .formal-id-block {
+            font-size: 9pt !important;
+            line-height: 1.35 !important;
+            max-width: 480px !important;
+            margin: 3pt auto 6pt auto !important;
+          }
+          .formal-id-row {
+            margin-bottom: 1pt !important;
+          }
+
+          /* Petunjuk Umum Spasi Kompak di Print */
+          .print-petunjuk-container {
+            margin-top: 3pt !important;
+            margin-bottom: 5pt !important;
+            font-size: 8.5pt !important;
+            line-height: 1.35 !important;
+          }
+          .print-petunjuk-title {
+            font-size: 9pt !important;
+            font-weight: 800 !important;
+            margin-bottom: 2pt !important;
+          }
+          .print-petunjuk-list {
+            margin-bottom: 2pt !important;
+          }
+          .print-petunjuk-list li {
+            margin-bottom: 1pt !important;
+          }
+          .print-selamat-bekerja {
+            margin-top: 3pt !important;
+            margin-bottom: 5pt !important;
+            font-size: 9pt !important;
+            font-weight: 700 !important;
           }
 
           .print-soal-content img:not(.school-letterhead-root *),
@@ -771,7 +914,7 @@ export const PrintSoalModal: React.FC<PrintSoalModalProps> = ({
         {/* Render Kop Sekolah Resmi jika mode "kop", atau Kop Soal Standar jika mode "default" */}
         {headerMode === "kop" ? (
           <>
-            <div className="print-soal-header mb-4 pb-1">
+            <div className="print-soal-header mb-2.5 print:mb-1 pb-0.5">
               <FormalPrintDocHeader
                 profile={profile}
                 examType={exam.config?.examType}
@@ -786,18 +929,18 @@ export const PrintSoalModal: React.FC<PrintSoalModalProps> = ({
             </div>
 
             {/* Dynamic General Instructions (Baku tanpa kotak latar) */}
-            <div className="mb-4 text-xs sm:text-[13px] text-black leading-relaxed">
-              <h2 className="text-center font-bold uppercase tracking-wider mb-1.5">
+            <div className="print-petunjuk-container mb-3 print:mb-2 text-xs sm:text-[13px] text-black leading-relaxed">
+              <h2 className="print-petunjuk-title text-center font-bold uppercase tracking-wider mb-1">
                 PETUNJUK UMUM
               </h2>
-              <ol className="list-decimal pl-6 space-y-0.5 max-w-3xl mx-auto">
+              <ol className="print-petunjuk-list list-decimal pl-6 space-y-0.5 max-w-3xl mx-auto">
                 {dynamicPetunjuk.map((item, idx) => (
                   <li key={idx} className="pl-1">
                     {item}
                   </li>
                 ))}
               </ol>
-              <p className="text-center font-semibold mt-4 mb-2 tracking-wide">
+              <p className="print-selamat-bekerja text-center font-semibold mt-3 mb-2 tracking-wide">
                 ------Selamat Bekerja------
               </p>
             </div>
@@ -900,8 +1043,8 @@ export const PrintSoalModal: React.FC<PrintSoalModalProps> = ({
             }
 
             return (
-              <div key={q.id || idx} className="print-question-card break-inside-avoid">
-                <div className="flex gap-2.5 items-start">
+              <div key={q.id || idx} className="print-question-card">
+                <div className="print-question-stem flex gap-2.5 items-start">
                   <span className="font-bold w-6 text-right shrink-0 select-none text-xs sm:text-sm pt-0.5">
                     {questionNumber}.
                   </span>
@@ -946,149 +1089,152 @@ export const PrintSoalModal: React.FC<PrintSoalModalProps> = ({
                         <p className="whitespace-pre-line text-slate-600 font-sans italic">{q.listeningScript}</p>
                       </div>
                     )}
-
-                    {/* Multiple Choice Options */}
-                    {q.questionType === "MULTIPLE_CHOICE" && q.options && (
-                      <div
-                        className={
-                          isTwoColOptions && shouldRenderTwoColumns(q.options)
-                            ? "grid grid-cols-2 gap-x-6 gap-y-1 mt-1.5 pl-6"
-                            : "space-y-1 mt-1.5 pl-6"
-                        }
-                      >
-                        {q.options.map((opt, oIdx) => (
-                          <div key={oIdx} className="flex gap-2 items-start text-xs sm:text-[13px]">
-                            <span className="font-bold shrink-0 text-black">
-                              {String.fromCharCode(65 + oIdx)}.
-                            </span>
-                            <div className="flex-1 text-black font-normal">
-                              <div 
-                                dangerouslySetInnerHTML={{ __html: renderFormattedHtml(opt) }}
-                              />
-                              {q.optionImages?.[oIdx] && (
-                                <img 
-                                  src={q.optionImages[oIdx]!} 
-                                  alt={`Opsi ${String.fromCharCode(65 + oIdx)}`} 
-                                  className="max-w-[100px] max-h-[100px] object-contain mt-1 rounded border border-slate-200" 
-                                  onError={(e) => {
-                                    (e.currentTarget as HTMLElement).style.display = "none";
-                                  }}
-                                />
-                              )}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-
-                    {/* Complex Multiple Choice Options */}
-                    {q.questionType === "COMPLEX_MULTIPLE_CHOICE" && q.options && (
-                      <div className="space-y-1.5 mt-2 pl-6">
-                        <p className="text-[11px] italic text-slate-600 mb-1">
-                          *(Pilihlah semua pernyataan yang benar - Jawaban lebih dari satu)*
-                        </p>
-                        {q.options.map((opt, oIdx) => (
-                          <div key={oIdx} className="flex gap-2 items-start text-xs sm:text-[13px]">
-                            <div className="w-3.5 h-3.5 border border-black rounded-sm shrink-0 mt-0.5"></div>
-                            <div className="flex-1 text-black font-normal">
-                              <div 
-                                dangerouslySetInnerHTML={{ __html: renderFormattedHtml(opt) }}
-                              />
-                              {q.optionImages?.[oIdx] && (
-                                <img 
-                                  src={q.optionImages[oIdx]!} 
-                                  alt="Opsi" 
-                                  className="max-w-[100px] max-h-[100px] object-contain mt-1 rounded border border-slate-200" 
-                                  onError={(e) => {
-                                    (e.currentTarget as HTMLElement).style.display = "none";
-                                  }}
-                                />
-                              )}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-
-                    {/* Fill In The Blank */}
-                    {q.questionType === "FILL_IN_THE_BLANK" && (
-                      <div className="mt-2 text-xs italic text-slate-700 max-w-full overflow-hidden break-all">
-                        Jawaban: ..........................................................................................................................................
-                      </div>
-                    )}
-
-                    {/* Essay */}
-                    {q.questionType === "ESSAY" && (
-                      <div className="mt-2 space-y-3">
-                        <div className="border-b border-black border-dashed"></div>
-                        <div className="border-b border-black border-dashed"></div>
-                        <div className="border-b border-black border-dashed"></div>
-                      </div>
-                    )}
-
-                    {/* True / False Table */}
-                    {q.questionType === "TRUE_FALSE" && q.trueFalseRows && (
-                      <div className="mt-2 pl-6">
-                        <table className="w-full border-collapse border border-black text-[11px] table-fixed">
-                          <thead>
-                            <tr className="bg-slate-100">
-                              <th className="border border-black px-2 py-1.5 text-left font-bold">Pernyataan</th>
-                              <th className="border border-black px-1 py-1.5 w-[75px] text-center font-bold">
-                                {(q.categoryLabels && q.categoryLabels[0]) || "Benar"}
-                              </th>
-                              <th className="border border-black px-1 py-1.5 w-[75px] text-center font-bold">
-                                {(q.categoryLabels && q.categoryLabels[1]) || "Salah"}
-                              </th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {q.trueFalseRows.map((row, rIdx) => (
-                              <tr key={rIdx}>
-                                <td 
-                                  className="border border-black px-2 py-1.5 leading-snug" 
-                                  dangerouslySetInnerHTML={{ __html: renderFormattedHtml(row.text) }}
-                                />
-                                <td className="border border-black px-1 py-1.5 text-center w-[75px]">
-                                  <div className="w-3.5 h-3.5 border border-black rounded-full mx-auto"></div>
-                                </td>
-                                <td className="border border-black px-1 py-1.5 text-center w-[75px]">
-                                  <div className="w-3.5 h-3.5 border border-black rounded-full mx-auto"></div>
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    )}
-
-                    {/* Matching Pairs */}
-                    {q.questionType === "MATCHING" && q.matchingPairs && (
-                      <div className="mt-2 pl-6">
-                        <table className="w-full border-collapse border border-black text-xs">
-                          <thead>
-                            <tr className="bg-slate-100">
-                              <th className="border border-black px-3 py-1.5 text-left font-bold w-1/2">Pernyataan / Soal</th>
-                              <th className="border border-black px-3 py-1.5 text-left font-bold w-1/2">Pasangan Jawaban</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {q.matchingPairs.map((pair, pIdx) => (
-                              <tr key={pIdx}>
-                                <td className="border border-black px-3 py-1.5">
-                                  <span className="font-bold mr-1">({pIdx + 1})</span>
-                                  <span dangerouslySetInnerHTML={{ __html: renderFormattedHtml(pair.left) }} />
-                                </td>
-                                <td className="border border-black px-3 py-1.5">
-                                  <span className="font-bold mr-1">({String.fromCharCode(65 + pIdx)})</span>
-                                  <span dangerouslySetInnerHTML={{ __html: renderFormattedHtml(pair.right) }} />
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    )}
                   </div>
+                </div>
+
+                {/* Question Answer Area (Sibling to stem so stem on page 1 + options on page 2 can paginate cleanly) */}
+                <div className="print-question-answer-area pl-[34px] text-xs sm:text-sm text-black leading-relaxed">
+                  {/* Multiple Choice Options */}
+                  {q.questionType === "MULTIPLE_CHOICE" && q.options && (
+                    <div
+                      className={`print-question-options ${
+                        isTwoColOptions && shouldRenderTwoColumns(q.options)
+                          ? "grid grid-cols-2 gap-x-6 gap-y-1 mt-1.5 pl-6"
+                          : "space-y-1 mt-1.5 pl-6"
+                      }`}
+                    >
+                      {q.options.map((opt, oIdx) => (
+                        <div key={oIdx} className="print-option-row flex gap-2 items-start text-xs sm:text-[13px]">
+                          <span className="font-bold shrink-0 text-black">
+                            {String.fromCharCode(65 + oIdx)}.
+                          </span>
+                          <div className="flex-1 text-black font-normal">
+                            <div 
+                              dangerouslySetInnerHTML={{ __html: renderFormattedHtml(opt) }}
+                            />
+                            {q.optionImages?.[oIdx] && (
+                              <img 
+                                src={q.optionImages[oIdx]!} 
+                                alt={`Opsi ${String.fromCharCode(65 + oIdx)}`} 
+                                className="max-w-[100px] max-h-[100px] object-contain mt-1 rounded border border-slate-200" 
+                                onError={(e) => {
+                                  (e.currentTarget as HTMLElement).style.display = "none";
+                                }}
+                              />
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Complex Multiple Choice Options */}
+                  {q.questionType === "COMPLEX_MULTIPLE_CHOICE" && q.options && (
+                    <div className="print-question-options space-y-1.5 mt-2 pl-6">
+                      <p className="text-[11px] italic text-slate-600 mb-1">
+                        *(Pilihlah semua pernyataan yang benar - Jawaban lebih dari satu)*
+                      </p>
+                      {q.options.map((opt, oIdx) => (
+                        <div key={oIdx} className="print-option-row flex gap-2 items-start text-xs sm:text-[13px]">
+                          <div className="w-3.5 h-3.5 border border-black rounded-sm shrink-0 mt-0.5"></div>
+                          <div className="flex-1 text-black font-normal">
+                            <div 
+                              dangerouslySetInnerHTML={{ __html: renderFormattedHtml(opt) }}
+                            />
+                            {q.optionImages?.[oIdx] && (
+                              <img 
+                                src={q.optionImages[oIdx]!} 
+                                alt="Opsi" 
+                                className="max-w-[100px] max-h-[100px] object-contain mt-1 rounded border border-slate-200" 
+                                onError={(e) => {
+                                  (e.currentTarget as HTMLElement).style.display = "none";
+                                }}
+                              />
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Fill In The Blank */}
+                  {q.questionType === "FILL_IN_THE_BLANK" && (
+                    <div className="mt-2 text-xs italic text-slate-700 max-w-full overflow-hidden break-all">
+                      Jawaban: ..........................................................................................................................................
+                    </div>
+                  )}
+
+                  {/* Essay */}
+                  {q.questionType === "ESSAY" && (
+                    <div className="mt-2 space-y-3">
+                      <div className="border-b border-black border-dashed"></div>
+                      <div className="border-b border-black border-dashed"></div>
+                      <div className="border-b border-black border-dashed"></div>
+                    </div>
+                  )}
+
+                  {/* True / False Table */}
+                  {q.questionType === "TRUE_FALSE" && q.trueFalseRows && (
+                    <div className="mt-2 pl-6">
+                      <table className="w-full border-collapse border border-black text-[11px] table-fixed">
+                        <thead>
+                          <tr className="bg-slate-100">
+                            <th className="border border-black px-2 py-1.5 text-left font-bold">Pernyataan</th>
+                            <th className="border border-black px-1 py-1.5 w-[75px] text-center font-bold">
+                              {(q.categoryLabels && q.categoryLabels[0]) || "Benar"}
+                            </th>
+                            <th className="border border-black px-1 py-1.5 w-[75px] text-center font-bold">
+                              {(q.categoryLabels && q.categoryLabels[1]) || "Salah"}
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {q.trueFalseRows.map((row, rIdx) => (
+                            <tr key={rIdx}>
+                              <td 
+                                className="border border-black px-2 py-1.5 leading-snug" 
+                                dangerouslySetInnerHTML={{ __html: renderFormattedHtml(row.text) }}
+                              />
+                              <td className="border border-black px-1 py-1.5 text-center w-[75px]">
+                                <div className="w-3.5 h-3.5 border border-black rounded-full mx-auto"></div>
+                              </td>
+                              <td className="border border-black px-1 py-1.5 text-center w-[75px]">
+                                <div className="w-3.5 h-3.5 border border-black rounded-full mx-auto"></div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+
+                  {/* Matching Pairs */}
+                  {q.questionType === "MATCHING" && q.matchingPairs && (
+                    <div className="mt-2 pl-6">
+                      <table className="w-full border-collapse border border-black text-xs">
+                        <thead>
+                          <tr className="bg-slate-100">
+                            <th className="border border-black px-3 py-1.5 text-left font-bold w-1/2">Pernyataan / Soal</th>
+                            <th className="border border-black px-3 py-1.5 text-left font-bold w-1/2">Pasangan Jawaban</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {q.matchingPairs.map((pair, pIdx) => (
+                            <tr key={pIdx}>
+                              <td className="border border-black px-3 py-1.5">
+                                <span className="font-bold mr-1">({pIdx + 1})</span>
+                                <span dangerouslySetInnerHTML={{ __html: renderFormattedHtml(pair.left) }} />
+                              </td>
+                              <td className="border border-black px-3 py-1.5">
+                                <span className="font-bold mr-1">({String.fromCharCode(65 + pIdx)})</span>
+                                <span dangerouslySetInnerHTML={{ __html: renderFormattedHtml(pair.right) }} />
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
                 </div>
               </div>
             );
