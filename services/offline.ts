@@ -1,6 +1,5 @@
 import { supabase } from '../lib/supabase';
-import type { Result, Exam } from '../types';
-import { calculateExamScore } from '../components/teacher/examUtils';
+import type { Result } from '../types';
 
 // --- INDEXED DB HELPER ---
 const DB_NAME = 'UjianCerdasDB';
@@ -8,7 +7,7 @@ const DB_VERSION = 1;
 const STORE_PROGRESS = 'exam_progress';
 const QUEUE_LOCAL_KEY = 'exam_sync_queue';
 const QUEUE_IDB_KEY = 'offline_sync_queue_backup';
-const MAX_RETRY_ATTEMPTS = 10;
+const MAX_RETRY_ATTEMPTS = 20;
 
 interface QueuedResult extends Result {
     _retryCount?: number;
@@ -33,7 +32,7 @@ const initDB = (): Promise<IDBDatabase> => {
 export class OfflineService {
     private syncQueue: QueuedResult[] = [];
     private isProcessingQueue = false;
-    private rpcUnavailable = false;
+    private activeProcessPromise: Promise<void> | null = null;
     private pendingSaveQueuePromise: Promise<void> = Promise.resolve();
 
     constructor() {
@@ -196,13 +195,66 @@ export class OfflineService {
         return removedCount;
     }
 
+    private sanitizeAnswers(clientAnswers?: Record<string, string>, existingAnswers?: Record<string, string>): Record<string, string> {
+        const clean: Record<string, string> = {};
+        if (clientAnswers) {
+            for (const [k, v] of Object.entries(clientAnswers)) {
+                if (!k.startsWith('_grade_')) {
+                    clean[k] = v;
+                }
+            }
+        }
+        if (existingAnswers) {
+            for (const [k, v] of Object.entries(existingAnswers)) {
+                if (k.startsWith('_grade_')) {
+                    clean[k] = v;
+                }
+            }
+        }
+        return clean;
+    }
+
     // --- QUEUE METHODS ---
-    addToQueue(payload: Result): Promise<void> {
-        this.syncQueue = this.syncQueue.filter(item => !(item.examCode === payload.examCode && item.student.studentId === payload.student.studentId));
-        this.syncQueue.push({ ...payload, timestamp: Date.now(), _retryCount: 0 });
+    addToQueue(payload: Result, options?: { skipImmediateProcess?: boolean }): Promise<void> {
+        this.syncQueue = this.syncQueue.filter(
+            item => !(item.examCode === payload.examCode && item.student.studentId === payload.student.studentId)
+        );
+        // Zero-Trust: never persist client-calculated score/correctAnswers into sync queue
+        const rawPayload: QueuedResult = {
+            ...payload,
+            answers: this.sanitizeAnswers(payload.answers),
+            score: 0,
+            correctAnswers: 0,
+            totalQuestions: 0,
+            isSynced: false,
+            timestamp: Date.now(),
+            _retryCount: 0,
+        };
+        this.syncQueue.push(rawPayload);
         const savePromise = this.saveQueue();
-        if (typeof navigator === 'undefined' || navigator.onLine !== false) this.processQueue();
+        if (!options?.skipImmediateProcess && (typeof navigator === 'undefined' || navigator.onLine !== false)) {
+            this.processQueue();
+        }
         return savePromise;
+    }
+
+    hasPendingSubmission(examCode: string, studentId: string): boolean {
+        return this.syncQueue.some(
+            item =>
+                item.examCode === examCode &&
+                item.student?.studentId === studentId &&
+                (item.status === 'completed' || item.status === 'force_closed')
+        );
+    }
+
+    async retryQueuedSubmission(examCode: string, studentId: string): Promise<boolean> {
+        this.syncQueue = this.syncQueue.map(item =>
+            item.examCode === examCode && item.student?.studentId === studentId
+                ? { ...item, _retryCount: 0 }
+                : item
+        );
+        await this.processQueue();
+        return !this.hasPendingSubmission(examCode, studentId);
     }
 
     waitForQueueSaved(): Promise<void> {
@@ -226,158 +278,158 @@ export class OfflineService {
         return this.syncQueue;
     }
 
-    async processQueue() {
-        if (this.isProcessingQueue || this.syncQueue.length === 0 || (typeof navigator !== 'undefined' && navigator.onLine === false)) return;
-        this.isProcessingQueue = true;
-        const queueCopy = [...this.syncQueue];
-        const remainingQueue: QueuedResult[] = [];
-        
-        for (const payload of queueCopy) {
-            try {
-                const student = payload.student;
-                const rawResultId = student.resultId ?? payload.id;
-                const numericResultId =
-                    typeof rawResultId === 'number' && !isNaN(rawResultId)
-                        ? rawResultId
-                        : (typeof rawResultId === 'string' && /^\d+$/.test(rawResultId)
-                            ? Number(rawResultId)
-                            : null);
-                const deviceId = payload.device_id || payload.answers?.['_deviceId'] || null;
+    private async persistRawAnswersBackup(payload: QueuedResult, numericResultId: number | null): Promise<boolean> {
+        const student = payload.student;
+        let existingAnswers: Record<string, string> = {};
+        let existingStatus: string | undefined;
+        let existingId: number | null = numericResultId;
 
-                // 1. Primary: Try Zero-Trust server RPC (already enforces completed/force_closed guard & _grade_* merge)
-                let syncedViaRpc = false;
-                if (!this.rpcUnavailable) {
-                    try {
-                        const { error: rpcError } = await supabase.rpc('calculate_and_submit_exam', {
-                            p_exam_code: payload.examCode,
-                            p_student_id: student.studentId,
-                            p_student_name: student.fullName,
-                            p_class_name: student.class,
-                            p_school_name: student.schoolName || '',
-                            p_answers: payload.answers || {},
-                            p_status: payload.status || 'in_progress',
-                            p_device_info: null,
-                            p_location: payload.location || null,
-                            p_activity_log: payload.activityLog || [],
-                            p_result_id: numericResultId,
-                            p_device_id: deviceId
-                        });
-
-                        if (!rpcError) {
-                            syncedViaRpc = true;
-                        } else if (rpcError.code === 'PGRST202' || rpcError.code === '42883') {
-                            this.rpcUnavailable = true;
-                        } else if (!rpcError.message?.includes('Failed to fetch')) {
-                            // Non-network RPC failure: still try direct fallback below
-                            console.warn("Queue RPC returned error, using guarded direct fallback:", rpcError.message);
-                        } else {
-                            throw rpcError;
-                        }
-                    } catch (rpcEx) {
-                        const errObj = rpcEx as Record<string, unknown>;
-                        if (errObj?.message === 'Failed to fetch') {
-                            throw rpcEx;
-                        }
-                    }
-                }
-
-                if (syncedViaRpc) {
-                    continue;
-                }
-
-                // 2. Guarded direct fallback if RPC unavailable
-                let existingAnswers: Record<string, string> = {};
-                let existingStatus: string | undefined;
-                if (numericResultId) {
-                    const { data: existingResult } = await supabase
-                        .from('results')
-                        .select('answers, status')
-                        .eq('id', numericResultId)
-                        .maybeSingle();
-                    if (existingResult) {
-                        existingAnswers = (existingResult.answers as Record<string, string>) || {};
-                        existingStatus = existingResult.status as string | undefined;
-                    }
-                } else {
-                    const { data: existingResult } = await supabase
-                        .from('results')
-                        .select('answers, status')
-                        .eq('exam_code', payload.examCode)
-                        .eq('student_id', student.studentId)
-                        .maybeSingle();
-                    if (existingResult) {
-                        existingAnswers = (existingResult.answers as Record<string, string>) || {};
-                        existingStatus = existingResult.status as string | undefined;
-                    }
-                }
-
-                // Guard: Never overwrite an already-finished exam with stale in_progress item
-                if ((existingStatus === 'completed' || existingStatus === 'force_closed') && payload.status === 'in_progress') {
-                    continue;
-                }
-
-                // Merge answers, preserving manual grades from server
-                const mergedAnswers = { ...(payload.answers || {}) };
-                Object.keys(existingAnswers).forEach(key => {
-                    if (key.startsWith('_grade_')) {
-                        mergedAnswers[key] = existingAnswers[key];
-                    }
-                });
-                payload.answers = mergedAnswers;
-
-                const calculatedScore = payload.score || 0;
-                const calculatedCorrect = payload.correctAnswers || 0;
-                const calculatedTotal = payload.totalQuestions || 0;
-
-                const classNameWithSchool = student.schoolName 
-                    ? `${student.schoolName}::${student.class}`
-                    : student.class;
-
-                let error;
-                if (numericResultId) {
-                    const { error: updateError } = await supabase
-                        .from('results')
-                        .update({ 
-                            answers: payload.answers || {}, 
-                            status: payload.status,
-                            activity_log: payload.activityLog, 
-                            score: calculatedScore, 
-                            correct_answers: calculatedCorrect, 
-                            total_questions: calculatedTotal, 
-                            location: payload.location, 
-                            updated_at: new Date().toISOString()
-                        })
-                        .eq('id', numericResultId);
-                    error = updateError;
-                } else {
-                    const { error: upsertError } = await supabase.from('results').upsert({
-                        exam_code: payload.examCode, student_id: student.studentId, student_name: student.fullName,
-                        class_name: classNameWithSchool, answers: payload.answers || {}, status: payload.status,
-                        activity_log: payload.activityLog, score: calculatedScore, correct_answers: calculatedCorrect,
-                        total_questions: calculatedTotal, location: payload.location, updated_at: new Date().toISOString()
-                    }, { onConflict: 'exam_code,student_id' });
-                    error = upsertError;
-                }
-                
-                if (error) {
-                    if (error.code === '42501' || error.code === 'PGRST301') { 
-                        console.error("Queue item dropped due to permission error:", error);
-                    } else {
-                        throw error; 
-                    }
-                }
-            } catch {
-                const nextRetry = (payload._retryCount || 0) + 1;
-                if (nextRetry < MAX_RETRY_ATTEMPTS) {
-                    remainingQueue.push({ ...payload, _retryCount: nextRetry });
-                } else {
-                    console.warn("Dropping queue item after max retry attempts:", payload.examCode, payload.student?.studentId);
-                }
+        if (existingId) {
+            const { data: existingResult } = await supabase
+                .from('results')
+                .select('id, answers, status')
+                .eq('id', existingId)
+                .maybeSingle();
+            if (existingResult) {
+                existingAnswers = (existingResult.answers as Record<string, string>) || {};
+                existingStatus = existingResult.status as string | undefined;
+            }
+        } else {
+            const { data: existingResult } = await supabase
+                .from('results')
+                .select('id, answers, status')
+                .eq('exam_code', payload.examCode)
+                .eq('student_id', student.studentId)
+                .maybeSingle();
+            if (existingResult) {
+                existingId = Number(existingResult.id);
+                existingAnswers = (existingResult.answers as Record<string, string>) || {};
+                existingStatus = existingResult.status as string | undefined;
             }
         }
-        this.syncQueue = remainingQueue;
-        await this.saveQueue();
-        this.isProcessingQueue = false;
+
+        if ((existingStatus === 'completed' || existingStatus === 'force_closed') && payload.status === 'in_progress') {
+            return true;
+        }
+
+        const mergedAnswers = this.sanitizeAnswers(payload.answers, existingAnswers);
+        const deviceId = payload.device_id || mergedAnswers['_deviceId'] || null;
+
+        if (existingId) {
+            // Update ONLY raw answers and metadata; never overwrite score/correct_answers/total_questions
+            const { error } = await supabase
+                .from('results')
+                .update({
+                    answers: mergedAnswers,
+                    status: payload.status || 'in_progress',
+                    activity_log: payload.activityLog || [],
+                    location: payload.location || null,
+                    ...(deviceId ? { device_id: deviceId } : {}),
+                    updated_at: new Date().toISOString(),
+                })
+                .eq('id', existingId);
+            return !error;
+        }
+
+        const classNameWithSchool = student.schoolName
+            ? `${student.schoolName}::${student.class}`
+            : student.class;
+
+        const { error } = await supabase.from('results').upsert({
+            exam_code: payload.examCode,
+            student_id: student.studentId,
+            student_name: student.fullName,
+            class_name: classNameWithSchool,
+            answers: mergedAnswers,
+            status: payload.status || 'in_progress',
+            activity_log: payload.activityLog || [],
+            score: 0,
+            correct_answers: 0,
+            total_questions: 0,
+            location: payload.location || null,
+            ...(deviceId ? { device_id: deviceId } : {}),
+            updated_at: new Date().toISOString(),
+        }, { onConflict: 'exam_code,student_id' });
+
+        return !error;
+    }
+
+    async processQueue(): Promise<void> {
+        if (this.activeProcessPromise) {
+            await this.activeProcessPromise;
+            if (this.syncQueue.length === 0) return;
+        }
+        if (this.isProcessingQueue || this.syncQueue.length === 0 || (typeof navigator !== 'undefined' && navigator.onLine === false)) {
+            return;
+        }
+
+        this.isProcessingQueue = true;
+        const runPromise = (async () => {
+            const queueCopy = [...this.syncQueue];
+            const remainingQueue: QueuedResult[] = [];
+
+            for (const payload of queueCopy) {
+                try {
+                    const student = payload.student;
+                    const rawResultId = student.resultId ?? payload.id;
+                    const numericResultId =
+                        typeof rawResultId === 'number' && !isNaN(rawResultId) && rawResultId < 1e12
+                            ? rawResultId
+                            : (typeof rawResultId === 'string' && /^\d+$/.test(rawResultId) && Number(rawResultId) < 1e12
+                                ? Number(rawResultId)
+                                : null);
+                    const deviceId = payload.device_id || payload.answers?.['_deviceId'] || null;
+
+                    // 1. Always attempt authoritative Zero-Trust server RPC grading
+                    const { error: rpcError } = await supabase.rpc('calculate_and_submit_exam', {
+                        p_exam_code: payload.examCode,
+                        p_student_id: student.studentId,
+                        p_student_name: student.fullName,
+                        p_class_name: student.class,
+                        p_school_name: student.schoolName || '',
+                        p_answers: payload.answers || {},
+                        p_status: payload.status || 'in_progress',
+                        p_device_info: null,
+                        p_location: payload.location || null,
+                        p_activity_log: payload.activityLog || [],
+                        p_result_id: numericResultId,
+                        p_device_id: deviceId
+                    });
+
+                    if (!rpcError) {
+                        continue;
+                    }
+
+                    // 2. RPC failed: backup raw answers ONLY (never client score!)
+                    const rawSaved = await this.persistRawAnswersBackup(payload, numericResultId).catch(() => false);
+
+                    // For in_progress heartbeats, raw-answer backup is enough; for completed/force_closed, keep retrying RPC!
+                    if (payload.status === 'in_progress' && rawSaved) {
+                        continue;
+                    }
+
+                    throw rpcError;
+                } catch {
+                    const nextRetry = (payload._retryCount || 0) + 1;
+                    if (nextRetry < MAX_RETRY_ATTEMPTS) {
+                        remainingQueue.push({ ...payload, _retryCount: nextRetry });
+                    } else {
+                        console.warn("Retaining/dropping exhausted queue item:", payload.examCode, payload.student?.studentId);
+                    }
+                }
+            }
+
+            this.syncQueue = remainingQueue;
+            await this.saveQueue();
+        })();
+
+        this.activeProcessPromise = runPromise;
+        try {
+            await runPromise;
+        } finally {
+            this.isProcessingQueue = false;
+            this.activeProcessPromise = null;
+        }
     }
 }
 
