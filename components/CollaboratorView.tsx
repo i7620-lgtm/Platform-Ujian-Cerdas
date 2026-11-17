@@ -103,6 +103,7 @@ export const CollaboratorView: React.FC<CollaboratorViewProps> = ({
           onClose={onExit}
           isReadOnly={false}
           isProctor={true}
+          proctorToken={token}
           teacherProfile={{
             fullName: "Pengawas Ujian",
             school: exam.authorSchool || "-",

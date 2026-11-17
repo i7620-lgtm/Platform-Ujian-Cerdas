@@ -83,6 +83,7 @@ const App: React.FC = () => {
   const [isInviteOpen, setIsInviteOpen] = useState(false);
   const [collaboratorData, setCollaboratorData] = useState<{ exam: Exam, role: 'editor' | 'viewer' | 'public', token: string } | null>(null);
   const [isMonitorProctor, setIsMonitorProctor] = useState(false);
+  const [monitorProctorToken, setMonitorProctorToken] = useState<string>('');
   const [appDialog, setAppDialog] = useState<{
     isOpen: boolean;
     variant: StudentDialogVariant;
@@ -672,11 +673,13 @@ const App: React.FC = () => {
                         // Supervisor live monitor view (has proctor action permissions)
                         setCurrentExam(data.exam);
                         setIsMonitorProctor(true);
+                        setMonitorProctorToken(collabToken);
                         setView('LIVE_MONITOR');
                     } else if (data.role === 'public') {
                         // Public/Parent live stream view (strict read-only, no proctor actions)
                         setCurrentExam(data.exam);
                         setIsMonitorProctor(false);
+                        setMonitorProctorToken('');
                         setView('LIVE_MONITOR');
                     } else {
                         setCollaboratorData({ ...data, token: collabToken });
@@ -870,9 +873,9 @@ const App: React.FC = () => {
         student: currentStudent,
         examCode: currentExam.code,
         answers: finalAnswers,
-        score: typeof (grading as {score?: number})?.score === 'number' ? (grading as {score: number}).score : 0,
+        score: 0,
         totalQuestions: (grading as {totalQuestions?: number})?.totalQuestions || currentExam.questions.length,
-        correctAnswers: (grading as {correctAnswers?: number})?.correctAnswers || 0,
+        correctAnswers: 0,
         status, 
         activityLog, 
         location, 
@@ -891,9 +894,13 @@ const App: React.FC = () => {
         }
 
         // RE-FETCH EXAM: Ensure we have the full exam with answers if showResultToStudent is true
-        // This is necessary because the initial fetch at login might have stripped answers
-        const updatedExam = await storageService.getExamForStudent(currentExam.code, currentStudent.studentId, false);
-        if (updatedExam) setCurrentExam(updatedExam);
+        // Wrapped in try/catch so offline / queued submissions still proceed cleanly to StudentResultPage
+        try {
+          const updatedExam = await storageService.getExamForStudent(currentExam.code, currentStudent.studentId, false);
+          if (updatedExam) setCurrentExam(updatedExam);
+        } catch {
+          // ignore offline refetch error
+        }
         
         setStudentResult(res as unknown as Result);
         setView('STUDENT_RESULT');
@@ -932,6 +939,8 @@ const App: React.FC = () => {
     setTeacherProfile(null);
     setPrefillCode('');
     setCollaboratorData(null);
+    setIsMonitorProctor(false);
+    setMonitorProctorToken('');
     // FIX: Clear shared state to prevent data leakage/ghosting between sessions
     lastExamsFetchRef.current = { teacherId: '', ts: 0 };
     lastResultsFetchRef.current = { teacherId: '', ts: 0 };
@@ -1283,6 +1292,7 @@ const App: React.FC = () => {
                 exam={currentExam} 
                 onFinish={resetToHome} 
                 onResume={handleResumeFromLock}
+                onResultUpdated={(updated) => setStudentResult(updated)}
                 isDarkMode={darkMode}
                 toggleTheme={toggleTheme}
             />
@@ -1295,6 +1305,7 @@ const App: React.FC = () => {
                 onExamFinished={() => resetToHome()}
                 isReadOnly={!isMonitorProctor}
                 isProctor={isMonitorProctor}
+                proctorToken={monitorProctorToken || undefined}
             />
         )}
 

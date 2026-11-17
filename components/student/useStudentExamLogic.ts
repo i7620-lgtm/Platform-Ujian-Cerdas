@@ -4,7 +4,7 @@ import { storageService } from "../../services/storage";
 import { examService } from "../../services/exam";
 import { supabase } from "../../lib/supabase";
 import type { RealtimeChannel } from "@supabase/supabase-js";
-import { calculateExamScore, sanitizeHtml } from "../teacher/examUtils";
+import { sanitizeHtml } from "../teacher/examUtils";
 import { useExamAntiCheat } from "../../hooks/useExamAntiCheat";
 import { getOvertimeGraceStatus, isOvertimeAllowedForExam } from "../../utils/scheduleUtils";
 import { measureClientBandwidthBytes, detectClientDevice, countIntegrityViolations } from "../../utils/telemetryUtils";
@@ -200,14 +200,16 @@ export const useStudentExamLogic = ({
           }
         }
 
-        const grading = calculateExamScore(activeExam, answersRef.current);
+        const scorableCount = activeExam.questions.filter(
+          (q) => q.questionType !== "INFO" && q.questionType !== "QUESTIONNAIRE",
+        ).length;
         await onSubmit(
           answersRef.current,
           timeLeftRef.current,
           resolvedStatus,
           logRef.current,
           userLocation,
-          grading,
+          { totalQuestions: scorableCount },
         );
 
         if (examRoomChannelRef.current) {

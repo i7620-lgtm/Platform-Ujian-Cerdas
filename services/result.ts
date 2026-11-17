@@ -5,7 +5,6 @@ import type { Result, ResultStatus, Exam, ExamConfig } from '../types';
 import { examService } from './exam';
 
 export class ResultService {
-  private static rpcDisabled = false; // Zero-Trust server RPC primary with graceful DB fallback
   mapRowToResult(row: Record<string, unknown>): Result {
         const studentIdStr = row.student_id as string;
         let absentNumber = '00';
@@ -227,25 +226,23 @@ export class ResultService {
         }
 
         // Row does not exist yet on server (student likely started offline): initialize via Zero-Trust RPC
-        if (!ResultService.rpcDisabled) {
-            const deviceId = params.answers?.['_deviceId'] || null;
-            const { data: rpcData, error: rpcErr } = await supabase.rpc('calculate_and_submit_exam', {
-                p_exam_code: params.examCode,
-                p_student_id: params.studentId,
-                p_student_name: params.studentName || 'Peserta Ujian',
-                p_class_name: params.className || '-',
-                p_school_name: params.schoolName || '',
-                p_answers: params.answers,
-                p_status: 'in_progress',
-                p_device_info: null,
-                p_location: null,
-                p_activity_log: [],
-                p_result_id: null,
-                p_device_id: deviceId
-            });
-            if (!rpcErr && rpcData?.id) {
-                return { ok: true, resultId: Number(rpcData.id) };
-            }
+        const deviceId = params.answers?.['_deviceId'] || null;
+        const { data: rpcData, error: rpcErr } = await supabase.rpc('calculate_and_submit_exam', {
+            p_exam_code: params.examCode,
+            p_student_id: params.studentId,
+            p_student_name: params.studentName || 'Peserta Ujian',
+            p_class_name: params.className || '-',
+            p_school_name: params.schoolName || '',
+            p_answers: params.answers,
+            p_status: 'in_progress',
+            p_device_info: null,
+            p_location: null,
+            p_activity_log: [],
+            p_result_id: null,
+            p_device_id: deviceId
+        });
+        if (!rpcErr && rpcData?.id) {
+            return { ok: true, resultId: Number(rpcData.id) };
         }
 
         return { ok: false };
@@ -254,168 +251,216 @@ export class ResultService {
     }
   }
 
+  private sanitizeClientAnswers(
+      clientAnswers?: Record<string, string>,
+      existingAnswers?: Record<string, string>
+  ): Record<string, string> {
+      const clean: Record<string, string> = {};
+      if (clientAnswers) {
+          for (const [k, v] of Object.entries(clientAnswers)) {
+              if (!k.startsWith('_grade_')) {
+                  clean[k] = v;
+              }
+          }
+      }
+      if (existingAnswers) {
+          for (const [k, v] of Object.entries(existingAnswers)) {
+              if (k.startsWith('_grade_')) {
+                  clean[k] = v;
+              }
+          }
+      }
+      return clean;
+  }
+
+  private async persistRawAnswersBackup(resultPayload: Result): Promise<{ ok: boolean; id?: number }> {
+      try {
+          const student = resultPayload.student;
+          const rawResultId = student.resultId ?? resultPayload.id;
+          let targetId =
+              typeof rawResultId === 'number' && !isNaN(rawResultId) && rawResultId < 1e12
+                  ? rawResultId
+                  : undefined;
+
+          let existingAnswers: Record<string, string> = {};
+          let existingStatus: string | undefined;
+
+          if (targetId) {
+              const { data: existingRow } = await supabase
+                  .from('results')
+                  .select('id, answers, status')
+                  .eq('id', targetId)
+                  .maybeSingle();
+              if (existingRow) {
+                  existingAnswers = (existingRow.answers as Record<string, string>) || {};
+                  existingStatus = existingRow.status as string | undefined;
+              }
+          } else {
+              const { data: existingRow } = await supabase
+                  .from('results')
+                  .select('id, answers, status')
+                  .eq('exam_code', resultPayload.examCode)
+                  .eq('student_id', student.studentId)
+                  .maybeSingle();
+              if (existingRow) {
+                  targetId = Number(existingRow.id);
+                  existingAnswers = (existingRow.answers as Record<string, string>) || {};
+                  existingStatus = existingRow.status as string | undefined;
+              }
+          }
+
+          if ((existingStatus === 'completed' || existingStatus === 'force_closed') && resultPayload.status === 'in_progress') {
+              return { ok: true, id: targetId };
+          }
+
+          const mergedAnswers = this.sanitizeClientAnswers(resultPayload.answers, existingAnswers);
+          const deviceId = resultPayload.device_id || mergedAnswers['_deviceId'] || null;
+
+          if (targetId) {
+              // Persist raw answers and session state ONLY; never write score/correct_answers/total_questions from client
+              const { error: updateErr } = await supabase
+                  .from('results')
+                  .update({
+                      answers: mergedAnswers,
+                      status: resultPayload.status || 'in_progress',
+                      activity_log: resultPayload.activityLog || [],
+                      location: resultPayload.location || null,
+                      ...(deviceId ? { device_id: deviceId } : {}),
+                      updated_at: new Date().toISOString(),
+                  })
+                  .eq('id', targetId);
+              return { ok: !updateErr, id: targetId };
+          }
+
+          const classNameWithSchool = student.schoolName
+              ? `${student.schoolName}::${student.class}`
+              : student.class;
+
+          const { data: upsertData, error: upsertErr } = await supabase
+              .from('results')
+              .upsert({
+                  exam_code: resultPayload.examCode,
+                  student_id: student.studentId,
+                  student_name: student.fullName,
+                  class_name: classNameWithSchool,
+                  answers: mergedAnswers,
+                  status: resultPayload.status || 'in_progress',
+                  activity_log: resultPayload.activityLog || [],
+                  score: 0,
+                  correct_answers: 0,
+                  total_questions: 0,
+                  location: resultPayload.location || null,
+                  ...(deviceId ? { device_id: deviceId } : {}),
+                  updated_at: new Date().toISOString(),
+              }, { onConflict: 'exam_code,student_id' })
+              .select('id')
+              .maybeSingle();
+
+          return {
+              ok: !upsertErr,
+              id: upsertData?.id ? Number(upsertData.id) : targetId,
+          };
+      } catch {
+          return { ok: false };
+      }
+  }
+
   async submitExamResult(resultPayload: Result): Promise<Result> {
+    const durationStr = resultPayload.answers?.['_duration'];
+    const parsedCompletion = durationStr ? parseInt(durationStr, 10) : undefined;
+    const validCompletionTime = !isNaN(parsedCompletion as number) ? parsedCompletion : 0;
+
+    // Never trust client-provided score or correctAnswers
+    const sanitizedBase: Result = {
+        ...resultPayload,
+        answers: this.sanitizeClientAnswers(resultPayload.answers),
+        score: 0,
+        correctAnswers: 0,
+        totalQuestions: resultPayload.totalQuestions || 0,
+        completionTime: validCompletionTime,
+    };
+
     if (typeof navigator !== 'undefined' && navigator.onLine === false) {
-        await offlineService.addToQueue(resultPayload);
-        return { ...resultPayload, isSynced: false, status: resultPayload.status || 'in_progress' };
+        await offlineService.addToQueue(sanitizedBase, { skipImmediateProcess: true });
+        return { ...sanitizedBase, isSynced: false, status: sanitizedBase.status || 'in_progress' };
     }
 
-    // 1. Try secure Zero-Trust RPC calculation if enabled and supported
-    if (!ResultService.rpcDisabled) {
-        try {
-            const rawResultId = resultPayload.student.resultId ?? resultPayload.id;
-            const numericResultId =
-                typeof rawResultId === 'number' && !isNaN(rawResultId) && rawResultId < 1e12
-                    ? rawResultId
-                    : (typeof rawResultId === 'string' && /^\d+$/.test(rawResultId) && Number(rawResultId) < 1e12
-                        ? Number(rawResultId)
-                        : null);
-            const deviceId = resultPayload.device_id || resultPayload.answers?.['_deviceId'] || null;
-
-            const { data: rpcData, error: rpcError } = await supabase.rpc('calculate_and_submit_exam', {
-                p_exam_code: resultPayload.examCode,
-                p_student_id: resultPayload.student.studentId,
-                p_student_name: resultPayload.student.fullName,
-                p_class_name: resultPayload.student.class,
-                p_school_name: resultPayload.student.schoolName || '',
-                p_answers: resultPayload.answers || {},
-                p_status: resultPayload.status || 'in_progress',
-                p_device_info: null,
-                p_location: resultPayload.location || null,
-                p_activity_log: resultPayload.activityLog || [],
-                p_result_id: numericResultId,
-                p_device_id: deviceId
-            });
-
-            if (rpcError) {
-                const errCode = String(rpcError.code || '');
-                const errMsg = String(rpcError.message || '');
-                if (errCode === 'PGRST202' || errCode === '42883') {
-                    // RPC function truly absent/signature mismatched: fall back for this session
-                    ResultService.rpcDisabled = true;
-                    console.info("RPC calculate_and_submit_exam unavailable in Supabase. Falling back to direct persistence.");
-                } else if (!errCode || errMsg.includes('Failed to fetch') || errMsg.includes('NetworkError')) {
-                    await offlineService.addToQueue(resultPayload);
-                    return { ...resultPayload, isSynced: false };
-                } else {
-                    throw rpcError;
-                }
-            } else if (rpcData) {
-                const durationStr = resultPayload.answers?.['_duration'];
-                const completionTime = durationStr ? parseInt(durationStr) : undefined;
-                const validCompletionTime = !isNaN(completionTime as number) ? completionTime : 0;
-
-                return {
-                    ...resultPayload,
-                    id: rpcData.id,
-                    student: {
-                        ...resultPayload.student,
-                        resultId: rpcData.id
-                    },
-                    score: rpcData.score,
-                    correctAnswers: rpcData.correct_answers,
-                    wrongAnswers: rpcData.wrong_answers,
-                    unansweredQuestions: rpcData.unanswered_questions,
-                    totalQuestions: rpcData.total_questions || resultPayload.totalQuestions,
-                    maxScore: rpcData.max_score,
-                    minScore: rpcData.min_score,
-                    isOlympiadMode: rpcData.is_olympiad,
-                    status: rpcData.status,
-                    device_id: deviceId || undefined,
-                    completionTime: validCompletionTime,
-                    isSynced: true
-                };
-            }
-        } catch (rpcEx) {
-            const errObj = rpcEx as Record<string, unknown>;
-            const errCode = String(errObj?.code || '');
-            const errMsg = String(errObj?.message || '');
-            if (errCode === 'PGRST202' || errCode === '42883') {
-                ResultService.rpcDisabled = true;
-            } else if (!errCode || errMsg === 'Failed to fetch' || errMsg.includes('NetworkError')) {
-                await offlineService.addToQueue(resultPayload);
-                return { ...resultPayload, isSynced: false };
-            }
-        }
-    }
-
-    // 2. Direct database persistence fallback ONLY when RPC function is absent (without querying exams.questions on client)
+    // 1. Primary & sole grading authority: Server RPC calculate_and_submit_exam
     try {
-        const student = resultPayload.student;
-        const classNameWithSchool = student.schoolName 
-            ? `${student.schoolName}::${student.class}`
-            : student.class;
+        const rawResultId = sanitizedBase.student.resultId ?? sanitizedBase.id;
+        const numericResultId =
+            typeof rawResultId === 'number' && !isNaN(rawResultId) && rawResultId < 1e12
+                ? rawResultId
+                : (typeof rawResultId === 'string' && /^\d+$/.test(rawResultId) && Number(rawResultId) < 1e12
+                    ? Number(rawResultId)
+                    : null);
+        const deviceId = sanitizedBase.device_id || sanitizedBase.answers?.['_deviceId'] || null;
 
-        let finalError;
-        let newId = student.resultId;
+        const { data: rpcData, error: rpcError } = await supabase.rpc('calculate_and_submit_exam', {
+            p_exam_code: sanitizedBase.examCode,
+            p_student_id: sanitizedBase.student.studentId,
+            p_student_name: sanitizedBase.student.fullName,
+            p_class_name: sanitizedBase.student.class,
+            p_school_name: sanitizedBase.student.schoolName || '',
+            p_answers: sanitizedBase.answers || {},
+            p_status: sanitizedBase.status || 'in_progress',
+            p_device_info: null,
+            p_location: sanitizedBase.location || null,
+            p_activity_log: sanitizedBase.activityLog || [],
+            p_result_id: numericResultId,
+            p_device_id: deviceId
+        });
 
-        const finalScore = typeof resultPayload.score === 'number' && !isNaN(resultPayload.score) ? resultPayload.score : 0;
-        const finalCorrect = resultPayload.correctAnswers || 0;
-        const finalTotal = resultPayload.totalQuestions || 0;
-
-        if (student.resultId && student.resultId < 1e12) {
-            const { error: updateError } = await supabase
-                .from('results')
-                .update({ 
-                    answers: resultPayload.answers || {}, 
-                    status: resultPayload.status || 'in_progress',
-                    activity_log: resultPayload.activityLog || [], 
-                    score: finalScore, 
-                    correct_answers: finalCorrect, 
-                    total_questions: finalTotal, 
-                    location: resultPayload.location || null, 
-                    updated_at: new Date().toISOString()
-                })
-                .eq('id', student.resultId);
-            finalError = updateError;
-        } else {
-            const { data: upsertData, error: upsertError } = await supabase.from('results').upsert({
-                exam_code: resultPayload.examCode, 
-                student_id: student.studentId, 
-                student_name: student.fullName,
-                class_name: classNameWithSchool, 
-                answers: resultPayload.answers || {}, 
-                status: resultPayload.status || 'in_progress',
-                activity_log: resultPayload.activityLog || [], 
-                score: finalScore, 
-                correct_answers: finalCorrect, 
-                total_questions: finalTotal, 
-                location: resultPayload.location || null, 
-                updated_at: new Date().toISOString()
-            }, { onConflict: 'exam_code,student_id' }).select('id').maybeSingle();
-
-            finalError = upsertError;
-            if (upsertData) newId = upsertData.id;
+        if (!rpcError && rpcData) {
+            return {
+                ...sanitizedBase,
+                id: rpcData.id,
+                student: {
+                    ...sanitizedBase.student,
+                    resultId: rpcData.id
+                },
+                score: rpcData.score,
+                correctAnswers: rpcData.correct_answers,
+                wrongAnswers: rpcData.wrong_answers,
+                unansweredQuestions: rpcData.unanswered_questions,
+                totalQuestions: rpcData.total_questions || sanitizedBase.totalQuestions,
+                maxScore: rpcData.max_score,
+                minScore: rpcData.min_score,
+                isOlympiadMode: rpcData.is_olympiad,
+                status: rpcData.status,
+                device_id: deviceId || undefined,
+                completionTime: validCompletionTime,
+                isSynced: true
+            };
         }
 
-        if (finalError) throw finalError;
-
-        const durationStr = resultPayload.answers?.['_duration'];
-        const completionTime = durationStr ? parseInt(durationStr) : undefined;
-        const validCompletionTime = !isNaN(completionTime as number) ? completionTime : 0;
-
-        return {
-            ...resultPayload,
-            score: finalScore,
-            correctAnswers: finalCorrect,
-            totalQuestions: finalTotal,
-            id: newId ? Number(newId) : undefined,
-            student: {
-                ...resultPayload.student,
-                resultId: newId ? Number(newId) : undefined
-            },
-            completionTime: validCompletionTime,
-            isSynced: true
-        };
-    } catch (saveError) {
-        console.error("Direct save failed:", saveError);
-        const errObj = saveError as Record<string, unknown>;
-        if (!errObj.code && errObj.message === 'Failed to fetch') {
-            await offlineService.addToQueue(resultPayload);
-            return { ...resultPayload, isSynced: false };
-        }
-        throw new Error("Gagal menyimpan hasil ujian: " + (errObj.message || "Izin database ditolak (RLS)."));
+        console.warn("RPC calculate_and_submit_exam unavailable/failed, saving raw answers & queuing for server grading:", rpcError?.message);
+    } catch (rpcEx) {
+        console.warn("RPC calculate_and_submit_exam exception, saving raw answers & queuing:", rpcEx);
     }
+
+    // 2. Resilient raw-answer-only backup + auto-retry queue (ZERO client score calculation/writes)
+    const backup = await this.persistRawAnswersBackup(sanitizedBase);
+    const resolvedId = backup.id ?? sanitizedBase.student.resultId ?? sanitizedBase.id;
+    const resultWithId: Result = {
+        ...sanitizedBase,
+        id: resolvedId ? Number(resolvedId) : undefined,
+        student: {
+            ...sanitizedBase.student,
+            resultId: resolvedId ? Number(resolvedId) : undefined
+        },
+        score: 0,
+        correctAnswers: 0,
+        isSynced: false
+    };
+
+    const isFinalSubmission = sanitizedBase.status === 'completed' || sanitizedBase.status === 'force_closed';
+    if (isFinalSubmission || !backup.ok) {
+        await offlineService.addToQueue(resultWithId, { skipImmediateProcess: true });
+        return { ...resultWithId, isSynced: false };
+    }
+
+    return { ...resultWithId, isSynced: true };
   }
 
   async getStudentResult(examCode: string, studentId: string): Promise<Result | null> {
@@ -430,7 +475,7 @@ export class ResultService {
       try {
           const { data, error } = await supabase
               .from('results')
-              .select('*')
+              .select('id, exam_code, student_id, student_name, class_name, status, score, correct_answers, total_questions, answers, activity_log, updated_at, location, device_id')
               .eq('exam_code', examCode)
               .eq('student_id', studentId)
               .maybeSingle();
@@ -499,24 +544,24 @@ export class ResultService {
       }
   }
 
-  async unlockStudentExam(examCode: string, studentId: string): Promise<void> {
-      const { data } = await supabase.from('results').select('activity_log').eq('exam_code', examCode).eq('student_id', studentId).maybeSingle();
-      const currentLog = (data?.activity_log as string[]) || [];
-      await supabase.from('results').update({ status: 'in_progress', activity_log: [...currentLog, "Guru membuka kunci"] }).eq('exam_code', examCode).eq('student_id', studentId);
+  async unlockStudentExam(examCode: string, studentId: string, proctorToken?: string): Promise<void> {
+      const { error } = await supabase.rpc('teacher_manage_student_session', {
+          p_exam_code: examCode,
+          p_student_id: studentId,
+          p_action: 'unlock',
+          p_proctor_token: proctorToken || null
+      });
+      if (error) throw new Error(error.message || 'Gagal membuka kunci sesi siswa.');
   }
 
-  async finishStudentExam(examCode: string, studentId: string): Promise<void> {
-      const { data } = await supabase.from('results').select('activity_log').eq('exam_code', examCode).eq('student_id', studentId).maybeSingle();
-      const currentLog = (data?.activity_log as string[]) || [];
-      const { error } = await supabase
-          .from('results')
-          .update({ 
-              status: 'completed', 
-              activity_log: [...currentLog, "Ujian dihentikan oleh Guru"] 
-          })
-          .eq('exam_code', examCode)
-          .eq('student_id', studentId);
-      if (error) throw error;
+  async finishStudentExam(examCode: string, studentId: string, proctorToken?: string): Promise<void> {
+      const { error } = await supabase.rpc('teacher_manage_student_session', {
+          p_exam_code: examCode,
+          p_student_id: studentId,
+          p_action: 'finish',
+          p_proctor_token: proctorToken || null
+      });
+      if (error) throw new Error(error.message || 'Gagal menghentikan ujian siswa.');
 
       const { data: examData } = await supabase.from('exams').select('config').eq('code', examCode).maybeSingle();
       if (examData?.config?.disableRealtime) return;
@@ -718,54 +763,32 @@ export class ResultService {
       }
   }
 
-  async generateUnlockToken(examCode: string, studentId: string): Promise<string> {
-      const token = Math.floor(1000 + Math.random() * 9000).toString();
-      await supabase.from('results').update({ unlock_token: token }).eq('exam_code', examCode).eq('student_id', studentId);
-      return token;
+  async generateUnlockToken(examCode: string, studentId: string, proctorToken?: string): Promise<string> {
+      const { data, error } = await supabase.rpc('generate_unlock_token', {
+          p_exam_code: examCode,
+          p_student_id: studentId,
+          p_proctor_token: proctorToken || null
+      });
+      if (error || !data) {
+          throw new Error(error?.message || 'Gagal membuat token akses.');
+      }
+      return String(data);
   }
 
   async verifyUnlockToken(examCode: string, studentId: string, token: string, newDeviceId?: string): Promise<boolean> {
       try {
-          const { data, error } = await supabase
-              .from('results')
-              .select('unlock_token, activity_log, answers')
-              .eq('exam_code', examCode)
-              .eq('student_id', studentId)
-              .maybeSingle();
+          const cleanToken = String(token || '').trim();
+          if (!/^\d{4}$/.test(cleanToken)) return false;
+
+          const { data, error } = await supabase.rpc('verify_unlock_token', {
+              p_exam_code: examCode,
+              p_student_id: studentId,
+              p_token: cleanToken,
+              p_new_device_id: newDeviceId || null
+          });
 
           if (error || !data) return false;
-          
-          if (data.unlock_token && String(data.unlock_token).trim() === token.trim()) {
-              const currentLog = (typeof data.activity_log === 'string' ? JSON.parse(data.activity_log) : data.activity_log) || [];
-              const existingAnswers = (typeof data.answers === 'object' && data.answers) ? (data.answers as Record<string, string>) : {};
-              const updatedAnswers = newDeviceId
-                  ? { ...existingAnswers, _deviceId: newDeviceId }
-                  : existingAnswers;
-              
-              const { error: updateError } = await supabase
-                  .from('results')
-                  .update({ 
-                      unlock_token: null, 
-                      status: 'in_progress',
-                      answers: updatedAnswers,
-                      activity_log: [...currentLog, `[${new Date().toLocaleTimeString()}] Akses dibuka siswa dengan token`]
-                  })
-                  .eq('exam_code', examCode)
-                  .eq('student_id', studentId);
-              
-              if (updateError) throw updateError;
-
-              if (newDeviceId) {
-                  await supabase
-                      .from('results')
-                      .update({ device_id: newDeviceId })
-                      .eq('exam_code', examCode)
-                      .eq('student_id', studentId)
-                      .then(() => {}, () => {});
-              }
-              return true;
-          }
-          return false;
+          return Boolean((data as { success?: boolean }).success);
       } catch (e) {
           console.error("Unlock verification failed:", e);
           return false;

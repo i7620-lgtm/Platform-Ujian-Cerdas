@@ -169,6 +169,14 @@ class StorageService {
       return offlineService.waitForQueueSaved();
   }
 
+  hasPendingSubmission(examCode: string, studentId: string): boolean {
+      return offlineService.hasPendingSubmission(examCode, studentId);
+  }
+
+  async retryQueuedSubmission(examCode: string, studentId: string): Promise<boolean> {
+      return offlineService.retryQueuedSubmission(examCode, studentId);
+  }
+
   async getStudentResult(examCode: string, studentId: string): Promise<Result | null> {
       return resultService.getStudentResult(examCode, studentId);
   }
@@ -177,12 +185,12 @@ class StorageService {
       return resultService.getStudentResultStatus(examCode, studentId);
   }
 
-  async unlockStudentExam(examCode: string, studentId: string): Promise<void> {
-      return resultService.unlockStudentExam(examCode, studentId);
+  async unlockStudentExam(examCode: string, studentId: string, proctorToken?: string): Promise<void> {
+      return resultService.unlockStudentExam(examCode, studentId, proctorToken);
   }
 
-  async finishStudentExam(examCode: string, studentId: string): Promise<void> {
-      return resultService.finishStudentExam(examCode, studentId);
+  async finishStudentExam(examCode: string, studentId: string, proctorToken?: string): Promise<void> {
+      return resultService.finishStudentExam(examCode, studentId, proctorToken);
   }
 
   async finishAllExams(examCode: string): Promise<void> {
@@ -203,8 +211,8 @@ class StorageService {
   
   async syncData() { this.processQueue(); }
 
-  async generateUnlockToken(examCode: string, studentId: string): Promise<string> {
-      return resultService.generateUnlockToken(examCode, studentId);
+  async generateUnlockToken(examCode: string, studentId: string, proctorToken?: string): Promise<string> {
+      return resultService.generateUnlockToken(examCode, studentId, proctorToken);
   }
 
   async verifyUnlockToken(examCode: string, studentId: string, token: string, newDeviceId?: string): Promise<boolean> {
