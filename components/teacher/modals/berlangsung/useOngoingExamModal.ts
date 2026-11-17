@@ -9,6 +9,7 @@ interface UseOngoingExamModalProps {
   teacherProfile?: TeacherProfile;
   onClose: () => void;
   onExamFinished?: (finishedExam: Exam) => void;
+  proctorToken?: string;
   isPremium?: boolean;
 }
 
@@ -27,6 +28,7 @@ export const useOngoingExamModal = ({
   exam,
   onClose,
   onExamFinished,
+  proctorToken,
   isPremium,
 }: UseOngoingExamModalProps) => {
   const [displayExam, setDisplayExam] = useState<Exam | null>(null);
@@ -696,10 +698,12 @@ export const useOngoingExamModal = ({
       const token = await storageService.generateUnlockToken(
         displayExam?.code || "",
         studentId,
+        proctorToken,
       );
       setGeneratedTokenData({ name: studentName, token });
-    } catch {
-      setAlertDialog({ isOpen: true, message: "Gagal membuat token akses." });
+    } catch (err) {
+      const msg = err instanceof Error && err.message ? err.message : "Gagal membuat token akses.";
+      setAlertDialog({ isOpen: true, message: msg });
     } finally {
       setTimeout(() => processingIdsRef.current.delete(studentId), 1000);
     }
@@ -758,6 +762,7 @@ export const useOngoingExamModal = ({
           await storageService.finishStudentExam(
             displayExam?.code || "",
             studentId,
+            proctorToken,
           );
           fetchLatest(true);
           setAlertDialog({ isOpen: true, message: "Ujian siswa berhasil dihentikan." });
