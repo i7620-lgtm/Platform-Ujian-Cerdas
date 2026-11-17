@@ -381,7 +381,7 @@ export const PrintKisiKisiModal: React.FC<PrintKisiKisiModalProps> = ({
         const existingStyle = document.getElementById(styleId);
         if (existingStyle) existingStyle.remove();
         const existingRoot = document.getElementById("print-portal-root");
-        if (existingRoot && existingRoot.parentNode && !document.querySelector(".print-soal-modal-wrapper")) {
+        if (existingRoot && existingRoot.parentNode && existingRoot.childElementCount === 0) {
           existingRoot.parentNode.removeChild(existingRoot);
         }
       };
