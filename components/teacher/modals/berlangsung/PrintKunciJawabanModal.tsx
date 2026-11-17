@@ -488,33 +488,112 @@ export const PrintKunciJawabanModal: React.FC<PrintKunciJawabanModalProps> = ({
         @media print {
           @page {
             size: A4 portrait;
-            margin: 12mm 15mm;
+            margin: 12mm 14mm 12mm 14mm;
           }
-          body {
-            background: white !important;
-            color: black !important;
-            font-size: 11pt !important;
-            line-height: 1.4 !important;
+
+          /* Reset html & body to allow natural multi-page pagination */
+          html, body {
+            width: 100% !important;
+            height: auto !important;
+            min-height: 100% !important;
+            overflow: visible !important;
+            position: static !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            background: #ffffff !important;
+            color: #000000 !important;
+            font-size: 10pt !important;
+            line-height: 1.45 !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
           }
-          .no-print {
+
+          /* Hide everything in the body except the dedicated print portal */
+          body > :not(#print-portal-root) {
             display: none !important;
           }
-          .print-kunci-modal-wrapper {
+
+          /* Dedicated print portal root must be static and unconstrained */
+          #print-portal-root {
             position: static !important;
             display: block !important;
             width: 100% !important;
             height: auto !important;
+            min-height: auto !important;
             overflow: visible !important;
-            background: white !important;
-            padding: 0 !important;
             margin: 0 !important;
+            padding: 0 !important;
+            background: #ffffff !important;
+            color: #000000 !important;
             z-index: auto !important;
           }
-          .print-kunci-content {
+
+          .no-print {
+            display: none !important;
+          }
+
+          .print-kunci-modal-wrapper {
+            position: static !important;
+            inset: auto !important;
+            display: block !important;
+            width: 100% !important;
+            height: auto !important;
+            min-height: auto !important;
+            overflow: visible !important;
+            background: #ffffff !important;
             padding: 0 !important;
             margin: 0 !important;
-            max-width: 100% !important;
             box-shadow: none !important;
+            z-index: auto !important;
+          }
+
+          .print-kunci-content {
+            position: static !important;
+            width: 100% !important;
+            max-width: 100% !important;
+            height: auto !important;
+            overflow: visible !important;
+            display: block !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            background: #ffffff !important;
+            color: #000000 !important;
+            box-shadow: none !important;
+            font-size: 10pt !important;
+            line-height: 1.45 !important;
+          }
+
+          .print-kunci-header {
+            break-inside: avoid !important;
+            page-break-inside: avoid !important;
+            break-after: avoid !important;
+            page-break-after: avoid !important;
+            margin-bottom: 8px !important;
+            padding-bottom: 4px !important;
+          }
+
+          .print-kunci-section-title {
+            break-inside: avoid !important;
+            page-break-inside: avoid !important;
+            break-after: avoid !important;
+            page-break-after: avoid !important;
+          }
+
+          .print-kunci-summary-table thead {
+            display: table-header-group !important;
+          }
+
+          .print-kunci-summary-table tr {
+            break-inside: avoid !important;
+            page-break-inside: avoid !important;
+          }
+
+          .katex {
+            font-size: 1em !important;
+            text-rendering: auto !important;
+          }
+          .katex-display {
+            margin: 0.2em 0 !important;
           }
           .print-kunci-content .geometry-shape {
             display: block !important;
@@ -681,7 +760,7 @@ export const PrintKunciJawabanModal: React.FC<PrintKunciJawabanModalProps> = ({
             padding: 0 !important;
             max-width: 100% !important;
           }
-          .print-kunci-content table {
+          .print-kunci-content table:not(.default-identity-table) {
             width: 100% !important;
             max-width: 100% !important;
             border-collapse: collapse !important;
@@ -691,19 +770,32 @@ export const PrintKunciJawabanModal: React.FC<PrintKunciJawabanModalProps> = ({
             overflow-wrap: break-word !important;
             border: 1px solid #000000 !important;
           }
-          .print-kunci-content th,
-          .print-kunci-content td {
+          .print-kunci-content table:not(.default-identity-table) th,
+          .print-kunci-content table:not(.default-identity-table) td {
             border: 1px solid #000000 !important;
             padding: 4px 7px !important;
             vertical-align: top !important;
             color: #000000 !important;
           }
-          .print-kunci-content th,
-          .print-kunci-content thead th {
+          .print-kunci-content table:not(.default-identity-table) th,
+          .print-kunci-content table:not(.default-identity-table) thead th {
             background-color: #f1f5f9 !important;
             font-weight: 700 !important;
             -webkit-print-color-adjust: exact !important;
             print-color-adjust: exact !important;
+          }
+          .print-kunci-content table.default-identity-table {
+            width: 100% !important;
+            border-collapse: collapse !important;
+            border: none !important;
+            border-top: 1px solid #000000 !important;
+          }
+          .print-kunci-content table.default-identity-table td {
+            border: none !important;
+            padding: 2px 6px 2px 0 !important;
+            vertical-align: top !important;
+            color: #000000 !important;
+            background: transparent !important;
           }
           .page-break-before {
             break-before: page !important;
@@ -737,24 +829,37 @@ export const PrintKunciJawabanModal: React.FC<PrintKunciJawabanModalProps> = ({
           overflow-x: auto !important;
           max-width: 100% !important;
         }
-        .print-kunci-content table {
+        .print-kunci-content table:not(.default-identity-table) {
           width: 100% !important;
           max-width: 100% !important;
           border-collapse: collapse !important;
           border-spacing: 0 !important;
           border: 1px solid #000000 !important;
         }
-        .print-kunci-content th,
-        .print-kunci-content td {
+        .print-kunci-content table:not(.default-identity-table) th,
+        .print-kunci-content table:not(.default-identity-table) td {
           border: 1px solid #000000 !important;
           padding: 5px 8px !important;
           vertical-align: top !important;
           color: #000000 !important;
         }
-        .print-kunci-content th,
-        .print-kunci-content thead th {
+        .print-kunci-content table:not(.default-identity-table) th,
+        .print-kunci-content table:not(.default-identity-table) thead th {
           background-color: #f1f5f9 !important;
           font-weight: 700 !important;
+        }
+        .print-kunci-content table.default-identity-table {
+          width: 100% !important;
+          border-collapse: collapse !important;
+          border: none !important;
+          border-top: 1px solid #000000 !important;
+        }
+        .print-kunci-content table.default-identity-table td {
+          border: none !important;
+          padding: 2px 6px 2px 0 !important;
+          vertical-align: top !important;
+          color: #000000 !important;
+          background: transparent !important;
         }
 
         .print-kunci-content .geometry-shape {
@@ -787,11 +892,24 @@ export const PrintKunciJawabanModal: React.FC<PrintKunciJawabanModalProps> = ({
       return () => {
         const el = document.getElementById(styleId);
         if (el) el.remove();
+        const existingRoot = document.getElementById("print-portal-root");
+        if (existingRoot && existingRoot.parentNode && existingRoot.childElementCount === 0) {
+          existingRoot.parentNode.removeChild(existingRoot);
+        }
       };
     }
   }, [isOpen]);
 
   if (!isOpen || !exam) return null;
+
+  let portalRoot = typeof document !== "undefined" ? document.getElementById("print-portal-root") : null;
+  if (!portalRoot && typeof document !== "undefined") {
+    portalRoot = document.createElement("div");
+    portalRoot.id = "print-portal-root";
+    document.body.appendChild(portalRoot);
+  }
+
+  if (!portalRoot) return null;
 
   const actualQuestions = (exam.questions || []).filter((q) => !isInfoItem(q));
   const currentYear = new Date().getFullYear();
@@ -910,7 +1028,7 @@ export const PrintKunciJawabanModal: React.FC<PrintKunciJawabanModalProps> = ({
               </div>
             </div>
 
-            <table className="w-full text-xs font-semibold mt-2 border-t border-black pt-2">
+            <table className="default-identity-table w-full text-xs font-semibold mt-2 border-t border-black pt-2">
               <tbody>
                 <tr>
                   <td className="w-28 py-0.5">Mata Pelajaran</td>
@@ -950,11 +1068,11 @@ export const PrintKunciJawabanModal: React.FC<PrintKunciJawabanModalProps> = ({
         )}
 
         {/* SEKSI 1: TABEL MATRIKS RINGKASAN KUNCI JAWABAN */}
-        <div className="mb-6 avoid-break">
-          <div className="bg-slate-100 border border-black px-3 py-1.5 font-bold text-xs uppercase tracking-wide mb-2">
+        <div className="mb-6">
+          <div className="print-kunci-section-title bg-slate-100 border border-black px-3 py-1.5 font-bold text-xs uppercase tracking-wide mb-2">
             I. Tabel Ringkasan Kunci Jawaban
           </div>
-          <table className="w-full border-collapse border border-black text-xs">
+          <table className="print-kunci-summary-table w-full border-collapse border border-black text-xs">
             <thead>
               <tr className="bg-slate-50 text-black">
                 <th className="border border-black px-2 py-1.5 text-center w-12 font-bold">No.</th>
@@ -980,7 +1098,7 @@ export const PrintKunciJawabanModal: React.FC<PrintKunciJawabanModalProps> = ({
 
         {/* SEKSI 2: NASKAH SOAL LENGKAP DENGAN KUNCI & PEMBAHASAN */}
         <div className="page-break-before pt-2">
-          <div className="bg-slate-100 border border-black px-3 py-1.5 font-bold text-xs uppercase tracking-wide mb-4">
+          <div className="print-kunci-section-title bg-slate-100 border border-black px-3 py-1.5 font-bold text-xs uppercase tracking-wide mb-4">
             II. Pembahasan Butir Soal Terperinci
           </div>
 
@@ -1209,6 +1327,6 @@ export const PrintKunciJawabanModal: React.FC<PrintKunciJawabanModalProps> = ({
         </div>
       </div>
     </div>,
-    document.body,
+    portalRoot,
   );
 };
