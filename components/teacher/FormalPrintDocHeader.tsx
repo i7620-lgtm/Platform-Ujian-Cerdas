@@ -29,23 +29,23 @@ export const FormalPrintDocHeader: React.FC<FormalPrintDocHeaderProps> = ({
     <div className={`formal-kop-header text-black ${className}`}>
       <SchoolLetterhead profile={profile} overrideData={overrideData} />
 
-      <div className="text-center my-2 space-y-0.5 leading-snug">
-        <p className="text-sm sm:text-[15px] font-bold uppercase tracking-wide text-black">
+      <div className="formal-title-container text-center my-1.5 print:my-1 space-y-0.5 leading-snug">
+        <p className="formal-title-eval text-xs sm:text-[13px] font-bold uppercase tracking-wide text-black">
           {formalExamTitle}
         </p>
-        <p className="text-xs sm:text-[13px] font-bold uppercase tracking-wide text-black">
+        <p className="formal-title-year text-[11px] sm:text-[11.5px] font-bold uppercase tracking-wide text-black">
           TAHUN AJARAN ...........................
         </p>
-        <h1 className="text-sm sm:text-base font-extrabold uppercase tracking-wider text-black pt-0.5">
+        <h1 className="formal-title-doc text-[13px] sm:text-[14px] font-extrabold uppercase tracking-wider text-black pt-0.5">
           {documentTitle}
         </h1>
       </div>
 
-      <div className="max-w-[520px] mx-auto my-3.5 text-xs sm:text-[13px] text-black leading-snug space-y-1">
+      <div className="formal-id-block max-w-[440px] mx-auto my-2.5 print:my-1.5 text-[11px] sm:text-[11.5px] text-black leading-snug space-y-0.5 print:space-y-0">
         {identityFields.map((field, idx) => (
           <div
             key={`${field.label}-${idx}`}
-            className="grid grid-cols-[155px_12px_1fr] items-baseline"
+            className="formal-id-row grid grid-cols-[135px_12px_1fr] items-baseline"
           >
             <span className="font-semibold uppercase tracking-wide">
               {field.label}
