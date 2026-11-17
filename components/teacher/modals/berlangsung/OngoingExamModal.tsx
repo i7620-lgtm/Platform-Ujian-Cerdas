@@ -41,11 +41,12 @@ interface OngoingExamModalProps {
   onExamFinished?: (finishedExam: Exam) => void;
   isReadOnly?: boolean;
   isProctor?: boolean;
+  proctorToken?: string;
   isPremium?: boolean;
 }
 
 export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
-  const { exam, onClose, onExamFinished, teacherProfile, isReadOnly, isProctor: isProctorProp, isPremium } = props;
+  const { exam, onClose, onExamFinished, teacherProfile, isReadOnly, isProctor: isProctorProp, proctorToken, isPremium } = props;
   const isProctor = !!isProctorProp || teacherProfile?.accountType === "collaborator";
   const isOwner = !isReadOnly && !isProctor;
   const isPublicAccess = isReadOnly && !isProctorProp;
@@ -111,7 +112,7 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
     completedCount,
     uniqueClassesInResults,
     uniqueSchoolsInResults,
-  } = useOngoingExamModal({ exam, teacherProfile, onClose, onExamFinished, isPremium });
+  } = useOngoingExamModal({ exam, teacherProfile, onClose, onExamFinished, proctorToken, isPremium });
 
   // Mode Terang / Gelap State & Sinkronisasi
   const [isDarkTheme, setIsDarkTheme] = React.useState(() => {
