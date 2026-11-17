@@ -531,14 +531,109 @@ export const PrintKunciJawabanModal: React.FC<PrintKunciJawabanModalProps> = ({
             width: auto !important;
             height: auto !important;
           }
-          .school-letterhead-root img,
-          .school-letterhead-logo {
-            max-width: 78px !important;
-            max-height: 78px !important;
+          /* Uniform School Letterhead Print Styling (Identical across screen & paper) */
+          .school-letterhead-root {
+            width: 100% !important;
+            margin-bottom: 0 !important;
+          }
+          .school-letterhead-root .school-letterhead-logo-container {
+            width: 58pt !important;
+            height: 58pt !important;
+            max-width: 58pt !important;
+            max-height: 58pt !important;
+            flex-shrink: 0 !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+          }
+          .school-letterhead-root img.school-letterhead-logo,
+          .school-letterhead-root .school-letterhead-logo {
+            max-width: 56pt !important;
+            max-height: 56pt !important;
             width: auto !important;
             height: auto !important;
             object-fit: contain !important;
             margin: 0 auto !important;
+          }
+          .school-letterhead-root .kop-aksara-pemda,
+          .school-letterhead-root .kop-aksara-dinas {
+            font-size: 9.5pt !important;
+            line-height: 1.25 !important;
+          }
+          .school-letterhead-root .kop-text-pemda {
+            font-size: 10pt !important;
+            font-weight: 800 !important;
+            line-height: 1.25 !important;
+            margin-bottom: 1pt !important;
+          }
+          .school-letterhead-root .kop-text-dinas {
+            font-size: 10.5pt !important;
+            font-weight: 800 !important;
+            line-height: 1.25 !important;
+            margin-bottom: 1pt !important;
+          }
+          .school-letterhead-root .kop-aksara-sekolah {
+            font-size: 10.5pt !important;
+            line-height: 1.25 !important;
+          }
+          .school-letterhead-root .kop-text-sekolah {
+            font-size: 12pt !important;
+            font-weight: 900 !important;
+            letter-spacing: 0.5px !important;
+            line-height: 1.25 !important;
+            margin-bottom: 2pt !important;
+          }
+          .school-letterhead-root .kop-aksara-alamat {
+            font-size: 8.5pt !important;
+            line-height: 1.2 !important;
+          }
+          .school-letterhead-root .kop-text-alamat {
+            font-size: 8.5pt !important;
+            line-height: 1.25 !important;
+            color: #000000 !important;
+          }
+          .school-letterhead-root .kop-text-kontak {
+            font-size: 8pt !important;
+            line-height: 1.2 !important;
+            color: #1e293b !important;
+          }
+          .school-letterhead-root .letterhead-divider-double {
+            border-top: 2.5pt solid #000000 !important;
+            border-bottom: 0.75pt solid #000000 !important;
+            height: 3pt !important;
+            background: transparent !important;
+            box-sizing: content-box !important;
+            margin: 3pt 0 6pt 0 !important;
+            padding: 0 !important;
+          }
+
+          /* Formal Title & Identity Block in Print */
+          .formal-title-container {
+            margin: 2pt 0 4pt 0 !important;
+          }
+          .formal-title-eval {
+            font-size: 11pt !important;
+            font-weight: 800 !important;
+            line-height: 1.3 !important;
+          }
+          .formal-title-year {
+            font-size: 9.5pt !important;
+            font-weight: 700 !important;
+            line-height: 1.3 !important;
+          }
+          .formal-title-doc {
+            font-size: 11.5pt !important;
+            font-weight: 900 !important;
+            line-height: 1.3 !important;
+          }
+          .formal-id-block {
+            font-size: 9pt !important;
+            line-height: 1.35 !important;
+            max-width: 480px !important;
+            margin: 3pt auto 6pt auto !important;
+          }
+          .formal-id-row {
+            margin-bottom: 1pt !important;
           }
           .print-kunci-content img:not(.school-letterhead-root *),
           .print-kunci-content svg:not(.katex *):not(.lucide):not(.geometry-shape *):not(.geometry-shape):not(.school-letterhead-root *) {
