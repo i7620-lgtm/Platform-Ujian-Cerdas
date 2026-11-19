@@ -173,6 +173,22 @@ class StorageService {
       return offlineService.hasPendingSubmission(examCode, studentId);
   }
 
+  hasFailedSubmission(examCode: string, studentId: string): boolean {
+      return offlineService.hasFailedSubmission(examCode, studentId);
+  }
+
+  getFailedSubmission(examCode: string, studentId: string) {
+      return offlineService.getFailedSubmission(examCode, studentId);
+  }
+
+  getSubmissionSyncState(examCode: string, studentId: string) {
+      return offlineService.getSubmissionSyncState(examCode, studentId);
+  }
+
+  subscribeQueueChange(listener: () => void): () => void {
+      return offlineService.subscribeQueueChange(listener);
+  }
+
   async retryQueuedSubmission(examCode: string, studentId: string): Promise<boolean> {
       return offlineService.retryQueuedSubmission(examCode, studentId);
   }
