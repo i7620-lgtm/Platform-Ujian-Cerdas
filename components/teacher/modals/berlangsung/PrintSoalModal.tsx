@@ -464,10 +464,47 @@ export const PrintSoalModal: React.FC<PrintSoalModalProps> = ({
             margin-top: 6px !important;
           }
 
-          /* KaTeX print protection - prevent square root lines and formulas from stretching across page */
-          .katex {
+          /* KaTeX print protection - consistent 1.10em scaling & baseline parity with screen preview */
+          .math-visual {
             font-size: 1em !important;
+            vertical-align: baseline !important;
+            line-height: normal !important;
+          }
+          .katex {
+            font-size: 1.10em !important;
+            line-height: 1.2 !important;
+            text-indent: 0 !important;
             text-rendering: auto !important;
+          }
+          .katex .katex {
+            font-size: 1em !important;
+          }
+          .katex .msupsub .katex-sizing.reset-size6.size3,
+          .katex .msupsub .sizing.reset-size6.size3,
+          .katex .op-limits .katex-sizing.reset-size6.size3,
+          .katex .op-limits .sizing.reset-size6.size3,
+          .katex .katex-sizing.reset-size6.size3,
+          .katex .sizing.reset-size6.size3 {
+            font-size: 0.68em !important;
+          }
+          .katex .msupsub .katex-sizing.reset-size6.size1,
+          .katex .msupsub .sizing.reset-size6.size1,
+          .katex .op-limits .katex-sizing.reset-size6.size1,
+          .katex .op-limits .sizing.reset-size6.size1,
+          .katex .sqrt .root .katex-sizing.reset-size6.size3,
+          .katex .sqrt .root .sizing.reset-size6.size3,
+          .katex .sqrt .root .katex-sizing.reset-size6.size1,
+          .katex .sqrt .root .sizing.reset-size6.size1,
+          .katex .katex-sizing.reset-size6.size1,
+          .katex .sizing.reset-size6.size1 {
+            font-size: 0.54em !important;
+          }
+          .print-soal-content p:has(.math-visual) {
+            line-height: 1.75 !important;
+          }
+          .print-soal-content .option-content p {
+            display: inline !important;
+            margin: 0 !important;
           }
           .katex-display {
             margin: 0.35em 0 !important;
@@ -839,6 +876,21 @@ export const PrintSoalModal: React.FC<PrintSoalModalProps> = ({
           margin-bottom: 3px !important;
           text-align: center !important;
         }
+
+        .print-soal-content .math-visual {
+          display: inline-block;
+          vertical-align: baseline !important;
+          font-size: 1em !important;
+          line-height: normal !important;
+        }
+        .print-soal-content p:has(.math-visual) {
+          line-height: 1.75 !important;
+        }
+        .print-soal-content .option-content p {
+          display: inline;
+          margin-top: 0 !important;
+          margin-bottom: 0 !important;
+        }
       `;
       document.head.appendChild(style);
 
@@ -1167,12 +1219,13 @@ export const PrintSoalModal: React.FC<PrintSoalModalProps> = ({
                       }`}
                     >
                       {q.options.map((opt, oIdx) => (
-                        <div key={oIdx} className="print-option-row flex gap-2 items-start text-xs sm:text-[13px]">
+                        <div key={oIdx} className="print-option-row flex gap-2 items-baseline text-xs sm:text-[13px]">
                           <span className="font-bold shrink-0 text-black">
                             {String.fromCharCode(65 + oIdx)}.
                           </span>
                           <div className="flex-1 text-black font-normal">
-                            <div 
+                            <div
+                              className="option-content"
                               dangerouslySetInnerHTML={{ __html: renderFormattedHtml(opt) }}
                             />
                             {q.optionImages?.[oIdx] && (
@@ -1201,7 +1254,8 @@ export const PrintSoalModal: React.FC<PrintSoalModalProps> = ({
                         <div key={oIdx} className="print-option-row flex gap-2 items-start text-xs sm:text-[13px]">
                           <div className="w-3.5 h-3.5 border border-black rounded-sm shrink-0 mt-0.5"></div>
                           <div className="flex-1 text-black font-normal">
-                            <div 
+                            <div
+                              className="option-content"
                               dangerouslySetInnerHTML={{ __html: renderFormattedHtml(opt) }}
                             />
                             {q.optionImages?.[oIdx] && (

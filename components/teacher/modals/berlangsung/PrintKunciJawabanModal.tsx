@@ -588,9 +588,39 @@ export const PrintKunciJawabanModal: React.FC<PrintKunciJawabanModalProps> = ({
             page-break-inside: avoid !important;
           }
 
-          .katex {
+          .math-visual {
             font-size: 1em !important;
+            vertical-align: baseline !important;
+            line-height: normal !important;
+          }
+          .katex {
+            font-size: 1.10em !important;
+            line-height: 1.2 !important;
+            text-indent: 0 !important;
             text-rendering: auto !important;
+          }
+          .katex .katex {
+            font-size: 1em !important;
+          }
+          .katex .msupsub .katex-sizing.reset-size6.size3,
+          .katex .msupsub .sizing.reset-size6.size3,
+          .katex .op-limits .katex-sizing.reset-size6.size3,
+          .katex .op-limits .sizing.reset-size6.size3,
+          .katex .katex-sizing.reset-size6.size3,
+          .katex .sizing.reset-size6.size3 {
+            font-size: 0.68em !important;
+          }
+          .katex .msupsub .katex-sizing.reset-size6.size1,
+          .katex .msupsub .sizing.reset-size6.size1,
+          .katex .op-limits .katex-sizing.reset-size6.size1,
+          .katex .op-limits .sizing.reset-size6.size1,
+          .katex .sqrt .root .katex-sizing.reset-size6.size3,
+          .katex .sqrt .root .sizing.reset-size6.size3,
+          .katex .sqrt .root .katex-sizing.reset-size6.size1,
+          .katex .sqrt .root .sizing.reset-size6.size1,
+          .katex .katex-sizing.reset-size6.size1,
+          .katex .sizing.reset-size6.size1 {
+            font-size: 0.54em !important;
           }
           .katex-display {
             margin: 0.2em 0 !important;
@@ -1166,7 +1196,7 @@ export const PrintKunciJawabanModal: React.FC<PrintKunciJawabanModalProps> = ({
                         return (
                           <div
                             key={oIdx}
-                            className={`flex items-start gap-2 p-1.5 rounded border text-xs ${
+                            className={`flex items-baseline gap-2 p-1.5 rounded border text-xs ${
                               isCorrect
                                 ? "bg-emerald-50 border-emerald-400 font-bold text-emerald-950"
                                 : "border-transparent text-slate-700"
@@ -1176,7 +1206,7 @@ export const PrintKunciJawabanModal: React.FC<PrintKunciJawabanModalProps> = ({
                             <div
                               className="flex-1"
                             >
-                              <div dangerouslySetInnerHTML={{ __html: renderFormattedHtml(opt) }} />
+                              <div className="option-content" dangerouslySetInnerHTML={{ __html: renderFormattedHtml(opt) }} />
                               {q.optionImages?.[oIdx] && (
                                 <img 
                                   src={q.optionImages[oIdx]!} 
@@ -1207,7 +1237,7 @@ export const PrintKunciJawabanModal: React.FC<PrintKunciJawabanModalProps> = ({
                         return (
                           <div
                             key={oIdx}
-                            className={`flex items-start gap-2 p-1.5 rounded border text-xs ${
+                            className={`flex items-baseline gap-2 p-1.5 rounded border text-xs ${
                               isSelected
                                 ? "bg-emerald-50 border-emerald-400 font-bold text-emerald-950"
                                 : "border-transparent text-slate-700"
@@ -1217,7 +1247,7 @@ export const PrintKunciJawabanModal: React.FC<PrintKunciJawabanModalProps> = ({
                             <div
                               className="flex-1"
                             >
-                              <div dangerouslySetInnerHTML={{ __html: renderFormattedHtml(opt) }} />
+                              <div className="option-content" dangerouslySetInnerHTML={{ __html: renderFormattedHtml(opt) }} />
                               {q.optionImages?.[oIdx] && (
                                 <img 
                                   src={q.optionImages[oIdx]!} 
