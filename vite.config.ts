@@ -157,10 +157,10 @@ export default defineConfig(() => {
           navigateFallbackDenylist: [/^\/api/],
           globPatterns: ['**/*.{js,css,html,ico,png,svg,webp,woff2}'],
           // Exclude large vendor chunks from precache to speed up sharing
-          globIgnores: ['**/vendor-pdf-export-*.js', '**/vendor-xlsx-*.js', '**/vendor-charts-*.js', '**/vendor-math-markdown-*.js'],
+          globIgnores: ['**/vendor-jspdf-*.js', '**/vendor-html-to-image-*.js', '**/vendor-xlsx-*.js', '**/vendor-charts-*.js', '**/vendor-math-markdown-*.js'],
           runtimeCaching: [
             {
-              urlPattern: /assets\/vendor-(pdf-export|xlsx|charts|math-markdown).*\.js$/,
+              urlPattern: /assets\/vendor-(jspdf|html-to-image|xlsx|charts|math-markdown).*\.js$/,
               handler: 'CacheFirst',
               options: {
                 cacheName: 'large-vendor-chunks',
@@ -256,6 +256,7 @@ export default defineConfig(() => {
         polyfill: false
       },
       rollupOptions: {
+        external: ['html2canvas', 'canvg'],
         output: {
           manualChunks(id) {
             if (id.includes('node_modules')) {
@@ -283,8 +284,11 @@ export default defineConfig(() => {
               if (id.includes('xlsx')) {
                 return 'vendor-xlsx';
               }
-              if (id.includes('jspdf') || id.includes('html2canvas') || id.includes('html2pdf.js') || id.includes('html-to-image')) {
-                return 'vendor-pdf-export';
+              if (id.includes('jspdf')) {
+                return 'vendor-jspdf';
+              }
+              if (id.includes('html-to-image')) {
+                return 'vendor-html-to-image';
               }
             }
           }

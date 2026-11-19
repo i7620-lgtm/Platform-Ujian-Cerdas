@@ -441,7 +441,9 @@ const App: React.FC = () => {
       } else if (!res && isResultNetErr && !isPreview) {
         // Offline / network failure during login check: allow ONLY unlocked returning students with local exam data
         const localProgress = localProgressForResume;
-        const queued = offlineService.getSyncQueue().find((q) => q.examCode === examCode && q.student.studentId === student.studentId);
+        const queued =
+          offlineService.getSyncQueue().find((q) => q.examCode === examCode && q.student.studentId === student.studentId) ||
+          offlineService.getFailedQueue().find((q) => q.examCode === examCode && q.student.studentId === student.studentId);
         const isPR = (exam.config.examMode || '').trim().toUpperCase() === 'PR';
         const lockKey = `exam_lock_${examCode}_${student.studentId}`;
         let hasLocalLock = false;
