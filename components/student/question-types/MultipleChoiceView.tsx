@@ -29,14 +29,14 @@ export const MultipleChoiceView: React.FC<MultipleChoiceViewProps> = React.memo(
               key={i}
               type="button"
               onClick={() => onAnswerChange(qId, opt)}
-              className={`w-full text-left p-3 sm:p-4 min-h-[44px] rounded-xl border-2 transition-all flex items-start gap-2.5 sm:gap-4 ${
+              className={`w-full text-left p-3 sm:p-4 min-h-[44px] rounded-xl border-2 transition-all flex items-baseline gap-2.5 sm:gap-4 ${
                 isSelected
                   ? "border-indigo-600 dark:border-indigo-500 bg-indigo-50/30 dark:bg-indigo-900/20"
                   : "border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800"
               }`}
             >
               <span
-                className={`flex items-center justify-center w-6 h-6 rounded-full border text-xs font-bold shrink-0 mt-0.5 ${
+                className={`inline-flex items-center justify-center w-6 h-6 rounded-full border text-xs font-bold shrink-0 ${
                   isSelected
                     ? "bg-indigo-600 dark:bg-indigo-500 border-indigo-600 dark:border-indigo-500 text-white"
                     : "border-slate-200 dark:border-slate-700 text-slate-400 dark:text-slate-500 bg-slate-50 dark:bg-slate-800"
@@ -75,14 +75,14 @@ export const MultipleChoiceView: React.FC<MultipleChoiceViewProps> = React.memo(
                 );
                 onAnswerChange(qId, JSON.stringify(newAns));
               }}
-              className={`w-full text-left p-3 sm:p-4 min-h-[44px] rounded-xl border-2 transition-all flex items-start gap-2.5 sm:gap-4 ${
+              className={`w-full text-left p-3 sm:p-4 min-h-[44px] rounded-xl border-2 transition-all flex items-baseline gap-2.5 sm:gap-4 ${
                 isSelected
                   ? "border-indigo-600 dark:border-indigo-500 bg-indigo-50/30 dark:bg-indigo-900/20"
                   : "border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800"
               }`}
             >
               <div
-                className={`w-6 h-6 rounded-md flex items-center justify-center border text-xs font-black mt-0.5 shrink-0 transition-colors ${
+                className={`w-6 h-6 rounded-md inline-flex items-center justify-center border text-xs font-black shrink-0 transition-colors ${
                   isSelected
                     ? "bg-indigo-600 dark:bg-indigo-500 border-indigo-600 dark:border-indigo-500 text-white shadow-sm"
                     : "border-slate-200 dark:border-slate-700 text-slate-400 dark:text-slate-500 bg-slate-50 dark:bg-slate-800"
