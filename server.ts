@@ -2,10 +2,11 @@ import express from "express";
 import path from "path";
 import cors from "cors";
 import {
-  getExamMetaBundle,
-  getStudentQuestionBundle,
-  getAuthorizedExamSolutions,
-  storeWarmBundleInMemory,
+  handleExamMetaRequest,
+  handleExamTestRequest,
+  handleExamSolutionsRequest,
+  handleExamWarmRequest,
+  sendExamContentResponse,
 } from "./server/examContent.ts";
 import { moderateExamContentOnServer } from "./server/contentModeration.ts";
 
@@ -52,22 +53,8 @@ async function startServer() {
     try {
       const code = (req.params.code || "").trim().toUpperCase();
       const isPreview = req.query.preview === "true" || req.query.isPreview === "true";
-      const meta = await getExamMetaBundle(code, isPreview);
-
-      res.setHeader("Content-Type", "application/json");
-      if (!meta.success) {
-        res.setHeader("Cache-Control", "no-store");
-        return res.status(meta.status || 500).json(meta);
-      }
-
-      if (isPreview) {
-        res.setHeader("Cache-Control", "no-store");
-      } else {
-        res.setHeader("Cache-Control", "public, max-age=0, s-maxage=10, stale-while-revalidate=30");
-        res.setHeader("CDN-Cache-Control", "public, s-maxage=10");
-        res.setHeader("Vercel-CDN-Cache-Control", "public, s-maxage=10");
-      }
-      res.status(200).json(meta);
+      const result = await handleExamMetaRequest({ code, isPreview });
+      return sendExamContentResponse(res, result);
     } catch (error: any) {
       res.status(500).json({ success: false, error: error.message });
     }
@@ -76,30 +63,18 @@ async function startServer() {
   app.get("/api/exam-content/:code/test", async (req, res) => {
     try {
       const code = (req.params.code || "").trim().toUpperCase();
-      const versionParam = req.query.v ? parseInt(req.query.v as string, 10) : undefined;
+      const parsedVersion = req.query.v ? parseInt(req.query.v as string, 10) : NaN;
+      const versionNum = Number.isFinite(parsedVersion) ? parsedVersion : undefined;
       const isPreview = req.query.preview === "true" || req.query.isPreview === "true";
-      const bundle = await getStudentQuestionBundle(code, versionParam, isPreview);
+      const ifNoneMatch = typeof req.headers["if-none-match"] === "string" ? req.headers["if-none-match"] : undefined;
 
-      if (!bundle.success) {
-        res.setHeader("Cache-Control", "no-store");
-        return res.status(bundle.status || 500).json(bundle);
-      }
-
-      if (!isPreview) {
-        const etag = `"${code}-v${bundle.version}"`;
-        if (req.headers["if-none-match"] === etag) {
-          return res.status(304).end();
-        }
-        res.setHeader("ETag", etag);
-        res.setHeader("Cache-Control", "public, max-age=0, s-maxage=86400, stale-while-revalidate=3600");
-        res.setHeader("CDN-Cache-Control", "public, s-maxage=86400");
-        res.setHeader("Vercel-CDN-Cache-Control", "public, s-maxage=86400");
-      } else {
-        res.setHeader("Cache-Control", "no-store");
-      }
-
-      res.setHeader("Content-Type", "application/json");
-      res.status(200).json(bundle);
+      const result = await handleExamTestRequest({
+        code,
+        versionNum,
+        isPreview,
+        ifNoneMatch,
+      });
+      return sendExamContentResponse(res, result);
     } catch (error: any) {
       res.status(500).json({ success: false, error: error.message });
     }
@@ -113,14 +88,14 @@ async function startServer() {
       const deviceId = (req.query.deviceId as string) || (req.headers["x-device-id"] as string) || "";
       const resultId = (req.query.resultId as string) || (req.headers["x-result-id"] as string) || "";
 
-      const result = await getAuthorizedExamSolutions(code, studentId, proctorToken, { deviceId, resultId });
-      if (!result.success) {
-        return res.status(result.status || 403).json(result);
-      }
-
-      res.setHeader("Content-Type", "application/json");
-      res.setHeader("Cache-Control", "private, no-cache, no-store, must-revalidate");
-      res.status(200).json(result);
+      const result = await handleExamSolutionsRequest({
+        code,
+        studentId,
+        proctorToken,
+        deviceId,
+        resultId,
+      });
+      return sendExamContentResponse(res, result);
     } catch (error: any) {
       res.status(500).json({ success: false, error: error.message });
     }
@@ -129,28 +104,16 @@ async function startServer() {
   app.all(["/api/exam-content/:code/warm", "/api/exam-content/warm"], async (req, res) => {
     try {
       const code = (((req.params as any).code || req.query.code || req.body?.code || req.body?.examBundle?.code) as string || "").trim().toUpperCase();
-      const versionParam = req.query.v ? parseInt(req.query.v as string, 10) : undefined;
-      if (!code) {
-        return res.status(400).json({ success: false, error: "Code required" });
-      }
+      const parsedVersion = req.query.v ? parseInt(req.query.v as string, 10) : NaN;
+      const versionNum = Number.isFinite(parsedVersion) ? parsedVersion : undefined;
 
-      res.setHeader("Cache-Control", "no-store");
-      if (
-        req.method === "POST" &&
-        req.body?.examBundle &&
-        Array.isArray(req.body.examBundle.questions)
-      ) {
-        const stored = storeWarmBundleInMemory(code, req.body.examBundle);
-        if (stored) {
-          return res.json({ success: true, warmed: true, version: stored.version, source: "publish_push" });
-        }
-      }
-
-      const bundle = await getStudentQuestionBundle(code, versionParam);
-      if (!bundle.success) {
-        return res.status(bundle.status || 500).json(bundle);
-      }
-      res.json({ success: true, warmed: true, version: bundle.version, source: bundle.source });
+      const result = await handleExamWarmRequest({
+        code,
+        versionNum,
+        method: req.method,
+        examBundle: req.body?.examBundle,
+      });
+      return sendExamContentResponse(res, result);
     } catch (error: any) {
       res.status(500).json({ success: false, error: error.message });
     }

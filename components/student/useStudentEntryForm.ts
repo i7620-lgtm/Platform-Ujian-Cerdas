@@ -574,6 +574,9 @@ export const useStudentEntryForm = ({ initialCode, onLoginSuccess }: UseStudentE
         isOfflineFlow && !result
           ? offlineService
               .getSyncQueue()
+              .find((q) => q.examCode === cleanExamCode && q.student.studentId === studentId) ||
+            offlineService
+              .getFailedQueue()
               .find((q) => q.examCode === cleanExamCode && q.student.studentId === studentId)
           : undefined;
 

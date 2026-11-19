@@ -1,6 +1,5 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
-import { toPng } from 'html-to-image';
 
 export interface CertData {
     studentName: string;
@@ -20,8 +19,11 @@ export const downloadCertificateAsPdf = async (
     fileName: string,
     schoolName?: string
 ): Promise<void> => {
-        const { jsPDF } = await import('jspdf');
-        const { CertificateDOM } = await import('../components/CertificateDOM');
+        const [{ jsPDF }, { toPng }, { CertificateDOM }] = await Promise.all([
+            import('jspdf'),
+            import('html-to-image'),
+            import('../components/CertificateDOM'),
+        ]);
 
         const div = document.createElement('div');
         div.style.position = 'fixed';

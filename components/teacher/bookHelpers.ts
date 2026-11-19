@@ -492,9 +492,9 @@ export const generateBookHtml = ({
             : `<span style="font-weight: bold; color: #000; flex-shrink: 0; min-width: 16px;">${String.fromCharCode(65 + oIndex)}.</span>`;
 
           questionsHtmlStr += `
-                <div class="printable-item option-item avoid-break" style="display: flex; gap: 8px; align-items: flex-start; font-size: ${optFontSize}; line-height: 1.45;">
+                <div class="printable-item option-item avoid-break" style="display: flex; gap: 8px; align-items: baseline; font-size: ${optFontSize}; line-height: 1.45;">
                     ${optionBadge}
-                    <div class="html-content" style="flex: 1; word-wrap: break-word; overflow-wrap: break-word; color: #000;">
+                    <div class="html-content option-content" style="flex: 1; word-wrap: break-word; overflow-wrap: break-word; color: #000;">
                         ${optText}
                         ${
                           q.optionImages && q.optionImages[oIndex]
@@ -725,7 +725,7 @@ export const generateBookHtml = ({
         <meta charset="UTF-8">
         <title>${bookTitle} - Platform Ujian Cerdas</title>
         <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.18.7/dist/katex.min.css">
         ${styleTags}
         <style>
             @page {
@@ -918,8 +918,44 @@ export const generateBookHtml = ({
                 border: 1px solid #cbd5e1;
                 padding: 8px;
             }
-            .katex, .katex * {
+            .option-item .option-content p {
+                display: inline;
+                margin: 0 !important;
+            }
+            .math-visual {
+                font-size: 1em !important;
+                vertical-align: baseline !important;
                 line-height: normal !important;
+            }
+            .katex {
+                font-size: 1.10em !important;
+                line-height: 1.2 !important;
+                text-indent: 0 !important;
+            }
+            .katex .katex {
+                font-size: 1em !important;
+            }
+            .katex .msupsub .katex-sizing.reset-size6.size3,
+            .katex .msupsub .sizing.reset-size6.size3,
+            .katex .op-limits .katex-sizing.reset-size6.size3,
+            .katex .op-limits .sizing.reset-size6.size3,
+            .katex .katex-sizing.reset-size6.size3,
+            .katex .sizing.reset-size6.size3 {
+                font-size: 0.68em !important;
+            }
+            .katex .msupsub .katex-sizing.reset-size6.size1,
+            .katex .msupsub .sizing.reset-size6.size1,
+            .katex .op-limits .katex-sizing.reset-size6.size1,
+            .katex .op-limits .sizing.reset-size6.size1,
+            .katex .sqrt .root .katex-sizing.reset-size6.size3,
+            .katex .sqrt .root .sizing.reset-size6.size3,
+            .katex .sqrt .root .katex-sizing.reset-size6.size1,
+            .katex .sqrt .root .sizing.reset-size6.size1,
+            .katex .katex-sizing.reset-size6.size1,
+            .katex .sizing.reset-size6.size1 {
+                font-size: 0.54em !important;
+            }
+            .katex * {
                 text-indent: 0 !important;
             }
         </style>
@@ -1035,7 +1071,7 @@ export const generateBookHtml = ({
             ${kisiKisiHtmlStr}
         </div>
 
-        <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/katex@0.18.7/dist/katex.min.js"></script>
         <script>
             ${chartScripts}
         </script>
@@ -1052,7 +1088,7 @@ export const generateBookHtml = ({
                     document.querySelectorAll('.math-visual[data-latex]').forEach(el => {
                         try {
                             const latex = el.getAttribute('data-latex');
-                            if (latex) {
+                            if (latex && (!el.querySelector('.katex') || el.innerHTML.trim() === '')) {
                                 const isBlock = el.style.display === 'block';
                                 el.innerHTML = window.katex.renderToString(latex, {
                                     throwOnError: false,

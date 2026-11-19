@@ -271,14 +271,14 @@ export const QuestionResultDetailPopover: React.FC<
                 return (
                   <div
                     key={oIdx}
-                    className={`flex items-start gap-2 p-2 rounded-xl border text-xs transition-colors ${cardStyle}`}
+                    className={`flex items-baseline gap-2 p-2 rounded-xl border text-xs transition-colors ${cardStyle}`}
                   >
-                    <span className="w-5 h-5 rounded-lg bg-black/5 dark:bg-white/10 flex items-center justify-center font-bold text-[10px] shrink-0 mt-0.5">
+                    <span className="w-5 h-5 rounded-lg bg-black/5 dark:bg-white/10 inline-flex items-center justify-center font-bold text-[10px] shrink-0">
                       {optLetter}
                     </span>
                     <div className="flex-1 min-w-0 flex flex-col gap-1">
                       <span
-                        className="[&_img]:max-h-20 [&_img]:max-w-full [&_img]:object-contain"
+                        className="option-content [&_img]:max-h-20 [&_img]:max-w-full [&_img]:object-contain"
                         dangerouslySetInnerHTML={{ __html: renderMathInHtml(sanitizeHtml(opt)) }}
                       />
                       {question.optionImages?.[oIdx] && (

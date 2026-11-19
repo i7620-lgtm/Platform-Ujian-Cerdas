@@ -8,8 +8,11 @@ import {
   MoonIcon,
   ArrowPathIcon,
   SparklesIcon,
+  ExclamationTriangleIcon,
 } from "./Icons";
+import { Download } from "lucide-react";
 import { storageService } from "../services/storage";
+import type { SubmissionSyncState } from "../services/offline";
 import {
   analyzeStudentPerformance,
   analyzeQuestionTypePerformance,
@@ -56,6 +59,9 @@ export const StudentResultPage: React.FC<StudentResultPageProps> = ({
   const [hasQueuedPending, setHasQueuedPending] = useState<boolean>(() =>
     result.isSynced === false || storageService.hasPendingSubmission(exam.code, result.student.studentId),
   );
+  const [syncState, setSyncState] = useState<SubmissionSyncState>(() =>
+    storageService.getSubmissionSyncState(exam.code, result.student.studentId),
+  );
   const [isCheckingSync, setIsCheckingSync] = useState(false);
   const [syncCheckNotice, setSyncCheckNotice] = useState<{
     type: "info" | "success" | "warning";
@@ -71,7 +77,26 @@ export const StudentResultPage: React.FC<StudentResultPageProps> = ({
     setHasQueuedPending(
       result.isSynced === false || storageService.hasPendingSubmission(exam.code, result.student.studentId),
     );
+    setSyncState(storageService.getSubmissionSyncState(exam.code, result.student.studentId));
   }, [result, exam.code]);
+
+  useEffect(() => {
+    const syncFromQueue = () => {
+      const nextState = storageService.getSubmissionSyncState(
+        currentExam.code,
+        currentResult.student.studentId,
+      );
+      setSyncState(nextState);
+      const queueHasPending = storageService.hasPendingSubmission(
+        currentExam.code,
+        currentResult.student.studentId,
+      );
+      setHasQueuedPending(currentResult.isSynced === false || queueHasPending);
+    };
+
+    syncFromQueue();
+    return storageService.subscribeQueueChange(syncFromQueue);
+  }, [currentExam.code, currentResult.student.studentId, currentResult.isSynced]);
 
   // Fetch authorized solution package if teacher permitted review & server grading completed
   useEffect(() => {
@@ -170,6 +195,11 @@ export const StudentResultPage: React.FC<StudentResultPageProps> = ({
         currentExam.code,
         currentResult.student.studentId,
       );
+      const latestSyncState = storageService.getSubmissionSyncState(
+        currentExam.code,
+        currentResult.student.studentId,
+      );
+      setSyncState(latestSyncState);
 
       if (latest && (latest.status === "completed" || latest.status === "force_closed") && !stillPending) {
         try {
@@ -190,6 +220,12 @@ export const StudentResultPage: React.FC<StudentResultPageProps> = ({
           type: "success",
           text: "Submit berhasil terverifikasi dan dinilai oleh server.",
         });
+      } else if (latestSyncState.status === "failed") {
+        setHasQueuedPending(true);
+        setSyncCheckNotice({
+          type: "warning",
+          text: "Pengiriman ke server gagal dan masuk ke daftar gagal sinkronisasi. Unduh Bukti JSON sekarang lalu serahkan ke pengawas atau coba kirim ulang.",
+        });
       } else if (isNetworkError || (typeof navigator !== "undefined" && navigator.onLine === false)) {
         setHasQueuedPending(true);
         setSyncCheckNotice({
@@ -200,7 +236,7 @@ export const StudentResultPage: React.FC<StudentResultPageProps> = ({
         setHasQueuedPending(true);
         setSyncCheckNotice({
           type: "info",
-          text: "Layanan penilaian server belum merespons. Jawaban mentah Anda tetap aman dan akan dicoba kirim ulang otomatis.",
+          text: "Layanan penilaian server belum merespons. Jawaban mentah Anda tetap aman di antrean dan akan dicoba kirim ulang bertahap secara otomatis.",
         });
       } else if (latest) {
         setHasQueuedPending(true);
@@ -224,6 +260,64 @@ export const StudentResultPage: React.FC<StudentResultPageProps> = ({
       setIsCheckingSync(false);
     }
   }, [isCheckingSync, currentExam.code, currentResult.student.studentId, onResultUpdated]);
+
+  const handleDownloadEmergencyProof = useCallback(() => {
+    const queueItem =
+      storageService.getFailedSubmission(currentExam.code, currentResult.student.studentId) ??
+      syncState.item;
+
+    const rawAnswersSource = queueItem?.answers || currentResult.answers || {};
+    const sanitizedAnswers: Record<string, string> = {};
+    for (const [k, v] of Object.entries(rawAnswersSource)) {
+      if (!k.startsWith("_grade_")) {
+        sanitizedAnswers[k] = v;
+      }
+    }
+
+    const emergencyProof = {
+      schemaVersion: 1,
+      backupType: "OFFLINE_SUBMISSION_PROOF",
+      exportedAt: new Date().toISOString(),
+      examCode: currentExam.code,
+      subject: currentExam.config.subject,
+      examType: currentExam.config.examType,
+      student: queueItem?.student || currentResult.student,
+      status: queueItem?.status || currentResult.status,
+      answers: sanitizedAnswers,
+      activityLog: queueItem?.activityLog || currentResult.activityLog || [],
+      location: queueItem?.location || currentResult.location || null,
+      completionTime: queueItem?.completionTime ?? currentResult.completionTime ?? null,
+      submittedAt: new Date(queueItem?.timestamp || currentResult.timestamp || Date.now()).toISOString(),
+      syncDiagnostics: {
+        syncStatus: syncState.status,
+        retryCount: syncState.retryCount,
+        networkFailCount: syncState.networkFailCount,
+        lastError: syncState.lastError || null,
+        failedAt: syncState.failedAt ? new Date(syncState.failedAt).toISOString() : null,
+      },
+    };
+
+    const safeCode = (currentExam.code || "UJIAN").replace(/[^a-zA-Z0-9_-]/g, "_");
+    const safeStudentId = (currentResult.student.studentId || "SISWA").replace(/[^a-zA-Z0-9_-]/g, "_");
+    const fileName = `Bukti_Jawaban_${safeCode}_${safeStudentId}.json`;
+
+    const blob = new Blob([JSON.stringify(emergencyProof, null, 2)], {
+      type: "application/json;charset=utf-8",
+    });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = fileName;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+
+    setSyncCheckNotice({
+      type: "success",
+      text: `File "${fileName}" berhasil diunduh. Simpan file ini sebagai bukti jawaban resmi untuk diserahkan ke pengawas.`,
+    });
+  }, [currentExam.code, currentExam.config.examType, currentExam.config.subject, currentResult, syncState]);
 
   // Auto-check server status as soon as browser returns online while pending sync
   useEffect(() => {
@@ -411,6 +505,7 @@ export const StudentResultPage: React.FC<StudentResultPageProps> = ({
 
   const showResult = config.showResultToStudent;
   const isOlympiad = !!config.isOlympiadMode;
+  const isSyncFailed = isWaitingForServer && syncState.status === "failed";
 
   // Strict Zero-Trust: display ONLY authoritative score from server (never client-calculated fallback)
   const displayScore =
@@ -446,82 +541,170 @@ export const StudentResultPage: React.FC<StudentResultPageProps> = ({
           {/* Background decoration */}
           <div
             className={`absolute top-0 left-0 w-full h-2 ${
-              isWaitingForServer
-                ? "bg-gradient-to-r from-amber-400 to-orange-500"
-                : isOlympiad
+              isSyncFailed
+                ? "bg-gradient-to-r from-rose-500 to-red-600"
+                : isWaitingForServer
                   ? "bg-gradient-to-r from-amber-400 to-orange-500"
-                  : "bg-gradient-to-r from-emerald-400 to-teal-500"
+                  : isOlympiad
+                    ? "bg-gradient-to-r from-amber-400 to-orange-500"
+                    : "bg-gradient-to-r from-emerald-400 to-teal-500"
             }`}
           ></div>
 
           <div className="mb-6">
             <div
               className={`inline-flex items-center justify-center w-16 h-16 rounded-full mb-4 shadow-sm ${
-                isWaitingForServer
-                  ? "bg-amber-50 dark:bg-amber-900/20 text-amber-500 dark:text-amber-400 ring-4 ring-amber-50/50 dark:ring-amber-900/10"
-                  : isOlympiad
+                isSyncFailed
+                  ? "bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 ring-4 ring-rose-50/70 dark:ring-rose-900/20"
+                  : isWaitingForServer
                     ? "bg-amber-50 dark:bg-amber-900/20 text-amber-500 dark:text-amber-400 ring-4 ring-amber-50/50 dark:ring-amber-900/10"
-                    : "bg-emerald-50 dark:bg-emerald-900/20 text-emerald-500 dark:text-emerald-400 ring-4 ring-emerald-50/50 dark:ring-emerald-900/10"
+                    : isOlympiad
+                      ? "bg-amber-50 dark:bg-amber-900/20 text-amber-500 dark:text-amber-400 ring-4 ring-amber-50/50 dark:ring-amber-900/10"
+                      : "bg-emerald-50 dark:bg-emerald-900/20 text-emerald-500 dark:text-emerald-400 ring-4 ring-emerald-50/50 dark:ring-emerald-900/10"
               }`}
             >
-              {isWaitingForServer ? (
+              {isSyncFailed ? (
+                <ExclamationTriangleIcon className="w-8 h-8" />
+              ) : isWaitingForServer ? (
                 <ArrowPathIcon className={`w-8 h-8 ${isCheckingSync ? "animate-spin" : ""}`} />
               ) : (
                 <CheckCircleIcon className="w-8 h-8" />
               )}
             </div>
             <h1 className="text-xl font-black text-slate-900 dark:text-white mb-1 tracking-tight">
-              {isWaitingForServer
-                ? "Jawaban Disimpan — Menunggu Verifikasi Server"
-                : isOlympiad
-                  ? "Ujian Olimpiade Selesai"
-                  : "Ujian Selesai"}
+              {isSyncFailed
+                ? "Sinkronisasi Gagal — Perlu Tindakan Darurat"
+                : isWaitingForServer
+                  ? "Jawaban Disimpan — Menunggu Verifikasi Server"
+                  : isOlympiad
+                    ? "Ujian Olimpiade Selesai"
+                    : "Ujian Selesai"}
             </h1>
             <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">
-              {isWaitingForServer
-                ? "Jawaban mentah Anda telah diamankan di perangkat dan antrean sinkronisasi otomatis."
-                : "Jawaban Anda telah berhasil disimpan dan dinilai oleh server."}
+              {isSyncFailed
+                ? "Jawaban mentah Anda tetap aman tersimpan di perangkat ini. Unduh bukti JSON atau coba kirim ulang."
+                : isWaitingForServer
+                  ? "Jawaban mentah Anda telah diamankan di perangkat dan antrean sinkronisasi otomatis."
+                  : "Jawaban Anda telah berhasil disimpan dan dinilai oleh server."}
             </p>
           </div>
 
-          {/* BANNER STATUS PENDAFTARAN & PENILAIAN TERTUNDA (KETIKA RPC GAGAL SEMENTARA / OFFLINE) */}
-          {isWaitingForServer && (
-            <div className="mb-6 rounded-3xl border border-amber-200 dark:border-amber-800/60 bg-amber-50/80 dark:bg-amber-950/30 p-5 text-left">
-              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div className="space-y-1.5">
-                  <p className="text-xs font-black uppercase tracking-wider text-amber-800 dark:text-amber-300">
-                    Submit Dalam Antrean Penilaian Server
-                  </p>
-                  <p className="text-xs text-amber-900/80 dark:text-amber-200/80 leading-relaxed">
-                    Sistem belum menerima konfirmasi penilaian akhir dari server. Jawaban mentah Anda aman tersimpan tanpa menghitung nilai di perangkat, dan sistem akan mencoba mengirim ulang secara otomatis. Tekan tombol di samping untuk memeriksa apakah submit sudah berhasil diproses server.
-                  </p>
-                  {syncCheckNotice && (
-                    <p
-                      className={`text-xs font-bold pt-1 ${
-                        syncCheckNotice.type === "success"
-                          ? "text-emerald-700 dark:text-emerald-300"
-                          : syncCheckNotice.type === "warning"
-                            ? "text-rose-700 dark:text-rose-300"
-                            : "text-amber-700 dark:text-amber-300"
-                      }`}
-                    >
-                      {syncCheckNotice.text}
+          {/* BANNER STATUS PENDAFTARAN & PENILAIAN TERTUNDA / GAGAL PERMANEN */}
+          {isWaitingForServer &&
+            (isSyncFailed ? (
+              <div
+                role="alert"
+                className="mb-6 rounded-3xl border border-rose-200 dark:border-rose-800/70 bg-rose-50/90 dark:bg-rose-950/35 p-5 text-left"
+              >
+                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2 text-rose-800 dark:text-rose-200">
+                      <ExclamationTriangleIcon className="w-4 h-4 shrink-0 text-rose-600 dark:text-rose-400" />
+                      <p className="text-xs font-black uppercase tracking-wider">
+                        Peringatan Sinkronisasi Gagal — Perlu Tindakan
+                      </p>
+                    </div>
+                    <p className="text-xs text-rose-900/90 dark:text-rose-100/85 leading-relaxed">
+                      Sistem telah mencoba mengirim jawaban berulang kali ke server namun terus ditolak atau gagal terhubung. Jawaban mentah Anda masih tersimpan aman secara lokal dan tidak terhapus. Segera{" "}
+                      <span className="font-bold">Unduh Bukti JSON</span> untuk diserahkan ke pengawas/guru, atau tekan{" "}
+                      <span className="font-bold">Kirim Ulang Sekarang</span> setelah koneksi stabil.
                     </p>
-                  )}
-                </div>
+                    <p className="text-[11px] font-medium text-rose-800/90 dark:text-rose-200/85 tabular-nums">
+                      Riwayat gagal: {syncState.retryCount}x percobaan server
+                      {syncState.networkFailCount > 0 ? ` · ${syncState.networkFailCount}x gangguan jaringan` : ""}
+                      {syncState.failedAt
+                        ? ` · Berhenti pukul ${new Date(syncState.failedAt).toLocaleTimeString("id-ID", {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}`
+                        : ""}
+                      {syncState.lastError ? ` — ${syncState.lastError}` : ""}
+                    </p>
+                    {syncCheckNotice && (
+                      <p
+                        className={`text-xs font-bold pt-0.5 ${
+                          syncCheckNotice.type === "success"
+                            ? "text-emerald-700 dark:text-emerald-300"
+                            : syncCheckNotice.type === "warning"
+                              ? "text-rose-700 dark:text-rose-300"
+                              : "text-amber-700 dark:text-amber-300"
+                        }`}
+                      >
+                        {syncCheckNotice.text}
+                      </p>
+                    )}
+                  </div>
 
-                <button
-                  type="button"
-                  onClick={handleCheckSyncAndReload}
-                  disabled={isCheckingSync}
-                  className="shrink-0 min-h-[44px] inline-flex items-center justify-center gap-2 px-5 py-3 rounded-2xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-black uppercase tracking-wider shadow-md shadow-amber-200/60 dark:shadow-none transition-all active:scale-[0.98] disabled:opacity-60 cursor-pointer"
-                >
-                  <ArrowPathIcon className={`w-4 h-4 ${isCheckingSync ? "animate-spin" : ""}`} />
-                  <span>{isCheckingSync ? "Memeriksa..." : "Cek Status & Muat Ulang"}</span>
-                </button>
+                  <div className="flex flex-col sm:flex-row lg:flex-col xl:flex-row items-stretch sm:items-center gap-2.5 shrink-0">
+                    <button
+                      type="button"
+                      onClick={handleDownloadEmergencyProof}
+                      className="min-h-[44px] whitespace-nowrap shrink-0 inline-flex items-center justify-center gap-2 px-4 py-3 rounded-2xl bg-white dark:bg-slate-900 border border-rose-300 dark:border-rose-700 text-rose-700 dark:text-rose-300 hover:bg-rose-100/70 dark:hover:bg-rose-900/40 text-xs font-black uppercase tracking-wider transition-all active:scale-[0.98] cursor-pointer"
+                    >
+                      <Download className="w-4 h-4 shrink-0" />
+                      <span>Unduh Bukti JSON</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={handleCheckSyncAndReload}
+                      disabled={isCheckingSync}
+                      className="min-h-[44px] whitespace-nowrap shrink-0 inline-flex items-center justify-center gap-2 px-5 py-3 rounded-2xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-black uppercase tracking-wider shadow-md shadow-rose-200/60 dark:shadow-none transition-all active:scale-[0.98] disabled:opacity-60 cursor-pointer"
+                    >
+                      <ArrowPathIcon className={`w-4 h-4 shrink-0 ${isCheckingSync ? "animate-spin" : ""}`} />
+                      <span>{isCheckingSync ? "Mengirim Ulang..." : "Kirim Ulang Sekarang"}</span>
+                    </button>
+                  </div>
+                </div>
               </div>
-            </div>
-          )}
+            ) : (
+              <div className="mb-6 rounded-3xl border border-amber-200 dark:border-amber-800/60 bg-amber-50/80 dark:bg-amber-950/30 p-5 text-left">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                  <div className="space-y-1.5">
+                    <p className="text-xs font-black uppercase tracking-wider text-amber-800 dark:text-amber-300">
+                      Submit Dalam Antrean Penilaian Server
+                    </p>
+                    <p className="text-xs text-amber-900/80 dark:text-amber-200/80 leading-relaxed">
+                      Sistem belum menerima konfirmasi penilaian akhir dari server. Jawaban mentah Anda aman tersimpan tanpa menghitung nilai di perangkat, dan sistem akan mencoba mengirim ulang secara otomatis dengan jeda bertahap. Tekan tombol di samping untuk memeriksa atau mengirim ulang sekarang.
+                    </p>
+                    {(syncState.retryCount > 0 || syncState.networkFailCount > 0) && (
+                      <p className="text-[11px] font-medium text-amber-800/90 dark:text-amber-300/85 tabular-nums">
+                        Status antrean: {syncState.retryCount}x percobaan ulang · {syncState.networkFailCount}x gangguan jaringan
+                        {syncState.nextRetryAt
+                          ? ` · Jadwal otomatis berikutnya pukul ${new Date(syncState.nextRetryAt).toLocaleTimeString("id-ID", {
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })}`
+                          : ""}
+                      </p>
+                    )}
+                    {syncCheckNotice && (
+                      <p
+                        className={`text-xs font-bold pt-1 ${
+                          syncCheckNotice.type === "success"
+                            ? "text-emerald-700 dark:text-emerald-300"
+                            : syncCheckNotice.type === "warning"
+                              ? "text-rose-700 dark:text-rose-300"
+                              : "text-amber-700 dark:text-amber-300"
+                        }`}
+                      >
+                        {syncCheckNotice.text}
+                      </p>
+                    )}
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleCheckSyncAndReload}
+                    disabled={isCheckingSync}
+                    className="shrink-0 whitespace-nowrap min-h-[44px] inline-flex items-center justify-center gap-2 px-5 py-3 rounded-2xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-black uppercase tracking-wider shadow-md shadow-amber-200/60 dark:shadow-none transition-all active:scale-[0.98] disabled:opacity-60 cursor-pointer"
+                  >
+                    <ArrowPathIcon className={`w-4 h-4 ${isCheckingSync ? "animate-spin" : ""}`} />
+                    <span>{isCheckingSync ? "Memeriksa..." : "Cek Status & Muat Ulang"}</span>
+                  </button>
+                </div>
+              </div>
+            ))}
 
           {!isWaitingForServer && syncCheckNotice?.type === "success" && (
             <div className="mb-6 rounded-2xl border border-emerald-200 dark:border-emerald-800/60 bg-emerald-50 dark:bg-emerald-950/30 px-4 py-3 text-xs font-bold text-emerald-700 dark:text-emerald-300">

@@ -166,36 +166,177 @@
   /* Wysiwyg Specific Lists & Quotes (Replicating Editor Styles Globally) */
   .wysiwyg-content:empty:before { content: attr(data-placeholder); color: #94a3b8; font-style: italic; } 
   .dark .wysiwyg-content:empty:before { color: #64748b; } 
-  .wysiwyg-content ul { list-style-type: disc; padding-left: 1.5rem; } 
-  .wysiwyg-content ol { list-style-type: decimal; padding-left: 1.5rem; } 
-  .wysiwyg-content blockquote { border-left: 3px solid #cbd5e1; padding-left: 1rem; color: #64748b; font-style: italic; } 
-  .dark .wysiwyg-content blockquote { border-color: #475569; color: #94a3b8; } 
   .dark .wysiwyg-content { color: #f1f5f9; }
   /* Force darker text in light mode for better contrast and to fix "gray" appearance */
   .wysiwyg-content { color: #0f172a; } /* Slate 900 (almost black) */
 
-  /* Text Styling Fixes: Ensure italic and underline are faithfully rendered */
+  /* Unified Lists Across Student Exam, Teacher Views, Prose, Options & Print */
+  .wysiwyg-content ul,
+  .prose ul,
+  .student-question-text ul,
+  .option-content ul,
+  .print-soal-content ul,
+  .print-kunci-content ul,
+  .print-container ul {
+    list-style-type: disc !important;
+    padding-left: 1.5rem !important;
+    margin-top: 0.5rem !important;
+    margin-bottom: 0.5rem !important;
+  } 
+
+  .wysiwyg-content ol,
+  .prose ol,
+  .student-question-text ol,
+  .option-content ol,
+  .print-soal-content ol,
+  .print-kunci-content ol,
+  .print-container ol {
+    list-style-type: decimal !important;
+    padding-left: 1.5rem !important;
+    margin-top: 0.5rem !important;
+    margin-bottom: 0.5rem !important;
+  } 
+
+  .wysiwyg-content li,
+  .prose li,
+  .student-question-text li,
+  .option-content li,
+  .print-soal-content li,
+  .print-kunci-content li,
+  .print-container li {
+    display: list-item !important;
+    margin-top: 0.25rem !important;
+    margin-bottom: 0.25rem !important;
+  }
+
+  /* Code Block Styling (Fenced ```code```) */
+  .wysiwyg-content pre,
+  .prose pre,
+  .student-question-text pre,
+  .option-content pre,
+  .print-soal-content pre,
+  .print-kunci-content pre,
+  .print-container pre {
+    font-family: 'JetBrains Mono', monospace !important;
+    font-size: 0.8125rem !important;
+    line-height: 1.5 !important;
+    background-color: #f1f5f9 !important;
+    color: #0f172a !important;
+    border: 1px solid #cbd5e1 !important;
+    border-radius: 0.625rem !important;
+    padding: 0.75rem 1rem !important;
+    margin: 0.625rem 0 !important;
+    overflow-x: auto !important;
+    max-width: 100% !important;
+    white-space: pre !important;
+    word-break: normal !important;
+  }
+
+  .dark .wysiwyg-content pre,
+  .dark .prose pre,
+  .dark .student-question-text pre,
+  .dark .option-content pre {
+    background-color: #0f172a !important;
+    color: #f1f5f9 !important;
+    border-color: #334155 !important;
+  }
+
+  /* Inline Code Styling (`code`) */
+  .wysiwyg-content code,
+  .prose code,
+  .student-question-text code,
+  .option-content code,
+  .print-soal-content code,
+  .print-kunci-content code,
+  .print-container code {
+    font-family: 'JetBrains Mono', monospace !important;
+    background-color: #f1f5f9 !important;
+    color: #0f172a !important;
+    border: 1px solid #e2e8f0 !important;
+    border-radius: 0.25rem !important;
+    padding: 0.125rem 0.375rem !important;
+    font-size: 0.875em !important;
+  }
+
+  .dark .wysiwyg-content code,
+  .dark .prose code,
+  .dark .student-question-text code,
+  .dark .option-content code {
+    background-color: #1e293b !important;
+    color: #f1f5f9 !important;
+    border-color: #334155 !important;
+  }
+
+  /* Text Styling Fixes: Ensure italic, bold, underline and strikethrough are faithfully rendered */
   .wysiwyg-content i,
   .wysiwyg-content em,
   .prose i,
   .prose em,
+  .student-question-text i,
+  .student-question-text em,
   .option-content i,
-  .option-content em {
+  .option-content em,
+  .print-soal-content i,
+  .print-soal-content em,
+  .print-kunci-content i,
+  .print-kunci-content em,
+  .print-container i,
+  .print-container em {
     font-style: italic !important;
+  }
+
+  .wysiwyg-content b,
+  .wysiwyg-content strong,
+  .prose b,
+  .prose strong,
+  .student-question-text b,
+  .student-question-text strong,
+  .option-content b,
+  .option-content strong,
+  .print-soal-content b,
+  .print-soal-content strong,
+  .print-kunci-content b,
+  .print-kunci-content strong,
+  .print-container b,
+  .print-container strong {
+    font-weight: 700 !important;
   }
 
   .wysiwyg-content u,
   .prose u,
-  .option-content u {
+  .student-question-text u,
+  .option-content u,
+  .print-soal-content u,
+  .print-kunci-content u,
+  .print-container u {
     text-decoration: underline !important;
     text-underline-offset: 2px !important;
   }
 
+  .wysiwyg-content s,
+  .wysiwyg-content del,
+  .prose s,
+  .prose del,
+  .student-question-text s,
+  .student-question-text del,
+  .option-content s,
+  .option-content del,
+  .print-soal-content s,
+  .print-soal-content del,
+  .print-container s,
+  .print-container del {
+    text-decoration: line-through !important;
+  }
+
   /* Callout Indent with Vertical Accent Line */
   .callout-indent-quote,
-  .wysiwyg-content blockquote.callout-indent-quote,
-  .prose blockquote.callout-indent-quote,
-  .option-content blockquote.callout-indent-quote {
+  .wysiwyg-content blockquote,
+  .prose blockquote,
+  .student-question-text blockquote,
+  .option-content blockquote,
+  .print-soal-content blockquote,
+  .print-kunci-content blockquote,
+  .print-container blockquote {
     border-left: 4px solid #6366f1 !important;
     background: rgba(99, 102, 241, 0.06) !important;
     padding: 0.5rem 1rem !important;
@@ -205,9 +346,10 @@
     color: inherit !important;
   }
   .dark .callout-indent-quote,
-  .dark .wysiwyg-content blockquote.callout-indent-quote,
-  .dark .prose blockquote.callout-indent-quote,
-  .dark .option-content blockquote.callout-indent-quote {
+  .dark .wysiwyg-content blockquote,
+  .dark .prose blockquote,
+  .dark .student-question-text blockquote,
+  .dark .option-content blockquote {
     border-left-color: #818cf8 !important;
     background: rgba(99, 102, 241, 0.14) !important;
   }
@@ -529,11 +671,11 @@
       font-family: inherit !important;
   }
 
-  /* 2. Only reset spans/fonts that have NO class (likely copy-paste junk) */
-  /* This avoids hitting KaTeX spans which usually have classes like 'mord', 'katex-html', etc. */
-  .prose :is(span, font):not([class]):not([style*="Noto Sans Balinese"]), 
-  .wysiwyg-content :is(span, font):not([class]):not([style*="Noto Sans Balinese"]),
-  .option-content :is(span, font):not([class]):not([style*="Noto Sans Balinese"]) {
+  /* 2. Only reset spans/fonts that have NO class (likely copy-paste junk), never inside KaTeX/math-visual */
+  /* This avoids hitting KaTeX internal layout spans */
+  .prose :is(span, font):not([class]):not(.katex *):not(.math-visual *):not([style*="Noto Sans Balinese"]), 
+  .wysiwyg-content :is(span, font):not([class]):not(.katex *):not(.math-visual *):not([style*="Noto Sans Balinese"]),
+  .option-content :is(span, font):not([class]):not(.katex *):not(.math-visual *):not([style*="Noto Sans Balinese"]) {
       font-size: inherit !important;
       line-height: inherit !important;
       font-family: inherit !important;
@@ -541,9 +683,9 @@
   
   /* 3. Also reset elements with inline font-size styles, but ONLY if they are not math related */
   /* We use a specific selector to avoid breaking math */
-  .prose :is(span, font)[style*="font-size"]:not([class]):not([style*="Noto Sans Balinese"]),
-  .wysiwyg-content :is(span, font)[style*="font-size"]:not([class]):not([style*="Noto Sans Balinese"]),
-  .option-content :is(span, font)[style*="font-size"]:not([class]):not([style*="Noto Sans Balinese"]) {
+  .prose :is(span, font)[style*="font-size"]:not([class]):not(.katex *):not(.math-visual *):not([style*="Noto Sans Balinese"]),
+  .wysiwyg-content :is(span, font)[style*="font-size"]:not([class]):not(.katex *):not(.math-visual *):not([style*="Noto Sans Balinese"]),
+  .option-content :is(span, font)[style*="font-size"]:not([class]):not(.katex *):not(.math-visual *):not([style*="Noto Sans Balinese"]) {
       font-size: inherit !important;
       line-height: inherit !important;
       font-family: inherit !important;
@@ -704,14 +846,22 @@
 
 .math-visual {
   display: inline-block;
-  vertical-align: baseline;
-  line-height: inherit;
+  vertical-align: baseline !important;
+  font-size: 1em !important;
+  line-height: normal !important;
+  overflow: visible !important;
   max-width: 100%;
   margin: 0 0.15rem;
   padding: 0 0.08rem;
   cursor: pointer;
   border-radius: 4px;
   transition: background-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.math-visual[style*="display: block"],
+.math-visual:has(> .katex-display) {
+  display: block;
+  margin: 0.5rem 0;
 }
 
 .math-visual:hover {
@@ -725,32 +875,66 @@
 }
 
 .option-content .math-visual,
-.option-content .katex {
-  white-space: nowrap;
-  font-size: 1.15em;
-}
-
-.option-content .math-visual {
-  display: inline-block;
-  max-width: 100%;
-  vertical-align: -0.05em;
-}
-
 .student-question-text .math-visual,
 .wysiwyg-content .math-visual,
-.prose .math-visual {
-  vertical-align: -0.05em;
+.prose .math-visual,
+.print-soal-content .math-visual,
+.print-kunci-content .math-visual {
+  display: inline-block;
+  max-width: 100%;
+  vertical-align: baseline !important;
+  font-size: 1em !important;
+  line-height: normal !important;
 }
 
-.katex {
-  font-size: 1.18em;
-  line-height: inherit;
-  text-indent: 0;
+/* Unified proportional KaTeX scaling (~1.10em) across Editor, Student Exam, Archive, Analysis & Print */
+.katex,
+.math-visual .katex,
+.wysiwyg-content .katex,
+.prose .katex,
+.student-question-text .katex,
+.option-content .katex,
+.answer-key-reset .katex,
+.print-container .katex,
+.print-soal-content .katex,
+.print-kunci-content .katex {
+  font-size: 1.10em !important;
+  line-height: 1.2 !important;
+  text-indent: 0 !important;
 }
 
-.math-visual .katex {
-  font-size: 1.18em;
-  line-height: inherit;
+.katex .katex {
+  font-size: 1em !important;
+}
+
+/* Keep exponents, subscripts, radical indices, and operator limits slightly smaller & proportional */
+.katex .msupsub .katex-sizing.reset-size6.size3,
+.katex .msupsub .sizing.reset-size6.size3,
+.katex .op-limits .katex-sizing.reset-size6.size3,
+.katex .op-limits .sizing.reset-size6.size3,
+.katex .katex-sizing.reset-size6.size3,
+.katex .sizing.reset-size6.size3 {
+  font-size: 0.68em !important;
+}
+.katex .msupsub .katex-sizing.reset-size6.size1,
+.katex .msupsub .sizing.reset-size6.size1,
+.katex .op-limits .katex-sizing.reset-size6.size1,
+.katex .op-limits .sizing.reset-size6.size1,
+.katex .sqrt .root .katex-sizing.reset-size6.size3,
+.katex .sqrt .root .sizing.reset-size6.size3,
+.katex .sqrt .root .katex-sizing.reset-size6.size1,
+.katex .sqrt .root .sizing.reset-size6.size1,
+.katex .katex-sizing.reset-size6.size1,
+.katex .sizing.reset-size6.size1 {
+  font-size: 0.54em !important;
+}
+
+/* Give paragraphs containing math formulas comfortable vertical breathing room for fractions & roots */
+.wysiwyg-content p:has(.math-visual),
+.prose p:has(.math-visual),
+.student-question-text p:has(.math-visual),
+.print-soal-content p:has(.math-visual) {
+  line-height: 1.75 !important;
 }
 
 .math-visual .katex-display {
@@ -836,7 +1020,11 @@
 
 /* Ensure math formulas (KaTeX) scale proportionally with base font without breaking sub/superscripts */
 .exam-content-scalable .katex {
-  font-size: 1.18em !important;
+  font-size: 1.10em !important;
+  line-height: 1.2 !important;
+}
+.exam-content-scalable .katex .katex {
+  font-size: 1em !important;
 }
 .exam-content-scalable .katex-display {
   overflow-x: auto;

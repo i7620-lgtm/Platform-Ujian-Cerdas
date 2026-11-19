@@ -7,10 +7,28 @@ const DB_VERSION = 1;
 const STORE_PROGRESS = 'exam_progress';
 const QUEUE_LOCAL_KEY = 'exam_sync_queue';
 const QUEUE_IDB_KEY = 'offline_sync_queue_backup';
+const FAILED_QUEUE_LOCAL_KEY = 'exam_failed_sync_queue';
+const FAILED_QUEUE_IDB_KEY = 'offline_failed_sync_queue_backup';
 const MAX_RETRY_ATTEMPTS = 20;
+const BASE_BACKOFF_MS = 30_000;
+const MAX_BACKOFF_MS = 5 * 60_000;
 
-interface QueuedResult extends Result {
+export interface QueuedResult extends Result {
     _retryCount?: number;
+    _networkFailCount?: number;
+    _nextRetryAt?: number;
+    _lastError?: string;
+    _failedAt?: number;
+}
+
+export interface SubmissionSyncState {
+    status: 'synced' | 'pending' | 'failed';
+    retryCount: number;
+    networkFailCount: number;
+    nextRetryAt?: number;
+    lastError?: string;
+    failedAt?: number;
+    item?: QueuedResult;
 }
 
 const initDB = (): Promise<IDBDatabase> => {
@@ -31,15 +49,24 @@ const initDB = (): Promise<IDBDatabase> => {
 
 export class OfflineService {
     private syncQueue: QueuedResult[] = [];
+    private failedQueue: QueuedResult[] = [];
     private isProcessingQueue = false;
     private activeProcessPromise: Promise<void> | null = null;
     private pendingSaveQueuePromise: Promise<void> = Promise.resolve();
+    private listeners = new Set<() => void>();
 
     constructor() {
         try {
             const savedQueue = localStorage.getItem(QUEUE_LOCAL_KEY);
             if (savedQueue) {
                 this.syncQueue = JSON.parse(savedQueue);
+            }
+        } catch { /* ignore */ }
+
+        try {
+            const savedFailed = localStorage.getItem(FAILED_QUEUE_LOCAL_KEY);
+            if (savedFailed) {
+                this.failedQueue = JSON.parse(savedFailed);
             }
         } catch { /* ignore */ }
         
@@ -49,6 +76,7 @@ export class OfflineService {
                 this.getLocalProgress(QUEUE_IDB_KEY).then((idbQueue) => {
                     if (Array.isArray(idbQueue) && idbQueue.length > 0 && this.syncQueue.length === 0) {
                         this.syncQueue = idbQueue as QueuedResult[];
+                        this.notifyListeners();
                         if (typeof navigator === 'undefined' || navigator.onLine !== false) {
                             this.processQueue();
                         }
@@ -56,7 +84,16 @@ export class OfflineService {
                 }).catch(() => {});
             }
 
-            window.addEventListener('online', () => this.processQueue());
+            if (this.failedQueue.length === 0) {
+                this.getLocalProgress(FAILED_QUEUE_IDB_KEY).then((idbFailed) => {
+                    if (Array.isArray(idbFailed) && idbFailed.length > 0 && this.failedQueue.length === 0) {
+                        this.failedQueue = idbFailed as QueuedResult[];
+                        this.notifyListeners();
+                    }
+                }).catch(() => {});
+            }
+
+            window.addEventListener('online', () => this.processQueue({ forceBypassBackoff: true }));
             setInterval(() => {
                 if (this.syncQueue.length > 0) this.processQueue();
             }, 30000);
@@ -214,11 +251,67 @@ export class OfflineService {
         return clean;
     }
 
+    private computeBackoffDelay(step: number): number {
+        return Math.min(MAX_BACKOFF_MS, BASE_BACKOFF_MS * Math.pow(2, Math.max(0, step - 1)));
+    }
+
+    private isLikelyNetworkError(err: unknown): boolean {
+        if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+            return true;
+        }
+        if (!err) return false;
+        const rec = err as { status?: number; name?: string; message?: string; details?: string };
+        if (typeof rec.status === 'number' && [0, 408, 502, 503, 504].includes(rec.status)) {
+            return true;
+        }
+        if (rec.name === 'AbortError' || rec.name === 'TimeoutError') {
+            return true;
+        }
+        const combined = `${rec.message || ''} ${rec.details || ''} ${String(err)}`.toLowerCase();
+        return /failed to fetch|networkerror|network request failed|load failed|err_internet_disconnected|err_name_not_resolved|err_network_changed|timeout|timed out|econnrefused|econnreset|etimedout|enotfound|bad gateway|service unavailable|gateway timeout|fetcherror/.test(
+            combined,
+        );
+    }
+
+    private extractErrorMessage(err: unknown): string {
+        if (!err) return 'Gagal terhubung ke server penilaian.';
+        if (typeof err === 'string') return err.slice(0, 240);
+        const rec = err as { message?: string; code?: string };
+        const raw = rec.message || String(err);
+        return (rec.code ? `[${rec.code}] ${raw}` : raw).slice(0, 240);
+    }
+
+    private notifyListeners(): void {
+        this.listeners.forEach((listener) => {
+            try {
+                listener();
+            } catch {
+                /* ignore listener error */
+            }
+        });
+    }
+
+    subscribeQueueChange(listener: () => void): () => void {
+        this.listeners.add(listener);
+        return () => {
+            this.listeners.delete(listener);
+        };
+    }
+
     // --- QUEUE METHODS ---
     addToQueue(payload: Result, options?: { skipImmediateProcess?: boolean }): Promise<void> {
         this.syncQueue = this.syncQueue.filter(
             item => !(item.examCode === payload.examCode && item.student.studentId === payload.student.studentId)
         );
+        const hadFailed = this.failedQueue.some(
+            item => item.examCode === payload.examCode && item.student.studentId === payload.student.studentId
+        );
+        if (hadFailed) {
+            this.failedQueue = this.failedQueue.filter(
+                item => !(item.examCode === payload.examCode && item.student.studentId === payload.student.studentId)
+            );
+        }
+
         // Zero-Trust: never persist client-calculated score/correctAnswers into sync queue
         const rawPayload: QueuedResult = {
             ...payload,
@@ -229,9 +322,16 @@ export class OfflineService {
             isSynced: false,
             timestamp: Date.now(),
             _retryCount: 0,
+            _networkFailCount: 0,
+            _nextRetryAt: undefined,
+            _lastError: undefined,
+            _failedAt: undefined,
         };
         this.syncQueue.push(rawPayload);
-        const savePromise = this.saveQueue();
+        const savePromise = hadFailed
+            ? Promise.all([this.saveQueue(), this.saveFailedQueue()]).then(() => undefined)
+            : this.saveQueue();
+        this.notifyListeners();
         if (!options?.skipImmediateProcess && (typeof navigator === 'undefined' || navigator.onLine !== false)) {
             this.processQueue();
         }
@@ -239,7 +339,15 @@ export class OfflineService {
     }
 
     hasPendingSubmission(examCode: string, studentId: string): boolean {
-        return this.syncQueue.some(
+        const isFinalMatch = (item: QueuedResult) =>
+            item.examCode === examCode &&
+            item.student?.studentId === studentId &&
+            (item.status === 'completed' || item.status === 'force_closed');
+        return this.syncQueue.some(isFinalMatch) || this.failedQueue.some(isFinalMatch);
+    }
+
+    hasFailedSubmission(examCode: string, studentId: string): boolean {
+        return this.failedQueue.some(
             item =>
                 item.examCode === examCode &&
                 item.student?.studentId === studentId &&
@@ -247,13 +355,98 @@ export class OfflineService {
         );
     }
 
-    async retryQueuedSubmission(examCode: string, studentId: string): Promise<boolean> {
-        this.syncQueue = this.syncQueue.map(item =>
-            item.examCode === examCode && item.student?.studentId === studentId
-                ? { ...item, _retryCount: 0 }
-                : item
+    getFailedSubmission(examCode: string, studentId: string): QueuedResult | null {
+        return (
+            this.failedQueue.find(
+                item => item.examCode === examCode && item.student?.studentId === studentId
+            ) || null
         );
-        await this.processQueue();
+    }
+
+    getSubmissionSyncState(examCode: string, studentId: string): SubmissionSyncState {
+        const failed = this.failedQueue.find(
+            item =>
+                item.examCode === examCode &&
+                item.student?.studentId === studentId &&
+                (item.status === 'completed' || item.status === 'force_closed')
+        );
+        if (failed) {
+            return {
+                status: 'failed',
+                retryCount: failed._retryCount || 0,
+                networkFailCount: failed._networkFailCount || 0,
+                lastError: failed._lastError,
+                failedAt: failed._failedAt,
+                item: failed,
+            };
+        }
+
+        const pending = this.syncQueue.find(
+            item =>
+                item.examCode === examCode &&
+                item.student?.studentId === studentId &&
+                (item.status === 'completed' || item.status === 'force_closed')
+        );
+        if (pending) {
+            return {
+                status: 'pending',
+                retryCount: pending._retryCount || 0,
+                networkFailCount: pending._networkFailCount || 0,
+                nextRetryAt: pending._nextRetryAt,
+                lastError: pending._lastError,
+                item: pending,
+            };
+        }
+
+        return {
+            status: 'synced',
+            retryCount: 0,
+            networkFailCount: 0,
+        };
+    }
+
+    async retryQueuedSubmission(examCode: string, studentId: string): Promise<boolean> {
+        const failedMatch = this.failedQueue.find(
+            item => item.examCode === examCode && item.student?.studentId === studentId
+        );
+
+        let movedFromFailed = false;
+        if (failedMatch) {
+            this.failedQueue = this.failedQueue.filter(
+                item => !(item.examCode === examCode && item.student?.studentId === studentId)
+            );
+            this.syncQueue = this.syncQueue.filter(
+                item => !(item.examCode === examCode && item.student?.studentId === studentId)
+            );
+            this.syncQueue.push({
+                ...failedMatch,
+                _retryCount: 0,
+                _networkFailCount: 0,
+                _nextRetryAt: undefined,
+                _failedAt: undefined,
+            });
+            movedFromFailed = true;
+        } else {
+            this.syncQueue = this.syncQueue.map(item =>
+                item.examCode === examCode && item.student?.studentId === studentId
+                    ? {
+                        ...item,
+                        _retryCount: 0,
+                        _networkFailCount: 0,
+                        _nextRetryAt: undefined,
+                    }
+                    : item
+            );
+        }
+
+        if (movedFromFailed) {
+            await Promise.all([this.saveQueue(), this.saveFailedQueue()]);
+        } else {
+            await this.saveQueue();
+        }
+        this.notifyListeners();
+
+        await this.processQueue({ forceBypassBackoff: true });
         return !this.hasPendingSubmission(examCode, studentId);
     }
 
@@ -274,8 +467,23 @@ export class OfflineService {
         return writeOp;
     }
 
-    getSyncQueue(): Result[] {
+    private saveFailedQueue(): Promise<void> {
+        try {
+            localStorage.setItem(FAILED_QUEUE_LOCAL_KEY, JSON.stringify(this.failedQueue));
+        } catch {
+            // Quota fallback handled in IndexedDB below
+        }
+        return this.failedQueue.length === 0
+            ? this.clearLocalProgress(FAILED_QUEUE_IDB_KEY).catch(() => {})
+            : this.saveLocalProgress(FAILED_QUEUE_IDB_KEY, this.failedQueue).catch(() => {});
+    }
+
+    getSyncQueue(): QueuedResult[] {
         return this.syncQueue;
+    }
+
+    getFailedQueue(): QueuedResult[] {
+        return this.failedQueue;
     }
 
     private async persistRawAnswersBackup(payload: QueuedResult, numericResultId: number | null): Promise<boolean> {
@@ -354,7 +562,7 @@ export class OfflineService {
         return !error;
     }
 
-    async processQueue(): Promise<void> {
+    async processQueue(options?: { forceBypassBackoff?: boolean }): Promise<void> {
         if (this.activeProcessPromise) {
             await this.activeProcessPromise;
             if (this.syncQueue.length === 0) return;
@@ -363,12 +571,25 @@ export class OfflineService {
             return;
         }
 
+        const now = Date.now();
+        const readyItems = options?.forceBypassBackoff
+            ? [...this.syncQueue]
+            : this.syncQueue.filter(item => !item._nextRetryAt || item._nextRetryAt <= now);
+
+        if (readyItems.length === 0) {
+            return;
+        }
+
         this.isProcessingQueue = true;
         const runPromise = (async () => {
-            const queueCopy = [...this.syncQueue];
-            const remainingQueue: QueuedResult[] = [];
+            const readySnapshots = readyItems.map(item => ({
+                item,
+                identity: `${item.examCode}::${item.student?.studentId}::${item.timestamp}`,
+            }));
+            const remainingProcessed: QueuedResult[] = [];
+            const newlyFailed: QueuedResult[] = [];
 
-            for (const payload of queueCopy) {
+            for (const { item: payload } of readySnapshots) {
                 try {
                     const student = payload.student;
                     const rawResultId = student.resultId ?? payload.id;
@@ -409,18 +630,72 @@ export class OfflineService {
                     }
 
                     throw rpcError;
-                } catch {
-                    const nextRetry = (payload._retryCount || 0) + 1;
-                    if (nextRetry < MAX_RETRY_ATTEMPTS) {
-                        remainingQueue.push({ ...payload, _retryCount: nextRetry });
+                } catch (err) {
+                    const errMsg = this.extractErrorMessage(err);
+                    const isNetErr = this.isLikelyNetworkError(err);
+
+                    if (isNetErr) {
+                        const nextNetFail = (payload._networkFailCount || 0) + 1;
+                        remainingProcessed.push({
+                            ...payload,
+                            _networkFailCount: nextNetFail,
+                            _nextRetryAt: Date.now() + this.computeBackoffDelay(nextNetFail),
+                            _lastError: errMsg,
+                        });
                     } else {
-                        console.warn("Retaining/dropping exhausted queue item:", payload.examCode, payload.student?.studentId);
+                        const nextRetry = (payload._retryCount || 0) + 1;
+                        if (nextRetry < MAX_RETRY_ATTEMPTS) {
+                            remainingProcessed.push({
+                                ...payload,
+                                _retryCount: nextRetry,
+                                _nextRetryAt: Date.now() + this.computeBackoffDelay(nextRetry),
+                                _lastError: errMsg,
+                            });
+                        } else if (payload.status === 'completed' || payload.status === 'force_closed') {
+                            newlyFailed.push({
+                                ...payload,
+                                _retryCount: nextRetry,
+                                _nextRetryAt: undefined,
+                                _lastError: errMsg,
+                                _failedAt: Date.now(),
+                            });
+                        }
                     }
                 }
             }
 
-            this.syncQueue = remainingQueue;
-            await this.saveQueue();
+            // Preserve deferred items and any concurrent items added while processing
+            const processedIdentities = new Set(readySnapshots.map(s => s.identity));
+            const untouchedItems = this.syncQueue.filter(
+                item => !processedIdentities.has(`${item.examCode}::${item.student?.studentId}::${item.timestamp}`)
+            );
+            const activeKeys = new Set(
+                untouchedItems.map(item => `${item.examCode}::${item.student?.studentId}`)
+            );
+            const dedupedProcessed = remainingProcessed.filter(
+                item => !activeKeys.has(`${item.examCode}::${item.student?.studentId}`)
+            );
+
+            this.syncQueue = [...untouchedItems, ...dedupedProcessed];
+
+            if (newlyFailed.length > 0) {
+                const movedIds = new Set(
+                    newlyFailed.map(item => `${item.examCode}::${item.student?.studentId}`)
+                );
+                const filteredFailed = this.failedQueue.filter(
+                    item => !movedIds.has(`${item.examCode}::${item.student?.studentId}`)
+                );
+                // Do not overwrite if a newer concurrent submission entered active queue
+                const validFailed = newlyFailed.filter(
+                    item => !activeKeys.has(`${item.examCode}::${item.student?.studentId}`)
+                );
+                this.failedQueue = [...filteredFailed, ...validFailed];
+                await Promise.all([this.saveQueue(), this.saveFailedQueue()]);
+            } else {
+                await this.saveQueue();
+            }
+
+            this.notifyListeners();
         })();
 
         this.activeProcessPromise = runPromise;

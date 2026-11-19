@@ -90,7 +90,7 @@ export const CertificateDOM: React.FC<CertificateDOMProps> = ({
     day: "numeric",
   });
 
-  // Wait until images are loaded for html2canvas
+  // Wait until images are loaded before DOM-to-image capture
   if (config.backgroundUrl && !imagesLoaded) {
     return (
       <div className="@container relative w-[1000px] h-[707px] shrink-0 shadow-2xl bg-white select-none opacity-0"></div>

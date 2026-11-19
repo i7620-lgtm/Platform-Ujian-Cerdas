@@ -119,14 +119,24 @@ export const cleanupExpiredExamCaches = async (): Promise<{
       /* ignore */
     }
 
-    // 2. Lindungi seluruh kode ujian yang masih memiliki item dalam antrean sinkronisasi offline
+    // 2. Lindungi seluruh kode ujian yang masih memiliki item dalam antrean sinkronisasi offline maupun daftar gagal tersimpan
     try {
       offlineService.getSyncQueue().forEach((item) => {
+        if (item?.examCode) protectedCodes.add(item.examCode.trim().toUpperCase());
+      });
+      offlineService.getFailedQueue().forEach((item) => {
         if (item?.examCode) protectedCodes.add(item.examCode.trim().toUpperCase());
       });
       const idbBackup = await offlineService.getLocalProgress("offline_sync_queue_backup");
       if (Array.isArray(idbBackup)) {
         idbBackup.forEach((item) => {
+          const rec = item as { examCode?: string } | null;
+          if (rec?.examCode) protectedCodes.add(rec.examCode.trim().toUpperCase());
+        });
+      }
+      const idbFailedBackup = await offlineService.getLocalProgress("offline_failed_sync_queue_backup");
+      if (Array.isArray(idbFailedBackup)) {
+        idbFailedBackup.forEach((item) => {
           const rec = item as { examCode?: string } | null;
           if (rec?.examCode) protectedCodes.add(rec.examCode.trim().toUpperCase());
         });

@@ -420,7 +420,7 @@ export const useWysiwygEditor = ({
       const span = document.createElement("span");
       span.className = "math-visual";
       span.style.display = "inline-block";
-      span.style.verticalAlign = "middle";
+      span.style.verticalAlign = "baseline";
       span.contentEditable = "false";
       span.setAttribute("data-latex", trimmed);
       span.innerHTML = html;

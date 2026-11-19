@@ -11,6 +11,7 @@ import {
 } from "../../../Icons";
 import { QuestionResultDetailPopover } from "../../../QuestionResultDetailPopover";
 import { showAlertModal } from "../../../../stores/feedbackStore";
+import { sanitizeHtml } from "../../examUtils";
 
 interface FinishedStudentsTabProps {
   displayExam: Exam;
@@ -487,7 +488,7 @@ export const FinishedStudentsTab: React.FC<FinishedStudentsTabProps> = ({
                                       <div
                                         className="font-bold text-slate-700 dark:text-slate-200 mb-1 line-clamp-2 prose prose-sm dark:prose-invert max-w-none"
                                         dangerouslySetInnerHTML={{
-                                          __html: q.questionText,
+                                          __html: sanitizeHtml(q.questionText || ""),
                                         }}
                                       ></div>
                                       <div className="bg-slate-50 dark:bg-slate-700/50 p-2 rounded text-slate-600 dark:text-slate-300 italic mb-2 break-words text-xs">

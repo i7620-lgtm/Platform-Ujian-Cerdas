@@ -1,7 +1,7 @@
 import React from "react";
 import type { Exam, Result, Question } from "../../../types";
 import { checkAnswerStatus, getCalculatedStats } from "./archiveUtils";
-import { isAnswerMatch, parseList } from "../examUtils";
+import { isAnswerMatch, parseList, sanitizeHtml } from "../examUtils";
 import {
   ChevronDownIcon,
   ChevronUpIcon,
@@ -168,7 +168,7 @@ export const ArchiveDetailUjianView: React.FC<ArchiveDetailUjianViewProps> = ({
 
                 <div
                   className="prose prose-sm max-w-none text-slate-700 dark:text-slate-200"
-                  dangerouslySetInnerHTML={{ __html: q.questionText }}
+                  dangerouslySetInnerHTML={{ __html: sanitizeHtml(q.questionText || "") }}
                 ></div>
 
                 {/* Pilihan Ganda (MC) */}
@@ -179,7 +179,7 @@ export const ArchiveDetailUjianView: React.FC<ArchiveDetailUjianViewProps> = ({
                     return (
                       <div
                         key={i}
-                        className={`flex items-start gap-3 p-3.5 rounded-xl border text-sm transition-colors ${
+                        className={`flex items-baseline gap-3 p-3.5 rounded-xl border text-sm transition-colors ${
                           isCorrect
                             ? "bg-emerald-50 dark:bg-emerald-950/40 border-emerald-300 dark:border-emerald-700 font-bold text-emerald-900 dark:text-emerald-200 ring-1 ring-emerald-400/30"
                             : "bg-slate-50 dark:bg-slate-700/50 border-slate-100 dark:border-slate-600 text-slate-600 dark:text-slate-300"
@@ -196,7 +196,7 @@ export const ArchiveDetailUjianView: React.FC<ArchiveDetailUjianViewProps> = ({
                         </span>
                         <div
                           className="flex-1 min-w-0 option-content"
-                          dangerouslySetInnerHTML={{ __html: opt }}
+                          dangerouslySetInnerHTML={{ __html: sanitizeHtml(opt || "") }}
                         ></div>
                       </div>
                     );
@@ -210,7 +210,7 @@ export const ArchiveDetailUjianView: React.FC<ArchiveDetailUjianViewProps> = ({
                     return (
                       <div
                         key={i}
-                        className={`flex items-start gap-3 p-3.5 rounded-xl border text-sm transition-colors ${
+                        className={`flex items-baseline gap-3 p-3.5 rounded-xl border text-sm transition-colors ${
                           isSelected
                             ? "bg-emerald-50 dark:bg-emerald-950/40 border-emerald-300 dark:border-emerald-700 font-bold text-emerald-900 dark:text-emerald-200 ring-1 ring-emerald-400/30"
                             : "bg-slate-50 dark:bg-slate-700/50 border-slate-100 dark:border-slate-600 text-slate-600 dark:text-slate-300"
@@ -227,7 +227,7 @@ export const ArchiveDetailUjianView: React.FC<ArchiveDetailUjianViewProps> = ({
                         </span>
                         <div
                           className="flex-1 min-w-0 option-content"
-                          dangerouslySetInnerHTML={{ __html: opt }}
+                          dangerouslySetInnerHTML={{ __html: sanitizeHtml(opt || "") }}
                         ></div>
                       </div>
                     );
@@ -259,7 +259,7 @@ export const ArchiveDetailUjianView: React.FC<ArchiveDetailUjianViewProps> = ({
                               <td className="p-3 dark:text-slate-200">
                                 <div
                                   className="[&_*]:!bg-transparent [&_*]:!text-inherit [&_*]:!p-0 [&_*]:!m-0 option-content"
-                                  dangerouslySetInnerHTML={{ __html: row.text }}
+                                  dangerouslySetInnerHTML={{ __html: sanitizeHtml(row.text || "") }}
                                 ></div>
                               </td>
                               <td className="p-3 text-center">
@@ -294,14 +294,14 @@ export const ArchiveDetailUjianView: React.FC<ArchiveDetailUjianViewProps> = ({
                       >
                         <div
                           className="flex-1 min-w-0 font-medium dark:text-slate-200 option-content"
-                          dangerouslySetInnerHTML={{ __html: pair.left }}
+                          dangerouslySetInnerHTML={{ __html: sanitizeHtml(pair.left || "") }}
                         ></div>
                         <div className="text-slate-400 dark:text-slate-500 font-bold px-1">
                           &rarr;
                         </div>
                         <div
                           className="flex-1 min-w-0 font-bold text-emerald-700 dark:text-emerald-300 option-content bg-emerald-50/60 dark:bg-emerald-950/30 px-3 py-1 rounded-lg border border-emerald-200/60 dark:border-emerald-800/60"
-                          dangerouslySetInnerHTML={{ __html: pair.right }}
+                          dangerouslySetInnerHTML={{ __html: sanitizeHtml(pair.right || "") }}
                         ></div>
                       </div>
                     ))}
@@ -319,7 +319,7 @@ export const ArchiveDetailUjianView: React.FC<ArchiveDetailUjianViewProps> = ({
                       <div
                         className="p-3.5 rounded-xl bg-emerald-50/60 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800/50 text-sm text-emerald-900 dark:text-emerald-200 font-medium prose prose-sm max-w-none dark:prose-invert"
                         dangerouslySetInnerHTML={{
-                          __html: q.correctAnswer || (q as any).correct_answer,
+                          __html: sanitizeHtml(q.correctAnswer || (q as any).correct_answer || ""),
                         }}
                       ></div>
                     </div>
@@ -337,7 +337,7 @@ export const ArchiveDetailUjianView: React.FC<ArchiveDetailUjianViewProps> = ({
                       </div>
                       <div
                         className="prose prose-sm max-w-none text-slate-700 dark:text-slate-200"
-                        dangerouslySetInnerHTML={{ __html: explanation }}
+                        dangerouslySetInnerHTML={{ __html: sanitizeHtml(explanation) }}
                       />
                     </div>
                   </div>
