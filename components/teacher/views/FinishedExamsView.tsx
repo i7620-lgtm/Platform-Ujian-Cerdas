@@ -64,7 +64,7 @@ export const FinishedExamsView: React.FC<FinishedExamsProps> = ({
       </div>
 
       {exams.length > 0 ? (
-        <div className="space-y-4">
+        <div className="flex flex-col gap-4 md:gap-0 md:bg-white md:dark:bg-slate-800 md:rounded-2xl md:border md:border-slate-200 md:dark:border-slate-700 md:divide-y md:divide-slate-100 md:dark:divide-slate-700/80 md:shadow-xs md:overflow-hidden">
           {exams.map((exam) => (
             <FinishedExamCard
               key={exam.code}

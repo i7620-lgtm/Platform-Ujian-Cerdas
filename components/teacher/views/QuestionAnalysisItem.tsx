@@ -5,8 +5,7 @@ import {
   ChevronDownIcon,
   ChevronUpIcon,
 } from "../../Icons";
-import { parseList, normalize, isAnswerMatch } from "../examUtils";
-import { renderMathInHtml } from "../../../utils/mathRenderer";
+import { parseList, isAnswerMatch, sanitizeHtml } from "../examUtils";
 import { useQuestionAnalysisItemLogic } from "./useQuestionAnalysisItemLogic";
 
 const QuestionnaireAnalysisContent: React.FC<{
@@ -149,7 +148,7 @@ const QuestionnaireAnalysisContent: React.FC<{
                   <div className="flex-1 min-w-0 flex flex-col gap-1">
                     <div
                       className="font-medium text-slate-800 dark:text-slate-200 [&_p]:inline"
-                      dangerouslySetInnerHTML={{ __html: renderMathInHtml(opt) }}
+                      dangerouslySetInnerHTML={{ __html: sanitizeHtml(opt || "") }}
                     ></div>
                     {q.optionImages?.[i] && (
                       <img
@@ -295,13 +294,13 @@ export const QuestionAnalysisItem: React.FC<{
         {!isExpanded ? (
           <div
             className="text-sm text-slate-700 dark:text-slate-300 line-clamp-2 font-medium option-content [&_img]:hidden [&_svg]:hidden"
-            dangerouslySetInnerHTML={{ __html: renderMathInHtml(q.questionText || "-") }}
+            dangerouslySetInnerHTML={{ __html: sanitizeHtml(q.questionText || "-") }}
           ></div>
         ) : (
           <div className="space-y-3">
             <div
               className="text-sm text-slate-800 dark:text-slate-200 font-medium option-content leading-relaxed [&_img]:max-w-full [&_img]:max-h-72 [&_img]:object-contain [&_img]:rounded-xl [&_img]:border [&_img]:border-slate-200 dark:[&_img]:border-slate-700 [&_img]:bg-white dark:[&_img]:bg-slate-900 [&_img]:p-1 [&_img]:mx-auto [&_img]:my-2 [&_svg]:max-w-full [&_svg]:max-h-72 [&_svg]:mx-auto [&_svg]:my-2 [&_table]:max-w-full [&_table]:overflow-x-auto"
-              dangerouslySetInnerHTML={{ __html: renderMathInHtml(q.questionText || "-") }}
+              dangerouslySetInnerHTML={{ __html: sanitizeHtml(q.questionText || "-") }}
             ></div>
 
             {/* Dedicated Stimulus Image (q.imageUrl) */}
@@ -425,7 +424,7 @@ export const QuestionAnalysisItem: React.FC<{
                               <div className="flex-1 min-w-0 flex flex-col gap-1 text-xs text-slate-700 dark:text-slate-300">
                                 <div
                                   className="option-content [&_p]:inline [&_img]:max-h-16 [&_img]:max-w-full [&_img]:object-contain [&_img]:inline-block"
-                                  dangerouslySetInnerHTML={{ __html: renderMathInHtml(opt) }}
+                                  dangerouslySetInnerHTML={{ __html: sanitizeHtml(opt || "") }}
                                 ></div>
                                 {q.optionImages?.[i] && (
                                   <img
@@ -490,7 +489,7 @@ export const QuestionAnalysisItem: React.FC<{
                               <div className="flex-1 min-w-0 flex flex-col gap-1 text-xs text-slate-700 dark:text-slate-300">
                                 <div
                                   className="option-content [&_p]:inline [&_img]:max-h-16 [&_img]:max-w-full [&_img]:object-contain [&_img]:inline-block"
-                                  dangerouslySetInnerHTML={{ __html: renderMathInHtml(opt) }}
+                                  dangerouslySetInnerHTML={{ __html: sanitizeHtml(opt || "") }}
                                 ></div>
                                 {q.optionImages?.[i] && (
                                   <img
@@ -523,7 +522,7 @@ export const QuestionAnalysisItem: React.FC<{
                                   <div
                                     className="text-xs flex-1 mr-4 text-slate-700 dark:text-slate-300 option-content [&_p]:inline [&_img]:max-h-10 [&_img]:inline-block"
                                     dangerouslySetInnerHTML={{
-                                      __html: row.text,
+                                      __html: sanitizeHtml(row.text || ""),
                                     }}
                                   ></div>
                                   <div className="flex gap-2 shrink-0">
@@ -582,7 +581,7 @@ export const QuestionAnalysisItem: React.FC<{
                                   <div
                                     className="text-xs text-slate-700 dark:text-slate-300 mb-2 p-2 bg-white dark:bg-slate-800 rounded border border-slate-100 dark:border-slate-700 option-content"
                                     dangerouslySetInnerHTML={{
-                                      __html: pair.left,
+                                      __html: sanitizeHtml(pair.left || ""),
                                     }}
                                   ></div>
                                   <input
@@ -632,39 +631,65 @@ export const QuestionAnalysisItem: React.FC<{
                       </span>
                       {q.questionType === "MULTIPLE_CHOICE" ||
                       q.questionType === "FILL_IN_THE_BLANK" ? (
-                        <div
-                          className="[&_p]:inline [&_img]:max-h-8 [&_img]:inline-block"
-                          dangerouslySetInnerHTML={{
-                            __html:
-                              q.correctAnswer ||
-                              '<span class="text-rose-500 italic">Belum diset</span>',
-                          }}
-                        ></div>
+                        q.correctAnswer ? (
+                          <div
+                            className="[&_p]:inline [&_img]:max-h-8 [&_img]:inline-block option-content"
+                            dangerouslySetInnerHTML={{
+                              __html: sanitizeHtml(q.correctAnswer),
+                            }}
+                          ></div>
+                        ) : (
+                          <span className="text-rose-500 italic">Belum diset</span>
+                        )
                       ) : q.questionType === "COMPLEX_MULTIPLE_CHOICE" ? (
-                        <div
-                          className="[&_p]:inline [&_img]:max-h-8 [&_img]:inline-block"
-                          dangerouslySetInnerHTML={{
-                            __html:
-                              parseList(q.correctAnswer || "").join(
-                                " &bull; ",
-                              ) ||
-                              '<span class="text-rose-500 italic">Belum diset</span>',
-                          }}
-                        ></div>
+                        (() => {
+                          const keyList = parseList(q.correctAnswer || "");
+                          return keyList.length > 0 ? (
+                            <div
+                              className="[&_p]:inline [&_img]:max-h-8 [&_img]:inline-block option-content"
+                              dangerouslySetInnerHTML={{
+                                __html: sanitizeHtml(keyList.join(" &bull; ")),
+                              }}
+                            ></div>
+                          ) : (
+                            <span className="text-rose-500 italic">Belum diset</span>
+                          );
+                        })()
                       ) : q.questionType === "TRUE_FALSE" && q.trueFalseRows ? (
-                        <span>
-                          {q.trueFalseRows
-                            .map(
-                              (r) =>
-                                `${r.text.replace(/<[^>]*>/g, "")}: ${r.answer ? "Benar" : "Salah"}`,
-                            )
-                            .join(", ")}
+                        <span className="option-content [&_p]:inline">
+                          {q.trueFalseRows.map((r, rIdx) => (
+                            <React.Fragment key={rIdx}>
+                              {rIdx > 0 && ", "}
+                              <span
+                                className="inline [&_p]:inline"
+                                dangerouslySetInnerHTML={{
+                                  __html: sanitizeHtml(r.text || ""),
+                                }}
+                              />
+                              : {r.answer ? "Benar" : "Salah"}
+                            </React.Fragment>
+                          ))}
                         </span>
                       ) : q.questionType === "MATCHING" && q.matchingPairs ? (
-                        <span>
-                          {q.matchingPairs
-                            .map((p) => `${p.left} → ${p.right}`)
-                            .join(", ")}
+                        <span className="option-content [&_p]:inline">
+                          {q.matchingPairs.map((p, pIdx) => (
+                            <React.Fragment key={pIdx}>
+                              {pIdx > 0 && ", "}
+                              <span
+                                className="inline [&_p]:inline"
+                                dangerouslySetInnerHTML={{
+                                  __html: sanitizeHtml(p.left || ""),
+                                }}
+                              />
+                              {" → "}
+                              <span
+                                className="inline [&_p]:inline"
+                                dangerouslySetInnerHTML={{
+                                  __html: sanitizeHtml(p.right || ""),
+                                }}
+                              />
+                            </React.Fragment>
+                          ))}
                         </span>
                       ) : (
                         <span className="italic text-slate-500">
@@ -725,16 +750,16 @@ export const QuestionAnalysisItem: React.FC<{
                       key={i}
                       className={`relative flex items-center justify-between p-2 rounded-lg text-xs ${isCorrect ? "bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-100 dark:border-emerald-800" : count > 0 ? "bg-slate-50 dark:bg-slate-700/50" : ""}`}
                     >
-                      <div className="flex items-start gap-2.5 z-10 w-full overflow-hidden">
+                      <div className="flex items-baseline gap-2.5 z-10 w-full overflow-hidden">
                         <span
-                          className={`w-5 h-5 flex shrink-0 items-center justify-center rounded font-bold mt-0.5 ${isCorrect ? "bg-emerald-500 text-white" : "bg-slate-200 dark:bg-slate-600 text-slate-500 dark:text-slate-300"}`}
+                          className={`w-5 h-5 inline-flex shrink-0 items-center justify-center rounded font-bold ${isCorrect ? "bg-emerald-500 text-white" : "bg-slate-200 dark:bg-slate-600 text-slate-500 dark:text-slate-300"}`}
                         >
                           {String.fromCharCode(65 + i)}
                         </span>
                         <div className="flex-1 min-w-0 flex flex-col gap-1">
                           <div
                             className="[&_p]:inline [&_br]:hidden dark:text-slate-300 option-content [&_img]:max-h-24 [&_img]:max-w-full [&_img]:object-contain [&_img]:rounded [&_img]:inline-block"
-                            dangerouslySetInnerHTML={{ __html: renderMathInHtml(opt) }}
+                            dangerouslySetInnerHTML={{ __html: sanitizeHtml(opt || "") }}
                           ></div>
                           {q.optionImages?.[i] && (
                             <div className="mt-1">
@@ -752,7 +777,7 @@ export const QuestionAnalysisItem: React.FC<{
                             </div>
                           )}
                         </div>
-                        <span className="font-bold text-slate-600 dark:text-slate-300 shrink-0 ml-2 mt-0.5">
+                        <span className="font-bold text-slate-600 dark:text-slate-300 shrink-0 ml-2">
                           {count} Siswa ({percentage}%)
                         </span>
                       </div>
@@ -776,7 +801,7 @@ export const QuestionAnalysisItem: React.FC<{
                         {q.trueFalseRows.map((r, i) => (
                           <span key={i}>
                             <span
-                              dangerouslySetInnerHTML={{ __html: r.text }}
+                              dangerouslySetInnerHTML={{ __html: sanitizeHtml(r.text || "") }}
                               className="inline answer-key-reset [&_p]:inline [&_span]:inline"
                             />
                             <span className="font-bold">
@@ -788,9 +813,22 @@ export const QuestionAnalysisItem: React.FC<{
                         ))}
                       </div>
                     ) : q.questionType === "MATCHING" && q.matchingPairs ? (
-                      q.matchingPairs
-                        .map((p) => `${p.left}→${p.right}`)
-                        .join(", ")
+                      <span className="inline option-content [&_p]:inline">
+                        {q.matchingPairs.map((p, i) => (
+                          <React.Fragment key={i}>
+                            {i > 0 && ", "}
+                            <span
+                              className="inline [&_p]:inline"
+                              dangerouslySetInnerHTML={{ __html: sanitizeHtml(p.left || "") }}
+                            />
+                            {" → "}
+                            <span
+                              className="inline [&_p]:inline"
+                              dangerouslySetInnerHTML={{ __html: sanitizeHtml(p.right || "") }}
+                            />
+                          </React.Fragment>
+                        ))}
+                      </span>
                     ) : q.questionType === "COMPLEX_MULTIPLE_CHOICE" ? (
                       (() => {
                         try {
@@ -802,16 +840,18 @@ export const QuestionAnalysisItem: React.FC<{
                           );
                           return (
                             <span
+                              className="option-content [&_p]:inline"
                               dangerouslySetInnerHTML={{
-                                __html: parsed.join(", "),
+                                __html: sanitizeHtml(parsed.join(", ")),
                               }}
                             ></span>
                           );
                         } catch {
                           return (
                             <span
+                              className="option-content [&_p]:inline"
                               dangerouslySetInnerHTML={{
-                                __html: q.correctAnswer || "",
+                                __html: sanitizeHtml(q.correctAnswer || ""),
                               }}
                             ></span>
                           );
@@ -819,8 +859,9 @@ export const QuestionAnalysisItem: React.FC<{
                       })()
                     ) : (
                       <span
+                        className="option-content [&_p]:inline"
                         dangerouslySetInnerHTML={{
-                          __html: q.correctAnswer || "",
+                          __html: sanitizeHtml(q.correctAnswer || ""),
                         }}
                       ></span>
                     )}
@@ -831,26 +872,29 @@ export const QuestionAnalysisItem: React.FC<{
                     ([ans, count], idx) => {
                       const isCorrect = isCorrectAnswer(ans);
                       let displayAns = ans;
+                      let parsedTrueFalse: any[] | null = null;
+                      let parsedMatching: any[] | null = null;
+
                       try {
                         if (
                           q.questionType === "TRUE_FALSE" &&
                           q.trueFalseRows
                         ) {
                           const parsed = JSON.parse(ans);
-                          displayAns = q.trueFalseRows
-                            .map(
-                              (r, i) =>
-                                `${r.text.replace(/<[^>]*>/g, "")}: ${parsed[i] ? "Benar" : "Salah"}`,
-                            )
-                            .join(", ");
+                          if (Array.isArray(parsed)) {
+                            parsedTrueFalse = parsed;
+                          }
                         } else if (
                           q.questionType === "MATCHING" &&
                           q.matchingPairs
                         ) {
                           const parsed = JSON.parse(ans);
-                          displayAns = q.matchingPairs
-                            .map((p, i) => `${p.left} → ${parsed[i] || "-"}`)
-                            .join(", ");
+                          if (Array.isArray(parsed) || (parsed && typeof parsed === "object")) {
+                            parsedMatching = q.matchingPairs.map((p, i) => ({
+                              left: p.left || "",
+                              selected: String(parsed[i] || "-"),
+                            }));
+                          }
                         } else if (ans.startsWith("{")) {
                           const parsed = JSON.parse(ans);
                           displayAns = Object.entries(parsed)
@@ -873,6 +917,10 @@ export const QuestionAnalysisItem: React.FC<{
                         /* ignore */
                       }
 
+                      const knownMatchingRights = new Set<string>(
+                        (q.matchingPairs || []).map((p) => p.right),
+                      );
+
                       return (
                         <li
                           key={idx}
@@ -882,14 +930,50 @@ export const QuestionAnalysisItem: React.FC<{
                             {isCorrect && (
                               <CheckCircleIcon className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
                             )}
-                            {/* FIX: Removed truncate, added image styling */}
-                            <div
-                              className={`italic ${isCorrect ? "text-emerald-700 dark:text-emerald-400 font-medium" : ""} [&_p]:inline option-content [&_img]:max-h-10 [&_img]:w-auto [&_img]:inline-block`}
-                              dangerouslySetInnerHTML={{ __html: displayAns }}
-                            ></div>
+                            {parsedTrueFalse && q.trueFalseRows ? (
+                              <div className={`italic ${isCorrect ? "text-emerald-700 dark:text-emerald-400 font-medium" : ""} [&_p]:inline option-content`}>
+                                {q.trueFalseRows.map((r, rIdx) => (
+                                  <React.Fragment key={rIdx}>
+                                    {rIdx > 0 && ", "}
+                                    <span
+                                      className="inline [&_p]:inline"
+                                      dangerouslySetInnerHTML={{ __html: sanitizeHtml(r.text || "") }}
+                                    />
+                                    : {parsedTrueFalse![rIdx] ? "Benar" : "Salah"}
+                                  </React.Fragment>
+                                ))}
+                              </div>
+                            ) : parsedMatching ? (
+                              <div className={`italic ${isCorrect ? "text-emerald-700 dark:text-emerald-400 font-medium" : ""} [&_p]:inline option-content`}>
+                                {parsedMatching.map((pair, pIdx) => (
+                                  <React.Fragment key={pIdx}>
+                                    {pIdx > 0 && ", "}
+                                    <span
+                                      className="inline [&_p]:inline"
+                                      dangerouslySetInnerHTML={{ __html: sanitizeHtml(pair.left) }}
+                                    />
+                                    {" → "}
+                                    {knownMatchingRights.has(pair.selected) ? (
+                                      <span
+                                        className="inline [&_p]:inline"
+                                        dangerouslySetInnerHTML={{ __html: sanitizeHtml(pair.selected) }}
+                                      />
+                                    ) : (
+                                      <span>{pair.selected}</span>
+                                    )}
+                                  </React.Fragment>
+                                ))}
+                              </div>
+                            ) : (
+                              <div
+                                className={`italic ${isCorrect ? "text-emerald-700 dark:text-emerald-400 font-medium" : ""} whitespace-pre-wrap break-words`}
+                              >
+                                {displayAns}
+                              </div>
+                            )}
                           </div>
                           <span
-                            className={`font-bold ml-2 ${isCorrect ? "text-emerald-700 dark:text-emerald-400" : ""}`}
+                            className={`font-bold ml-2 shrink-0 ${isCorrect ? "text-emerald-700 dark:text-emerald-400" : ""}`}
                           >
                             {count} Siswa
                           </span>

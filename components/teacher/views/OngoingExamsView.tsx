@@ -72,7 +72,7 @@ export const OngoingExamsView: React.FC<{
       </div>
 
       {exams.length > 0 ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="flex flex-col gap-4 md:gap-0 md:bg-white md:dark:bg-slate-800 md:rounded-2xl md:border md:border-emerald-200/80 md:dark:border-emerald-900/60 md:divide-y md:divide-slate-100 md:dark:divide-slate-700/80 md:shadow-xs md:overflow-hidden">
           {exams.map((exam) => {
             const activeCount = results.filter(
               (r) => r.examCode === exam.code,

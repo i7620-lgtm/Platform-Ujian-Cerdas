@@ -1,20 +1,10 @@
 import React, { useState } from "react";
 import type { Exam, TeacherProfile } from "../../../types";
-import {
-  CalendarDaysIcon,
-  ClockIcon,
-  PencilIcon,
-  EnvelopeIcon,
-  UserIcon,
-  DocumentDuplicateIcon,
-  EyeIcon,
-  TrashIcon,
-  ArrowPathIcon,
-} from "../../Icons";
-import { MetaBadge } from "./SharedComponents";
+import { CalendarDaysIcon, ArrowPathIcon } from "../../Icons";
 import { InvitationModal } from "../InvitationModal";
 import { CollaboratorModal } from "../CollaboratorModal";
 import { useUpcomingExamsView } from "../useUpcomingExamsView";
+import { UpcomingExamCard } from "./UpcomingExamCard";
 
 interface UpcomingExamsViewProps {
   exams: Exam[];
@@ -80,188 +70,29 @@ export const UpcomingExamsView: React.FC<UpcomingExamsViewProps> = ({
             className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-bold rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 shadow-xs transition-all shrink-0 cursor-pointer disabled:opacity-60"
             title="Perbarui Daftar Ujian"
           >
-            <ArrowPathIcon className={`w-4 h-4 ${isRefreshing ? "animate-spin text-blue-600" : ""}`} />
+            <ArrowPathIcon
+              className={`w-4 h-4 ${isRefreshing ? "animate-spin text-blue-600" : ""}`}
+            />
             <span className="hidden sm:inline">Perbarui</span>
           </button>
         )}
       </div>
 
       {exams.length > 0 ? (
-        <div id="upcoming-exams-list" className="space-y-4">
+        <div
+          id="upcoming-exams-list"
+          className="flex flex-col gap-4 md:gap-0 md:bg-white md:dark:bg-slate-800 md:rounded-2xl md:border md:border-slate-200 md:dark:border-slate-700 md:divide-y md:divide-slate-100 md:dark:divide-slate-700/80 md:shadow-xs md:overflow-hidden"
+        >
           {exams.map((exam) => (
-            <div
+            <UpcomingExamCard
               key={exam.code}
-              id={`upcoming-exam-card-${exam.code}`}
-              className="bg-white dark:bg-slate-800 p-5 rounded-2xl border border-gray-100 dark:border-slate-700 flex flex-col md:flex-row md:items-center justify-between gap-4 transition-all hover:shadow-md hover:border-blue-200 dark:hover:border-blue-800 group"
-            >
-              <div className="flex items-start gap-5">
-                {(() => {
-                  const startDate =
-                    exam.config.startDate || exam.config.date || "";
-                  const d = startDate.includes("T")
-                    ? new Date(startDate)
-                    : new Date(
-                        `${startDate}T${exam.config.startTime || "00:00"}`,
-                      );
-                  return (
-                    <div className="bg-blue-50 dark:bg-blue-900/20 w-14 h-14 rounded-2xl flex flex-col items-center justify-center text-blue-700 dark:text-blue-300 border border-blue-100 dark:border-blue-800 shrink-0">
-                      <span className="text-[10px] font-bold uppercase">
-                        {d.toLocaleDateString("id-ID", { month: "short" })}
-                      </span>
-                      <span className="text-xl font-black leading-none">
-                        {d.getDate()}
-                      </span>
-                    </div>
-                  );
-                })()}
-                <div>
-                  <div className="flex items-center gap-2 mb-1">
-                    <h3 className="font-bold text-lg text-neutral dark:text-white">
-                      {exam.config.subject || "Tanpa Judul"}
-                    </h3>
-                    <span className="text-xs font-code slashed-zero text-gray-400 dark:text-slate-500 bg-gray-50 dark:bg-slate-700 px-1.5 py-0.5 rounded">
-                      {exam.code}
-                    </span>
-                  </div>
-                  <div className="flex flex-wrap items-center gap-2 mb-2">
-                    <MetaBadge
-                      text={exam.config.classLevel}
-                      colorClass="bg-gray-100 text-gray-600"
-                    />
-                    <MetaBadge
-                      text={exam.config.examType}
-                      colorClass="bg-gray-100 text-gray-600"
-                    />
-                    {exam.config.targetClasses &&
-                      exam.config.targetClasses.length > 0 && (
-                        <MetaBadge
-                          text={exam.config.targetClasses.join(", ")}
-                          colorClass="bg-orange-50 text-orange-700 border-orange-100"
-                        />
-                      )}
-                  </div>
-                  <div className="text-xs text-gray-500 dark:text-slate-400 flex items-center gap-3 font-medium">
-                    <span className="flex items-center gap-1.5">
-                      <ClockIcon className="w-3.5 h-3.5" />{" "}
-                      {(() => {
-                        if (exam.config.examMode === "PR") {
-                          const endDate = exam.config.endDate || exam.config.date || "";
-                          const endTime = exam.config.endTime || "23:59";
-                          let dateStr = endDate;
-                          if (endDate.includes("T")) {
-                            const dEnd = new Date(endDate);
-                            if (!isNaN(dEnd.getTime())) {
-                              dateStr = dEnd.toLocaleDateString("id-ID", {
-                                day: "numeric",
-                                month: "short",
-                              });
-                            }
-                          }
-                          return `Tenggat: ${dateStr} pukul ${endTime}`;
-                        }
-                        const startDate =
-                          exam.config.startDate || exam.config.date || "";
-                        const d = startDate.includes("T")
-                          ? new Date(startDate)
-                          : new Date(
-                              `${startDate}T${exam.config.startTime || "00:00"}`,
-                            );
-                        return (
-                          d.toLocaleTimeString("id-ID", {
-                            hour: "2-digit",
-                            minute: "2-digit",
-                            hour12: false,
-                          }) +
-                          " " +
-                          (d
-                            .toLocaleTimeString("id-ID", {
-                              timeZoneName: "short",
-                            })
-                            .split(" ")
-                            .pop() || "")
-                        );
-                      })()}
-                    </span>
-                    <span className="text-gray-300 dark:text-slate-600">•</span>
-                    <span>
-                      {exam.config.examMode === "PR"
-                        ? "Mode PR"
-                        : exam.config.timeLimit > 0
-                          ? `${exam.config.timeLimit} Menit`
-                          : "Tanpa Batas"}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex gap-1.5 sm:gap-2 self-end md:self-center w-full md:w-auto flex-wrap">
-                <button
-                  id={`btn-preview-${exam.code}`}
-                  onClick={() => {
-                    try {
-                      localStorage.setItem(`ujiancerdas_preview_exam_${exam.code}`, JSON.stringify(exam));
-                    } catch {
-                      // ignore
-                    }
-                    window.open(`/?preview=${exam.code}`, "_blank");
-                  }}
-                  className="flex-1 md:flex-none flex items-center justify-center gap-1.5 sm:gap-2 bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 px-2.5 sm:px-4 py-2.5 text-xs sm:text-sm rounded-xl hover:bg-amber-100 dark:hover:bg-amber-900/50 transition-all font-bold shadow-sm border border-amber-100 dark:border-amber-800"
-                  title="Preview Soal"
-                >
-                  <EyeIcon className="w-4 h-4 shrink-0" />
-                  <span className="inline sm:hidden">Preview</span>
-                  <span className="hidden sm:inline">Preview</span>
-                </button>
-                <button
-                  id={`btn-duplicate-${exam.code}`}
-                  onClick={() => onDuplicateExam(exam)}
-                  className="flex-1 md:flex-none flex items-center justify-center gap-1.5 sm:gap-2 bg-gray-50 dark:bg-slate-700/50 text-gray-600 dark:text-slate-400 px-2.5 sm:px-4 py-2.5 text-xs sm:text-sm rounded-xl hover:bg-gray-100 dark:hover:bg-slate-700 hover:text-primary dark:hover:text-white transition-all font-bold shadow-sm border border-gray-200 dark:border-slate-600"
-                  title="Duplikasi Soal"
-                >
-                  <DocumentDuplicateIcon className="w-4 h-4 shrink-0" />
-                  <span className="inline sm:hidden">Salin</span>
-                  <span className="hidden sm:inline">Duplikasi</span>
-                </button>
-                <button
-                  id={`btn-collab-${exam.code}`}
-                  onClick={() => setSelectedCollaboratorExam(exam)}
-                  className="flex-1 md:flex-none flex items-center justify-center gap-1.5 sm:gap-2 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 px-2.5 sm:px-4 py-2.5 text-xs sm:text-sm rounded-xl hover:bg-emerald-100 dark:hover:bg-emerald-900/50 transition-all font-bold shadow-sm border border-emerald-100 dark:border-emerald-800"
-                  title="Kelola Kolaborator"
-                >
-                  <UserIcon className="w-4 h-4 shrink-0" />
-                  <span className="inline sm:hidden">Tim</span>
-                  <span className="hidden sm:inline">Kolaborator</span>
-                </button>
-                <button
-                  id={`btn-invite-${exam.code}`}
-                  onClick={() => setSelectedInviteExam(exam)}
-                  className="flex-1 md:flex-none flex items-center justify-center gap-1.5 sm:gap-2 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 px-2.5 sm:px-4 py-2.5 text-xs sm:text-sm rounded-xl hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-all font-bold shadow-sm border border-indigo-100 dark:border-indigo-800"
-                  title="Undangan Peserta"
-                >
-                  <EnvelopeIcon className="w-4 h-4 shrink-0" />
-                  <span>Undangan</span>
-                </button>
-                <button
-                  id={`btn-edit-${exam.code}`}
-                  onClick={() => onEditExam(exam)}
-                  className="flex-1 md:flex-none flex items-center justify-center gap-1.5 sm:gap-2 bg-white dark:bg-slate-700 border-2 border-gray-100 dark:border-slate-600 text-gray-600 dark:text-slate-300 px-2.5 sm:px-4 py-2.5 text-xs sm:text-sm rounded-xl hover:border-primary dark:hover:border-primary hover:text-primary dark:hover:text-white transition-all font-bold shadow-sm"
-                  title="Edit Ujian"
-                >
-                  <PencilIcon className="w-4 h-4 shrink-0" />
-                  <span>Edit</span>
-                </button>
-                <button
-                  id={`btn-delete-${exam.code}`}
-                  onClick={() => onDeleteExam(exam)}
-                  className="flex-1 md:flex-none flex items-center justify-center gap-1.5 sm:gap-2 bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 px-2.5 sm:px-4 py-2.5 text-xs sm:text-sm rounded-xl hover:bg-red-100 dark:hover:bg-red-900/50 transition-all font-bold shadow-sm border border-red-100 dark:border-red-800"
-                  title="Hapus Ujian"
-                >
-                  <TrashIcon className="w-4 h-4 shrink-0" />
-                  <span className="inline sm:hidden">Hapus</span>
-                  <span className="hidden sm:inline">Hapus</span>
-                </button>
-              </div>
-            </div>
+              exam={exam}
+              onInvite={() => setSelectedInviteExam(exam)}
+              onCollab={() => setSelectedCollaboratorExam(exam)}
+              onEdit={() => onEditExam(exam)}
+              onDuplicate={() => onDuplicateExam(exam)}
+              onDelete={() => onDeleteExam(exam)}
+            />
           ))}
         </div>
       ) : (
