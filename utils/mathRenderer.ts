@@ -7,6 +7,102 @@ if (typeof window !== "undefined") {
 }
 
 /**
+ * Promotes top-level \frac{a}{b} to \dfrac{a}{b} so inline fractions match question text legibility,
+ * while preserving compact \frac inside exponents (^{...}), subscripts (_{...}), and nested fractions.
+ */
+export const promoteTopLevelFractions = (latex: string): string => {
+  if (!latex || !latex.includes("\\frac")) return latex;
+
+  let out = "";
+  let i = 0;
+  const braceStack: boolean[] = [];
+  let protectedDepth = 0;
+  let pendingProtectedArgs = 0;
+  let expectScriptBrace = false;
+
+  while (i < latex.length) {
+    const ch = latex[i];
+
+    if (ch === "\\") {
+      // Check for \frac (not \dfrac, \tfrac, \cfrac, \fracfoo)
+      if (
+        latex.startsWith("\\frac", i) &&
+        (i + 5 >= latex.length || !/[a-zA-Z]/.test(latex[i + 5]))
+      ) {
+        if (protectedDepth === 0 && !expectScriptBrace) {
+          out += "\\dfrac";
+          i += 5;
+          pendingProtectedArgs = 2;
+          continue;
+        }
+        expectScriptBrace = false;
+        out += "\\frac";
+        i += 5;
+        continue;
+      }
+
+      // If \dfrac, \tfrac, \cfrac, protect their nested arguments as well
+      if (
+        (latex.startsWith("\\dfrac", i) ||
+          latex.startsWith("\\tfrac", i) ||
+          latex.startsWith("\\cfrac", i)) &&
+        (i + 6 >= latex.length || !/[a-zA-Z]/.test(latex[i + 6]))
+      ) {
+        pendingProtectedArgs = 2;
+      }
+
+      expectScriptBrace = false;
+      out += ch;
+      if (i + 1 < latex.length) {
+        out += latex[i + 1];
+        i += 2;
+      } else {
+        i += 1;
+      }
+      continue;
+    }
+
+    if (ch === "^" || ch === "_") {
+      expectScriptBrace = true;
+      out += ch;
+      i += 1;
+      continue;
+    }
+
+    if (ch === "{") {
+      const isProtected = expectScriptBrace || pendingProtectedArgs > 0;
+      expectScriptBrace = false;
+      if (pendingProtectedArgs > 0) {
+        pendingProtectedArgs -= 1;
+      }
+      braceStack.push(isProtected);
+      if (isProtected) protectedDepth += 1;
+      out += ch;
+      i += 1;
+      continue;
+    }
+
+    if (ch === "}") {
+      const wasProtected = braceStack.pop();
+      if (wasProtected) protectedDepth = Math.max(0, protectedDepth - 1);
+      expectScriptBrace = false;
+      out += ch;
+      i += 1;
+      continue;
+    }
+
+    if (!/\s/.test(ch)) {
+      expectScriptBrace = false;
+    }
+
+    out += ch;
+    i += 1;
+  }
+
+  return out;
+};
+
+/**
  * Normalizes and cleans LaTeX expressions to ensure high render compatibility with KaTeX.
  */
 export const normalizeLatex = (latex: string): string => {
@@ -38,6 +134,9 @@ export const normalizeLatex = (latex: string): string => {
   clean = clean.replace(/\\text\{\s*m\s*\}\^([23])/g, "\\text{ m}^$1");
   clean = clean.replace(/\\text\{\s*dm\s*\}\^([23])/g, "\\text{ dm}^$1");
   clean = clean.replace(/\\text\{\s*mm\s*\}\^([23])/g, "\\text{ mm}^$1");
+
+  // Promote top-level \frac to \dfrac for readable inline fraction sizing
+  clean = promoteTopLevelFractions(clean);
 
   // Handle multiline math with newline (\n) or dangling \\
   // If text contains newlines (\n) and is not already wrapped in a math environment (\begin{...})
@@ -81,15 +180,23 @@ export const renderLatexToString = (
         displayMode,
         output: "html",
         strict: false,
-        trust: true,
+        trust: false,
       });
     }
   } catch (err) {
     console.warn("KaTeX rendering warning for:", cleanLatex, err);
   }
 
+  // Escape HTML special characters before building fallback HTML
+  const escapedLatex = cleanLatex
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+
   // Graceful HTML fallback for simple units/exponents if KaTeX is unavailable
-  const fallbackHtml = cleanLatex
+  const fallbackHtml = escapedLatex
     .replace(/\\text\{\s*([^}]+)\s*\}/g, "$1")
     .replace(/\\mathrm\{\s*([^}]+)\s*\}/g, "$1")
     .replace(/\^([0-9]+|\{[0-9]+\})/g, (_, exp) => `<sup>${exp.replace(/[{}]/g, "")}</sup>`)
@@ -105,6 +212,13 @@ export const renderLatexToString = (
   return `<span class="math-fallback font-mono">${fallbackHtml}</span>`;
 };
 
+const escapeAttrValue = (val: string): string =>
+  val
+    .replace(/&/g, "&amp;")
+    .replace(/"/g, "&quot;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+
 /**
  * Helper to convert math delimiters and naked math patterns within plain text into math-visual spans.
  */
@@ -116,26 +230,26 @@ const convertTextToMathSpans = (text: string): string => {
   result = result.replace(/\$\$([\s\S]+?)\$\$/g, (_, latex) => {
     const clean = normalizeLatex(latex);
     const rendered = renderLatexToString(clean, true);
-    return `&#8203;<span class="math-visual" style="display: block; text-align: center; margin: 0.5rem 0;" contenteditable="false" data-latex="${clean.replace(/"/g, "&quot;")}">${rendered}</span>&#8203;`;
+    return `&#8203;<span class="math-visual" style="display: block; text-align: center; margin: 0.5rem 0;" contenteditable="false" data-latex="${escapeAttrValue(clean)}">${rendered}</span>&#8203;`;
   });
 
   result = result.replace(/\\\[([\s\S]+?)\\\]/g, (_, latex) => {
     const clean = normalizeLatex(latex);
     const rendered = renderLatexToString(clean, true);
-    return `&#8203;<span class="math-visual" style="display: block; text-align: center; margin: 0.5rem 0;" contenteditable="false" data-latex="${clean.replace(/"/g, "&quot;")}">${rendered}</span>&#8203;`;
+    return `&#8203;<span class="math-visual" style="display: block; text-align: center; margin: 0.5rem 0;" contenteditable="false" data-latex="${escapeAttrValue(clean)}">${rendered}</span>&#8203;`;
   });
 
   // 2. Process Inline Math: $...$ or \(...\)
   result = result.replace(/\$([^$\n]+?)\$/g, (_, latex) => {
     const clean = normalizeLatex(latex);
     const rendered = renderLatexToString(clean, false);
-    return `&#8203;<span class="math-visual" style="display: inline-block; vertical-align: baseline;" contenteditable="false" data-latex="${clean.replace(/"/g, "&quot;")}">${rendered}</span>&#8203;`;
+    return `&#8203;<span class="math-visual" style="display: inline-block; vertical-align: baseline;" contenteditable="false" data-latex="${escapeAttrValue(clean)}">${rendered}</span>&#8203;`;
   });
 
   result = result.replace(/\\\(([\s\S]+?)\\\)/g, (_, latex) => {
     const clean = normalizeLatex(latex);
     const rendered = renderLatexToString(clean, false);
-    return `&#8203;<span class="math-visual" style="display: inline-block; vertical-align: baseline;" contenteditable="false" data-latex="${clean.replace(/"/g, "&quot;")}">${rendered}</span>&#8203;`;
+    return `&#8203;<span class="math-visual" style="display: inline-block; vertical-align: baseline;" contenteditable="false" data-latex="${escapeAttrValue(clean)}">${rendered}</span>&#8203;`;
   });
 
   // 3. Process un-delimited LaTeX fractions, roots, or units
@@ -146,7 +260,7 @@ const convertTextToMathSpans = (text: string): string => {
       const rendered = renderLatexToString(clean, false);
       const prefix = fullMatch.startsWith(" ") ? " " : "";
       const suffix = fullMatch.endsWith(" ") ? " " : "";
-      return `${prefix}&#8203;<span class="math-visual" style="display: inline-block; vertical-align: baseline;" contenteditable="false" data-latex="${clean.replace(/"/g, "&quot;")}">${rendered}</span>&#8203;${suffix}`;
+      return `${prefix}&#8203;<span class="math-visual" style="display: inline-block; vertical-align: baseline;" contenteditable="false" data-latex="${escapeAttrValue(clean)}">${rendered}</span>&#8203;${suffix}`;
     },
   );
 
@@ -179,11 +293,18 @@ export const renderMathInHtml = (html: string): string => {
       const parser = new DOMParser();
       const doc = parser.parseFromString(`<body>${html}</body>`, "text/html");
 
-      // 1. First ensure any existing .math-visual elements have their KaTeX markup hydrated
+      // 1. First ensure any existing .math-visual elements have their KaTeX markup hydrated and baseline aligned
       doc.querySelectorAll(".math-visual[data-latex]").forEach((el) => {
-        if (!el.querySelector(".katex") || el.innerHTML.trim() === "") {
-          const latex = el.getAttribute("data-latex") || "";
-          const isBlock = (el as HTMLElement).style.display === "block";
+        const htmlEl = el as HTMLElement;
+        const isBlock = htmlEl.style.display === "block";
+        if (!isBlock && htmlEl.style.verticalAlign === "middle") {
+          htmlEl.style.verticalAlign = "baseline";
+        }
+        const latex = el.getAttribute("data-latex") || "";
+        const hasLegacySmallFrac =
+          latex.includes("\\frac") &&
+          Boolean(el.querySelector(".mfrac .katex-sizing.size3, .mfrac .sizing.size3"));
+        if (!el.querySelector(".katex") || el.innerHTML.trim() === "" || hasLegacySmallFrac) {
           el.innerHTML = renderLatexToString(latex, isBlock);
         }
       });
@@ -253,12 +374,19 @@ export const renderMathInHtml = (html: string): string => {
 export const hydrateMathInContainer = (container: Element | Document = document) => {
   if (typeof window === "undefined" || !container) return;
 
-  // 1. Hydrate all .math-visual[data-latex] where KaTeX HTML is not yet present
+  // 1. Hydrate all .math-visual[data-latex] where KaTeX HTML is not yet present or uses legacy small inline fractions
   const mathVisuals = container.querySelectorAll(".math-visual[data-latex]:not([data-math-hydrated='true'])");
   mathVisuals.forEach((el) => {
+    const htmlEl = el as HTMLElement;
+    const displayMode = htmlEl.style.display === "block";
+    if (!displayMode && htmlEl.style.verticalAlign === "middle") {
+      htmlEl.style.verticalAlign = "baseline";
+    }
     const latex = el.getAttribute("data-latex");
-    if (latex && (!el.querySelector(".katex") || el.innerHTML.trim() === "")) {
-      const displayMode = (el as HTMLElement).style.display === "block";
+    const hasLegacySmallFrac =
+      Boolean(latex && latex.includes("\\frac")) &&
+      Boolean(el.querySelector(".mfrac .katex-sizing.size3, .mfrac .sizing.size3"));
+    if (latex && (!el.querySelector(".katex") || el.innerHTML.trim() === "" || hasLegacySmallFrac)) {
       el.innerHTML = renderLatexToString(latex, displayMode);
     }
     el.setAttribute("data-math-hydrated", "true");
