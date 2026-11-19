@@ -1,7 +1,7 @@
 import React from "react";
 import type { Exam, Result } from "../../../../types";
 import { checkAnswerStatus } from "../archiveUtils";
-import { isAnswerMatch, parseList } from "../../examUtils";
+import { isAnswerMatch, parseList, sanitizeHtml } from "../../examUtils";
 
 interface PrintItemDifficultyProps {
   exam: Exam;
@@ -133,7 +133,7 @@ export const PrintItemDifficulty: React.FC<PrintItemDifficultyProps> = ({
                               </span>
                               <div
                                 className="min-w-0 option-content [&_p]:inline [&_br]:hidden [&_img]:max-h-20 [&_img]:w-auto [&_img]:inline-block"
-                                dangerouslySetInnerHTML={{ __html: opt }}
+                                dangerouslySetInnerHTML={{ __html: sanitizeHtml(opt || "", { forPrint: true }) }}
                               ></div>
                             </div>
                             <span className="shrink-0 ml-2">
@@ -157,6 +157,7 @@ export const PrintItemDifficulty: React.FC<PrintItemDifficultyProps> = ({
                                 : 0;
 
                             let displayAns = ans;
+                            let structuredTokens: string[] | null = null;
                             let isCorrect = false;
 
                             try {
@@ -164,8 +165,8 @@ export const PrintItemDifficulty: React.FC<PrintItemDifficultyProps> = ({
                                 const parsed = JSON.parse(ans);
                                 const orderedValues = (
                                   originalQ.matchingPairs || []
-                                ).map((_, pIdx) => parsed[pIdx] || "—");
-                                displayAns = orderedValues.join(", ");
+                                ).map((_, pIdx) => String(parsed[pIdx] || "—"));
+                                structuredTokens = orderedValues;
                                 isCorrect =
                                   originalQ.matchingPairs?.every(
                                     (pair, pIdx) => parsed[pIdx] === pair.right,
@@ -199,7 +200,7 @@ export const PrintItemDifficulty: React.FC<PrintItemDifficultyProps> = ({
                                     (originalQ.options || []).indexOf(a) -
                                     (originalQ.options || []).indexOf(b),
                                 );
-                                displayAns = parsed.join(", ");
+                                structuredTokens = parsed;
                                 const cList = parseList(
                                   originalQ.correctAnswer || "",
                                 );
@@ -225,17 +226,39 @@ export const PrintItemDifficulty: React.FC<PrintItemDifficultyProps> = ({
                               /* ignore */
                             }
 
+                            const knownTeacherTokens = new Set<string>([
+                              ...(originalQ?.options || []),
+                              ...((originalQ?.matchingPairs || []).map((p) => p.right)),
+                            ]);
+
                             return (
                               <div
                                 key={i}
                                 className={`flex items-start justify-between px-2 py-1 rounded border ${isCorrect ? "print-bg-green font-bold" : "bg-slate-50 border-slate-100 text-slate-600"}`}
                               >
-                                <div
-                                  className="flex-1 mr-2 min-w-0 option-content [&_p]:inline [&_br]:hidden [&_img]:max-h-10 [&_img]:w-auto [&_img]:inline-block"
-                                  dangerouslySetInnerHTML={{
-                                    __html: displayAns,
-                                  }}
-                                ></div>
+                                {structuredTokens ? (
+                                  <div className="flex-1 mr-2 min-w-0 option-content [&_p]:inline [&_br]:hidden [&_img]:max-h-10 [&_img]:w-auto [&_img]:inline-block">
+                                    {structuredTokens.map((token, tIdx) => (
+                                      <React.Fragment key={tIdx}>
+                                        {tIdx > 0 && ", "}
+                                        {knownTeacherTokens.has(token) ? (
+                                          <span
+                                            className="inline"
+                                            dangerouslySetInnerHTML={{
+                                              __html: sanitizeHtml(token, { forPrint: true }),
+                                            }}
+                                          />
+                                        ) : (
+                                          <span>{token}</span>
+                                        )}
+                                      </React.Fragment>
+                                    ))}
+                                  </div>
+                                ) : (
+                                  <div className="flex-1 mr-2 min-w-0 whitespace-pre-wrap break-words">
+                                    {displayAns}
+                                  </div>
+                                )}
                                 <span className="shrink-0 font-bold">
                                   {count} ({pct}%)
                                 </span>
