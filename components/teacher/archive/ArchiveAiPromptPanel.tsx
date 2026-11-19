@@ -19,7 +19,6 @@ import {
   extractTargetStats,
   type AnalysisTargetOption,
 } from "./archivePromptBuilder";
-import { generateArchivePromptPdf } from "./archivePdfGenerator";
 
 interface ArchiveAiPromptPanelProps {
   isOpen: boolean;
@@ -104,6 +103,7 @@ export const ArchiveAiPromptPanel: React.FC<ArchiveAiPromptPanelProps> = ({
     if (!exam || !results || promptTargetsToInclude.length === 0) return false;
     setIsGeneratingPdf(true);
     try {
+      const { generateArchivePromptPdf } = await import("./archivePdfGenerator");
       const fileName = await generateArchivePromptPdf(exam, results, promptTargetsToInclude);
       setDownloadedFilename(fileName);
       setDownloadSuccess(true);

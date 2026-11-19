@@ -1,4 +1,5 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
+import { createPortal } from "react-dom";
 import type { Exam, Result, TeacherProfile, ExamSummary } from "../../../types";
 import {
   ChartBarIcon,
@@ -70,6 +71,7 @@ export const ArchiveClassAnalysis: React.FC<ArchiveClassAnalysisProps> = ({
   aiProgressStatus,
 }) => {
   const [copied, setCopied] = useState(false);
+  const [isPrintingAI, setIsPrintingAI] = useState(false);
 
   const filteredResults = useMemo(() => {
     if (!results) return [];
@@ -191,23 +193,28 @@ export const ArchiveClassAnalysis: React.FC<ArchiveClassAnalysisProps> = ({
     };
   }, [currentSubTabKey, filteredResults.length, currentSubTabResults.length, uniqueSchools.length, analysisSchools.length]);
 
-  const handlePrintAI = () => {
-    const printContent = document.getElementById("ai-analysis-print-content");
-    if (printContent) {
-      const originalContents = document.body.innerHTML;
-      document.body.innerHTML = `
-        <div style="padding: 24px; font-family: system-ui, -apple-system, sans-serif;">
-          <div style="border-bottom: 2px solid #0f172a; padding-bottom: 12px; margin-bottom: 20px;">
-            <h1 style="font-size: 20px; font-weight: 800; color: #0f172a; margin: 0 0 6px 0;">Laporan Analisis AI - ${exam.config.subject}</h1>
-            <p style="font-size: 13px; color: #475569; margin: 0;">${currentSubTabMeta.title} • ${currentSubTabMeta.studentCount} Siswa • Kode Ujian: ${exam.code} • Sekolah: ${exam.authorSchool || "-"}</p>
-          </div>
-          ${printContent.innerHTML}
-        </div>
-      `;
+  useEffect(() => {
+    if (!isPrintingAI) return;
+    document.body.classList.add("ai-printing-mode");
+    const cleanup = () => {
+      document.body.classList.remove("ai-printing-mode");
+      setIsPrintingAI(false);
+    };
+    window.addEventListener("afterprint", cleanup, { once: true });
+    const timer = window.setTimeout(() => {
       window.print();
-      document.body.innerHTML = originalContents;
-      window.location.reload();
-    }
+      window.addEventListener("focus", cleanup, { once: true });
+    }, 150);
+    return () => {
+      window.clearTimeout(timer);
+      window.removeEventListener("afterprint", cleanup);
+      window.removeEventListener("focus", cleanup);
+      document.body.classList.remove("ai-printing-mode");
+    };
+  }, [isPrintingAI]);
+
+  const handlePrintAI = () => {
+    setIsPrintingAI(true);
   };
 
   const handleCopyText = async () => {
@@ -517,90 +524,122 @@ export const ArchiveClassAnalysis: React.FC<ArchiveClassAnalysisProps> = ({
           </div>
 
           {/* Sub-tab content area */}
-          <div className="p-6">
-            <div id="ai-analysis-print-content" className="bg-white dark:bg-slate-900 rounded-2xl p-6 border border-amber-100 dark:border-amber-900/30 shadow-inner">
-              {/* Header Badge */}
-              <div className="mb-6 p-4 rounded-xl bg-gradient-to-r from-indigo-50/60 to-purple-50/60 dark:from-slate-800 dark:to-slate-800/60 border border-indigo-100/60 dark:border-slate-700 flex flex-wrap items-center justify-between gap-3">
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-bold text-sm shadow-sm">
-                    {currentSubTabKey === "OVERALL" ? "🌐" : "🏫"}
-                  </div>
-                  <div>
-                    <h4 className="font-extrabold text-sm text-slate-900 dark:text-white">
-                      {currentSubTabMeta.title}
-                    </h4>
-                    <p className="text-xs text-slate-500 dark:text-slate-400">
-                      Menganalisis hasil belajar {currentSubTabMeta.studentCount} siswa terdaftar
-                    </p>
-                  </div>
-                </div>
-                <span className="px-2.5 py-1 bg-indigo-100/70 dark:bg-indigo-950/70 text-indigo-700 dark:text-indigo-300 rounded-lg text-xs font-bold">
-                  {currentSubTabMeta.badge}
-                </span>
-              </div>
-
-              {splitAnalysis.splitFound ? (
-                <div className="space-y-6">
-                  <div className="prose prose-sm dark:prose-invert max-w-none prose-headings:text-slate-800 dark:prose-headings:text-slate-100 prose-a:text-indigo-600 dark:prose-a:text-indigo-400">
-                    <div className="markdown-body">
-                      <Markdown remarkPlugins={[remarkGfm]} components={markdownComponents}>{splitAnalysis.before}</Markdown>
+          {(() => {
+            const renderAIAnalysisBody = () => (
+              <>
+                {/* Header Badge */}
+                <div className="mb-6 p-4 rounded-xl bg-gradient-to-r from-indigo-50/60 to-purple-50/60 dark:from-slate-800 dark:to-slate-800/60 border border-indigo-100/60 dark:border-slate-700 flex flex-wrap items-center justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-bold text-sm shadow-sm">
+                      {currentSubTabKey === "OVERALL" ? "🌐" : "🏫"}
                     </div>
-                  </div>
-
-                  <div className="border-t border-b border-slate-100 dark:border-slate-800 py-6 my-6 bg-slate-50/30 dark:bg-slate-900/10 rounded-xl p-4">
-                    <div className="mb-4">
-                      <h4 className="font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 12l3-3 3 3 4-4M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                        </svg>
-                        Visualisasi Sebaran Performa ({currentSubTabMeta.title})
+                    <div>
+                      <h4 className="font-extrabold text-sm text-slate-900 dark:text-white">
+                        {currentSubTabMeta.title}
                       </h4>
+                      <p className="text-xs text-slate-500 dark:text-slate-400">
+                        Menganalisis hasil belajar {currentSubTabMeta.studentCount} siswa terdaftar
+                      </p>
                     </div>
-                    {currentSubTabResults.length > 0 && (
-                      <ClassPerformanceDistribution
-                        results={currentSubTabResults}
-                        kkm={exam.config.kkm}
-                        subject={exam.config.subject}
-                      />
-                    )}
                   </div>
+                  <span className="px-2.5 py-1 bg-indigo-100/70 dark:bg-indigo-950/70 text-indigo-700 dark:text-indigo-300 rounded-lg text-xs font-bold">
+                    {currentSubTabMeta.badge}
+                  </span>
+                </div>
 
-                  {splitAnalysis.after && (
+                {splitAnalysis.splitFound ? (
+                  <div className="space-y-6">
                     <div className="prose prose-sm dark:prose-invert max-w-none prose-headings:text-slate-800 dark:prose-headings:text-slate-100 prose-a:text-indigo-600 dark:prose-a:text-indigo-400">
                       <div className="markdown-body">
-                        <Markdown remarkPlugins={[remarkGfm]} components={markdownComponents}>{splitAnalysis.after}</Markdown>
+                        <Markdown remarkPlugins={[remarkGfm]} components={markdownComponents}>{splitAnalysis.before}</Markdown>
                       </div>
                     </div>
-                  )}
-                </div>
-              ) : (
-                <div className="space-y-6">
-                  <div className="border-b border-slate-100 dark:border-slate-800 pb-6 mb-6">
-                    <div className="mb-4">
-                      <h4 className="font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 12l3-3 3 3 4-4M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                        </svg>
-                        Visualisasi Sebaran Performa ({currentSubTabMeta.title})
-                      </h4>
+
+                    <div className="border-t border-b border-slate-100 dark:border-slate-800 py-6 my-6 bg-slate-50/30 dark:bg-slate-900/10 rounded-xl p-4">
+                      <div className="mb-4">
+                        <h4 className="font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 12l3-3 3 3 4-4M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                          </svg>
+                          Visualisasi Sebaran Performa ({currentSubTabMeta.title})
+                        </h4>
+                      </div>
+                      {currentSubTabResults.length > 0 && (
+                        <ClassPerformanceDistribution
+                          results={currentSubTabResults}
+                          kkm={exam.config.kkm}
+                          subject={exam.config.subject}
+                        />
+                      )}
                     </div>
-                    {currentSubTabResults.length > 0 && (
-                      <ClassPerformanceDistribution
-                        results={currentSubTabResults}
-                        kkm={exam.config.kkm}
-                        subject={exam.config.subject}
-                      />
+
+                    {splitAnalysis.after && (
+                      <div className="prose prose-sm dark:prose-invert max-w-none prose-headings:text-slate-800 dark:prose-headings:text-slate-100 prose-a:text-indigo-600 dark:prose-a:text-indigo-400">
+                        <div className="markdown-body">
+                          <Markdown remarkPlugins={[remarkGfm]} components={markdownComponents}>{splitAnalysis.after}</Markdown>
+                        </div>
+                      </div>
                     )}
                   </div>
-                  <div className="prose prose-sm dark:prose-invert max-w-none prose-headings:text-slate-800 dark:prose-headings:text-slate-100 prose-a:text-indigo-600 dark:prose-a:text-indigo-400">
-                    <div className="markdown-body">
-                      <Markdown remarkPlugins={[remarkGfm]} components={markdownComponents}>{sanitizedAnalysis}</Markdown>
+                ) : (
+                  <div className="space-y-6">
+                    <div className="border-b border-slate-100 dark:border-slate-800 pb-6 mb-6">
+                      <div className="mb-4">
+                        <h4 className="font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 12l3-3 3 3 4-4M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                          </svg>
+                          Visualisasi Sebaran Performa ({currentSubTabMeta.title})
+                        </h4>
+                      </div>
+                      {currentSubTabResults.length > 0 && (
+                        <ClassPerformanceDistribution
+                          results={currentSubTabResults}
+                          kkm={exam.config.kkm}
+                          subject={exam.config.subject}
+                        />
+                      )}
+                    </div>
+                    <div className="prose prose-sm dark:prose-invert max-w-none prose-headings:text-slate-800 dark:prose-headings:text-slate-100 prose-a:text-indigo-600 dark:prose-a:text-indigo-400">
+                      <div className="markdown-body">
+                        <Markdown remarkPlugins={[remarkGfm]} components={markdownComponents}>{sanitizedAnalysis}</Markdown>
+                      </div>
                     </div>
                   </div>
+                )}
+              </>
+            );
+
+            return (
+              <div className="p-6">
+                <div id="ai-analysis-print-content" className="bg-white dark:bg-slate-900 rounded-2xl p-6 border border-amber-100 dark:border-amber-900/30 shadow-inner">
+                  {renderAIAnalysisBody()}
                 </div>
-              )}
-            </div>
-          </div>
+
+                {isPrintingAI && typeof document !== "undefined" && (
+                  <>
+                    <style>{`@media print { body.ai-printing-mode > *:not(#ai-print-portal-root) { display: none !important; } body.ai-printing-mode #ai-print-portal-root { display: block !important; } }`}</style>
+                    {createPortal(
+                      <div id="ai-print-portal-root" className="hidden print:block p-6 bg-white text-slate-900 font-sans">
+                        <div className="border-b-2 border-slate-900 pb-3 mb-5">
+                          <h1 className="text-xl font-extrabold text-slate-900 m-0 mb-1.5">
+                            Laporan Analisis AI - {exam.config.subject}
+                          </h1>
+                          <p className="text-[13px] text-slate-600 m-0">
+                            {currentSubTabMeta.title} • {currentSubTabMeta.studentCount} Siswa • Kode Ujian: {exam.code} • Sekolah: {exam.authorSchool || "-"}
+                          </p>
+                        </div>
+                        <div className="bg-white rounded-2xl p-4 border border-slate-200">
+                          {renderAIAnalysisBody()}
+                        </div>
+                      </div>,
+                      document.body,
+                    )}
+                  </>
+                )}
+              </div>
+            );
+          })()}
         </div>
       )}
 
