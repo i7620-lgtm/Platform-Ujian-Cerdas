@@ -1,3 +1,4 @@
+import DOMPurify from "dompurify";
 import type { Question, QuestionType, Exam, Result, ChartData } from "../../types";
 import { generateGeometrySVG, parseGeometryLabels } from "./geometryUtils";
 import { renderLatexToString, renderMathInHtml, normalizeLatex } from "../../utils/mathRenderer";
@@ -2411,19 +2412,38 @@ export const repairGeometrySvgInHtml = (html: string): string => {
 const SANITIZE_HTML_CACHE = new Map<string, string>();
 const SANITIZE_HTML_CACHE_MAX = 600;
 
-export const sanitizeHtml = (html: string): string => {
-  if (!html) return "";
-  const cached = SANITIZE_HTML_CACHE.get(html);
-  if (cached !== undefined) return cached;
-
-  // Pre-process any raw LaTeX / math markers ($...$, $$...$$, \(...\), \[...\])
-  const mathProcessed = renderMathInHtml(html);
-
-  const parser = new DOMParser();
-  const doc = parser.parseFromString(mathProcessed, "text/html");
-
-  // SECURITY FIX: Remove potentially dangerous tags (XSS Protection)
-  const dangerousTags = [
+const DOMPURIFY_CONFIG = {
+  USE_PROFILES: { html: true, svg: true, svgFilters: true },
+  ADD_TAGS: ["audio", "video", "source", "code", "pre", "s", "del", "blockquote", "ul", "ol", "li"],
+  ADD_ATTR: [
+    "controls",
+    "preload",
+    "playsinline",
+    "loop",
+    "muted",
+    "poster",
+    "contenteditable",
+    "data-latex",
+    "data-shape",
+    "data-labels",
+    "data-lang",
+    "target",
+    "rel",
+    "aria-hidden",
+    "preserveAspectRatio",
+    "viewBox",
+    "markerWidth",
+    "markerHeight",
+    "refX",
+    "refY",
+    "orient",
+    "marker-end",
+    "marker-start",
+    "stroke-dasharray",
+    "dominant-baseline",
+    "text-anchor",
+  ],
+  FORBID_TAGS: [
     "script",
     "iframe",
     "object",
@@ -2432,13 +2452,69 @@ export const sanitizeHtml = (html: string): string => {
     "meta",
     "link",
     "base",
-  ];
-  dangerousTags.forEach((tag) => {
-    const elements = doc.getElementsByTagName(tag);
-    for (let i = elements.length - 1; i >= 0; i--) {
-      elements[i].parentNode?.removeChild(elements[i]);
-    }
+    "style",
+    "form",
+    "input",
+    "textarea",
+    "select",
+    "option",
+    "button",
+  ],
+  FORBID_ATTR: [
+    "onerror",
+    "onload",
+    "onclick",
+    "onmouseover",
+    "onmouseout",
+    "onmouseenter",
+    "onmouseleave",
+    "onfocus",
+    "onblur",
+    "onchange",
+    "onsubmit",
+    "onkeydown",
+    "onkeyup",
+    "onkeypress",
+    "formaction",
+  ],
+  ALLOWED_URI_REGEXP:
+    /^(?:(?:https?|mailto|tel|blob):|data:(?:image\/(?:png|jpe?g|gif|webp|bmp|avif|svg\+xml)|audio\/[a-z0-9.+-]+|video\/[a-z0-9.+-]+)[;,]|[^a-z]|[a-z0-9+.-]+(?:[^a-z0-9+.-:]|$))/i,
+};
+
+export interface SanitizeHtmlOptions {
+  forPrint?: boolean;
+}
+
+export const sanitizeHtml = (
+  html: string,
+  options?: SanitizeHtmlOptions,
+): string => {
+  if (!html) return "";
+  const forPrint = Boolean(options?.forPrint);
+  const cacheKey = forPrint ? `__PRINT__:${html}` : html;
+  const cached = SANITIZE_HTML_CACHE.get(cacheKey);
+  if (cached !== undefined) return cached;
+
+  // Step 1: Pre-sanitize untrusted HTML with DOMPurify before formatting & KaTeX processing
+  const preSanitized =
+    typeof window !== "undefined"
+      ? DOMPurify.sanitize(html, DOMPURIFY_CONFIG)
+      : html;
+
+  // Step 2: Convert LLM/AI markdown formatting (**bold**, *italic*, _underline_, `code`, lists, etc.)
+  const formattedHtml = convertLlmFormattingToHtml(preSanitized, {
+    convertNewlines: !preSanitized.includes("<p>") && !preSanitized.includes("<div>") && !preSanitized.includes("<br"),
   });
+
+  // Step 3: Pre-process any raw LaTeX / math markers ($...$, $$...$$, \(...\), \[...\])
+  const mathProcessed = renderMathInHtml(formattedHtml);
+
+  if (typeof window === "undefined" || typeof DOMParser === "undefined") {
+    return mathProcessed;
+  }
+
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(mathProcessed, "text/html");
 
   const isMath = (el: Element) =>
     el.classList.contains("math-visual") ||
@@ -2466,34 +2542,17 @@ export const sanitizeHtml = (html: string): string => {
     el.tagName.toLowerCase() === "svg" ||
     el.closest("svg") !== null;
 
-  // Handle style tags separately to preserve them if they are inside math or geometry
-  const styleElements = doc.getElementsByTagName("style");
-  for (let i = styleElements.length - 1; i >= 0; i--) {
-    const el = styleElements[i];
-    if (!isMath(el) && !isGeometry(el)) {
-      el.parentNode?.removeChild(el);
-    }
-  }
-
   const isAksaraBali = (el: Element) =>
     el.classList.contains("aksara-bali") ||
     (el instanceof HTMLElement &&
       el.style.fontFamily.includes("Noto Sans Balinese"));
 
   doc.body.querySelectorAll("*").forEach((el) => {
-    // SECURITY FIX: Remove all inline event handlers (on*)
-    const attrs = el.attributes;
-    for (let i = attrs.length - 1; i >= 0; i--) {
-      if (attrs[i].name.toLowerCase().startsWith("on")) {
-        el.removeAttribute(attrs[i].name);
-      }
-    }
-
-    // SECURITY FIX: Prevent javascript: URIs
+    // Enforce safe external link attributes
     if (el.tagName === "A") {
-      const href = el.getAttribute("href");
-      if (href && href.toLowerCase().trim().startsWith("javascript:")) {
-        el.removeAttribute("href");
+      const target = el.getAttribute("target");
+      if (target === "_blank") {
+        el.setAttribute("rel", "noopener noreferrer");
       }
     }
 
@@ -2505,29 +2564,31 @@ export const sanitizeHtml = (html: string): string => {
 
         // Remove font-size, font-family, and line-height to allow app to control text size
         el.style.fontSize = "";
-        if (!isAksaraBali(el)) {
+        if (!isAksaraBali(el) && el.tagName !== "CODE" && el.tagName !== "PRE") {
           el.style.fontFamily = "";
         }
         el.style.lineHeight = "";
 
-        // Remove theme-specific classes (Tailwind)
-        const classes = Array.from(el.classList);
-        classes.forEach((cls) => {
-          if (
-            cls.startsWith("dark:") ||
-            cls.includes("slate-") ||
-            cls.includes("gray-") ||
-            cls.includes("zinc-") ||
-            cls.includes("neutral-") ||
-            cls.includes("stone-") ||
-            cls.includes("text-white") ||
-            cls.includes("text-black") ||
-            cls.includes("bg-white") ||
-            cls.includes("bg-black")
-          ) {
-            el.classList.remove(cls);
-          }
-        });
+        // Remove theme-specific classes (Tailwind), preserving intentional code/list classes
+        if (el.tagName !== "CODE" && el.tagName !== "PRE" && el.tagName !== "UL" && el.tagName !== "OL" && el.tagName !== "LI") {
+          const classes = Array.from(el.classList);
+          classes.forEach((cls) => {
+            if (
+              cls.startsWith("dark:") ||
+              cls.includes("slate-") ||
+              cls.includes("gray-") ||
+              cls.includes("zinc-") ||
+              cls.includes("neutral-") ||
+              cls.includes("stone-") ||
+              cls.includes("text-white") ||
+              cls.includes("text-black") ||
+              cls.includes("bg-white") ||
+              cls.includes("bg-black")
+            ) {
+              el.classList.remove(cls);
+            }
+          });
+        }
 
         if (el.getAttribute("style") === "") el.removeAttribute("style");
         if (el.getAttribute("class") === "") el.removeAttribute("class");
@@ -2551,29 +2612,36 @@ export const sanitizeHtml = (html: string): string => {
     }
   });
 
-  // Wrap tables in a responsive container to prevent overflow and squeezed vertical text
-  doc.body.querySelectorAll("table").forEach((table) => {
-    // Check if it's already wrapped
-    if (
-      table.parentElement &&
-      (table.parentElement.classList.contains("overflow-x-auto") ||
-        table.parentElement.classList.contains("table-responsive-wrapper"))
-    ) {
-      return;
-    }
-    const wrapper = doc.createElement("div");
-    wrapper.className = "table-responsive-wrapper max-w-full overflow-x-auto my-3 rounded-xl border border-slate-200 dark:border-slate-700 shadow-2xs custom-scrollbar";
-    table.parentNode?.insertBefore(wrapper, table);
-    wrapper.appendChild(table);
-  });
+  // Wrap tables in a responsive container on screen views (skip on static print views)
+  if (!forPrint) {
+    doc.body.querySelectorAll("table").forEach((table) => {
+      if (
+        table.parentElement &&
+        (table.parentElement.classList.contains("overflow-x-auto") ||
+          table.parentElement.classList.contains("table-responsive-wrapper"))
+      ) {
+        return;
+      }
+      const wrapper = doc.createElement("div");
+      wrapper.className =
+        "table-responsive-wrapper max-w-full overflow-x-auto my-3 rounded-xl border border-slate-200 dark:border-slate-700 shadow-2xs custom-scrollbar";
+      table.parentNode?.insertBefore(wrapper, table);
+      wrapper.appendChild(table);
+    });
+  }
 
-  const result = doc.body.innerHTML;
-  const finalHtml = repairGeometrySvgInHtml(cleanOrphanedSvgMarkup(result));
+  const repaired = repairGeometrySvgInHtml(
+    cleanOrphanedSvgMarkup(doc.body.innerHTML),
+  );
+
+  // Step 3: Post-sanitize final markup with DOMPurify to guarantee strict whitelist compliance
+  const finalHtml = DOMPurify.sanitize(repaired, DOMPURIFY_CONFIG);
+
   if (SANITIZE_HTML_CACHE.size >= SANITIZE_HTML_CACHE_MAX) {
     const oldestKey = SANITIZE_HTML_CACHE.keys().next().value;
     if (oldestKey !== undefined) SANITIZE_HTML_CACHE.delete(oldestKey);
   }
-  SANITIZE_HTML_CACHE.set(html, finalHtml);
+  SANITIZE_HTML_CACHE.set(cacheKey, finalHtml);
   return finalHtml;
 };
 
@@ -2868,7 +2936,7 @@ export const markdownToHtml = (markdown: string): string => {
   const renderMath = (latex: string, displayMode: boolean) => {
     const clean = normalizeLatex(latex);
     const rendered = renderLatexToString(clean, displayMode);
-    return `&#8203;<span class="math-visual" style="display: ${displayMode ? "block" : "inline-block"}; vertical-align: middle;" contenteditable="false" data-latex="${clean.replace(/"/g, "&quot;")}">${rendered}</span>&#8203;`;
+    return `&#8203;<span class="math-visual" style="display: ${displayMode ? "block" : "inline-block"};${displayMode ? "" : " vertical-align: baseline;"}" contenteditable="false" data-latex="${clean.replace(/"/g, "&quot;")}">${rendered}</span>&#8203;`;
   };
 
   mathBlocks.forEach((latex, i) => {
@@ -3478,7 +3546,7 @@ export const generateQuestionsPDF = async (exam: Exam): Promise<void> => {
             <title>Naskah Soal UjianCerdas - ${exam.config.examType ? exam.config.examType + " - " : ""}${exam.config.subject || "Ujian"} - ${exam.code}</title>
             <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
             <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0"></script>
-            <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+            <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.18.7/dist/katex.min.css">
             ${styleTags}
             <style>
                 @page { margin: 20mm; }
@@ -3492,9 +3560,10 @@ export const generateQuestionsPDF = async (exam: Exam): Promise<void> => {
                 .question-text > span.font-bold { min-width: 20px; text-align: right; margin-top: 2px; }
                 .question-text > .prose { flex: 1; }
                 .options-container { margin-left: 36px; font-size: 14px; }
-                .option-item { margin-bottom: 8px; display: flex; align-items: flex-start; gap: 12px; }
-                .option-item > span.font-bold { min-width: 20px; text-align: right; margin-top: 2px; }
+                .option-item { margin-bottom: 8px; display: flex; align-items: baseline; gap: 12px; }
+                .option-item > span.font-bold { min-width: 20px; text-align: right; }
                 .option-item > .prose { flex: 1; }
+                .option-item > .prose p { display: inline; margin: 0; }
                 .answer-key { page-break-before: always; }
                 .chart-wrapper { width: 100%; max-width: 420px; max-height: 240px; margin: 12px auto; page-break-inside: avoid; display: flex; justify-content: center; overflow: hidden; }
                 .chart-wrapper canvas, .chart-wrapper svg { max-width: 100% !important; max-height: 230px !important; width: auto !important; height: auto !important; }
@@ -3505,6 +3574,26 @@ export const generateQuestionsPDF = async (exam: Exam): Promise<void> => {
                 .prose { max-width: none !important; }
                 blockquote { border-left: 3px solid #cbd5e1; padding-left: 1rem; color: #475569; font-style: italic; margin: 1em 0; }
                 blockquote[style*="margin"] { border-left: 3px solid #cbd5e1 !important; padding-left: 1rem !important; }
+                .math-visual { font-size: 1em !important; vertical-align: baseline !important; line-height: normal !important; }
+                .katex { font-size: 1.10em !important; line-height: 1.2 !important; text-indent: 0 !important; }
+                .katex .katex { font-size: 1em !important; }
+                .katex .msupsub .katex-sizing.reset-size6.size3,
+                .katex .msupsub .sizing.reset-size6.size3,
+                .katex .op-limits .katex-sizing.reset-size6.size3,
+                .katex .op-limits .sizing.reset-size6.size3,
+                .katex .katex-sizing.reset-size6.size3,
+                .katex .sizing.reset-size6.size3 { font-size: 0.68em !important; }
+                .katex .msupsub .katex-sizing.reset-size6.size1,
+                .katex .msupsub .sizing.reset-size6.size1,
+                .katex .op-limits .katex-sizing.reset-size6.size1,
+                .katex .op-limits .sizing.reset-size6.size1,
+                .katex .sqrt .root .katex-sizing.reset-size6.size3,
+                .katex .sqrt .root .sizing.reset-size6.size3,
+                .katex .sqrt .root .katex-sizing.reset-size6.size1,
+                .katex .sqrt .root .sizing.reset-size6.size1,
+                .katex .katex-sizing.reset-size6.size1,
+                .katex .sizing.reset-size6.size1 { font-size: 0.54em !important; }
+                .prose p:has(.math-visual), .wysiwyg-content p:has(.math-visual) { line-height: 1.75 !important; }
             </style>
         </head>
         <body class="bg-white text-black p-8">
@@ -3528,7 +3617,7 @@ export const generateQuestionsPDF = async (exam: Exam): Promise<void> => {
     scorableQuestions.forEach((q, index) => {
       htmlContent += `<div class="question-item">`;
 
-      let questionHtml = q.questionText || "";
+      let questionHtml = renderMathInHtml(sanitizeHtml(q.questionText || "", { forPrint: true }));
       questionHtml = injectChart(q.chartData, questionHtml);
 
       htmlContent += `<div class="question-text flex gap-4"><span class="font-bold">${index + 1}.</span> <div class="wysiwyg-content prose prose-sm max-w-none text-black flex-1">${questionHtml}</div></div>`;
@@ -3540,13 +3629,13 @@ export const generateQuestionsPDF = async (exam: Exam): Promise<void> => {
       ) {
         if (q.options) {
           q.options.forEach((opt, optIdx) => {
-            let optHtml = opt;
+            let optHtml = renderMathInHtml(sanitizeHtml(opt || "", { forPrint: true }));
             if (q.optionCharts && q.optionCharts[optIdx]) {
               optHtml = injectChart(q.optionCharts[optIdx], optHtml);
             }
-            htmlContent += `<div class="option-item flex gap-3">
-                            <span class="font-bold mt-1">${String.fromCharCode(65 + optIdx)}.</span> 
-                            <div class="wysiwyg-content prose prose-sm max-w-none text-black flex-1">${optHtml}</div>
+            htmlContent += `<div class="option-item flex items-baseline gap-3">
+                            <span class="font-bold">${String.fromCharCode(65 + optIdx)}.</span> 
+                            <div class="wysiwyg-content option-content prose prose-sm max-w-none text-black flex-1">${optHtml}</div>
                         </div>`;
           });
         }
@@ -3680,7 +3769,7 @@ export const generateQuestionsPDF = async (exam: Exam): Promise<void> => {
                     </div>
                 </div>
             </div>
-            <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+            <script src="https://cdn.jsdelivr.net/npm/katex@0.18.7/dist/katex.min.js"></script>
             <script>
                 // Initialize charts
                 ${chartScripts}
@@ -3693,7 +3782,7 @@ export const generateQuestionsPDF = async (exam: Exam): Promise<void> => {
                         document.querySelectorAll('.math-visual[data-latex]').forEach(el => {
                             try {
                                 const latex = el.getAttribute('data-latex');
-                                if (latex) {
+                                if (latex && (!el.querySelector('.katex') || el.innerHTML.trim() === '')) {
                                     const isBlock = el.style.display === 'block';
                                     el.innerHTML = window.katex.renderToString(latex, {
                                         throwOnError: false,
