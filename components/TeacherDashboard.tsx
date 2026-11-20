@@ -440,6 +440,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
             setSelectedFinishedExam(null);
             onRefreshExams(false);
           }}
+          onResultsUpdated={() => onRefreshResults(true)}
         />
       )}
 
