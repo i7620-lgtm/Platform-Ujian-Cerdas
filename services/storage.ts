@@ -240,6 +240,20 @@ class StorageService {
       return resultService.verifyUnlockToken(examCode, studentId, token, newDeviceId);
   }
 
+  async gradeManualQuestion(params: {
+      examCode: string;
+      studentId: string;
+      resultId?: number;
+      questionId: string;
+      isCorrect: boolean;
+      nextAnswers: Record<string, string>;
+      nextScore: number;
+      nextCorrectAnswers: number;
+      totalQuestions?: number;
+  }) {
+      return resultService.gradeManualQuestion(params);
+  }
+
   async deleteStudentResult(examCode: string, studentId: string): Promise<void> {
       return resultService.deleteStudentResult(examCode, studentId);
   }
