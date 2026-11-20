@@ -93,9 +93,16 @@ export const QuestionnaireView: React.FC<QuestionnaireViewProps> = React.memo(({
                 <button
                   key={star}
                   type="button"
-                  onMouseEnter={() => setHoveredStar(star)}
-                  onMouseLeave={() => setHoveredStar(null)}
-                  onClick={() => onAnswerChange(question.id, String(star))}
+                  onPointerEnter={(e) => {
+                    if (e.pointerType === "mouse") setHoveredStar(star);
+                  }}
+                  onPointerLeave={(e) => {
+                    if (e.pointerType === "mouse") setHoveredStar(null);
+                  }}
+                  onClick={() => {
+                    setHoveredStar(null);
+                    onAnswerChange(question.id, String(star));
+                  }}
                   className="p-2 sm:p-2.5 transition-transform hover:scale-115 active:scale-95 cursor-pointer focus:outline-hidden"
                   title={`Beri rating ${star} bintang`}
                 >
@@ -170,7 +177,7 @@ export const QuestionnaireView: React.FC<QuestionnaireViewProps> = React.memo(({
             value={currentAnswer}
             onChange={(e) => onAnswerChange(question.id, e.target.value)}
             rows={4}
-            className="w-full p-4 bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 rounded-xl focus:border-indigo-500 dark:focus:border-indigo-500 outline-none text-xs sm:text-sm text-slate-800 dark:text-slate-200 placeholder:text-slate-400 dark:placeholder:text-slate-500 transition-all resize-y leading-relaxed"
+            className="w-full p-4 bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 rounded-xl focus:border-indigo-500 dark:focus:border-indigo-500 outline-none text-base text-slate-800 dark:text-slate-200 placeholder:text-slate-400 dark:placeholder:text-slate-500 transition-all resize-y leading-relaxed"
             placeholder="Tuliskan refleksi, opini, kritik, atau saran Anda secara leluasa di sini..."
           />
           <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-1 text-right">
