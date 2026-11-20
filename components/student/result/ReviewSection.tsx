@@ -20,10 +20,13 @@ const renderQuestionTextWithChart = (
       '<span data-chart="true"></span>',
     );
   }
+  const questionProseClass =
+    "text-sm font-medium text-slate-800 dark:text-slate-200 mb-4 leading-relaxed prose prose-sm max-w-full min-w-0 break-words dark:prose-invert [&_img]:max-w-full [&_img]:h-auto [&_svg]:max-w-full [&_.katex-display]:max-w-full [&_.katex-display]:overflow-x-auto [&_.katex-display]:overflow-y-hidden [&_.katex-display]:py-1 [&_table]:text-xs";
+
   if (!chartData) {
     return (
       <div
-        className="text-sm font-medium text-slate-800 dark:text-slate-200 mb-4 leading-relaxed prose prose-sm max-w-none dark:prose-invert"
+        className={questionProseClass}
         dangerouslySetInnerHTML={{ __html: sanitized }}
       ></div>
     );
@@ -37,10 +40,10 @@ const renderQuestionTextWithChart = (
     return (
       <>
         <div
-          className="text-sm font-medium text-slate-800 dark:text-slate-200 mb-4 leading-relaxed prose prose-sm max-w-none dark:prose-invert"
+          className={questionProseClass}
           dangerouslySetInnerHTML={{ __html: sanitized }}
         ></div>
-        <div className="mb-4 w-full max-w-3xl mx-auto">
+        <div className="mb-4 w-full max-w-3xl mx-auto min-w-0 overflow-hidden">
           <ChartRenderer data={chartData} />
         </div>
       </>
@@ -55,12 +58,12 @@ const renderQuestionTextWithChart = (
   const parts = newHtml.split(marker);
 
   return (
-    <div className="text-sm font-medium text-slate-800 dark:text-slate-200 mb-4 leading-relaxed prose prose-sm max-w-none dark:prose-invert">
+    <div className={questionProseClass}>
       {parts.map((part, index) => (
         <React.Fragment key={index}>
           <div dangerouslySetInnerHTML={{ __html: part }}></div>
           {index < parts.length - 1 && (
-            <div className="my-4 w-full max-w-3xl mx-auto">
+            <div className="my-4 w-full max-w-3xl mx-auto min-w-0 overflow-hidden">
               <ChartRenderer data={chartData} />
             </div>
           )}
@@ -93,7 +96,7 @@ export const ReviewSection: React.FC<ReviewSectionProps> = ({
   };
 
   return (
-    <div className="mt-8 space-y-4 text-left border-t border-slate-50 dark:border-slate-800 pt-8 animate-fade-in">
+    <div className="mt-8 space-y-4 text-left border-t border-slate-50 dark:border-slate-800 pt-6 sm:pt-8 animate-fade-in min-w-0 max-w-full">
       {exam.questions
         .filter((q) => q.questionType !== "INFO")
         .map((q, idx) => {
@@ -239,10 +242,10 @@ export const ReviewSection: React.FC<ReviewSectionProps> = ({
           return (
             <div
               key={q.id}
-              className="p-5 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700 hover:border-slate-200 dark:hover:border-slate-600 transition-colors"
+              className="p-4 sm:p-5 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700 hover:border-slate-200 dark:hover:border-slate-600 transition-colors min-w-0 max-w-full overflow-hidden"
             >
-              <div className="flex justify-between mb-3">
-                <span className="text-[10px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest">
+              <div className="flex items-center justify-between gap-2 mb-3">
+                <span className="text-[10px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest shrink-0">
                   Soal {idx + 1}
                 </span>
                 {q.questionType === "QUESTIONNAIRE" ? (
@@ -273,13 +276,13 @@ export const ReviewSection: React.FC<ReviewSectionProps> = ({
               </div>
               {renderQuestionTextWithChart(q.questionText, q.chartData)}
 
-              <div className="text-xs space-y-2 bg-white dark:bg-slate-900 p-3 rounded-xl border border-slate-100 dark:border-slate-700">
-                <div className="flex justify-between items-start gap-2">
-                  <span className="text-slate-400 dark:text-slate-500 font-bold shrink-0">
+              <div className="text-xs space-y-2.5 sm:space-y-2 bg-white dark:bg-slate-900 p-3 sm:p-3.5 rounded-xl border border-slate-100 dark:border-slate-700 min-w-0 max-w-full overflow-hidden">
+                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-1.5 sm:gap-3 min-w-0">
+                  <span className="text-[11px] sm:text-xs text-slate-400 dark:text-slate-500 font-bold shrink-0">
                     Jawaban Kamu:
                   </span>
                   <div
-                    className={`text-right font-black option-content flex-1 min-w-0 [&_p]:inline ${
+                    className={`text-left sm:text-right font-black option-content w-full sm:w-auto sm:flex-1 min-w-0 max-w-full break-words leading-relaxed [&_p]:inline [&_.katex-display]:max-w-full [&_.katex-display]:overflow-x-auto [&_.katex-display]:overflow-y-hidden [&_img]:max-w-full [&_img]:h-auto [&_svg]:max-w-full [&_table]:text-[11px] ${
                       q.questionType === "QUESTIONNAIRE"
                         ? "text-indigo-600 dark:text-indigo-400"
                         : !showKeys || isPendingManualEssay
@@ -296,12 +299,12 @@ export const ReviewSection: React.FC<ReviewSectionProps> = ({
                   ></div>
                 </div>
                 {showKeys && q.questionType !== "QUESTIONNAIRE" && (
-                  <div className="flex justify-between items-start border-t border-slate-50 dark:border-slate-800 pt-2 mt-2 gap-2">
-                    <span className="text-slate-400 dark:text-slate-500 font-bold shrink-0">
+                  <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start border-t border-slate-100 dark:border-slate-800 pt-2.5 sm:pt-2 mt-2 gap-1.5 sm:gap-3 min-w-0">
+                    <span className="text-[11px] sm:text-xs text-slate-400 dark:text-slate-500 font-bold shrink-0">
                       Kunci Jawaban:
                     </span>
                     <div
-                      className="text-right font-black text-slate-700 dark:text-slate-300 option-content flex-1 min-w-0 [&_p]:inline"
+                      className="text-left sm:text-right font-black text-slate-700 dark:text-slate-300 option-content w-full sm:w-auto sm:flex-1 min-w-0 max-w-full break-words leading-relaxed [&_p]:inline [&_.katex-display]:max-w-full [&_.katex-display]:overflow-x-auto [&_.katex-display]:overflow-y-hidden [&_img]:max-w-full [&_img]:h-auto [&_svg]:max-w-full [&_table]:text-[11px]"
                       dangerouslySetInnerHTML={{
                         __html: sanitizeHtml(displayCorrectAns),
                       }}
@@ -320,9 +323,9 @@ export const ReviewSection: React.FC<ReviewSectionProps> = ({
                       <button
                         type="button"
                         onClick={() => toggleHint(q.id)}
-                        className="w-full min-h-[44px] px-3.5 py-2.5 flex items-center justify-between text-left hover:bg-amber-100/50 dark:hover:bg-amber-900/30 transition-colors cursor-pointer"
+                        className="w-full min-h-[44px] px-3.5 py-2.5 flex items-center justify-between gap-2 text-left hover:bg-amber-100/50 dark:hover:bg-amber-900/30 transition-colors cursor-pointer"
                       >
-                        <div className="flex items-center gap-2 min-w-0">
+                        <div className="flex items-center gap-2 min-w-0 flex-1">
                           <LightBulbIcon className="w-4 h-4 text-amber-500 shrink-0" />
                           <span className="text-xs font-bold text-amber-800 dark:text-amber-300 truncate">
                             Petunjuk Pengerjaan
@@ -339,9 +342,9 @@ export const ReviewSection: React.FC<ReviewSectionProps> = ({
                       </button>
 
                       {openHints[q.id] && (
-                        <div className="px-3.5 pb-3.5 pt-1 text-xs text-slate-700 dark:text-slate-200 border-t border-amber-100 dark:border-amber-900/40 leading-relaxed">
+                        <div className="px-3.5 pb-3.5 pt-1 text-xs text-slate-700 dark:text-slate-200 border-t border-amber-100 dark:border-amber-900/40 leading-relaxed min-w-0 max-w-full overflow-hidden">
                           <div
-                            className="prose prose-sm dark:prose-invert max-w-none text-slate-700 dark:text-slate-200 [&_p]:my-1"
+                            className="prose prose-sm dark:prose-invert max-w-full min-w-0 break-words text-slate-700 dark:text-slate-200 [&_p]:my-1 [&_img]:max-w-full [&_img]:h-auto [&_svg]:max-w-full [&_.katex-display]:max-w-full [&_.katex-display]:overflow-x-auto [&_.katex-display]:overflow-y-hidden [&_table]:text-xs"
                             dangerouslySetInnerHTML={{
                               __html: sanitizeHtml(q.hint),
                             }}
@@ -357,9 +360,9 @@ export const ReviewSection: React.FC<ReviewSectionProps> = ({
                       <button
                         type="button"
                         onClick={() => toggleSteps(q.id)}
-                        className="w-full min-h-[44px] px-3.5 py-2.5 flex items-center justify-between text-left hover:bg-indigo-100/50 dark:hover:bg-indigo-900/30 transition-colors cursor-pointer"
+                        className="w-full min-h-[44px] px-3.5 py-2.5 flex items-center justify-between gap-2 text-left hover:bg-indigo-100/50 dark:hover:bg-indigo-900/30 transition-colors cursor-pointer"
                       >
-                        <div className="flex items-center gap-2 min-w-0">
+                        <div className="flex items-center gap-2 min-w-0 flex-1">
                           <AcademicCapIcon className="w-4 h-4 text-indigo-500 shrink-0" />
                           <span className="text-xs font-bold text-indigo-800 dark:text-indigo-300 truncate">
                             Pembahasan Jawaban & Langkah Penyelesaian
@@ -376,9 +379,9 @@ export const ReviewSection: React.FC<ReviewSectionProps> = ({
                       </button>
 
                       {openSteps[q.id] && (
-                        <div className="px-3.5 pb-3.5 pt-1 text-xs text-slate-700 dark:text-slate-200 border-t border-indigo-100 dark:border-indigo-900/40 leading-relaxed">
+                        <div className="px-3.5 pb-3.5 pt-1 text-xs text-slate-700 dark:text-slate-200 border-t border-indigo-100 dark:border-indigo-900/40 leading-relaxed min-w-0 max-w-full overflow-hidden">
                           <div
-                            className="prose prose-sm dark:prose-invert max-w-none text-slate-700 dark:text-slate-200 [&_p]:my-1"
+                            className="prose prose-sm dark:prose-invert max-w-full min-w-0 break-words text-slate-700 dark:text-slate-200 [&_p]:my-1 [&_img]:max-w-full [&_img]:h-auto [&_svg]:max-w-full [&_.katex-display]:max-w-full [&_.katex-display]:overflow-x-auto [&_.katex-display]:overflow-y-hidden [&_table]:text-xs"
                             dangerouslySetInnerHTML={{
                               __html: sanitizeHtml(solutionContent),
                             }}
