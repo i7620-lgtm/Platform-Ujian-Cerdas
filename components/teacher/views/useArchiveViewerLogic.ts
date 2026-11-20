@@ -450,14 +450,6 @@ export const useArchiveViewerLogic = ({ archiveViewer, teacherProfile }: UseArch
   }, [sourceType, currentCloudFilename, archiveViewer]);
 
   const handleOpenAiTargetModal = React.useCallback(() => {
-    if (!teacherProfile?.isPremium) {
-      void showAlertModal({
-        title: "Fitur Akun Premium",
-        message: "Fitur ini khusus untuk akun Premium. Silakan upgrade akun Anda.",
-        tone: "warning",
-      });
-      return;
-    }
     if (!archiveData || !archiveData.results || archiveData.results.length === 0) {
       void showAlertModal({
         title: "Data Siswa Kosong",
@@ -516,7 +508,7 @@ export const useArchiveViewerLogic = ({ archiveViewer, teacherProfile }: UseArch
 
     setAnalysisTargets(targets);
     setIsTargetModalOpen(true);
-  }, [teacherProfile, archiveData]);
+  }, [archiveData]);
 
   const handleGenerateAI = React.useCallback(() => {
     handleOpenAiTargetModal();

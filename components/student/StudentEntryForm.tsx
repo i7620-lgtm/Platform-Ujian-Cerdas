@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from "react";
+import React, { useState, useMemo } from "react";
 import {
   ArrowLeftIcon,
   UserIcon,
@@ -8,14 +8,14 @@ import {
   SunIcon,
   MoonIcon,
   ChevronDownIcon,
-  XMarkIcon,
+  ArrowPathIcon,
+  ExclamationTriangleIcon,
+  SparklesIcon,
 } from "../Icons";
-import type { Student, Exam } from "../../types";
-import { storageService } from "../../services/storage";
+import type { Student, Exam, Result, ExamConfig } from "../../types";
 import { useStudentEntryForm, parseClassConfig } from "./useStudentEntryForm";
 import { QrScannerModal } from "./QrScannerModal";
 import { UnlockForm } from "./UnlockForm";
-import { supabase } from "../../lib/supabase";
 import { StudentInvitationCard } from "./StudentInvitationCard";
 import { useStudentScheduleStore } from "../../stores/studentScheduleStore";
 import { calculateStudentAccess } from "../../utils/scheduleUtils";
@@ -23,6 +23,12 @@ import { StudentDialogModal } from "./StudentDialogModal";
 
 interface StudentEntryFormProps {
   onLoginSuccess: (examCode: string, student: Student) => void;
+  onViewResult?: (
+    examCode: string,
+    student: Student,
+    existingResult?: Result | null,
+    fallbackConfig?: ExamConfig | null,
+  ) => void | Promise<void>;
   onBack: () => void;
   isDarkMode?: boolean;
   toggleTheme?: () => void;
@@ -31,6 +37,7 @@ interface StudentEntryFormProps {
 
 export const StudentEntryForm: React.FC<StudentEntryFormProps> = ({
   onLoginSuccess,
+  onViewResult,
   onBack,
   isDarkMode,
   toggleTheme,
@@ -39,6 +46,7 @@ export const StudentEntryForm: React.FC<StudentEntryFormProps> = ({
   const {
     isLoading,
     isLocked,
+    lockReason,
     availableClasses,
     registeredData,
     isQrScannerOpen,
@@ -75,9 +83,19 @@ export const StudentEntryForm: React.FC<StudentEntryFormProps> = ({
     handleQrScan,
     handleSubmit,
     handleUnlockAndResume,
-    setIsLocked, pendingStudentData, setPendingStudentData,
-    setIsLoading
-  } = useStudentEntryForm({ initialCode, onLoginSuccess });
+    setIsLocked,
+    setLockReason,
+    pendingStudentData,
+    setPendingStudentData,
+    setIsLoading,
+    activeMatchedSession,
+    openMatchedResult,
+    openForceClosedUnlock,
+    retakeChoiceData,
+    setRetakeChoiceData,
+    handleRetakeChoiceViewResult,
+    handleRetakeChoiceStartOver,
+  } = useStudentEntryForm({ initialCode, onLoginSuccess, onViewResult });
 
   const [isNameDropdownOpen, setIsNameDropdownOpen] = useState(false);
 
@@ -149,6 +167,13 @@ export const StudentEntryForm: React.FC<StudentEntryFormProps> = ({
   }
 
   if (isLocked) {
+    const lockedTitle =
+      lockReason === "force_closed"
+        ? "Sesi Dihentikan Paksa"
+        : lockReason === "other_device"
+          ? "Sesi Aktif di Perangkat Lain"
+          : "Sesi Terkunci";
+
     return (
       <div className="min-h-screen w-full flex flex-col items-center justify-center bg-[#FAFAFA] dark:bg-slate-950 relative font-sans transition-colors duration-300">
         <div className="fixed inset-0 pointer-events-none overflow-hidden">
@@ -160,14 +185,14 @@ export const StudentEntryForm: React.FC<StudentEntryFormProps> = ({
               <LockClosedIcon className="w-8 h-8" />
             </div>
             <h2 className="text-xl font-black text-slate-800 dark:text-white mb-2 tracking-tight">
-              Sesi Terkunci
+              {lockedTitle}
             </h2>
             <p className="text-xs text-slate-500 dark:text-slate-400 mb-6 leading-relaxed">
               {error ? error : `Akun "${fullName}" (Kelas ${studentClass}, No ${absentNumber}) sedang aktif atau dihentikan paksa.`}
-              {!error?.includes('selesai') && !error?.includes('Dihentikan Paksa') && (
+              {!error?.includes("Token") && (
                 <>
                   <br />
-                  Masukkan <strong>Token Reset</strong> dari pengawas.
+                  Masukkan <strong>Token Buka Kunci 4 angka</strong> dari pengawas.
                 </>
               )}
             </p>
@@ -179,6 +204,8 @@ export const StudentEntryForm: React.FC<StudentEntryFormProps> = ({
               onCancel={() => {
                 setUnlockError("");
                 setIsLocked(false);
+                setLockReason(null);
+                setPendingStudentData(null);
                 setIsLoading(false);
               }}
             />
@@ -597,6 +624,150 @@ export const StudentEntryForm: React.FC<StudentEntryFormProps> = ({
               </div>
             </div>
 
+            {activeMatchedSession && (
+              <div
+                className={`rounded-2xl p-3.5 border text-left animate-fast-fade ${
+                  activeMatchedSession.kind === "completed"
+                    ? "bg-emerald-50/90 dark:bg-emerald-950/35 border-emerald-200 dark:border-emerald-800/60 text-emerald-900 dark:text-emerald-100"
+                    : activeMatchedSession.kind === "queued_completed"
+                      ? "bg-amber-50/90 dark:bg-amber-950/35 border-amber-200 dark:border-amber-800/60 text-amber-900 dark:text-amber-100"
+                      : "bg-rose-50/90 dark:bg-rose-950/35 border-rose-200 dark:border-rose-800/60 text-rose-900 dark:text-rose-100"
+                }`}
+              >
+                {activeMatchedSession.kind === "completed" && (
+                  <div className="space-y-2.5">
+                    <div className="flex items-start gap-2.5">
+                      <CheckCircleIcon className="w-5 h-5 shrink-0 text-emerald-600 dark:text-emerald-400 mt-0.5" />
+                      <div className="min-w-0">
+                        <p className="text-xs font-black tracking-tight">
+                          {activeMatchedSession.allowRetakes
+                            ? "Riwayat Hasil Ditemukan (Ujian Ulang Aktif)"
+                            : "Ujian Sudah Selesai Dikerjakan"}
+                        </p>
+                        <p className="text-[11px] leading-relaxed opacity-90 mt-0.5">
+                          Data atas nama <span className="font-bold">{activeMatchedSession.student.fullName}</span>{" "}
+                          ({activeMatchedSession.student.class} · No. {activeMatchedSession.student.absentNumber}) sudah tercatat selesai.
+                          {activeMatchedSession.allowRetakes && activeMatchedSession.isExamClosed
+                            ? " Masa pengerjaan ujian ulang telah berakhir, namun hasil terakhir tetap dapat dibuka."
+                            : ""}
+                        </p>
+                      </div>
+                    </div>
+
+                    {activeMatchedSession.allowRetakes ? (
+                      <div className="flex flex-col sm:flex-row gap-2">
+                        <button
+                          type="button"
+                          onClick={() => openMatchedResult(activeMatchedSession)}
+                          disabled={isLoading}
+                          className="flex-1 min-h-[44px] px-3.5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold tracking-wide transition-all active:scale-[0.98] whitespace-nowrap cursor-pointer disabled:opacity-60"
+                        >
+                          Lihat Hasil Terakhir
+                        </button>
+                        {!activeMatchedSession.isExamClosed && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setPendingStudentData({
+                                cleanExamCode: activeMatchedSession.examCode,
+                                studentData: activeMatchedSession.student,
+                                config: activeMatchedSession.config,
+                                canResumeOvertime: false,
+                              });
+                            }}
+                            disabled={isLoading}
+                            className="flex-1 min-h-[44px] px-3.5 py-2.5 rounded-xl bg-white dark:bg-slate-900 border border-emerald-300 dark:border-emerald-700 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100/70 dark:hover:bg-emerald-900/40 text-xs font-bold tracking-wide transition-all active:scale-[0.98] whitespace-nowrap cursor-pointer disabled:opacity-60"
+                          >
+                            Kerjakan Ulang
+                          </button>
+                        )}
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => openMatchedResult(activeMatchedSession)}
+                        disabled={isLoading}
+                        className="w-full min-h-[44px] px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold tracking-wide flex items-center justify-center gap-2 transition-all active:scale-[0.98] whitespace-nowrap cursor-pointer disabled:opacity-60"
+                      >
+                        <SparklesIcon className="w-4 h-4 shrink-0" />
+                        <span>Lihat Hasil Ujian</span>
+                      </button>
+                    )}
+                  </div>
+                )}
+
+                {(activeMatchedSession.kind === "queued_completed" ||
+                  activeMatchedSession.kind === "failed_sync") && (
+                  <div className="space-y-2.5">
+                    <div className="flex items-start gap-2.5">
+                      {activeMatchedSession.kind === "failed_sync" ? (
+                        <ExclamationTriangleIcon className="w-5 h-5 shrink-0 text-rose-600 dark:text-rose-400 mt-0.5" />
+                      ) : (
+                        <ArrowPathIcon className="w-5 h-5 shrink-0 text-amber-600 dark:text-amber-400 mt-0.5" />
+                      )}
+                      <div className="min-w-0">
+                        <p className="text-xs font-black tracking-tight">
+                          {activeMatchedSession.kind === "failed_sync"
+                            ? "Pengiriman Jawaban Gagal Sinkron"
+                            : "Jawaban Menunggu Sinkronisasi Server"}
+                        </p>
+                        <p className="text-[11px] leading-relaxed opacity-90 mt-0.5">
+                          {activeMatchedSession.kind === "failed_sync"
+                            ? "Jawaban mentah Anda tersimpan aman di perangkat ini, namun pengiriman ke server gagal. Buka halaman status untuk mengirim ulang atau mengunduh Bukti JSON."
+                            : "Ujian atas nama peserta ini sudah dikumpulkan dan masih berada di antrean sinkronisasi offline. Buka halaman status untuk memantau pengiriman atau mengirim ulang."}
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => openMatchedResult(activeMatchedSession)}
+                      disabled={isLoading}
+                      className={`w-full min-h-[44px] px-4 py-2.5 rounded-xl text-white text-xs font-bold tracking-wide flex items-center justify-center gap-2 transition-all active:scale-[0.98] whitespace-nowrap cursor-pointer disabled:opacity-60 ${
+                        activeMatchedSession.kind === "failed_sync"
+                          ? "bg-rose-600 hover:bg-rose-700"
+                          : "bg-amber-600 hover:bg-amber-700"
+                      }`}
+                    >
+                      <ArrowPathIcon className="w-4 h-4 shrink-0" />
+                      <span>Buka Status & Bukti Jawaban</span>
+                    </button>
+                  </div>
+                )}
+
+                {(activeMatchedSession.kind === "force_closed" ||
+                  activeMatchedSession.kind === "queued_force_closed") && (
+                  <div className="space-y-2.5">
+                    <div className="flex items-start gap-2.5">
+                      <LockClosedIcon className="w-5 h-5 shrink-0 text-rose-600 dark:text-rose-400 mt-0.5" />
+                      <div className="min-w-0">
+                        <p className="text-xs font-black tracking-tight">
+                          Sesi Dihentikan Paksa — Menunggu Token Pengawas
+                        </p>
+                        <p className="text-[11px] leading-relaxed opacity-90 mt-0.5">
+                          {activeMatchedSession.isExamClosed
+                            ? "Sesi peserta ini terkunci karena penghentian paksa dan jadwal ujian telah berakhir atau ditutup. Hubungi pengawas/guru untuk pengecekan status sesi maupun pembukaan hasil."
+                            : activeMatchedSession.kind === "queued_force_closed"
+                              ? "Sesi peserta ini terkunci saat offline. Sambungkan ke internet dan minta Token Buka Kunci 4 angka dari pengawas/guru."
+                              : "Sesi peserta ini terkunci karena penghentian paksa dan menunggu Token Buka Kunci 4 angka dari pengawas/guru."}
+                        </p>
+                      </div>
+                    </div>
+                    {!activeMatchedSession.isExamClosed && (
+                      <button
+                        type="button"
+                        onClick={() => openForceClosedUnlock(activeMatchedSession)}
+                        disabled={isLoading}
+                        className="w-full min-h-[44px] px-4 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold tracking-wide flex items-center justify-center gap-2 transition-all active:scale-[0.98] whitespace-nowrap cursor-pointer disabled:opacity-60"
+                      >
+                        <LockClosedIcon className="w-4 h-4 shrink-0" />
+                        <span>Masukkan Token Pengawas</span>
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
             {error && (
               <div className="flex items-start gap-3 p-3 rounded-xl bg-rose-50 dark:bg-rose-900/20 border border-rose-100 dark:border-rose-800 text-rose-600 dark:text-rose-400 text-xs font-medium animate-fast-fade">
                 <div className="shrink-0 mt-0.5 w-4 h-4 rounded-full bg-rose-100 dark:bg-rose-800 flex items-center justify-center text-rose-500 dark:text-rose-300 font-bold">
@@ -618,7 +789,16 @@ export const StudentEntryForm: React.FC<StudentEntryFormProps> = ({
                 </>
               ) : (
                 <>
-                  <span className="relative z-10">Mulai Mengerjakan</span>
+                  <span className="relative z-10">
+                    {activeMatchedSession?.kind === "completed" && !activeMatchedSession.allowRetakes
+                      ? "Masuk & Lihat Hasil"
+                      : activeMatchedSession?.kind === "completed" && activeMatchedSession.allowRetakes
+                        ? "Pilih Hasil / Kerjakan Ulang"
+                        : activeMatchedSession?.kind === "queued_completed" ||
+                            activeMatchedSession?.kind === "failed_sync"
+                          ? "Buka Status Jawaban"
+                          : "Mulai Mengerjakan"}
+                  </span>
                   <div className="absolute inset-0 bg-gradient-to-r from-indigo-600 to-indigo-600 opacity-0 group-hover:opacity-10 transition-opacity"></div>
                   <CheckCircleIcon className="w-4 h-4 text-emerald-400 dark:text-emerald-200 group-hover:text-emerald-300 transition-colors relative z-10" />
                 </>
@@ -768,6 +948,75 @@ export const StudentEntryForm: React.FC<StudentEntryFormProps> = ({
               >
                 <CheckCircleIcon className="w-4 h-4" />
                 Ya, Data Sudah Benar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {retakeChoiceData && (
+        <div
+          id="modal-pilihan-ujian-ulang-overlay"
+          className="fixed inset-0 z-[100] bg-slate-900/90 backdrop-blur-sm flex flex-col items-center justify-center p-4 animate-fade-in"
+        >
+          <div
+            id="modal-pilihan-ujian-ulang-card"
+            className="bg-white dark:bg-slate-800 p-6 sm:p-8 rounded-3xl shadow-2xl w-full max-w-md relative animate-slide-in-up border border-white dark:border-slate-700"
+          >
+            <div className="flex justify-center mb-4">
+              <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 shadow-sm">
+                <CheckCircleIcon className="w-7 h-7" />
+              </div>
+            </div>
+            <div className="text-center mb-5">
+              <h3 className="font-black text-slate-800 dark:text-white text-xl mb-1 tracking-tight">
+                {retakeChoiceData.isQueuedOnly
+                  ? "Jawaban Menunggu Sinkronisasi"
+                  : "Ujian Sudah Pernah Dikerjakan"}
+              </h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+                Peserta <span className="font-bold text-slate-700 dark:text-slate-200">{retakeChoiceData.student.fullName}</span>{" "}
+                ({retakeChoiceData.student.class} · No. {retakeChoiceData.student.absentNumber}) memiliki riwayat pengerjaan untuk ujian ini.
+              </p>
+            </div>
+
+            {retakeChoiceData.isExamClosed && (
+              <div className="mb-5 p-3.5 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60 text-amber-800 dark:text-amber-200 text-xs leading-relaxed text-left">
+                {retakeChoiceData.closureReason ||
+                  "Masa pengerjaan ujian telah ditutup oleh guru, sehingga pengerjaan ulang tidak lagi dibuka. Anda tetap dapat melihat hasil terakhir Anda."}
+              </div>
+            )}
+
+            <div className="space-y-2.5">
+              <button
+                type="button"
+                onClick={handleRetakeChoiceViewResult}
+                className="w-full min-h-[48px] py-3 px-4 text-xs font-bold text-white bg-emerald-600 rounded-xl hover:bg-emerald-700 shadow-lg shadow-emerald-200/60 dark:shadow-none transition-all uppercase tracking-wide flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <SparklesIcon className="w-4 h-4 shrink-0" />
+                <span>
+                  {retakeChoiceData.isQueuedOnly
+                    ? "Lihat Status & Bukti Jawaban"
+                    : "Lihat Hasil Terakhir"}
+                </span>
+              </button>
+
+              {!retakeChoiceData.isExamClosed && !retakeChoiceData.isQueuedOnly && (
+                <button
+                  type="button"
+                  onClick={handleRetakeChoiceStartOver}
+                  className="w-full min-h-[48px] py-3 px-4 text-xs font-bold text-indigo-700 dark:text-indigo-200 bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-200 dark:border-indigo-800 rounded-xl hover:bg-indigo-100 dark:hover:bg-indigo-900/60 transition-all uppercase tracking-wide flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <ArrowPathIcon className="w-4 h-4 shrink-0" />
+                  <span>Kerjakan Ulang</span>
+                </button>
+              )}
+
+              <button
+                type="button"
+                onClick={() => setRetakeChoiceData(null)}
+                className="w-full min-h-[44px] py-2.5 px-4 text-xs font-bold text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-900/60 rounded-xl hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors uppercase tracking-wide cursor-pointer"
+              >
+                Kembali ke Formulir
               </button>
             </div>
           </div>

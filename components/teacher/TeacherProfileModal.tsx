@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import {
   UserIcon,
@@ -86,6 +86,7 @@ export const TeacherProfileModal: React.FC<TeacherProfileModalProps> = ({
   const [isDesignerModalOpen, setIsDesignerModalOpen] = useState(false);
   const [error, setError] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
+  const bodyScrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (isOpen && profile) {
@@ -195,6 +196,7 @@ export const TeacherProfileModal: React.FC<TeacherProfileModalProps> = ({
     e.preventDefault();
     if (!fullName.trim() || !school.trim()) {
       setError("Nama Lengkap Guru dan Nama Sekolah wajib diisi.");
+      bodyScrollRef.current?.scrollTo({ top: 0, behavior: "smooth" });
       return;
     }
 
@@ -260,6 +262,7 @@ export const TeacherProfileModal: React.FC<TeacherProfileModalProps> = ({
     } catch (err: unknown) {
       const errorObj = err as Error;
       setError(errorObj.message || "Gagal memperbarui profil.");
+      bodyScrollRef.current?.scrollTo({ top: 0, behavior: "smooth" });
     } finally {
       setIsLoading(false);
     }
@@ -291,37 +294,42 @@ export const TeacherProfileModal: React.FC<TeacherProfileModalProps> = ({
   };
 
   return createPortal(
-    <div className="fixed inset-0 z-[200] flex items-center justify-center p-2 sm:p-4 bg-slate-900/60 backdrop-blur-md animate-fade-in font-sans">
-      <div className="bg-white dark:bg-slate-900 w-full max-w-3xl max-h-[94vh] rounded-2xl sm:rounded-[2rem] shadow-2xl overflow-hidden border border-slate-100 dark:border-slate-800 flex flex-col animate-gentle-slide">
-        {/* Header Modal - Compact */}
-        <div className="px-4 py-3 sm:px-6 sm:py-3.5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-white dark:bg-slate-900 sticky top-0 z-10 shrink-0">
-          <div className="flex items-center gap-2.5">
+    <div className="fixed inset-0 z-[200] flex items-center justify-center p-2 sm:p-4 bg-slate-900/60 backdrop-blur-md animate-fade-in font-sans overflow-hidden">
+      <div className="bg-white dark:bg-slate-900 w-full max-w-6xl max-h-[calc(100dvh-1rem)] sm:max-h-[calc(100dvh-2rem)] rounded-2xl sm:rounded-[2rem] shadow-2xl overflow-hidden border border-slate-100 dark:border-slate-800 flex flex-col min-h-0 animate-gentle-slide">
+        {/* Header Modal - Fixed */}
+        <div className="px-4 py-3 sm:px-6 sm:py-3.5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between gap-3 bg-white dark:bg-slate-900 shrink-0">
+          <div className="flex items-center gap-2.5 min-w-0">
             <div className="p-2 bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 rounded-xl shrink-0">
               <UserIcon className="w-4 h-4 sm:w-5 sm:h-5" />
             </div>
-            <div>
-              <h2 className="text-sm sm:text-base font-black text-slate-900 dark:text-white tracking-tight leading-tight">
+            <div className="min-w-0">
+              <h2 className="text-sm sm:text-base font-black text-slate-900 dark:text-white tracking-tight leading-tight truncate">
                 Profil Guru, Pejabat & Instansi Pendidikan
               </h2>
-              <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-tight">
+              <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-tight truncate">
                 Kelola identitas pendidik, kepala sekolah, dan data resmi kop surat sekolah.
               </p>
             </div>
           </div>
           <button
+            type="button"
             onClick={onClose}
-            className="p-1.5 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all cursor-pointer"
+            className="min-w-[40px] min-h-[40px] p-1.5 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all cursor-pointer flex items-center justify-center shrink-0"
             title="Tutup Modal"
           >
             <XMarkIcon className="w-5 h-5" />
           </button>
         </div>
 
-        {/* Modal Scrollable Body - Vertically Compact */}
+        {/* Form Wrapper: Scrollable Body + Dedicated Fixed Footer */}
         <form
           onSubmit={handleSubmit}
-          className="flex-1 overflow-y-auto p-3.5 sm:p-5 space-y-3.5 custom-scrollbar"
+          className="flex-1 min-h-0 flex flex-col overflow-hidden"
         >
+          <div
+            ref={bodyScrollRef}
+            className="flex-1 min-h-0 overflow-y-auto p-3.5 sm:p-5 lg:p-6 space-y-3.5 sm:space-y-4 custom-scrollbar"
+          >
           {error && (
             <div className="p-2.5 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/50 rounded-xl text-rose-600 dark:text-rose-400 text-xs font-bold flex items-center gap-2">
               <span>⚠️</span>
@@ -345,8 +353,8 @@ export const TeacherProfileModal: React.FC<TeacherProfileModalProps> = ({
               </h3>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-12 gap-2">
-              <div className="sm:col-span-6">
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-2.5 sm:gap-3">
+              <div className="md:col-span-5">
                 <label className="text-[10.5px] font-bold text-slate-600 dark:text-slate-300 ml-0.5">
                   Nama Lengkap & Gelar <span className="text-rose-500">*</span>
                 </label>
@@ -360,7 +368,7 @@ export const TeacherProfileModal: React.FC<TeacherProfileModalProps> = ({
                 />
               </div>
 
-              <div className="sm:col-span-2">
+              <div className="md:col-span-3">
                 <label className="text-[10.5px] font-bold text-slate-600 dark:text-slate-300 ml-0.5">
                   Identitas
                 </label>
@@ -390,7 +398,7 @@ export const TeacherProfileModal: React.FC<TeacherProfileModalProps> = ({
                 </div>
               </div>
 
-              <div className="sm:col-span-4">
+              <div className="md:col-span-4">
                 <label className="text-[10.5px] font-bold text-slate-600 dark:text-slate-300 ml-0.5">
                   Nomor {nipType} Guru
                 </label>
@@ -419,8 +427,8 @@ export const TeacherProfileModal: React.FC<TeacherProfileModalProps> = ({
               </span>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-12 gap-2">
-              <div className="sm:col-span-6">
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-2.5 sm:gap-3">
+              <div className="md:col-span-5">
                 <label className="text-[10.5px] font-bold text-slate-600 dark:text-slate-300 ml-0.5">
                   Nama Kepala Sekolah & Gelar
                 </label>
@@ -433,7 +441,7 @@ export const TeacherProfileModal: React.FC<TeacherProfileModalProps> = ({
                 />
               </div>
 
-              <div className="sm:col-span-2">
+              <div className="md:col-span-3">
                 <label className="text-[10.5px] font-bold text-slate-600 dark:text-slate-300 ml-0.5">
                   Identitas Kasek
                 </label>
@@ -463,7 +471,7 @@ export const TeacherProfileModal: React.FC<TeacherProfileModalProps> = ({
                 </div>
               </div>
 
-              <div className="sm:col-span-4">
+              <div className="md:col-span-4">
                 <label className="text-[10.5px] font-bold text-slate-600 dark:text-slate-300 ml-0.5">
                   Nomor {headmasterNipType} Kepala Sekolah
                 </label>
@@ -519,7 +527,7 @@ export const TeacherProfileModal: React.FC<TeacherProfileModalProps> = ({
             </div>
 
             {/* Grid 1: Nama Sekolah & NPSN */}
-            <div className="grid grid-cols-1 sm:grid-cols-12 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5 sm:gap-3">
               <div className="sm:col-span-8">
                 <label className="text-[10.5px] font-bold text-slate-600 dark:text-slate-300 ml-0.5">
                   Nama Asal Sekolah <span className="text-rose-500">*</span>
@@ -549,8 +557,8 @@ export const TeacherProfileModal: React.FC<TeacherProfileModalProps> = ({
             </div>
 
             {/* Grid 2: Nama Dinas Pendidikan & Alamat */}
-            <div className="grid grid-cols-1 sm:grid-cols-12 gap-2">
-              <div className="sm:col-span-6">
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-2.5 sm:gap-3">
+              <div className="md:col-span-6">
                 <label className="text-[10.5px] font-bold text-slate-600 dark:text-slate-300 ml-0.5">
                   Nama Dinas Pendidikan
                 </label>
@@ -563,7 +571,7 @@ export const TeacherProfileModal: React.FC<TeacherProfileModalProps> = ({
                 />
               </div>
 
-              <div className="sm:col-span-6">
+              <div className="md:col-span-6">
                 <label className="text-[10.5px] font-bold text-slate-600 dark:text-slate-300 ml-0.5">
                   Alamat Sekolah (Jalan / Banjar)
                 </label>
@@ -578,7 +586,7 @@ export const TeacherProfileModal: React.FC<TeacherProfileModalProps> = ({
             </div>
 
             {/* Grid 3: Desa/Kel, Kecamatan, Kab/Kota, Provinsi, Kode Pos */}
-            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2.5 sm:gap-3">
               <div>
                 <label className="text-[10px] font-bold text-slate-600 dark:text-slate-300 ml-0.5">
                   Desa / Kelurahan
@@ -646,7 +654,7 @@ export const TeacherProfileModal: React.FC<TeacherProfileModalProps> = ({
             </div>
 
             {/* Grid 4: Kontak (Email Sekolah, Telepon, Website, Faksimile) */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3">
               <div>
                 <label className="text-[10px] font-bold text-slate-600 dark:text-slate-300 ml-0.5">
                   Email Sekolah
@@ -701,7 +709,7 @@ export const TeacherProfileModal: React.FC<TeacherProfileModalProps> = ({
             </div>
 
             {/* Grid 5: Upload Logo Dinas & Logo Sekolah */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1 border-t border-slate-200/60 dark:border-slate-700/60">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 sm:gap-3 pt-2 border-t border-slate-200/60 dark:border-slate-700/60">
               {/* Logo Dinas */}
               <div className="flex items-center gap-2.5 p-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl">
                 <label
@@ -825,7 +833,7 @@ export const TeacherProfileModal: React.FC<TeacherProfileModalProps> = ({
               </h3>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3">
               <div>
                 <label className="text-[10.5px] font-bold text-slate-600 dark:text-slate-300 ml-0.5">
                   Email Akun
@@ -854,20 +862,22 @@ export const TeacherProfileModal: React.FC<TeacherProfileModalProps> = ({
             </div>
           </div>
 
-          {/* Form Actions Footer - Sticky */}
-          <div className="pt-2 flex items-center justify-end gap-2.5 sticky bottom-0 bg-white dark:bg-slate-900 pb-1 z-10 border-t border-slate-100 dark:border-slate-800">
+          </div>
+
+          {/* Dedicated Fixed Footer Outside Scrollable Body */}
+          <div className="shrink-0 px-4 py-3 sm:px-6 sm:py-3.5 bg-white dark:bg-slate-900 border-t border-slate-100 dark:border-slate-800 flex items-center justify-end gap-2.5">
             <button
               type="button"
               onClick={onClose}
               disabled={isLoading}
-              className="px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 text-xs font-bold hover:bg-slate-100 dark:hover:bg-slate-800 transition-all cursor-pointer"
+              className="min-h-[40px] px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 text-xs font-bold hover:bg-slate-100 dark:hover:bg-slate-800 transition-all cursor-pointer"
             >
               Batal
             </button>
             <button
               type="submit"
               disabled={isLoading}
-              className="px-5 py-2 bg-indigo-600 text-white rounded-xl text-xs font-bold shadow-md hover:bg-indigo-700 active:scale-95 transition-all flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
+              className="min-h-[40px] px-5 py-2 bg-indigo-600 text-white rounded-xl text-xs font-bold shadow-md hover:bg-indigo-700 active:scale-95 transition-all flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
             >
               {isLoading ? (
                 <>

@@ -2161,11 +2161,30 @@ export const calculateExamScore = (
           } catch { /* ignore */ }
         }
       } else {
-        // Fallback for other types if useCustomWeights enabled but not specifically handled
+        // Fallback for other types if useCustomWeights enabled (e.g. ESSAY, FILL_IN_THE_BLANK)
         maxPossibleScore += weight;
-        if (!empty && q.correctAnswer && isAnswerMatch(q.correctAnswer, studentAnswer, q.questionType, q.options)) {
+        const manualGradeKey = `_grade_${q.id}`;
+        const manualGrade = answers[manualGradeKey];
+        if (
+          (q.questionType === "ESSAY" || q.questionType === "FILL_IN_THE_BLANK") &&
+          manualGrade
+        ) {
+          if (manualGrade === "CORRECT") {
+            totalScore += weight;
+            correctCount++;
+          } else {
+            wrongCount++;
+          }
+        } else if (empty) {
+          unansweredCount++;
+        } else if (
+          q.correctAnswer &&
+          isAnswerMatch(q.correctAnswer, studentAnswer, q.questionType, q.options)
+        ) {
           totalScore += weight;
           correctCount++;
+        } else {
+          wrongCount++;
         }
       }
       return;

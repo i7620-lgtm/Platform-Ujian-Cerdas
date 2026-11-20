@@ -8,6 +8,7 @@ import {
   ExclamationTriangleIcon,
   FileExcelIcon,
   MagnifyingGlassIcon,
+  ArrowPathIcon,
 } from "../../../Icons";
 import { QuestionResultDetailPopover } from "../../../QuestionResultDetailPopover";
 import { showAlertModal } from "../../../../stores/feedbackStore";
@@ -27,6 +28,7 @@ interface FinishedStudentsTabProps {
     qId: string,
     isCorrect: boolean,
   ) => Promise<void>;
+  gradingStates: Record<string, "CORRECT" | "WRONG">;
   handleDeleteResult: (studentId: string, studentName: string) => Promise<void>;
   getCalculatedStats: (r: Result) => {
     correct: number;
@@ -60,6 +62,7 @@ export const FinishedStudentsTab: React.FC<FinishedStudentsTabProps> = ({
   expandedStudent,
   toggleStudent,
   rateQuestion,
+  gradingStates,
   handleDeleteResult,
   getCalculatedStats,
   formatDuration,
@@ -498,28 +501,47 @@ export const FinishedStudentsTab: React.FC<FinishedStudentsTabProps> = ({
                                           </span>
                                         )}
                                       </div>
-                                      <div className="flex gap-2 justify-end">
-                                        <button
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            rateQuestion(r, q.id, true);
-                                          }}
-                                          className={`px-3 py-1 text-xs font-bold rounded border flex items-center gap-1 ${manualStatus === "CORRECT" ? "bg-emerald-100 border-emerald-500 text-emerald-700" : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-600 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700"}`}
-                                        >
-                                          <CheckCircleIcon className="w-3 h-3" />{" "}
-                                          Benar
-                                        </button>
-                                        <button
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            rateQuestion(r, q.id, false);
-                                          }}
-                                          className={`px-3 py-1 text-xs font-bold rounded border flex items-center gap-1 ${manualStatus === "WRONG" ? "bg-rose-100 border-rose-500 text-rose-700" : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-600 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700"}`}
-                                        >
-                                          <XMarkIcon className="w-3 h-3" />{" "}
-                                          Salah
-                                        </button>
-                                      </div>
+                                      {(() => {
+                                        const gradingAction =
+                                          gradingStates[`${r.student.studentId}::${q.id}`];
+                                        const isSaving = Boolean(gradingAction);
+                                        return (
+                                          <div className="flex gap-2 justify-end">
+                                            <button
+                                              type="button"
+                                              disabled={isSaving}
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                rateQuestion(r, q.id, true);
+                                              }}
+                                              className={`px-3 py-1 text-xs font-bold rounded border flex items-center gap-1 transition-all cursor-pointer disabled:opacity-60 disabled:cursor-wait ${manualStatus === "CORRECT" ? "bg-emerald-100 border-emerald-500 text-emerald-700" : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-600 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700"}`}
+                                            >
+                                              {gradingAction === "CORRECT" ? (
+                                                <ArrowPathIcon className="w-3 h-3 animate-spin" />
+                                              ) : (
+                                                <CheckCircleIcon className="w-3 h-3" />
+                                              )}{" "}
+                                              {gradingAction === "CORRECT" ? "Menyimpan..." : "Benar"}
+                                            </button>
+                                            <button
+                                              type="button"
+                                              disabled={isSaving}
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                rateQuestion(r, q.id, false);
+                                              }}
+                                              className={`px-3 py-1 text-xs font-bold rounded border flex items-center gap-1 transition-all cursor-pointer disabled:opacity-60 disabled:cursor-wait ${manualStatus === "WRONG" ? "bg-rose-100 border-rose-500 text-rose-700" : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-600 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700"}`}
+                                            >
+                                              {gradingAction === "WRONG" ? (
+                                                <ArrowPathIcon className="w-3 h-3 animate-spin" />
+                                              ) : (
+                                                <XMarkIcon className="w-3 h-3" />
+                                              )}{" "}
+                                              {gradingAction === "WRONG" ? "Menyimpan..." : "Salah"}
+                                            </button>
+                                          </div>
+                                        );
+                                      })()}
                                     </div>
                                   );
                                 })}

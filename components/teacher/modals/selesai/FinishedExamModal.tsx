@@ -17,12 +17,14 @@ interface FinishedExamModalProps {
   exam: Exam;
   teacherProfile: TeacherProfile;
   onClose: () => void;
+  onResultsUpdated?: () => void;
 }
 
 export const FinishedExamModal: React.FC<FinishedExamModalProps> = ({
   exam,
   teacherProfile,
   onClose,
+  onResultsUpdated,
 }) => {
   const {
     displayExam,
@@ -53,7 +55,16 @@ export const FinishedExamModal: React.FC<FinishedExamModalProps> = ({
     checkAnswerStatus,
     toggleStudent,
     rateQuestion,
+    gradingStates,
+    consumeGradedChanges,
   } = useFinishedExamModal({ exam, teacherProfile, isOpen: true });
+
+  const handleCloseModal = () => {
+    if (consumeGradedChanges()) {
+      onResultsUpdated?.();
+    }
+    onClose();
+  };
 
   return createPortal(
     <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in">
@@ -87,7 +98,7 @@ export const FinishedExamModal: React.FC<FinishedExamModalProps> = ({
               </button>
             </div>
             <button
-              onClick={onClose}
+              onClick={handleCloseModal}
               className="p-2.5 bg-slate-50 dark:bg-slate-700 text-slate-400 dark:text-slate-300 rounded-xl hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-900/30 dark:hover:text-rose-400 transition-all"
             >
               <XMarkIcon className="w-6 h-6" />
@@ -139,6 +150,7 @@ export const FinishedExamModal: React.FC<FinishedExamModalProps> = ({
               expandedStudent={expandedStudent}
               toggleStudent={toggleStudent}
               rateQuestion={rateQuestion}
+              gradingStates={gradingStates}
               handleDeleteResult={handleDeleteResult}
               getCalculatedStats={getCalculatedStats}
               formatDuration={formatDuration}

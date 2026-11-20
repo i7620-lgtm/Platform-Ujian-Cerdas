@@ -242,7 +242,7 @@ export const UserManagementView: React.FC = () => {
               </div>
               <div>
                 <label className="text-xs font-bold text-slate-500 dark:text-slate-400 block mb-2">
-                  Tipe Akun (Akses Fitur AI & Realtime)
+                  Tipe Akun (Akses Sertifikat & Fitur Premium)
                 </label>
                 <div className="flex items-center gap-4">
                   <label className="flex items-center gap-2 cursor-pointer">

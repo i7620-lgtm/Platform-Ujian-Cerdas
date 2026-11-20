@@ -5,7 +5,7 @@ import { StudentResultPage } from './components/StudentResultPage';
 import { ResultNotFoundPage } from './components/ResultNotFoundPage';
 import { TeacherLogin } from './components/TeacherLogin';
 import { OngoingExamModal } from './components/teacher/DashboardModals';
-import type { Exam, Student, Result, TeacherProfile, ResultStatus } from './types';
+import type { Exam, ExamConfig, Student, Result, TeacherProfile, ResultStatus } from './types';
 import { LogoIcon, NoWifiIcon, UserIcon, ArrowLeftIcon, SunIcon, MoonIcon, QrCodeIcon, BookOpenIcon } from './components/Icons';
 import { storageService } from './services/storage';
 import { offlineService } from './services/offline';
@@ -22,6 +22,7 @@ import { hydrateMathInContainer } from './utils/mathRenderer';
 import { calculateStudentAccess, canStudentResumeInOvertime } from './utils/scheduleUtils';
 import { measureClientBandwidthBytes, detectClientDevice, countIntegrityViolations } from './utils/telemetryUtils';
 import { cleanupExpiredExamCaches } from './utils/cacheHygiene';
+import { findLocalCompletedStudent, saveLocalCompletedStudent } from './utils/studentIdentity';
 import { FeedbackHost } from './components/FeedbackHost';
 import { showAlertModal, showConfirmModal, showToast } from './stores/feedbackStore';
 import { PWAInstallButton } from './components/PWAInstallButton';
@@ -343,21 +344,186 @@ const App: React.FC = () => {
     }
   }, [view, currentStudent, currentExam]);
 
+  const loadExamForResultView = useCallback(
+    async (
+      examCode: string,
+      student: Student,
+      fallbackConfig?: ExamConfig | null,
+    ): Promise<Exam | null> => {
+      try {
+        const fetched = await storageService.getExamForStudent(examCode, student.studentId, false);
+        if (fetched) return fetched;
+      } catch {
+        // Fallback below if offline or questions unavailable
+      }
+
+      let resolvedConfig = fallbackConfig || null;
+      if (!resolvedConfig) {
+        try {
+          const { config } = await storageService.getExamConfigStatus(examCode);
+          if (config) resolvedConfig = config;
+        } catch {
+          /* ignore */
+        }
+      }
+
+      if (resolvedConfig) {
+        return {
+          code: examCode,
+          config: resolvedConfig,
+          questions: [],
+          status: resolvedConfig.isFinished ? 'closed' : 'PUBLISHED',
+          authorSchool: student.schoolName,
+        };
+      }
+      return null;
+    },
+    [],
+  );
+
+  const handleOpenStudentResult = useCallback(
+    async (
+      examCode: string,
+      student: Student,
+      existingResult?: Result | null,
+      fallbackConfig?: ExamConfig | null,
+    ) => {
+      const cleanCode = String(examCode || '').trim().toUpperCase();
+      setIsSyncing(true);
+      try {
+        const { result: serverRes } = await storageService.getStudentResultStatus(
+          cleanCode,
+          student.studentId,
+          student,
+        );
+        const queuedMatch = storageService.findQueuedSubmission(
+          cleanCode,
+          serverRes?.student || student,
+          { onlyFinal: true },
+        );
+        const localCompleted = findLocalCompletedStudent(cleanCode, serverRes?.student || student);
+
+        let resolvedResult: Result | null = null;
+        if (queuedMatch) {
+          resolvedResult = { ...queuedMatch, isSynced: false };
+        } else if (serverRes) {
+          resolvedResult = { ...serverRes, isSynced: true };
+        } else if (existingResult) {
+          resolvedResult = existingResult;
+        } else if (localCompleted) {
+          resolvedResult = {
+            id: localCompleted.resultId,
+            student: localCompleted.student,
+            examCode: cleanCode,
+            answers: localCompleted.answers || {},
+            score: localCompleted.score ?? 0,
+            correctAnswers: localCompleted.correctAnswers ?? 0,
+            totalQuestions: localCompleted.totalQuestions ?? 0,
+            completionTime: localCompleted.completionTime ?? 0,
+            status: localCompleted.status,
+            timestamp: localCompleted.timestamp,
+            isSynced: localCompleted.isSynced ?? true,
+          };
+        }
+
+        if (!resolvedResult) {
+          showAppDialog(
+            "info",
+            "Hasil Tidak Ditemukan",
+            "Data hasil ujian belum ditemukan untuk identitas tersebut.",
+          );
+          return;
+        }
+
+        const resolvedStudent = resolvedResult.student || student;
+        const examObj = await loadExamForResultView(cleanCode, resolvedStudent, fallbackConfig);
+        if (!examObj) {
+          showAppDialog(
+            "error",
+            "Gagal Memuat Data Ujian",
+            "Informasi ujian tidak dapat dimuat. Pastikan koneksi internet aktif lalu coba lagi.",
+          );
+          return;
+        }
+
+        if (
+          resolvedResult.status === 'completed' ||
+          resolvedResult.status === 'force_closed'
+        ) {
+          saveLocalCompletedStudent(cleanCode, resolvedStudent, resolvedResult.status, {
+            resultId: resolvedResult.id,
+            score: resolvedResult.score,
+            correctAnswers: resolvedResult.correctAnswers,
+            totalQuestions: resolvedResult.totalQuestions,
+            completionTime: resolvedResult.completionTime,
+            answers: resolvedResult.answers,
+            isSynced: resolvedResult.isSynced,
+            timestamp: resolvedResult.timestamp,
+          });
+        }
+
+        setCurrentExam(examObj);
+        setCurrentStudent({ ...resolvedStudent, resultId: resolvedResult.id ?? resolvedStudent.resultId });
+        setStudentResult(resolvedResult);
+        setView('STUDENT_RESULT');
+      } catch (err) {
+        console.error("Failed to open student result:", err);
+        showAppDialog(
+          "error",
+          "Gagal Membuka Hasil",
+          "Terjadi kesalahan saat membuka halaman hasil ujian. Coba lagi beberapa saat lagi.",
+        );
+      } finally {
+        setIsSyncing(false);
+      }
+    },
+    [loadExamForResultView, showAppDialog],
+  );
+
   const handleStudentLoginSuccess = useCallback(async (examCode: string, student: Student, isPreview: boolean = false) => {
     setIsSyncing(true);
     try {
+      const cleanCode = String(examCode || '').trim().toUpperCase();
       // Pass studentId to ensure consistent shuffling (Fix #2)
-      const exam = await storageService.getExamForStudent(examCode, student.studentId, isPreview);
-      if (!exam) { 
-        showAppDialog("error", "Kode Ujian Tidak Ditemukan", "Kode Ujian tidak ditemukan atau belum dipublikasikan.");
-        return; 
+      let exam: Exam | null = null;
+      let examLoadError: unknown = null;
+      try {
+        exam = await storageService.getExamForStudent(cleanCode, student.studentId, isPreview);
+      } catch (err) {
+        examLoadError = err;
       }
 
-      const { result: res, isNetworkError: isResultNetErr } = await storageService.getStudentResultStatus(examCode, student.studentId);
+      const { result: res, isNetworkError: isResultNetErr } =
+        await storageService.getStudentResultStatus(cleanCode, student.studentId, student);
+      const queuedFinal = !isPreview
+        ? storageService.findQueuedSubmission(cleanCode, res?.student || student, { onlyFinal: true })
+        : null;
+
+      if (!exam) {
+        if (!isPreview && (res?.status === 'completed' || queuedFinal?.status === 'completed')) {
+          const fallbackExam = await loadExamForResultView(cleanCode, res?.student || student);
+          if (fallbackExam) {
+            const targetRes = queuedFinal
+              ? { ...queuedFinal, isSynced: false }
+              : { ...res!, isSynced: true };
+            setCurrentExam(fallbackExam);
+            setCurrentStudent({ ...(targetRes.student || student), resultId: targetRes.id });
+            setStudentResult(targetRes);
+            setView('STUDENT_RESULT');
+            return;
+          }
+        }
+        if (examLoadError) throw examLoadError;
+        showAppDialog("error", "Kode Ujian Tidak Ditemukan", "Kode Ujian tidak ditemukan atau belum dipublikasikan.");
+        return;
+      }
+
+      const resolvedStudent = res?.student || queuedFinal?.student || student;
+      const effectiveStudentId = resolvedStudent.studentId;
 
       const localProgressForResume =
         !res && isResultNetErr && !isPreview
-          ? ((await storageService.getLocalProgress(`exam_local_${examCode}_${student.studentId}`)) as {
+          ? ((await storageService.getLocalProgress(`exam_local_${cleanCode}_${effectiveStudentId}`)) as {
               answers?: Record<string, string>;
               logs?: string[];
               status?: ResultStatus;
@@ -366,18 +532,44 @@ const App: React.FC = () => {
             } | null)
           : null;
 
+      if (queuedFinal?.status === 'completed' && !isPreview && !exam.config.allowRetakes) {
+          setCurrentExam(exam);
+          setCurrentStudent({ ...resolvedStudent, resultId: queuedFinal.id });
+          setStudentResult({ ...queuedFinal, isSynced: false });
+          setView('STUDENT_RESULT');
+          return;
+      }
+
       if (res && res.status === 'completed' && !isPreview) {
+          saveLocalCompletedStudent(cleanCode, resolvedStudent, 'completed', {
+            resultId: res.id,
+            score: res.score,
+            correctAnswers: res.correctAnswers,
+            totalQuestions: res.totalQuestions,
+            completionTime: res.completionTime,
+            answers: res.answers,
+            isSynced: true,
+            timestamp: res.timestamp,
+          });
           if (!exam.config.allowRetakes) {
               setCurrentExam(exam);
-              setCurrentStudent({ ...student, resultId: res.id });
+              setCurrentStudent({ ...resolvedStudent, resultId: res.id });
               setStudentResult(res);
               setView('STUDENT_RESULT');
               return;
           }
       }
 
+      const isPRMode = (exam.config.examMode || '').trim().toUpperCase() === 'PR';
       const isClosedByTeacher = Boolean(exam.config.isFinished) || exam.status === 'closed';
       if (isClosedByTeacher && !isPreview) {
+          if (res?.status === 'force_closed' && !isPRMode) {
+              setCurrentExam(exam);
+              setCurrentStudent({ ...resolvedStudent, resultId: res.id });
+              setStudentResult(res);
+              setView('STUDENT_RESULT');
+              return;
+          }
           showAppDialog(
             "info",
             "Ujian Telah Ditutup",
@@ -388,7 +580,7 @@ const App: React.FC = () => {
 
       // Check schedule before allowing entry, EXCEPT returning students eligible for overtime resumption
       if (!isPreview) {
-          const access = calculateStudentAccess(exam.config, student.class, new Date());
+          const access = calculateStudentAccess(exam.config, resolvedStudent.class, new Date());
           if (!access.canAccess) {
               const resumeStatus = res?.status || localProgressForResume?.status || (localProgressForResume ? 'in_progress' : undefined);
               const resumeStartStr = res?.answers?._startTime || localProgressForResume?.answers?._startTime;
@@ -408,6 +600,13 @@ const App: React.FC = () => {
 
               if (!canResumeOvertime) {
                   if (access.status === 'FINISHED_GLOBAL') {
+                      if (res?.status === 'force_closed' && !isPRMode) {
+                          setCurrentExam(exam);
+                          setCurrentStudent({ ...resolvedStudent, resultId: res.id });
+                          setStudentResult(res);
+                          setView('STUDENT_RESULT');
+                          return;
+                      }
                       showAppDialog("error", "Ujian Telah Berakhir", access.message);
                   } else {
                       setInvitationExam(exam);
@@ -418,17 +617,16 @@ const App: React.FC = () => {
       }
 
       // Initialize with potential resultId if resuming
-      let studentWithId = { ...student, resultId: res?.id ?? student.resultId };
+      let studentWithId = { ...resolvedStudent, resultId: res?.id ?? resolvedStudent.resultId };
 
       if (res && res.status === 'force_closed' && !isPreview) {
-          const isPR = (exam.config.examMode || '').trim().toUpperCase() === 'PR';
-          if (isPR) {
+          if (isPRMode) {
               // Pada mode PR, siswa tidak boleh terkunci akibat force_closed. Izinkan melanjutkan pengerjaan.
               setResumedResult(res);
-              studentWithId = { ...student, resultId: res.id };
+              studentWithId = { ...resolvedStudent, resultId: res.id };
           } else {
               setCurrentExam(exam);
-              setCurrentStudent({ ...student, resultId: res.id });
+              setCurrentStudent({ ...resolvedStudent, resultId: res.id });
               setStudentResult(res);
               setView('STUDENT_RESULT');
               return;
@@ -437,15 +635,12 @@ const App: React.FC = () => {
       
       if (res && res.status === 'in_progress' && !isPreview) {
         setResumedResult(res);
-        studentWithId = { ...student, resultId: res.id };
+        studentWithId = { ...resolvedStudent, resultId: res.id };
       } else if (!res && isResultNetErr && !isPreview) {
         // Offline / network failure during login check: allow ONLY unlocked returning students with local exam data
         const localProgress = localProgressForResume;
-        const queued =
-          offlineService.getSyncQueue().find((q) => q.examCode === examCode && q.student.studentId === student.studentId) ||
-          offlineService.getFailedQueue().find((q) => q.examCode === examCode && q.student.studentId === student.studentId);
-        const isPR = (exam.config.examMode || '').trim().toUpperCase() === 'PR';
-        const lockKey = `exam_lock_${examCode}_${student.studentId}`;
+        const queued = storageService.findQueuedSubmission(cleanCode, resolvedStudent);
+        const lockKey = `exam_lock_${cleanCode}_${effectiveStudentId}`;
         let hasLocalLock = false;
         try {
           hasLocalLock = localStorage.getItem(lockKey) === '1';
@@ -454,7 +649,7 @@ const App: React.FC = () => {
         }
 
         if (
-          !isPR &&
+          !isPRMode &&
           exam.config.detectBehavior &&
           exam.config.continueWithPermission &&
           (hasLocalLock || localProgress?.status === 'force_closed' || queued?.status === 'force_closed')
@@ -462,7 +657,7 @@ const App: React.FC = () => {
           showAppDialog(
             "warning",
             "Sesi Ujian Terkunci",
-            "Sesi ini terkunci karena terdeteksi pelanggaran. Sambungkan ke internet dan hubungi pengawas untuk membuka kunci.",
+            "Sesi ini terkunci karena dihentikan paksa dan menunggu token pengawas. Sambungkan ke internet dan hubungi pengawas untuk membuka kunci.",
           );
           return;
         }
@@ -476,12 +671,12 @@ const App: React.FC = () => {
           return;
         }
 
-        const resolvedResultId = localProgress.resultId ?? student.resultId;
-        studentWithId = { ...student, resultId: resolvedResultId };
+        const resolvedResultId = localProgress.resultId ?? resolvedStudent.resultId;
+        studentWithId = { ...resolvedStudent, resultId: resolvedResultId };
         const offlineResumedResult: Result = {
           id: resolvedResultId,
           student: studentWithId,
-          examCode,
+          examCode: cleanCode,
           answers: localProgress.answers || {},
           score: 0,
           correctAnswers: 0,
@@ -500,8 +695,8 @@ const App: React.FC = () => {
 
         // Initial creation (online)
         const newRes = await storageService.submitExamResult({
-          student,
-          examCode,
+          student: resolvedStudent,
+          examCode: cleanCode,
           answers: { _startTime: Date.now().toString(), ...(deviceId ? { _deviceId: deviceId } : {}) },
           score: 0,
           totalQuestions: exam.questions.length,
@@ -511,7 +706,7 @@ const App: React.FC = () => {
           timestamp: Date.now()
         });
         // Capture the new ID
-        studentWithId = { ...student, resultId: newRes.id as number };
+        studentWithId = { ...resolvedStudent, resultId: newRes.id as number };
         setResumedResult(newRes as unknown as Result);
       }
       
@@ -523,7 +718,7 @@ const App: React.FC = () => {
         localStorage.setItem(
           'ujiancerdas_active_exam_session',
           JSON.stringify({
-            examCode,
+            examCode: cleanCode,
             student: studentWithId,
             isPreview,
             savedAt: Date.now(),
@@ -548,7 +743,7 @@ const App: React.FC = () => {
             showAppDialog("error", "Gagal Memuat Ujian", "Terjadi kendala saat memuat ujian. Periksa koneksi internet Anda lalu coba lagi.");
         }
     } finally { setIsSyncing(false); }
-  }, [showAppDialog]);
+  }, [loadExamForResultView, showAppDialog]);
 
   // Session check & automatic recovery on reload (iPhone/mobile crash protection)
   useEffect(() => {
@@ -885,6 +1080,18 @@ const App: React.FC = () => {
     });
     
     if (status === 'completed' || status === 'force_closed') {
+        // Persist completed/force_closed student index locally so reopening the link recovers result immediately
+        saveLocalCompletedStudent(currentExam.code, currentStudent, status, {
+          resultId: res.id,
+          score: res.score,
+          correctAnswers: res.correctAnswers,
+          totalQuestions: res.totalQuestions,
+          completionTime: res.completionTime,
+          answers: res.answers,
+          isSynced: res.isSynced,
+          timestamp: res.timestamp,
+        });
+
         // Clear active session storage upon completion
         if (status === 'completed') {
           try {
@@ -1158,6 +1365,7 @@ const App: React.FC = () => {
         {view === 'STUDENT_LOGIN' && (
             <StudentLogin 
                 onLoginSuccess={handleStudentLoginSuccess} 
+                onViewResult={handleOpenStudentResult}
                 onBack={() => setView('SELECTOR')} 
                 isDarkMode={darkMode}
                 toggleTheme={toggleTheme}

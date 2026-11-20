@@ -2,6 +2,7 @@ import React, { useRef, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { Exam, ChartData, TeacherProfile } from "../../../../types";
 import { XMarkIcon, PrinterIcon } from "../../../Icons";
+import { Columns2, List } from "lucide-react";
 import { sanitizeHtml } from "../../examUtils";
 import { renderMathInHtml } from "../../../../utils/mathRenderer";
 import { FormalPrintDocHeader } from "../../FormalPrintDocHeader";
@@ -578,6 +579,10 @@ export const PrintSoalModal: React.FC<PrintSoalModalProps> = ({
             padding: 0 !important;
             max-width: 100% !important;
           }
+          .print-soal-content .print-table-scroll {
+            overflow: visible !important;
+            max-width: 100% !important;
+          }
           .print-soal-content table {
             width: 100% !important;
             max-width: 100% !important;
@@ -891,6 +896,123 @@ export const PrintSoalModal: React.FC<PrintSoalModalProps> = ({
           margin-top: 0 !important;
           margin-bottom: 0 !important;
         }
+
+        /* Smartphone Screen Preview Only (never affects @media print / A4 output) */
+        @media screen and (max-width: 639px) {
+          .print-soal-modal-wrapper {
+            overflow-x: hidden !important;
+          }
+          .print-soal-content {
+            width: 100% !important;
+            max-width: 100% !important;
+            overflow-x: hidden !important;
+            box-sizing: border-box !important;
+          }
+          .print-soal-content .school-letterhead-root .flex {
+            gap: 6px !important;
+          }
+          .print-soal-content .school-letterhead-root .school-letterhead-logo-container {
+            width: 40px !important;
+            height: 40px !important;
+            max-width: 40px !important;
+            max-height: 40px !important;
+          }
+          .print-soal-content .school-letterhead-root img.school-letterhead-logo,
+          .print-soal-content .school-letterhead-root .school-letterhead-logo {
+            max-width: 38px !important;
+            max-height: 38px !important;
+          }
+          .print-soal-content .school-letterhead-root .kop-aksara-pemda,
+          .print-soal-content .school-letterhead-root .kop-aksara-dinas {
+            font-size: 8.5px !important;
+            line-height: 1.2 !important;
+          }
+          .print-soal-content .school-letterhead-root .kop-text-pemda,
+          .print-soal-content .school-letterhead-root .kop-text-dinas {
+            font-size: 9px !important;
+            line-height: 1.2 !important;
+          }
+          .print-soal-content .school-letterhead-root .kop-aksara-sekolah {
+            font-size: 9.5px !important;
+            line-height: 1.2 !important;
+          }
+          .print-soal-content .school-letterhead-root .kop-text-sekolah {
+            font-size: 10.5px !important;
+            line-height: 1.2 !important;
+          }
+          .print-soal-content .school-letterhead-root .kop-aksara-alamat,
+          .print-soal-content .school-letterhead-root .kop-text-alamat,
+          .print-soal-content .school-letterhead-root .kop-text-kontak {
+            font-size: 8px !important;
+            line-height: 1.2 !important;
+          }
+          .print-soal-content .formal-id-block {
+            max-width: 100% !important;
+            font-size: 10.5px !important;
+          }
+          .print-soal-content .formal-id-row {
+            grid-template-columns: 110px 10px 1fr !important;
+          }
+          .print-soal-content .table-responsive-wrapper,
+          .print-soal-content .print-table-scroll {
+            display: block !important;
+            width: 100% !important;
+            max-width: 100% !important;
+            overflow-x: auto !important;
+            overflow-y: hidden !important;
+            -webkit-overflow-scrolling: touch !important;
+            margin: 0.4rem 0 !important;
+          }
+          .print-soal-content table {
+            width: 100% !important;
+            max-width: none !important;
+            font-size: 10.5px !important;
+            line-height: 1.35 !important;
+          }
+          .print-soal-content th,
+          .print-soal-content td {
+            padding: 3.5px 5px !important;
+            font-size: 10.5px !important;
+          }
+          .print-soal-content .print-chart-container {
+            width: 100% !important;
+            max-width: 100% !important;
+            padding: 6px !important;
+            overflow: hidden !important;
+          }
+          .print-soal-content .recharts-wrapper {
+            width: 100% !important;
+            max-width: 100% !important;
+            height: auto !important;
+            aspect-ratio: 400 / 190;
+          }
+          .print-soal-content .recharts-surface {
+            width: 100% !important;
+            max-width: 100% !important;
+            height: auto !important;
+          }
+          .print-soal-content .geometry-shape {
+            max-width: 100% !important;
+            width: 100% !important;
+            overflow: hidden !important;
+          }
+          .print-soal-content .geometry-shape svg {
+            max-width: 100% !important;
+            width: auto !important;
+            height: auto !important;
+          }
+          .print-soal-content img:not(.school-letterhead-root *),
+          .print-soal-content svg:not(.katex *):not(.lucide):not(.geometry-shape *):not(.geometry-shape):not(.school-letterhead-root *) {
+            max-width: min(280px, 100%) !important;
+            height: auto !important;
+          }
+          .print-soal-content .katex-display {
+            max-width: 100% !important;
+            overflow-x: auto !important;
+            overflow-y: hidden !important;
+            padding-bottom: 2px !important;
+          }
+        }
       `;
       document.head.appendChild(style);
 
@@ -944,30 +1066,49 @@ export const PrintSoalModal: React.FC<PrintSoalModalProps> = ({
   const dynamicPetunjuk = generateDynamicPetunjukUmum(allQuestions);
 
   return createPortal(
-    <div className="print-soal-modal-wrapper fixed inset-0 bg-white z-[9999] overflow-y-auto">
+    <div className="print-soal-modal-wrapper fixed inset-0 bg-white z-[9999] overflow-y-auto overflow-x-hidden print:static print:overflow-visible">
       {/* Screen Toolbar */}
-      <div className="no-print sticky top-0 bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 px-4 py-3 flex flex-wrap justify-between items-center shadow-sm z-10 gap-3">
-        <div className="flex items-center gap-3">
-          <div className="p-2 bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 rounded-xl">
-            <PrinterIcon className="w-5 h-5" />
+      <div className="no-print sticky top-0 w-full max-w-full bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 px-3 py-2 sm:px-4 sm:py-3 flex flex-col sm:flex-row sm:justify-between sm:items-center shadow-sm z-20 gap-2 sm:gap-3">
+        {/* Row 1 (Mobile): Title + Metadata + Close Button */}
+        <div className="flex items-center justify-between gap-2 min-w-0 sm:flex-1">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
+            <div className="p-1.5 sm:p-2 bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 rounded-lg sm:rounded-xl shrink-0">
+              <PrinterIcon className="w-4 h-4 sm:w-5 sm:h-5" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <h2 className="text-sm sm:text-base font-bold text-slate-800 dark:text-white truncate">
+                Pratinjau Cetak Naskah Soal
+              </h2>
+              <p className="text-[11px] sm:text-xs text-slate-500 dark:text-slate-400 truncate tabular-nums">
+                <span className="sm:hidden">
+                  {exam.config?.subject || "Ujian"} · {actualQuestionsCount} Soal
+                </span>
+                <span className="hidden sm:inline">
+                  {exam.config?.subject || "Ujian"} • {actualQuestionsCount} Butir Soal • Format Cetak Hemat Kertas
+                </span>
+              </p>
+            </div>
           </div>
-          <div>
-            <h2 className="text-base font-bold text-slate-800 dark:text-white">
-              Pratinjau Cetak Naskah Soal
-            </h2>
-            <p className="text-xs text-slate-500 dark:text-slate-400">
-              {exam.config?.subject || "Ujian"} • {actualQuestionsCount} Butir Soal • Format Cetak Hemat Kertas
-            </p>
-          </div>
+
+          <button
+            type="button"
+            onClick={onClose}
+            className="sm:hidden shrink-0 min-h-[40px] min-w-[40px] inline-flex items-center justify-center border border-slate-200 dark:border-slate-700 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-400 transition-colors cursor-pointer"
+            title="Tutup Pratinjau"
+            aria-label="Tutup Pratinjau"
+          >
+            <XMarkIcon className="w-5 h-5" />
+          </button>
         </div>
 
-        <div className="flex items-center gap-2">
+        {/* Row 2 (Mobile) / Right Controls (Tablet & Desktop) */}
+        <div className="flex items-center justify-between sm:justify-end gap-1.5 sm:gap-2 min-w-0 shrink-0">
           {/* Tombol Pengalihan Tampilan Kop: Default vs Kop Sekolah */}
-          <div className="flex items-center bg-slate-100 dark:bg-slate-700/60 p-0.5 rounded-lg border border-slate-200 dark:border-slate-600">
+          <div className="flex items-center bg-slate-100 dark:bg-slate-700/60 p-0.5 rounded-lg border border-slate-200 dark:border-slate-600 shrink-0">
             <button
               type="button"
               onClick={() => setHeaderMode("default")}
-              className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all cursor-pointer ${
+              className={`min-h-[36px] sm:min-h-0 px-2.5 sm:px-3 py-1.5 rounded-md text-[11px] sm:text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${
                 headerMode === "default"
                   ? "bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 shadow-xs"
                   : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
@@ -979,42 +1120,55 @@ export const PrintSoalModal: React.FC<PrintSoalModalProps> = ({
             <button
               type="button"
               onClick={() => setHeaderMode("kop")}
-              className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all cursor-pointer ${
+              className={`min-h-[36px] sm:min-h-0 px-2.5 sm:px-3 py-1.5 rounded-md text-[11px] sm:text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${
                 headerMode === "kop"
                   ? "bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 shadow-xs"
                   : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
               }`}
               title="Tampilkan Kop Resmi Sekolah (Dwibahasa Aksara Bali / Latin)"
             >
-              Kop Sekolah
+              <span className="sm:hidden">Kop</span>
+              <span className="hidden sm:inline">Kop Sekolah</span>
             </button>
           </div>
 
           <button
             type="button"
             onClick={() => setIsTwoColOptions(!isTwoColOptions)}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
+            className={`flex-1 sm:flex-initial min-w-0 min-h-[38px] sm:min-h-0 inline-flex items-center justify-center gap-1 px-2.5 sm:px-3 py-1.5 rounded-lg text-[11px] sm:text-xs font-semibold border whitespace-nowrap transition-all cursor-pointer ${
               isTwoColOptions
                 ? "bg-indigo-50 text-indigo-700 border-indigo-300 dark:bg-indigo-900/40 dark:text-indigo-300 dark:border-indigo-700"
                 : "bg-white text-slate-600 border-slate-300 dark:bg-slate-700 dark:text-slate-300"
             }`}
             title="Opsi jawaban pendek disusun 2 kolom untuk menghemat kertas"
           >
-            {isTwoColOptions ? "✓ Opsi 2 Kolom (Hemat Kertas)" : "Opsi 1 Kolom"}
+            {isTwoColOptions ? (
+              <Columns2 className="w-3.5 h-3.5 shrink-0 sm:hidden" />
+            ) : (
+              <List className="w-3.5 h-3.5 shrink-0 sm:hidden" />
+            )}
+            <span className="sm:hidden">{isTwoColOptions ? "2 Kolom" : "1 Kolom"}</span>
+            <span className="hidden sm:inline">
+              {isTwoColOptions ? "✓ Opsi 2 Kolom (Hemat Kertas)" : "Opsi 1 Kolom"}
+            </span>
           </button>
+
           <button
             type="button"
             onClick={() => window.print()}
-            className="flex items-center gap-1.5 px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold transition-colors shadow-sm cursor-pointer"
+            className="shrink-0 min-h-[38px] sm:min-h-0 inline-flex items-center justify-center gap-1.5 px-3 sm:px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-[11px] sm:text-xs font-bold whitespace-nowrap transition-colors shadow-sm cursor-pointer"
           >
-            <PrinterIcon className="w-4 h-4" />
-            <span>Cetak (PDF)</span>
+            <PrinterIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
+            <span className="sm:hidden">Cetak PDF</span>
+            <span className="hidden sm:inline">Cetak (PDF)</span>
           </button>
+
           <button
             type="button"
             onClick={onClose}
-            className="p-1.5 border border-slate-200 dark:border-slate-700 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-400 transition-colors cursor-pointer"
+            className="hidden sm:inline-flex p-1.5 border border-slate-200 dark:border-slate-700 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-400 transition-colors cursor-pointer"
             title="Tutup Pratinjau"
+            aria-label="Tutup Pratinjau"
           >
             <XMarkIcon className="w-5 h-5" />
           </button>
@@ -1023,13 +1177,13 @@ export const PrintSoalModal: React.FC<PrintSoalModalProps> = ({
 
       {/* Printable Sheet (Calibrated A4 Width 794px with 14mm padding) */}
       <div
-        className="print-soal-content max-w-[794px] mx-auto bg-white px-5 py-6 sm:px-[14mm] sm:py-[12mm] text-black"
+        className="print-soal-content w-full max-w-[794px] mx-auto bg-white px-3 py-4 sm:px-[14mm] sm:py-[12mm] print:px-0 print:py-0 text-black box-border"
         ref={printContainerRef}
       >
         {/* Render Kop Sekolah Resmi jika mode "kop", atau Kop Soal Standar jika mode "default" */}
         {headerMode === "kop" ? (
           <>
-            <div className="print-soal-header mb-2.5 print:mb-1 pb-0.5">
+            <div className="print-soal-header mb-2.5 print:mb-1 pb-0.5 min-w-0 max-w-full">
               <FormalPrintDocHeader
                 profile={profile}
                 examType={exam.config?.examType}
@@ -1044,11 +1198,11 @@ export const PrintSoalModal: React.FC<PrintSoalModalProps> = ({
             </div>
 
             {/* Dynamic General Instructions (Baku tanpa kotak latar) */}
-            <div className="print-petunjuk-container mb-3 print:mb-2 text-xs sm:text-[13px] text-black leading-relaxed">
+            <div className="print-petunjuk-container mb-3 print:mb-2 text-[11px] sm:text-[13px] print:text-[8.5pt] text-black leading-relaxed">
               <h2 className="print-petunjuk-title text-center font-bold uppercase tracking-wider mb-1">
                 PETUNJUK UMUM
               </h2>
-              <ol className="print-petunjuk-list list-decimal pl-6 space-y-0.5 max-w-3xl mx-auto">
+              <ol className="print-petunjuk-list list-decimal pl-5 sm:pl-6 print:pl-6 space-y-0.5 max-w-3xl mx-auto">
                 {dynamicPetunjuk.map((item, idx) => (
                   <li key={idx} className="pl-1">
                     {item}
@@ -1063,52 +1217,52 @@ export const PrintSoalModal: React.FC<PrintSoalModalProps> = ({
         ) : (
           <>
             {/* Official Indonesian School Exam Header (Kop Soal Standar) */}
-            <div className="print-soal-header mb-5 border-b-2 border-black pb-3">
-              <div className="flex items-center justify-between border-b border-black pb-2 mb-2">
-                <div className="text-left">
-                  <h2 className="text-sm font-extrabold uppercase tracking-wide text-black leading-tight">
+            <div className="print-soal-header mb-4 sm:mb-5 print:mb-5 border-b-2 border-black pb-2.5 sm:pb-3 print:pb-3">
+              <div className="flex items-center justify-between gap-2 border-b border-black pb-2 mb-2">
+                <div className="text-left min-w-0 flex-1">
+                  <h2 className="text-xs sm:text-sm print:text-sm font-extrabold uppercase tracking-wide text-black leading-tight break-words">
                     {exam.authorSchool || profile?.school || "UJIAN SEKOLAH / ASESMEN AKADEMIK"}
                   </h2>
-                  <p className="text-[11px] font-semibold text-slate-700">
+                  <p className="text-[10px] sm:text-[11px] print:text-[11px] font-semibold text-slate-700">
                     TAHUN PELAJARAN {currentYear}/{currentYear + 1}
                   </p>
                 </div>
-                <div className="text-right">
-                  <span className="inline-block px-2.5 py-0.5 border border-black font-bold text-[11px] uppercase tracking-wider">
+                <div className="text-right shrink-0">
+                  <span className="inline-block px-2 sm:px-2.5 print:px-2.5 py-0.5 border border-black font-bold text-[10px] sm:text-[11px] print:text-[11px] uppercase tracking-wider whitespace-nowrap">
                     NASKAH SOAL
                   </span>
                 </div>
               </div>
 
-              <h1 className="text-base font-black uppercase tracking-wider text-black text-center my-1.5">
+              <h1 className="text-sm sm:text-base print:text-base font-black uppercase tracking-wider text-black text-center my-1.5 break-words">
                 {exam.config?.examType || "PENILAIAN AKHIR SEMESTER"} - {exam.config?.subject || ""}
               </h1>
 
-              <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-left text-xs font-medium border-t border-slate-300 pt-2 mt-2">
-                <div>
+              <div className="grid grid-cols-2 gap-x-3 sm:gap-x-6 print:gap-x-6 gap-y-1 text-left text-[10.5px] sm:text-xs print:text-xs font-medium border-t border-slate-300 pt-2 mt-2">
+                <div className="min-w-0 break-words">
                   <span className="font-bold">Mata Pelajaran:</span> {exam.config?.subject || "-"}
                 </div>
-                <div>
+                <div className="min-w-0 break-words">
                   <span className="font-bold">Alokasi Waktu:</span> {exam.config?.timeLimit ? `${exam.config.timeLimit} Menit` : "Sesuai Jadwal"}
                 </div>
-                <div>
+                <div className="min-w-0 break-words">
                   <span className="font-bold">Kelas / Jenjang:</span> {exam.config?.classLevel || "-"}
                 </div>
-                <div>
+                <div className="min-w-0 break-words">
                   <span className="font-bold">Jumlah Soal:</span> {actualQuestionsCount} Butir ({exam.code})
                 </div>
               </div>
             </div>
 
             {/* General Instruction */}
-            <div className="mb-4 p-2 bg-slate-50 border border-slate-300 rounded text-[11px] leading-tight text-slate-800">
+            <div className="mb-4 p-2 bg-slate-50 border border-slate-300 rounded text-[10.5px] sm:text-[11px] print:text-[11px] leading-tight text-slate-800">
               <span className="font-bold">PETUNJUK UMUM:</span> Periksa dan bacalah lembar soal dengan teliti sebelum menjawab. Laporkan kepada pengawas jika terdapat butir soal yang kurang jelas atau tidak lengkap.
             </div>
           </>
         )}
 
         {/* Questions List */}
-        <div className="space-y-4">
+        <div className="space-y-4 min-w-0 max-w-full">
           {allQuestions.map((q, idx) => {
             const isInfo = isInfoItem(q);
             const questionNumber = allQuestions
@@ -1119,11 +1273,11 @@ export const PrintSoalModal: React.FC<PrintSoalModalProps> = ({
               return (
                 <div 
                   key={q.id || idx} 
-                  className="print-info-card break-inside-avoid bg-blue-50/70 border border-blue-200 print:border-blue-700/60 rounded-lg p-3.5 sm:p-4 my-3 border-l-4 border-l-blue-600"
+                  className="print-info-card break-inside-avoid bg-blue-50/70 border border-blue-200 print:border-blue-700/60 rounded-lg p-3 sm:p-4 print:p-[10px_14px] my-3 border-l-4 border-l-blue-600 min-w-0 max-w-full"
                 >
                   {/* Stem / Stimulus */}
                   <div 
-                    className="text-black font-normal text-xs sm:text-sm leading-relaxed"
+                    className="text-black font-normal text-[11.5px] sm:text-sm print:text-sm leading-relaxed min-w-0 max-w-full break-words"
                     dangerouslySetInnerHTML={{ __html: renderFormattedHtml(q.questionText) }}
                   />
 
@@ -1158,15 +1312,15 @@ export const PrintSoalModal: React.FC<PrintSoalModalProps> = ({
             }
 
             return (
-              <div key={q.id || idx} className="print-question-card">
-                <div className="print-question-stem flex gap-2.5 items-start">
-                  <span className="font-bold w-6 text-right shrink-0 select-none text-xs sm:text-sm pt-0.5">
+              <div key={q.id || idx} className="print-question-card min-w-0 max-w-full">
+                <div className="print-question-stem flex gap-1.5 sm:gap-2.5 print:gap-2.5 items-start min-w-0 max-w-full">
+                  <span className="font-bold w-5 sm:w-6 print:w-6 text-right shrink-0 select-none text-[11.5px] sm:text-sm print:text-sm pt-0.5 tabular-nums">
                     {questionNumber}.
                   </span>
-                  <div className="flex-1 text-xs sm:text-sm text-black leading-relaxed">
+                  <div className="flex-1 min-w-0 max-w-full text-[11.5px] sm:text-sm print:text-sm text-black leading-relaxed break-words">
                     {/* Question Stem / Stimulus */}
                     <div 
-                      className="text-black font-normal"
+                      className="text-black font-normal min-w-0 max-w-full"
                       dangerouslySetInnerHTML={{ __html: renderFormattedHtml(q.questionText) }}
                     />
 
@@ -1191,15 +1345,15 @@ export const PrintSoalModal: React.FC<PrintSoalModalProps> = ({
 
                     {/* Audio Stimulus Note */}
                     {q.audioUrl && (
-                      <div className="my-2 p-2 bg-slate-50 rounded text-xs text-slate-700 border border-slate-300 inline-flex items-center gap-2">
-                        <span className="font-bold">[Audio Soal]:</span>
+                      <div className="my-2 p-2 bg-slate-50 rounded text-xs text-slate-700 border border-slate-300 inline-flex items-center gap-2 max-w-full">
+                        <span className="font-bold shrink-0">[Audio Soal]:</span>
                         <span className="text-slate-500 break-all">{q.audioUrl}</span>
                       </div>
                     )}
 
                     {/* Listening Script Note for Teacher Print */}
                     {q.listeningScript && (
-                      <div className="my-2 p-2 bg-slate-50 rounded text-xs text-slate-700 border border-slate-300 block">
+                      <div className="my-2 p-2 bg-slate-50 rounded text-xs text-slate-700 border border-slate-300 block max-w-full">
                         <span className="font-bold block mb-1 text-slate-800">[Naskah Menyimak / Listening]:</span>
                         <p className="whitespace-pre-line text-slate-600 font-sans italic">{q.listeningScript}</p>
                       </div>
@@ -1208,24 +1362,24 @@ export const PrintSoalModal: React.FC<PrintSoalModalProps> = ({
                 </div>
 
                 {/* Question Answer Area (Sibling to stem so stem on page 1 + options on page 2 can paginate cleanly) */}
-                <div className="print-question-answer-area pl-[34px] text-xs sm:text-sm text-black leading-relaxed">
+                <div className="print-question-answer-area pl-4 sm:pl-[34px] print:pl-[34px] min-w-0 max-w-full text-[11.5px] sm:text-sm print:text-sm text-black leading-relaxed">
                   {/* Multiple Choice Options */}
                   {q.questionType === "MULTIPLE_CHOICE" && q.options && (
                     <div
-                      className={`print-question-options ${
+                      className={`print-question-options min-w-0 max-w-full ${
                         isTwoColOptions && shouldRenderTwoColumns(q.options)
-                          ? "grid grid-cols-2 gap-x-6 gap-y-1 mt-1.5 pl-6"
-                          : "space-y-1 mt-1.5 pl-6"
+                          ? "grid grid-cols-2 gap-x-3 sm:gap-x-6 print:gap-x-6 gap-y-1 mt-1.5 pl-2 sm:pl-6 print:pl-6"
+                          : "space-y-1 mt-1.5 pl-2 sm:pl-6 print:pl-6"
                       }`}
                     >
                       {q.options.map((opt, oIdx) => (
-                        <div key={oIdx} className="print-option-row flex gap-2 items-baseline text-xs sm:text-[13px]">
+                        <div key={oIdx} className="print-option-row flex gap-1.5 sm:gap-2 print:gap-2 items-baseline text-[11px] sm:text-[13px] print:text-[13px] min-w-0 max-w-full">
                           <span className="font-bold shrink-0 text-black">
                             {String.fromCharCode(65 + oIdx)}.
                           </span>
-                          <div className="flex-1 text-black font-normal">
+                          <div className="flex-1 min-w-0 max-w-full text-black font-normal break-words">
                             <div
-                              className="option-content"
+                              className="option-content min-w-0 max-w-full"
                               dangerouslySetInnerHTML={{ __html: renderFormattedHtml(opt) }}
                             />
                             {q.optionImages?.[oIdx] && (
@@ -1246,16 +1400,16 @@ export const PrintSoalModal: React.FC<PrintSoalModalProps> = ({
 
                   {/* Complex Multiple Choice Options */}
                   {q.questionType === "COMPLEX_MULTIPLE_CHOICE" && q.options && (
-                    <div className="print-question-options space-y-1.5 mt-2 pl-6">
-                      <p className="text-[11px] italic text-slate-600 mb-1">
+                    <div className="print-question-options space-y-1.5 mt-2 pl-2 sm:pl-6 print:pl-6 min-w-0 max-w-full">
+                      <p className="text-[10.5px] sm:text-[11px] print:text-[11px] italic text-slate-600 mb-1">
                         *(Pilihlah semua pernyataan yang benar - Jawaban lebih dari satu)*
                       </p>
                       {q.options.map((opt, oIdx) => (
-                        <div key={oIdx} className="print-option-row flex gap-2 items-start text-xs sm:text-[13px]">
+                        <div key={oIdx} className="print-option-row flex gap-2 items-start text-[11px] sm:text-[13px] print:text-[13px] min-w-0 max-w-full">
                           <div className="w-3.5 h-3.5 border border-black rounded-sm shrink-0 mt-0.5"></div>
-                          <div className="flex-1 text-black font-normal">
+                          <div className="flex-1 min-w-0 max-w-full text-black font-normal break-words">
                             <div
-                              className="option-content"
+                              className="option-content min-w-0 max-w-full"
                               dangerouslySetInnerHTML={{ __html: renderFormattedHtml(opt) }}
                             />
                             {q.optionImages?.[oIdx] && (
@@ -1292,15 +1446,15 @@ export const PrintSoalModal: React.FC<PrintSoalModalProps> = ({
 
                   {/* True / False Table */}
                   {q.questionType === "TRUE_FALSE" && q.trueFalseRows && (
-                    <div className="mt-2 pl-6">
-                      <table className="w-full border-collapse border border-black text-[11px] table-fixed">
+                    <div className="print-table-scroll mt-2 pl-2 sm:pl-6 print:pl-6 max-w-full overflow-x-auto print:overflow-visible">
+                      <table className="w-full border-collapse border border-black text-[10.5px] sm:text-[11px] print:text-[11px] table-fixed">
                         <thead>
                           <tr className="bg-slate-100">
                             <th className="border border-black px-2 py-1.5 text-left font-bold">Pernyataan</th>
-                            <th className="border border-black px-1 py-1.5 w-[75px] text-center font-bold">
+                            <th className="border border-black px-1 py-1.5 w-[56px] sm:w-[75px] print:w-[75px] text-center font-bold">
                               {(q.categoryLabels && q.categoryLabels[0]) || "Benar"}
                             </th>
-                            <th className="border border-black px-1 py-1.5 w-[75px] text-center font-bold">
+                            <th className="border border-black px-1 py-1.5 w-[56px] sm:w-[75px] print:w-[75px] text-center font-bold">
                               {(q.categoryLabels && q.categoryLabels[1]) || "Salah"}
                             </th>
                           </tr>
@@ -1312,10 +1466,10 @@ export const PrintSoalModal: React.FC<PrintSoalModalProps> = ({
                                 className="border border-black px-2 py-1.5 leading-snug" 
                                 dangerouslySetInnerHTML={{ __html: renderFormattedHtml(row.text) }}
                               />
-                              <td className="border border-black px-1 py-1.5 text-center w-[75px]">
+                              <td className="border border-black px-1 py-1.5 text-center w-[56px] sm:w-[75px] print:w-[75px]">
                                 <div className="w-3.5 h-3.5 border border-black rounded-full mx-auto"></div>
                               </td>
-                              <td className="border border-black px-1 py-1.5 text-center w-[75px]">
+                              <td className="border border-black px-1 py-1.5 text-center w-[56px] sm:w-[75px] print:w-[75px]">
                                 <div className="w-3.5 h-3.5 border border-black rounded-full mx-auto"></div>
                               </td>
                             </tr>
@@ -1327,22 +1481,22 @@ export const PrintSoalModal: React.FC<PrintSoalModalProps> = ({
 
                   {/* Matching Pairs */}
                   {q.questionType === "MATCHING" && q.matchingPairs && (
-                    <div className="mt-2 pl-6">
-                      <table className="w-full border-collapse border border-black text-xs">
+                    <div className="print-table-scroll mt-2 pl-2 sm:pl-6 print:pl-6 max-w-full overflow-x-auto print:overflow-visible">
+                      <table className="w-full border-collapse border border-black text-[10.5px] sm:text-xs print:text-xs">
                         <thead>
                           <tr className="bg-slate-100">
-                            <th className="border border-black px-3 py-1.5 text-left font-bold w-1/2">Pernyataan / Soal</th>
-                            <th className="border border-black px-3 py-1.5 text-left font-bold w-1/2">Pasangan Jawaban</th>
+                            <th className="border border-black px-2 sm:px-3 print:px-3 py-1.5 text-left font-bold w-1/2">Pernyataan / Soal</th>
+                            <th className="border border-black px-2 sm:px-3 print:px-3 py-1.5 text-left font-bold w-1/2">Pasangan Jawaban</th>
                           </tr>
                         </thead>
                         <tbody>
                           {q.matchingPairs.map((pair, pIdx) => (
                             <tr key={pIdx}>
-                              <td className="border border-black px-3 py-1.5">
+                              <td className="border border-black px-2 sm:px-3 print:px-3 py-1.5">
                                 <span className="font-bold mr-1">({pIdx + 1})</span>
                                 <span dangerouslySetInnerHTML={{ __html: renderFormattedHtml(pair.left) }} />
                               </td>
-                              <td className="border border-black px-3 py-1.5">
+                              <td className="border border-black px-2 sm:px-3 print:px-3 py-1.5">
                                 <span className="font-bold mr-1">({String.fromCharCode(65 + pIdx)})</span>
                                 <span dangerouslySetInnerHTML={{ __html: renderFormattedHtml(pair.right) }} />
                               </td>

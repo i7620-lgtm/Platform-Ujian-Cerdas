@@ -875,6 +875,21 @@ export class ExamService {
             if (offlineExam) {
                 return this.sanitizeExamForStudent(offlineExam, studentId, isPreview);
             }
+            const edgeBundle = await offlineService.getLocalProgress(`edge_bundle_${cleanCode}`) as {
+                config?: ExamConfig;
+                questions?: Question[];
+                version?: number;
+            } | null;
+            if (edgeBundle && edgeBundle.config && Array.isArray(edgeBundle.questions) && edgeBundle.questions.length > 0) {
+                const reconstructed: Exam = {
+                    code: cleanCode,
+                    config: edgeBundle.config,
+                    questions: edgeBundle.questions,
+                    status: edgeBundle.config.isFinished ? 'closed' : 'PUBLISHED',
+                    version: edgeBundle.version || 1,
+                };
+                return this.sanitizeExamForStudent(reconstructed, studentId, isPreview);
+            }
             const localExams = await this.getLocalTeacherExamsAsync();
             if (localExams[cleanCode]) {
                 return this.sanitizeExamForStudent(localExams[cleanCode], studentId, isPreview);

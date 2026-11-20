@@ -3,6 +3,7 @@ import { offlineService } from './offline';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import type { Result, ResultStatus, Exam, ExamConfig } from '../types';
 import { examService } from './exam';
+import { isSameStudentIdentity, type StudentIdentityCandidate } from '../utils/studentIdentity';
 
 export class ResultService {
   mapRowToResult(row: Record<string, unknown>): Result {
@@ -463,20 +464,26 @@ export class ResultService {
     return { ...resultWithId, isSynced: true };
   }
 
-  async getStudentResult(examCode: string, studentId: string): Promise<Result | null> {
-      const { result } = await this.getStudentResultStatus(examCode, studentId);
+  async getStudentResult(examCode: string, studentId: string, studentHint?: StudentIdentityCandidate): Promise<Result | null> {
+      const { result } = await this.getStudentResultStatus(examCode, studentId, studentHint);
       return result;
   }
 
-  async getStudentResultStatus(examCode: string, studentId: string): Promise<{ result: Result | null; isNetworkError: boolean }> {
+  async getStudentResultStatus(
+      examCode: string,
+      studentId: string,
+      studentHint?: StudentIdentityCandidate,
+  ): Promise<{ result: Result | null; isNetworkError: boolean }> {
       if (typeof navigator !== 'undefined' && navigator.onLine === false) {
           return { result: null, isNetworkError: true };
       }
+      const cleanExamCode = String(examCode || '').trim().toUpperCase();
+      const SELECT_COLS = 'id, exam_code, student_id, student_name, class_name, status, score, correct_answers, total_questions, answers, activity_log, updated_at, location, device_id';
       try {
           const { data, error } = await supabase
               .from('results')
-              .select('id, exam_code, student_id, student_name, class_name, status, score, correct_answers, total_questions, answers, activity_log, updated_at, location, device_id')
-              .eq('exam_code', examCode)
+              .select(SELECT_COLS)
+              .eq('exam_code', cleanExamCode)
               .eq('student_id', studentId)
               .maybeSingle();
 
@@ -485,60 +492,74 @@ export class ResultService {
               const isNet = !error.code || msg.includes('failed to fetch') || msg.includes('network');
               return { result: null, isNetworkError: isNet };
           }
-          if (!data) {
-              return { result: null, isNetworkError: false };
+
+          if (data) {
+              const mapped = this.mapRowToResult(data as Record<string, unknown>);
+              return {
+                  result: {
+                      ...mapped,
+                      student: {
+                          ...mapped.student,
+                          schoolName: mapped.student.schoolName || undefined,
+                      },
+                  },
+                  isNetworkError: false,
+              };
           }
 
-          let absentNumber = '00';
-          let dbSchoolName = '';
-          let dbClassName = data.class_name as string;
-          let studentName = data.student_name as string;
+          // Fallback: Tolerant identity matching across browsers (e.g. "05" vs "5", whitespace, letter case)
+          if (studentHint && (studentHint.fullName || studentHint.absentNumber)) {
+              const hintCandidate: StudentIdentityCandidate = {
+                  studentId,
+                  ...studentHint,
+              };
+              const PAGE_SIZE = 1000;
+              let from = 0;
+              const matches: Result[] = [];
 
-          // Parse Format 2 if applicable
-          if (studentId.startsWith('@') && studentId.includes('#') && studentId.includes('$') && studentId.includes('%')) {
-              const match = studentId.match(/^@(.*?)#(.*?)\$(.*?)%(.*)$/);
-              if (match) {
-                  dbSchoolName = match[1];
-                  studentName = match[2];
-                  dbClassName = match[3];
-                  absentNumber = match[4];
-              }
-          } else {
-              // Format 1 Fallback
-              if (dbClassName && dbClassName.includes('::')) {
-                  const parts = dbClassName.split('::');
-                  dbSchoolName = parts[0];
-                  dbClassName = parts[1];
-              }
-              if (typeof studentId === 'string') {
-                  const parts = studentId.includes('_') ? studentId.split('_') : studentId.split('-');
-                  if (parts.length >= 2) {
-                      const lastPart = parts[parts.length - 1];
-                      if (!isNaN(parseInt(lastPart))) {
-                          absentNumber = lastPart;
-                      } else if (parts.length > 2) {
-                          absentNumber = parts[parts.length - 2];
+              while (from < 3000) {
+                  const { data: rows, error: listErr } = await supabase
+                      .from('results')
+                      .select(SELECT_COLS)
+                      .eq('exam_code', cleanExamCode)
+                      .order('updated_at', { ascending: false })
+                      .range(from, from + PAGE_SIZE - 1);
+
+                  if (listErr) {
+                      const msg = String(listErr.message || '').toLowerCase();
+                      const isNet = !listErr.code || msg.includes('failed to fetch') || msg.includes('network');
+                      return { result: null, isNetworkError: isNet };
+                  }
+                  if (!rows || rows.length === 0) break;
+
+                  for (const row of rows as Record<string, unknown>[]) {
+                      const mapped = this.mapRowToResult(row);
+                      if (isSameStudentIdentity(mapped.student, hintCandidate)) {
+                          matches.push({
+                              ...mapped,
+                              student: {
+                                  ...mapped.student,
+                                  schoolName: mapped.student.schoolName || undefined,
+                              },
+                          });
                       }
                   }
+
+                  if (rows.length < PAGE_SIZE) break;
+                  from += PAGE_SIZE;
+              }
+
+              if (matches.length > 0) {
+                  const completedMatch = matches.find((m) => m.status === 'completed');
+                  const forceClosedMatch = matches.find((m) => m.status === 'force_closed');
+                  return {
+                      result: completedMatch || forceClosedMatch || matches[0],
+                      isNetworkError: false,
+                  };
               }
           }
 
-          const answers = data.answers || {};
-          const durationStr = answers['_duration'];
-          const completionTime = durationStr ? parseInt(durationStr) : undefined;
-          const validCompletionTime = !isNaN(completionTime as number) ? completionTime : 0;
-
-          return {
-              result: {
-                  id: data.id, // Include Primary Key
-                  student: { studentId: data.student_id, fullName: studentName, class: dbClassName, schoolName: dbSchoolName || undefined, absentNumber: absentNumber, resultId: data.id },
-                  examCode: data.exam_code, answers: answers, score: data.score, correctAnswers: data.correct_answers,
-                  totalQuestions: data.total_questions, completionTime: validCompletionTime, status: data.status, activityLog: data.activity_log,
-                  timestamp: new Date(data.updated_at).getTime(), location: data.location,
-                  device_id: (data.device_id as string | undefined) || answers['_deviceId'] || undefined
-              },
-              isNetworkError: false
-          };
+          return { result: null, isNetworkError: false };
       } catch {
           return { result: null, isNetworkError: true };
       }
@@ -793,6 +814,147 @@ export class ResultService {
           console.error("Unlock verification failed:", e);
           return false;
       }
+  }
+
+  async gradeManualQuestion(params: {
+      examCode: string;
+      studentId: string;
+      resultId?: number;
+      questionId: string;
+      isCorrect: boolean;
+      nextAnswers: Record<string, string>;
+      nextScore: number;
+      nextCorrectAnswers: number;
+      totalQuestions?: number;
+  }): Promise<{
+      id?: number;
+      answers: Record<string, string>;
+      score: number;
+      correctAnswers: number;
+      totalQuestions?: number;
+  }> {
+      if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+          throw new Error('Koneksi internet terputus. Penilaian manual memerlukan koneksi ke server.');
+      }
+
+      const expectedGrade = params.isCorrect ? 'CORRECT' : 'WRONG';
+      const validResultId =
+          typeof params.resultId === 'number' && !isNaN(params.resultId) && params.resultId < 1e12
+              ? params.resultId
+              : null;
+
+      const { data: rpcData, error: rpcError } = await supabase.rpc('teacher_grade_manual_question', {
+          p_exam_code: params.examCode,
+          p_student_id: params.studentId,
+          p_question_id: params.questionId,
+          p_grade: expectedGrade,
+          p_result_id: validResultId,
+      });
+
+      if (!rpcError && rpcData && (rpcData as { success?: boolean }).success) {
+          const payload = rpcData as {
+              id?: number;
+              answers?: Record<string, string>;
+              score?: number;
+              correct_answers?: number;
+              total_questions?: number;
+          };
+          return {
+              id: payload.id !== undefined ? Number(payload.id) : (validResultId ?? undefined),
+              answers: payload.answers || params.nextAnswers,
+              score: Number(payload.score ?? params.nextScore),
+              correctAnswers: Number(payload.correct_answers ?? params.nextCorrectAnswers),
+              totalQuestions:
+                  payload.total_questions !== undefined
+                      ? Number(payload.total_questions)
+                      : params.totalQuestions,
+          };
+      }
+
+      if (rpcError) {
+          const errCode = String((rpcError as { code?: string }).code || '');
+          const errMsg = String(rpcError.message || '');
+          const isMissingRpc =
+              errCode === 'PGRST202' ||
+              errCode === '42883' ||
+              /could not find the function|function .*teacher_grade_manual_question.* does not exist/i.test(errMsg);
+
+          if (!isMissingRpc) {
+              throw new Error(errMsg || 'Gagal menyimpan nilai koreksi manual siswa.');
+          }
+      }
+
+      // Fallback update langsung jika fungsi RPC baru belum terpasang di Supabase
+      let baseAnswers = params.nextAnswers;
+      let targetQuery = supabase
+          .from('results')
+          .select('id, answers');
+      targetQuery = validResultId
+          ? targetQuery.eq('id', validResultId).eq('exam_code', params.examCode)
+          : targetQuery.eq('exam_code', params.examCode).eq('student_id', params.studentId);
+      const { data: latestRow } = await targetQuery.maybeSingle();
+
+      if (latestRow?.answers && typeof latestRow.answers === 'object') {
+          baseAnswers = {
+              ...(latestRow.answers as Record<string, string>),
+              ...params.nextAnswers,
+              [`_grade_${params.questionId}`]: expectedGrade,
+          };
+      }
+
+      const roundedScore = Math.round(Number(params.nextScore));
+      const roundedCorrect = Math.round(Number(params.nextCorrectAnswers));
+      const targetRowId = latestRow?.id ? Number(latestRow.id) : validResultId;
+
+      let updateQuery = supabase
+          .from('results')
+          .update({
+              answers: baseAnswers,
+              score: roundedScore,
+              correct_answers: roundedCorrect,
+              updated_at: new Date().toISOString(),
+          });
+
+      updateQuery = targetRowId
+          ? updateQuery.eq('id', targetRowId).eq('exam_code', params.examCode)
+          : updateQuery.eq('exam_code', params.examCode).eq('student_id', params.studentId);
+
+      const { data: updatedRow, error: updateError } = await updateQuery
+          .select('id, answers, score, correct_answers, total_questions')
+          .maybeSingle();
+
+      if (updateError) {
+          throw new Error(updateError.message || 'Gagal menyimpan penilaian esai ke database.');
+      }
+
+      if (!updatedRow) {
+          throw new Error(
+              'Perubahan nilai ditolak oleh kebijakan akses database atau data siswa tidak ditemukan.'
+          );
+      }
+
+      const savedAnswers = (updatedRow.answers as Record<string, string>) || {};
+      const savedGrade = savedAnswers[`_grade_${params.questionId}`];
+      if (
+          savedGrade !== expectedGrade ||
+          Number(updatedRow.score) !== roundedScore ||
+          Number(updatedRow.correct_answers) !== roundedCorrect
+      ) {
+          throw new Error(
+              'Database menolak penyimpanan nilai esai. Pastikan skrip fungsi RPC SQL terbaru telah dijalankan di Supabase dan akun Anda memiliki hak akses.'
+          );
+      }
+
+      return {
+          id: Number(updatedRow.id),
+          answers: savedAnswers,
+          score: Number(updatedRow.score),
+          correctAnswers: Number(updatedRow.correct_answers),
+          totalQuestions:
+              updatedRow.total_questions !== undefined
+                  ? Number(updatedRow.total_questions)
+                  : params.totalQuestions,
+      };
   }
 
   async deleteStudentResult(examCode: string, studentId: string): Promise<void> {
