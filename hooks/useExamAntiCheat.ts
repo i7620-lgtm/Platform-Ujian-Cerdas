@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import type { Exam, Student, Result, ResultStatus } from '../types';
 import { storageService } from '../services/storage';
 import { computeStudentExamDeadline } from '../utils/scheduleUtils';
+import { getAntiCheatBlurThresholds } from '../utils/platformUtils';
 
 interface UseExamAntiCheatProps {
     student: Student;
@@ -106,6 +107,7 @@ export const useExamAntiCheat = ({
         const isPR = (exam.config.examMode || '').trim().toUpperCase() === 'PR';
         if (student.class === 'PREVIEW' || !exam.config.detectBehavior || isPR) return;
 
+        const { softLogDelayMs, hardLockDelayMs } = getAntiCheatBlurThresholds();
         let blurTimeout: ReturnType<typeof setTimeout> | null = null;
         let notifLockTimeout: ReturnType<typeof setTimeout> | null = null;
 
@@ -120,7 +122,7 @@ export const useExamAntiCheat = ({
                 logs: logRef.current,
             });
 
-            // Hanya kunci sesi jika merupakan pelanggaran 'hard' (terbukti meninggalkan aplikasi/tab atau buka notifikasi > 5 detik)
+            // Hanya kunci sesi jika merupakan pelanggaran 'hard' (terbukti meninggalkan aplikasi/tab atau buka notifikasi melewati batas toleransi)
             if (type === 'hard' && exam.config.continueWithPermission) {
                 onForceSubmit(true, 'force_closed');
             }
@@ -131,6 +133,14 @@ export const useExamAntiCheat = ({
                 // Konfirmasi pasti bahwa aplikasi ditinggalkan / diminimalkan
                 handleViolation('hard', 'Meninggalkan halaman / beralih aplikasi');
             }
+        };
+
+        const handlePageHide = () => {
+            // Safari/WebKit iOS mengandalkan pagehide untuk persistensi lokal sebelum halaman dibekukan/ditutup
+            storageService.saveLocalProgress(storageKey, {
+                answers: answersRef.current,
+                logs: logRef.current,
+            });
         };
 
         const handleBlur = () => {
@@ -150,7 +160,7 @@ export const useExamAntiCheat = ({
                 return;
             }
 
-            // 2. Berikan toleransi waktu 1500ms untuk pencatatan log awal jika kehilangan fokus
+            // 2. Berikan toleransi adaptif (1.5s desktop / 3s perangkat sentuh-iOS) untuk pencatatan log awal
             if (blurTimeout) clearTimeout(blurTimeout);
             blurTimeout = setTimeout(() => {
                 if (document.hidden && !isSubmittingRef.current) {
@@ -158,16 +168,18 @@ export const useExamAntiCheat = ({
                 } else if (!document.hasFocus() && !isSubmittingRef.current) {
                     handleViolation('soft', 'Kehilangan fokus sementara / notifikasi');
                 }
-            }, 1500);
+            }, softLogDelayMs);
 
-            // 3. Batas toleransi 5 detik (5000ms): Jika siswa tetap melihat notifikasi / tidak kembali fokus selama > 5 detik,
-            // dan guru mengaktifkan 'Kunci Akses Jika Melanggar' (continueWithPermission), kunci aplikasi secara otomatis
+            // 3. Batas toleransi kunci akses adaptif (5s desktop / 8s perangkat sentuh-iOS)
             if (notifLockTimeout) clearTimeout(notifLockTimeout);
             notifLockTimeout = setTimeout(() => {
                 if (!isSubmittingRef.current && (!document.hasFocus() || document.hidden)) {
-                    handleViolation('hard', 'Melihat notifikasi / kehilangan fokus lebih dari 5 detik');
+                    handleViolation(
+                        'hard',
+                        `Melihat notifikasi / kehilangan fokus lebih dari ${Math.round(hardLockDelayMs / 1000)} detik`,
+                    );
                 }
-            }, 5000);
+            }, hardLockDelayMs);
         };
 
         const handleFocus = () => {
@@ -183,6 +195,7 @@ export const useExamAntiCheat = ({
         };
 
         document.addEventListener('visibilitychange', handleVisibilityChange);
+        window.addEventListener('pagehide', handlePageHide);
         window.addEventListener('blur', handleBlur);
         window.addEventListener('focus', handleFocus);
 
@@ -190,6 +203,7 @@ export const useExamAntiCheat = ({
             if (blurTimeout) clearTimeout(blurTimeout);
             if (notifLockTimeout) clearTimeout(notifLockTimeout);
             document.removeEventListener('visibilitychange', handleVisibilityChange);
+            window.removeEventListener('pagehide', handlePageHide);
             window.removeEventListener('blur', handleBlur);
             window.removeEventListener('focus', handleFocus);
         };
