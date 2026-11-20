@@ -6,9 +6,10 @@ import { resultService } from './result';
 import { archiveService } from './archive';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import type { Exam, Result, Question, TeacherProfile, AccountType, UserProfile, ExamSummary, ExamConfig, ResultStatus } from '../types';
+import type { StudentIdentityCandidate } from '../utils/studentIdentity';
 
 // --- INDEXED DB HELPER ---
-import { offlineService } from './offline';
+import { offlineService, type QueuedResult } from './offline';
 
 class StorageService {
 
@@ -169,36 +170,40 @@ class StorageService {
       return offlineService.waitForQueueSaved();
   }
 
-  hasPendingSubmission(examCode: string, studentId: string): boolean {
-      return offlineService.hasPendingSubmission(examCode, studentId);
+  findQueuedSubmission(examCode: string, studentOrId: string | StudentIdentityCandidate, options?: { onlyFinal?: boolean }): QueuedResult | null {
+      return offlineService.findQueuedSubmission(examCode, studentOrId, options);
   }
 
-  hasFailedSubmission(examCode: string, studentId: string): boolean {
-      return offlineService.hasFailedSubmission(examCode, studentId);
+  hasPendingSubmission(examCode: string, studentId: string, studentHint?: StudentIdentityCandidate): boolean {
+      return offlineService.hasPendingSubmission(examCode, studentId, studentHint);
   }
 
-  getFailedSubmission(examCode: string, studentId: string) {
-      return offlineService.getFailedSubmission(examCode, studentId);
+  hasFailedSubmission(examCode: string, studentId: string, studentHint?: StudentIdentityCandidate): boolean {
+      return offlineService.hasFailedSubmission(examCode, studentId, studentHint);
   }
 
-  getSubmissionSyncState(examCode: string, studentId: string) {
-      return offlineService.getSubmissionSyncState(examCode, studentId);
+  getFailedSubmission(examCode: string, studentId: string, studentHint?: StudentIdentityCandidate) {
+      return offlineService.getFailedSubmission(examCode, studentId, studentHint);
+  }
+
+  getSubmissionSyncState(examCode: string, studentId: string, studentHint?: StudentIdentityCandidate) {
+      return offlineService.getSubmissionSyncState(examCode, studentId, studentHint);
   }
 
   subscribeQueueChange(listener: () => void): () => void {
       return offlineService.subscribeQueueChange(listener);
   }
 
-  async retryQueuedSubmission(examCode: string, studentId: string): Promise<boolean> {
-      return offlineService.retryQueuedSubmission(examCode, studentId);
+  async retryQueuedSubmission(examCode: string, studentId: string, studentHint?: StudentIdentityCandidate): Promise<boolean> {
+      return offlineService.retryQueuedSubmission(examCode, studentId, studentHint);
   }
 
-  async getStudentResult(examCode: string, studentId: string): Promise<Result | null> {
-      return resultService.getStudentResult(examCode, studentId);
+  async getStudentResult(examCode: string, studentId: string, studentHint?: StudentIdentityCandidate): Promise<Result | null> {
+      return resultService.getStudentResult(examCode, studentId, studentHint);
   }
 
-  async getStudentResultStatus(examCode: string, studentId: string): Promise<{ result: Result | null; isNetworkError: boolean }> {
-      return resultService.getStudentResultStatus(examCode, studentId);
+  async getStudentResultStatus(examCode: string, studentId: string, studentHint?: StudentIdentityCandidate): Promise<{ result: Result | null; isNetworkError: boolean }> {
+      return resultService.getStudentResultStatus(examCode, studentId, studentHint);
   }
 
   async unlockStudentExam(examCode: string, studentId: string, proctorToken?: string): Promise<void> {
