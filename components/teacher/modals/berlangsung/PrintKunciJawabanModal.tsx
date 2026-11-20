@@ -790,6 +790,10 @@ export const PrintKunciJawabanModal: React.FC<PrintKunciJawabanModalProps> = ({
             padding: 0 !important;
             max-width: 100% !important;
           }
+          .print-kunci-content .print-table-scroll {
+            overflow: visible !important;
+            max-width: 100% !important;
+          }
           .print-kunci-content table:not(.default-identity-table) {
             width: 100% !important;
             max-width: 100% !important;
@@ -917,6 +921,131 @@ export const PrintKunciJawabanModal: React.FC<PrintKunciJawabanModalProps> = ({
           display: block !important;
           margin: 6px auto !important;
         }
+
+        /* Smartphone Screen Preview Only (never affects @media print / A4 output) */
+        @media screen and (max-width: 639px) {
+          .print-kunci-modal-wrapper {
+            overflow-x: hidden !important;
+          }
+          .print-kunci-content {
+            width: 100% !important;
+            max-width: 100% !important;
+            overflow-x: hidden !important;
+            box-sizing: border-box !important;
+          }
+          .print-kunci-content .school-letterhead-root .flex {
+            gap: 6px !important;
+          }
+          .print-kunci-content .school-letterhead-root .school-letterhead-logo-container {
+            width: 40px !important;
+            height: 40px !important;
+            max-width: 40px !important;
+            max-height: 40px !important;
+          }
+          .print-kunci-content .school-letterhead-root img.school-letterhead-logo,
+          .print-kunci-content .school-letterhead-root .school-letterhead-logo {
+            max-width: 38px !important;
+            max-height: 38px !important;
+          }
+          .print-kunci-content .school-letterhead-root .kop-aksara-pemda,
+          .print-kunci-content .school-letterhead-root .kop-aksara-dinas {
+            font-size: 8.5px !important;
+            line-height: 1.2 !important;
+          }
+          .print-kunci-content .school-letterhead-root .kop-text-pemda,
+          .print-kunci-content .school-letterhead-root .kop-text-dinas {
+            font-size: 9px !important;
+            line-height: 1.2 !important;
+          }
+          .print-kunci-content .school-letterhead-root .kop-aksara-sekolah {
+            font-size: 9.5px !important;
+            line-height: 1.2 !important;
+          }
+          .print-kunci-content .school-letterhead-root .kop-text-sekolah {
+            font-size: 10.5px !important;
+            line-height: 1.2 !important;
+          }
+          .print-kunci-content .school-letterhead-root .kop-aksara-alamat,
+          .print-kunci-content .school-letterhead-root .kop-text-alamat,
+          .print-kunci-content .school-letterhead-root .kop-text-kontak {
+            font-size: 8px !important;
+            line-height: 1.2 !important;
+          }
+          .print-kunci-content .formal-id-block {
+            max-width: 100% !important;
+            font-size: 10.5px !important;
+          }
+          .print-kunci-content .formal-id-row {
+            grid-template-columns: 110px 10px 1fr !important;
+          }
+          .print-kunci-content table.default-identity-table {
+            font-size: 10px !important;
+            line-height: 1.3 !important;
+          }
+          .print-kunci-content table.default-identity-table td {
+            padding: 2px 3px 2px 0 !important;
+            word-break: break-word !important;
+          }
+          .print-kunci-content .table-responsive-wrapper,
+          .print-kunci-content .print-table-scroll {
+            display: block !important;
+            width: 100% !important;
+            max-width: 100% !important;
+            overflow-x: auto !important;
+            overflow-y: hidden !important;
+            -webkit-overflow-scrolling: touch !important;
+            margin: 0.4rem 0 !important;
+          }
+          .print-kunci-content table:not(.default-identity-table) {
+            width: 100% !important;
+            max-width: none !important;
+            font-size: 10.5px !important;
+            line-height: 1.35 !important;
+          }
+          .print-kunci-content table:not(.default-identity-table) th,
+          .print-kunci-content table:not(.default-identity-table) td {
+            padding: 4px 5px !important;
+            font-size: 10.5px !important;
+          }
+          .print-kunci-content .print-chart-container {
+            width: 100% !important;
+            max-width: 100% !important;
+            padding: 6px !important;
+            overflow: hidden !important;
+          }
+          .print-kunci-content .recharts-wrapper {
+            width: 100% !important;
+            max-width: 100% !important;
+            height: auto !important;
+            aspect-ratio: 400 / 190;
+          }
+          .print-kunci-content .recharts-surface {
+            width: 100% !important;
+            max-width: 100% !important;
+            height: auto !important;
+          }
+          .print-kunci-content .geometry-shape {
+            max-width: 100% !important;
+            width: 100% !important;
+            overflow: hidden !important;
+          }
+          .print-kunci-content .geometry-shape svg {
+            max-width: 100% !important;
+            width: auto !important;
+            height: auto !important;
+          }
+          .print-kunci-content img:not(.school-letterhead-root *),
+          .print-kunci-content svg:not(.katex *):not(.lucide):not(.geometry-shape *):not(.geometry-shape):not(.school-letterhead-root *) {
+            max-width: min(280px, 100%) !important;
+            height: auto !important;
+          }
+          .print-kunci-content .katex-display {
+            max-width: 100% !important;
+            overflow-x: auto !important;
+            overflow-y: hidden !important;
+            padding-bottom: 2px !important;
+          }
+        }
       `;
       document.head.appendChild(style);
       return () => {
@@ -945,30 +1074,49 @@ export const PrintKunciJawabanModal: React.FC<PrintKunciJawabanModalProps> = ({
   const currentYear = new Date().getFullYear();
 
   return createPortal(
-    <div className="print-kunci-modal-wrapper fixed inset-0 bg-white z-[9999] overflow-y-auto">
+    <div className="print-kunci-modal-wrapper fixed inset-0 bg-white z-[9999] overflow-y-auto overflow-x-hidden print:static print:overflow-visible">
       {/* Screen Toolbar */}
-      <div className="no-print sticky top-0 bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 px-4 py-3 flex flex-wrap justify-between items-center shadow-sm z-10 gap-3">
-        <div className="flex items-center gap-3">
-          <div className="p-2 bg-amber-50 dark:bg-amber-950/50 text-amber-600 dark:text-amber-400 rounded-xl">
-            <CheckCircleIcon className="w-5 h-5" />
+      <div className="no-print sticky top-0 w-full max-w-full bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 px-3 py-2 sm:px-4 sm:py-3 flex flex-col sm:flex-row sm:justify-between sm:items-center shadow-sm z-20 gap-2 sm:gap-3">
+        {/* Row 1 (Mobile): Title + Metadata + Close Button */}
+        <div className="flex items-center justify-between gap-2 min-w-0 sm:flex-1">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
+            <div className="p-1.5 sm:p-2 bg-amber-50 dark:bg-amber-950/50 text-amber-600 dark:text-amber-400 rounded-lg sm:rounded-xl shrink-0">
+              <CheckCircleIcon className="w-4 h-4 sm:w-5 sm:h-5" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <h2 className="text-sm sm:text-base font-bold text-slate-800 dark:text-white truncate">
+                Pratinjau Kunci Jawaban & Pembahasan
+              </h2>
+              <p className="text-[11px] sm:text-xs text-slate-500 dark:text-slate-400 truncate tabular-nums">
+                <span className="sm:hidden">
+                  {exam.config?.subject || "Ujian"} · {actualQuestions.length} Soal
+                </span>
+                <span className="hidden sm:inline">
+                  {exam.config?.subject || "Ujian"} • {actualQuestions.length} Butir Soal • Format Cetak Standar PDF
+                </span>
+              </p>
+            </div>
           </div>
-          <div>
-            <h2 className="text-base font-bold text-slate-800 dark:text-white">
-              Pratinjau Kunci Jawaban & Pembahasan
-            </h2>
-            <p className="text-xs text-slate-500 dark:text-slate-400">
-              {exam.config?.subject || "Ujian"} • {actualQuestions.length} Butir Soal • Format Cetak Standar PDF
-            </p>
-          </div>
+
+          <button
+            type="button"
+            onClick={onClose}
+            className="sm:hidden shrink-0 min-h-[40px] min-w-[40px] inline-flex items-center justify-center border border-slate-200 dark:border-slate-700 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-400 transition-colors cursor-pointer"
+            title="Tutup Pratinjau"
+            aria-label="Tutup Pratinjau"
+          >
+            <XMarkIcon className="w-5 h-5" />
+          </button>
         </div>
 
-        <div className="flex items-center gap-2">
+        {/* Row 2 (Mobile) / Right Controls (Tablet & Desktop) */}
+        <div className="flex items-center justify-between sm:justify-end gap-2 min-w-0 shrink-0">
           {/* Tombol Pengalihan Tampilan Kop: Default vs Kop Sekolah */}
-          <div className="flex items-center bg-slate-100 dark:bg-slate-700/60 p-0.5 rounded-lg border border-slate-200 dark:border-slate-600">
+          <div className="flex items-center bg-slate-100 dark:bg-slate-700/60 p-0.5 rounded-lg border border-slate-200 dark:border-slate-600 shrink-0">
             <button
               type="button"
               onClick={() => setHeaderMode("default")}
-              className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all cursor-pointer ${
+              className={`min-h-[36px] sm:min-h-0 px-2.5 sm:px-3 py-1.5 rounded-md text-[11px] sm:text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${
                 headerMode === "default"
                   ? "bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 shadow-xs"
                   : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
@@ -980,30 +1128,34 @@ export const PrintKunciJawabanModal: React.FC<PrintKunciJawabanModalProps> = ({
             <button
               type="button"
               onClick={() => setHeaderMode("kop")}
-              className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all cursor-pointer ${
+              className={`min-h-[36px] sm:min-h-0 px-2.5 sm:px-3 py-1.5 rounded-md text-[11px] sm:text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${
                 headerMode === "kop"
                   ? "bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 shadow-xs"
                   : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
               }`}
               title="Tampilkan Kop Resmi Sekolah (Dwibahasa Aksara Bali / Latin)"
             >
-              Kop Sekolah
+              <span className="sm:hidden">Kop</span>
+              <span className="hidden sm:inline">Kop Sekolah</span>
             </button>
           </div>
 
           <button
             type="button"
             onClick={() => window.print()}
-            className="flex items-center gap-1.5 px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold transition-colors shadow-sm cursor-pointer"
+            className="shrink-0 min-h-[38px] sm:min-h-0 inline-flex items-center justify-center gap-1.5 px-3 sm:px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-[11px] sm:text-xs font-bold whitespace-nowrap transition-colors shadow-sm cursor-pointer"
           >
-            <PrinterIcon className="w-4 h-4" />
-            <span>Cetak (PDF)</span>
+            <PrinterIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
+            <span className="sm:hidden">Cetak PDF</span>
+            <span className="hidden sm:inline">Cetak (PDF)</span>
           </button>
+
           <button
             type="button"
             onClick={onClose}
-            className="p-1.5 border border-slate-200 dark:border-slate-700 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-400 transition-colors cursor-pointer"
+            className="hidden sm:inline-flex p-1.5 border border-slate-200 dark:border-slate-700 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-400 transition-colors cursor-pointer"
             title="Tutup Pratinjau"
+            aria-label="Tutup Pratinjau"
           >
             <XMarkIcon className="w-5 h-5" />
           </button>
@@ -1012,12 +1164,12 @@ export const PrintKunciJawabanModal: React.FC<PrintKunciJawabanModalProps> = ({
 
       {/* Printable Sheet (Calibrated A4 Width 794px with 14mm padding) */}
       <div
-        className="print-kunci-content max-w-[794px] mx-auto bg-white px-5 py-6 sm:px-[14mm] sm:py-[12mm] text-black"
+        className="print-kunci-content w-full max-w-[794px] mx-auto bg-white px-3 py-4 sm:px-[14mm] sm:py-[12mm] print:px-0 print:py-0 text-black box-border"
         ref={printContainerRef}
       >
         {/* Render Kop Sekolah Resmi jika mode "kop", atau Kop Resmi Standar jika mode "default" */}
         {headerMode === "kop" ? (
-          <div className="print-kunci-header mb-5 pb-2">
+          <div className="print-kunci-header mb-4 sm:mb-5 print:mb-5 pb-2 min-w-0 max-w-full">
             <FormalPrintDocHeader
               profile={profile}
               examType={exam.config?.examType}
@@ -1033,39 +1185,39 @@ export const PrintKunciJawabanModal: React.FC<PrintKunciJawabanModalProps> = ({
             />
           </div>
         ) : (
-          <div className="print-kunci-header mb-5 border-b-2 border-black pb-3">
+          <div className="print-kunci-header mb-4 sm:mb-5 print:mb-5 border-b-2 border-black pb-2.5 sm:pb-3 print:pb-3">
             <div className="mb-2">
-              <div className="flex items-center justify-between border-b border-black pb-2 mb-2">
-                <div className="text-left">
-                  <h2 className="text-sm font-extrabold uppercase tracking-wide text-black leading-tight">
+              <div className="flex items-center justify-between gap-2 border-b border-black pb-2 mb-2">
+                <div className="text-left min-w-0 flex-1">
+                  <h2 className="text-xs sm:text-sm print:text-sm font-extrabold uppercase tracking-wide text-black leading-tight break-words">
                     {exam.authorSchool || profile?.school || "SATUAN PENDIDIKAN"}
                   </h2>
-                  <p className="text-[11px] font-semibold text-slate-700">
+                  <p className="text-[10px] sm:text-[11px] print:text-[11px] font-semibold text-slate-700">
                     TAHUN PELAJARAN {currentYear}/{currentYear + 1}
                   </p>
                 </div>
-                <div className="text-right">
-                  <span className="inline-block px-2.5 py-0.5 border border-black font-bold text-[11px] uppercase tracking-wider">
+                <div className="text-right shrink-0">
+                  <span className="inline-block px-2 sm:px-2.5 print:px-2.5 py-0.5 border border-black font-bold text-[10px] sm:text-[11px] print:text-[11px] uppercase tracking-wider whitespace-nowrap">
                     KUNCI JAWABAN
                   </span>
                 </div>
               </div>
 
-              <div className="text-center my-3">
-                <h3 className="text-sm font-extrabold uppercase tracking-wider text-black underline underline-offset-4">
+              <div className="text-center my-2.5 sm:my-3 print:my-3">
+                <h3 className="text-xs sm:text-sm print:text-sm font-extrabold uppercase tracking-wider text-black underline underline-offset-4">
                   KUNCI JAWABAN & PEDOMAN PENILAIAN
                 </h3>
               </div>
             </div>
 
-            <table className="default-identity-table w-full text-xs font-semibold mt-2 border-t border-black pt-2">
+            <table className="default-identity-table w-full text-[10.5px] sm:text-xs print:text-xs font-semibold mt-2 border-t border-black pt-2">
               <tbody>
                 <tr>
-                  <td className="w-28 py-0.5">Mata Pelajaran</td>
-                  <td className="w-3">:</td>
+                  <td className="w-[78px] sm:w-28 print:w-28 py-0.5">Mata Pelajaran</td>
+                  <td className="w-2.5 sm:w-3 print:w-3">:</td>
                   <td className="font-bold">{exam.config?.subject || "-"}</td>
-                  <td className="w-24 py-0.5">Kelas / Jenjang</td>
-                  <td className="w-3">:</td>
+                  <td className="w-[68px] sm:w-24 print:w-24 py-0.5">Kelas / Jenjang</td>
+                  <td className="w-2.5 sm:w-3 print:w-3">:</td>
                   <td className="font-bold">{exam.config?.classLevel || "-"}</td>
                 </tr>
                 <tr>
@@ -1098,41 +1250,43 @@ export const PrintKunciJawabanModal: React.FC<PrintKunciJawabanModalProps> = ({
         )}
 
         {/* SEKSI 1: TABEL MATRIKS RINGKASAN KUNCI JAWABAN */}
-        <div className="mb-6">
-          <div className="print-kunci-section-title bg-slate-100 border border-black px-3 py-1.5 font-bold text-xs uppercase tracking-wide mb-2">
+        <div className="mb-6 min-w-0 max-w-full">
+          <div className="print-kunci-section-title bg-slate-100 border border-black px-2.5 sm:px-3 print:px-3 py-1.5 font-bold text-[11px] sm:text-xs print:text-xs uppercase tracking-wide mb-2">
             I. Tabel Ringkasan Kunci Jawaban
           </div>
-          <table className="print-kunci-summary-table w-full border-collapse border border-black text-xs">
-            <thead>
-              <tr className="bg-slate-50 text-black">
-                <th className="border border-black px-2 py-1.5 text-center w-12 font-bold">No.</th>
-                <th className="border border-black px-3 py-1.5 text-left w-36 font-bold">Bentuk Soal</th>
-                <th className="border border-black px-3 py-1.5 text-left font-bold">Kunci Jawaban</th>
-                <th className="border border-black px-2 py-1.5 text-center w-20 font-bold">Bobot</th>
-              </tr>
-            </thead>
-            <tbody>
-              {actualQuestions.map((q, idx) => (
-                <tr key={q.id || idx} className="hover:bg-slate-50/50">
-                  <td className="border border-black px-2 py-1 text-center font-bold">{idx + 1}</td>
-                  <td className="border border-black px-3 py-1 font-medium">{formatQuestionType(q.questionType)}</td>
-                  <td className="border border-black px-3 py-1 font-bold text-slate-900 font-mono text-[11px]">
-                    {getShortAnswerSummary(q)}
-                  </td>
-                  <td className="border border-black px-2 py-1 text-center">{q.scoreWeight || 1}</td>
+          <div className="print-table-scroll overflow-x-auto print:overflow-visible max-w-full">
+            <table className="print-kunci-summary-table w-full border-collapse border border-black text-xs">
+              <thead>
+                <tr className="bg-slate-50 text-black">
+                  <th className="border border-black px-2 py-1.5 text-center w-10 sm:w-12 print:w-12 font-bold">No.</th>
+                  <th className="border border-black px-2 sm:px-3 print:px-3 py-1.5 text-left w-24 sm:w-36 print:w-36 font-bold">Bentuk Soal</th>
+                  <th className="border border-black px-2 sm:px-3 print:px-3 py-1.5 text-left font-bold">Kunci Jawaban</th>
+                  <th className="border border-black px-2 py-1.5 text-center w-14 sm:w-20 print:w-20 font-bold">Bobot</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {actualQuestions.map((q, idx) => (
+                  <tr key={q.id || idx} className="hover:bg-slate-50/50">
+                    <td className="border border-black px-2 py-1 text-center font-bold tabular-nums">{idx + 1}</td>
+                    <td className="border border-black px-2 sm:px-3 print:px-3 py-1 font-medium">{formatQuestionType(q.questionType)}</td>
+                    <td className="border border-black px-2 sm:px-3 print:px-3 py-1 font-bold text-slate-900 font-mono text-[10.5px] sm:text-[11px] print:text-[11px] break-words">
+                      {getShortAnswerSummary(q)}
+                    </td>
+                    <td className="border border-black px-2 py-1 text-center tabular-nums">{q.scoreWeight || 1}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
 
         {/* SEKSI 2: NASKAH SOAL LENGKAP DENGAN KUNCI & PEMBAHASAN */}
-        <div className="page-break-before pt-2">
-          <div className="print-kunci-section-title bg-slate-100 border border-black px-3 py-1.5 font-bold text-xs uppercase tracking-wide mb-4">
+        <div className="page-break-before pt-2 min-w-0 max-w-full">
+          <div className="print-kunci-section-title bg-slate-100 border border-black px-2.5 sm:px-3 print:px-3 py-1.5 font-bold text-[11px] sm:text-xs print:text-xs uppercase tracking-wide mb-4">
             II. Pembahasan Butir Soal Terperinci
           </div>
 
-          <div className="space-y-5">
+          <div className="space-y-4 sm:space-y-5 print:space-y-5 min-w-0 max-w-full">
             {actualQuestions.map((q, qIdx) => {
               const explanation = getExplanation(q);
               const tfRows = q.questionType === "TRUE_FALSE" ? getTrueFalseRows(q) : [];
@@ -1141,31 +1295,31 @@ export const PrintKunciJawabanModal: React.FC<PrintKunciJawabanModalProps> = ({
               return (
                 <div
                   key={q.id || qIdx}
-                  className="avoid-break p-3.5 border border-slate-300 rounded-lg text-xs space-y-2.5"
+                  className="avoid-break p-2.5 sm:p-3.5 print:p-3.5 border border-slate-300 rounded-lg text-[11.5px] sm:text-xs print:text-xs space-y-2.5 min-w-0 max-w-full"
                 >
                   {/* Nomor dan Meta */}
-                  <div className="flex items-center justify-between border-b border-slate-200 pb-1.5">
-                    <div className="flex items-center gap-2">
-                      <span className="w-5 h-5 bg-black text-white rounded-full flex items-center justify-center font-bold text-[10px]">
+                  <div className="flex items-center justify-between gap-2 border-b border-slate-200 pb-1.5 min-w-0">
+                    <div className="flex items-center flex-wrap gap-1.5 sm:gap-2 min-w-0 flex-1">
+                      <span className="w-5 h-5 bg-black text-white rounded-full flex items-center justify-center font-bold text-[10px] shrink-0 tabular-nums">
                         {qIdx + 1}
                       </span>
                       <span className="font-bold text-[11px] text-slate-800">
                         {formatQuestionType(q.questionType)}
                       </span>
                       {q.category && (
-                        <span className="text-[10px] text-slate-500 font-medium">
+                        <span className="text-[10px] text-slate-500 font-medium break-words">
                           • {q.category}
                         </span>
                       )}
                     </div>
-                    <span className="text-[10px] font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
+                    <span className="shrink-0 text-[10px] font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded border border-slate-200 tabular-nums">
                       Bobot: {q.scoreWeight || 1}
                     </span>
                   </div>
 
                   {/* Teks Soal */}
                   <div
-                    className="font-normal text-slate-900 leading-relaxed"
+                    className="font-normal text-slate-900 leading-relaxed min-w-0 max-w-full break-words"
                     dangerouslySetInnerHTML={{ __html: renderFormattedHtml(q.questionText) }}
                   />
 
@@ -1176,11 +1330,11 @@ export const PrintKunciJawabanModal: React.FC<PrintKunciJawabanModalProps> = ({
 
                   {/* Image Stimulus */}
                   {q.imageUrl && q.imageUrl.trim() !== "" && (
-                    <div className="my-2 text-center">
+                    <div className="my-2 text-center max-w-full">
                       <img 
                         src={q.imageUrl} 
                         alt="Gambar Soal" 
-                        className="max-w-[280px] max-h-[220px] object-contain rounded border border-slate-200 mx-auto" 
+                        className="max-w-full sm:max-w-[280px] print:max-w-[280px] max-h-[220px] object-contain rounded border border-slate-200 mx-auto" 
                         onError={(e) => {
                           (e.currentTarget as HTMLElement).style.display = "none";
                         }}
@@ -1190,23 +1344,23 @@ export const PrintKunciJawabanModal: React.FC<PrintKunciJawabanModalProps> = ({
 
                   {/* Pilihan Ganda (MC) */}
                   {q.questionType === "MULTIPLE_CHOICE" && q.options && (
-                    <div className="space-y-1.5 pl-2">
+                    <div className="space-y-1.5 pl-1 sm:pl-2 print:pl-2 min-w-0 max-w-full">
                       {q.options.map((opt, oIdx) => {
                         const isCorrect = isCorrectMCOption(q, opt, oIdx);
                         return (
                           <div
                             key={oIdx}
-                            className={`flex items-baseline gap-2 p-1.5 rounded border text-xs ${
+                            className={`flex items-baseline gap-1.5 sm:gap-2 print:gap-2 p-1.5 rounded border text-[11px] sm:text-xs print:text-xs min-w-0 max-w-full ${
                               isCorrect
                                 ? "bg-emerald-50 border-emerald-400 font-bold text-emerald-950"
                                 : "border-transparent text-slate-700"
                             }`}
                           >
-                            <span className="w-4 font-bold">{String.fromCharCode(65 + oIdx)}.</span>
+                            <span className="w-4 font-bold shrink-0">{String.fromCharCode(65 + oIdx)}.</span>
                             <div
-                              className="flex-1"
+                              className="flex-1 min-w-0 max-w-full break-words"
                             >
-                              <div className="option-content" dangerouslySetInnerHTML={{ __html: renderFormattedHtml(opt) }} />
+                              <div className="option-content min-w-0 max-w-full" dangerouslySetInnerHTML={{ __html: renderFormattedHtml(opt) }} />
                               {q.optionImages?.[oIdx] && (
                                 <img 
                                   src={q.optionImages[oIdx]!} 
@@ -1219,7 +1373,7 @@ export const PrintKunciJawabanModal: React.FC<PrintKunciJawabanModalProps> = ({
                               )}
                             </div>
                             {isCorrect && (
-                              <span className="text-[9px] font-bold text-emerald-700 uppercase tracking-wider shrink-0 bg-emerald-100 px-1.5 py-0.5 rounded border border-emerald-200">
+                              <span className="text-[9px] font-bold text-emerald-700 uppercase tracking-wider shrink-0 bg-emerald-100 px-1.5 py-0.5 rounded border border-emerald-200 whitespace-nowrap">
                                 Kunci Benar
                               </span>
                             )}
@@ -1231,23 +1385,23 @@ export const PrintKunciJawabanModal: React.FC<PrintKunciJawabanModalProps> = ({
 
                   {/* Pilihan Ganda Kompleks (CMC) */}
                   {q.questionType === "COMPLEX_MULTIPLE_CHOICE" && q.options && (
-                    <div className="space-y-1.5 pl-2">
+                    <div className="space-y-1.5 pl-1 sm:pl-2 print:pl-2 min-w-0 max-w-full">
                       {q.options.map((opt, oIdx) => {
                         const isSelected = isCorrectCMCOption(q, opt, oIdx);
                         return (
                           <div
                             key={oIdx}
-                            className={`flex items-baseline gap-2 p-1.5 rounded border text-xs ${
+                            className={`flex items-baseline gap-1.5 sm:gap-2 print:gap-2 p-1.5 rounded border text-[11px] sm:text-xs print:text-xs min-w-0 max-w-full ${
                               isSelected
                                 ? "bg-emerald-50 border-emerald-400 font-bold text-emerald-950"
                                 : "border-transparent text-slate-700"
                             }`}
                           >
-                            <span className="w-4 font-bold">{String.fromCharCode(65 + oIdx)}.</span>
+                            <span className="w-4 font-bold shrink-0">{String.fromCharCode(65 + oIdx)}.</span>
                             <div
-                              className="flex-1"
+                              className="flex-1 min-w-0 max-w-full break-words"
                             >
-                              <div className="option-content" dangerouslySetInnerHTML={{ __html: renderFormattedHtml(opt) }} />
+                              <div className="option-content min-w-0 max-w-full" dangerouslySetInnerHTML={{ __html: renderFormattedHtml(opt) }} />
                               {q.optionImages?.[oIdx] && (
                                 <img 
                                   src={q.optionImages[oIdx]!} 
@@ -1260,7 +1414,7 @@ export const PrintKunciJawabanModal: React.FC<PrintKunciJawabanModalProps> = ({
                               )}
                             </div>
                             {isSelected && (
-                              <span className="text-[9px] font-bold text-emerald-700 uppercase tracking-wider shrink-0 bg-emerald-100 px-1.5 py-0.5 rounded border border-emerald-200">
+                              <span className="text-[9px] font-bold text-emerald-700 uppercase tracking-wider shrink-0 bg-emerald-100 px-1.5 py-0.5 rounded border border-emerald-200 whitespace-nowrap">
                                 Kunci Benar
                               </span>
                             )}
@@ -1272,65 +1426,69 @@ export const PrintKunciJawabanModal: React.FC<PrintKunciJawabanModalProps> = ({
 
                   {/* Benar / Salah (TF) */}
                   {q.questionType === "TRUE_FALSE" && tfRows.length > 0 && (
-                    <table className="w-full border-collapse border border-black text-[11px] mt-1 table-fixed">
-                      <thead>
-                        <tr className="bg-slate-100">
-                          <th className="border border-black px-2 py-1 text-left font-bold">Pernyataan</th>
-                          <th className="border border-black px-2 py-1 text-center w-[100px] font-bold">Kunci</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {tfRows.map((row, rIdx) => (
-                          <tr key={rIdx}>
-                            <td
-                              className="border border-black px-2 py-1 leading-snug"
-                              dangerouslySetInnerHTML={{ __html: renderFormattedHtml(row.text) }}
-                            />
-                            <td className="border border-black px-2 py-1 text-center font-bold text-emerald-800 bg-emerald-50/50 w-[100px]">
-                              {row.answer
-                                ? (q.categoryLabels && q.categoryLabels[0]) || "Benar"
-                                : (q.categoryLabels && q.categoryLabels[1]) || "Salah"}
-                            </td>
+                    <div className="print-table-scroll max-w-full overflow-x-auto print:overflow-visible">
+                      <table className="w-full border-collapse border border-black text-[10.5px] sm:text-[11px] print:text-[11px] mt-1 table-fixed">
+                        <thead>
+                          <tr className="bg-slate-100">
+                            <th className="border border-black px-2 py-1 text-left font-bold">Pernyataan</th>
+                            <th className="border border-black px-2 py-1 text-center w-[80px] sm:w-[100px] print:w-[100px] font-bold">Kunci</th>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                        </thead>
+                        <tbody>
+                          {tfRows.map((row, rIdx) => (
+                            <tr key={rIdx}>
+                              <td
+                                className="border border-black px-2 py-1 leading-snug"
+                                dangerouslySetInnerHTML={{ __html: renderFormattedHtml(row.text) }}
+                              />
+                              <td className="border border-black px-2 py-1 text-center font-bold text-emerald-800 bg-emerald-50/50 w-[80px] sm:w-[100px] print:w-[100px]">
+                                {row.answer
+                                  ? (q.categoryLabels && q.categoryLabels[0]) || "Benar"
+                                  : (q.categoryLabels && q.categoryLabels[1]) || "Salah"}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
                   )}
 
                   {/* Menjodohkan (Matching) */}
                   {q.questionType === "MATCHING" && matchingPairs.length > 0 && (
-                    <table className="w-full border-collapse border border-slate-300 text-xs mt-1">
-                      <thead>
-                        <tr className="bg-slate-100">
-                          <th className="border border-slate-300 px-2 py-1 text-left font-bold w-1/2">Pernyataan / Kiri</th>
-                          <th className="border border-slate-300 px-2 py-1 text-left font-bold w-1/2">Pasangan Benar / Kanan</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {matchingPairs.map((pair, pIdx) => (
-                          <tr key={pIdx}>
-                            <td
-                              className="border border-slate-300 px-2 py-1"
-                              dangerouslySetInnerHTML={{ __html: renderFormattedHtml(pair.left) }}
-                            />
-                            <td
-                              className="border border-slate-300 px-2 py-1 font-bold text-emerald-800 bg-emerald-50/50"
-                              dangerouslySetInnerHTML={{ __html: renderFormattedHtml(pair.right) }}
-                            />
+                    <div className="print-table-scroll max-w-full overflow-x-auto print:overflow-visible">
+                      <table className="w-full border-collapse border border-slate-300 text-[10.5px] sm:text-xs print:text-xs mt-1">
+                        <thead>
+                          <tr className="bg-slate-100">
+                            <th className="border border-slate-300 px-2 py-1 text-left font-bold w-1/2">Pernyataan / Kiri</th>
+                            <th className="border border-slate-300 px-2 py-1 text-left font-bold w-1/2">Pasangan Benar / Kanan</th>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                        </thead>
+                        <tbody>
+                          {matchingPairs.map((pair, pIdx) => (
+                            <tr key={pIdx}>
+                              <td
+                                className="border border-slate-300 px-2 py-1"
+                                dangerouslySetInnerHTML={{ __html: renderFormattedHtml(pair.left) }}
+                              />
+                              <td
+                                className="border border-slate-300 px-2 py-1 font-bold text-emerald-800 bg-emerald-50/50"
+                                dangerouslySetInnerHTML={{ __html: renderFormattedHtml(pair.right) }}
+                              />
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
                   )}
 
                   {/* Isian Singkat & Esai */}
                   {(q.questionType === "FILL_IN_THE_BLANK" || q.questionType === "ESSAY") && (
-                    <div className="p-2.5 bg-emerald-50 border border-emerald-200 rounded">
+                    <div className="p-2.5 bg-emerald-50 border border-emerald-200 rounded min-w-0 max-w-full break-words">
                       <span className="font-bold text-[10px] uppercase text-emerald-800 block mb-0.5">
                         Kunci Jawaban / Pedoman Penskoran:
                       </span>
                       <div
-                        className="font-medium text-emerald-950"
+                        className="font-medium text-emerald-950 min-w-0 max-w-full"
                         dangerouslySetInnerHTML={{
                           __html: renderFormattedHtml(q.correctAnswer || (q as any).correct_answer || "-"),
                         }}
@@ -1340,12 +1498,12 @@ export const PrintKunciJawabanModal: React.FC<PrintKunciJawabanModalProps> = ({
 
                   {/* Kotak Pembahasan */}
                   {explanation && (
-                    <div className="p-3 bg-indigo-50/70 border border-indigo-200 rounded text-slate-800 space-y-1">
+                    <div className="p-2.5 sm:p-3 print:p-3 bg-indigo-50/70 border border-indigo-200 rounded text-slate-800 space-y-1 min-w-0 max-w-full break-words">
                       <span className="font-bold text-[10px] uppercase tracking-wider text-indigo-700 block">
                         Pembahasan & Solusi:
                       </span>
                       <div
-                        className="leading-relaxed text-slate-800 font-normal"
+                        className="leading-relaxed text-slate-800 font-normal min-w-0 max-w-full"
                         dangerouslySetInnerHTML={{ __html: renderFormattedHtml(explanation) }}
                       />
                     </div>
