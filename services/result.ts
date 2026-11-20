@@ -3,6 +3,7 @@ import { offlineService } from './offline';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import type { Result, ResultStatus, Exam, ExamConfig } from '../types';
 import { examService } from './exam';
+import { isSameStudentIdentity, type StudentIdentityCandidate } from '../utils/studentIdentity';
 
 export class ResultService {
   mapRowToResult(row: Record<string, unknown>): Result {
@@ -463,20 +464,26 @@ export class ResultService {
     return { ...resultWithId, isSynced: true };
   }
 
-  async getStudentResult(examCode: string, studentId: string): Promise<Result | null> {
-      const { result } = await this.getStudentResultStatus(examCode, studentId);
+  async getStudentResult(examCode: string, studentId: string, studentHint?: StudentIdentityCandidate): Promise<Result | null> {
+      const { result } = await this.getStudentResultStatus(examCode, studentId, studentHint);
       return result;
   }
 
-  async getStudentResultStatus(examCode: string, studentId: string): Promise<{ result: Result | null; isNetworkError: boolean }> {
+  async getStudentResultStatus(
+      examCode: string,
+      studentId: string,
+      studentHint?: StudentIdentityCandidate,
+  ): Promise<{ result: Result | null; isNetworkError: boolean }> {
       if (typeof navigator !== 'undefined' && navigator.onLine === false) {
           return { result: null, isNetworkError: true };
       }
+      const cleanExamCode = String(examCode || '').trim().toUpperCase();
+      const SELECT_COLS = 'id, exam_code, student_id, student_name, class_name, status, score, correct_answers, total_questions, answers, activity_log, updated_at, location, device_id';
       try {
           const { data, error } = await supabase
               .from('results')
-              .select('id, exam_code, student_id, student_name, class_name, status, score, correct_answers, total_questions, answers, activity_log, updated_at, location, device_id')
-              .eq('exam_code', examCode)
+              .select(SELECT_COLS)
+              .eq('exam_code', cleanExamCode)
               .eq('student_id', studentId)
               .maybeSingle();
 
@@ -485,60 +492,74 @@ export class ResultService {
               const isNet = !error.code || msg.includes('failed to fetch') || msg.includes('network');
               return { result: null, isNetworkError: isNet };
           }
-          if (!data) {
-              return { result: null, isNetworkError: false };
+
+          if (data) {
+              const mapped = this.mapRowToResult(data as Record<string, unknown>);
+              return {
+                  result: {
+                      ...mapped,
+                      student: {
+                          ...mapped.student,
+                          schoolName: mapped.student.schoolName || undefined,
+                      },
+                  },
+                  isNetworkError: false,
+              };
           }
 
-          let absentNumber = '00';
-          let dbSchoolName = '';
-          let dbClassName = data.class_name as string;
-          let studentName = data.student_name as string;
+          // Fallback: Tolerant identity matching across browsers (e.g. "05" vs "5", whitespace, letter case)
+          if (studentHint && (studentHint.fullName || studentHint.absentNumber)) {
+              const hintCandidate: StudentIdentityCandidate = {
+                  studentId,
+                  ...studentHint,
+              };
+              const PAGE_SIZE = 1000;
+              let from = 0;
+              const matches: Result[] = [];
 
-          // Parse Format 2 if applicable
-          if (studentId.startsWith('@') && studentId.includes('#') && studentId.includes('$') && studentId.includes('%')) {
-              const match = studentId.match(/^@(.*?)#(.*?)\$(.*?)%(.*)$/);
-              if (match) {
-                  dbSchoolName = match[1];
-                  studentName = match[2];
-                  dbClassName = match[3];
-                  absentNumber = match[4];
-              }
-          } else {
-              // Format 1 Fallback
-              if (dbClassName && dbClassName.includes('::')) {
-                  const parts = dbClassName.split('::');
-                  dbSchoolName = parts[0];
-                  dbClassName = parts[1];
-              }
-              if (typeof studentId === 'string') {
-                  const parts = studentId.includes('_') ? studentId.split('_') : studentId.split('-');
-                  if (parts.length >= 2) {
-                      const lastPart = parts[parts.length - 1];
-                      if (!isNaN(parseInt(lastPart))) {
-                          absentNumber = lastPart;
-                      } else if (parts.length > 2) {
-                          absentNumber = parts[parts.length - 2];
+              while (from < 3000) {
+                  const { data: rows, error: listErr } = await supabase
+                      .from('results')
+                      .select(SELECT_COLS)
+                      .eq('exam_code', cleanExamCode)
+                      .order('updated_at', { ascending: false })
+                      .range(from, from + PAGE_SIZE - 1);
+
+                  if (listErr) {
+                      const msg = String(listErr.message || '').toLowerCase();
+                      const isNet = !listErr.code || msg.includes('failed to fetch') || msg.includes('network');
+                      return { result: null, isNetworkError: isNet };
+                  }
+                  if (!rows || rows.length === 0) break;
+
+                  for (const row of rows as Record<string, unknown>[]) {
+                      const mapped = this.mapRowToResult(row);
+                      if (isSameStudentIdentity(mapped.student, hintCandidate)) {
+                          matches.push({
+                              ...mapped,
+                              student: {
+                                  ...mapped.student,
+                                  schoolName: mapped.student.schoolName || undefined,
+                              },
+                          });
                       }
                   }
+
+                  if (rows.length < PAGE_SIZE) break;
+                  from += PAGE_SIZE;
+              }
+
+              if (matches.length > 0) {
+                  const completedMatch = matches.find((m) => m.status === 'completed');
+                  const forceClosedMatch = matches.find((m) => m.status === 'force_closed');
+                  return {
+                      result: completedMatch || forceClosedMatch || matches[0],
+                      isNetworkError: false,
+                  };
               }
           }
 
-          const answers = data.answers || {};
-          const durationStr = answers['_duration'];
-          const completionTime = durationStr ? parseInt(durationStr) : undefined;
-          const validCompletionTime = !isNaN(completionTime as number) ? completionTime : 0;
-
-          return {
-              result: {
-                  id: data.id, // Include Primary Key
-                  student: { studentId: data.student_id, fullName: studentName, class: dbClassName, schoolName: dbSchoolName || undefined, absentNumber: absentNumber, resultId: data.id },
-                  examCode: data.exam_code, answers: answers, score: data.score, correctAnswers: data.correct_answers,
-                  totalQuestions: data.total_questions, completionTime: validCompletionTime, status: data.status, activityLog: data.activity_log,
-                  timestamp: new Date(data.updated_at).getTime(), location: data.location,
-                  device_id: (data.device_id as string | undefined) || answers['_deviceId'] || undefined
-              },
-              isNetworkError: false
-          };
+          return { result: null, isNetworkError: false };
       } catch {
           return { result: null, isNetworkError: true };
       }
