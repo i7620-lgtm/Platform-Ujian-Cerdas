@@ -47,6 +47,7 @@ export const clearExamLocalCache = async (examCode: string): Promise<void> => {
         `exam_def_${cleanCode}`,
         `ujiancerdas_preview_exam_${cleanCode}`,
         `student_pref_${cleanCode}`,
+        `completed_students_${cleanCode}`,
       ];
       exactKeys.forEach((key) => {
         try {
