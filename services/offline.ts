@@ -1,5 +1,6 @@
 import { supabase } from '../lib/supabase';
 import type { Result } from '../types';
+import { isSameStudentIdentity, type StudentIdentityCandidate } from '../utils/studentIdentity';
 
 // --- INDEXED DB HELPER ---
 const DB_NAME = 'UjianCerdasDB';
@@ -338,36 +339,69 @@ export class OfflineService {
         return savePromise;
     }
 
-    hasPendingSubmission(examCode: string, studentId: string): boolean {
+    private matchesQueuedIdentity(
+        item: QueuedResult,
+        examCode: string,
+        studentOrId: string | StudentIdentityCandidate,
+        studentHint?: StudentIdentityCandidate,
+    ): boolean {
+        const cleanCode = String(examCode || '').trim().toUpperCase();
+        if (String(item.examCode || '').trim().toUpperCase() !== cleanCode) return false;
+
+        if (typeof studentOrId === 'string') {
+            if (item.student?.studentId === studentOrId) return true;
+            if (studentHint) {
+                return isSameStudentIdentity(item.student, { ...studentHint, studentId: studentOrId });
+            }
+            return false;
+        }
+
+        if (studentOrId.studentId && item.student?.studentId === studentOrId.studentId) {
+            return true;
+        }
+        return isSameStudentIdentity(item.student, studentOrId);
+    }
+
+    findQueuedSubmission(
+        examCode: string,
+        studentOrId: string | StudentIdentityCandidate,
+        options?: { onlyFinal?: boolean }
+    ): QueuedResult | null {
+        const onlyFinal = options?.onlyFinal ?? false;
+        const matcher = (item: QueuedResult) =>
+            this.matchesQueuedIdentity(item, examCode, studentOrId) &&
+            (!onlyFinal || item.status === 'completed' || item.status === 'force_closed');
+
+        return this.failedQueue.find(matcher) || this.syncQueue.find(matcher) || null;
+    }
+
+    hasPendingSubmission(examCode: string, studentId: string, studentHint?: StudentIdentityCandidate): boolean {
         const isFinalMatch = (item: QueuedResult) =>
-            item.examCode === examCode &&
-            item.student?.studentId === studentId &&
+            this.matchesQueuedIdentity(item, examCode, studentId, studentHint) &&
             (item.status === 'completed' || item.status === 'force_closed');
         return this.syncQueue.some(isFinalMatch) || this.failedQueue.some(isFinalMatch);
     }
 
-    hasFailedSubmission(examCode: string, studentId: string): boolean {
+    hasFailedSubmission(examCode: string, studentId: string, studentHint?: StudentIdentityCandidate): boolean {
         return this.failedQueue.some(
             item =>
-                item.examCode === examCode &&
-                item.student?.studentId === studentId &&
+                this.matchesQueuedIdentity(item, examCode, studentId, studentHint) &&
                 (item.status === 'completed' || item.status === 'force_closed')
         );
     }
 
-    getFailedSubmission(examCode: string, studentId: string): QueuedResult | null {
+    getFailedSubmission(examCode: string, studentId: string, studentHint?: StudentIdentityCandidate): QueuedResult | null {
         return (
             this.failedQueue.find(
-                item => item.examCode === examCode && item.student?.studentId === studentId
+                item => this.matchesQueuedIdentity(item, examCode, studentId, studentHint)
             ) || null
         );
     }
 
-    getSubmissionSyncState(examCode: string, studentId: string): SubmissionSyncState {
+    getSubmissionSyncState(examCode: string, studentId: string, studentHint?: StudentIdentityCandidate): SubmissionSyncState {
         const failed = this.failedQueue.find(
             item =>
-                item.examCode === examCode &&
-                item.student?.studentId === studentId &&
+                this.matchesQueuedIdentity(item, examCode, studentId, studentHint) &&
                 (item.status === 'completed' || item.status === 'force_closed')
         );
         if (failed) {
@@ -383,8 +417,7 @@ export class OfflineService {
 
         const pending = this.syncQueue.find(
             item =>
-                item.examCode === examCode &&
-                item.student?.studentId === studentId &&
+                this.matchesQueuedIdentity(item, examCode, studentId, studentHint) &&
                 (item.status === 'completed' || item.status === 'force_closed')
         );
         if (pending) {
@@ -405,18 +438,18 @@ export class OfflineService {
         };
     }
 
-    async retryQueuedSubmission(examCode: string, studentId: string): Promise<boolean> {
+    async retryQueuedSubmission(examCode: string, studentId: string, studentHint?: StudentIdentityCandidate): Promise<boolean> {
         const failedMatch = this.failedQueue.find(
-            item => item.examCode === examCode && item.student?.studentId === studentId
+            item => this.matchesQueuedIdentity(item, examCode, studentId, studentHint)
         );
 
         let movedFromFailed = false;
         if (failedMatch) {
             this.failedQueue = this.failedQueue.filter(
-                item => !(item.examCode === examCode && item.student?.studentId === studentId)
+                item => !this.matchesQueuedIdentity(item, examCode, studentId, studentHint)
             );
             this.syncQueue = this.syncQueue.filter(
-                item => !(item.examCode === examCode && item.student?.studentId === studentId)
+                item => !this.matchesQueuedIdentity(item, examCode, studentId, studentHint)
             );
             this.syncQueue.push({
                 ...failedMatch,
@@ -428,7 +461,7 @@ export class OfflineService {
             movedFromFailed = true;
         } else {
             this.syncQueue = this.syncQueue.map(item =>
-                item.examCode === examCode && item.student?.studentId === studentId
+                this.matchesQueuedIdentity(item, examCode, studentId, studentHint)
                     ? {
                         ...item,
                         _retryCount: 0,
@@ -447,7 +480,7 @@ export class OfflineService {
         this.notifyListeners();
 
         await this.processQueue({ forceBypassBackoff: true });
-        return !this.hasPendingSubmission(examCode, studentId);
+        return !this.hasPendingSubmission(examCode, studentId, studentHint);
     }
 
     waitForQueueSaved(): Promise<void> {
