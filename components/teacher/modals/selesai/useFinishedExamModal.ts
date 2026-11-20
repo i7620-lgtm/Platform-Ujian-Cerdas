@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useCallback, useRef, useState } from "react";
 import type { Exam, Result, Question, TeacherProfile } from "../../../../types";
 import { storageService } from "../../../../services/storage";
-import { supabase } from "../../../../lib/supabase";
 import {
   calculateAggregateStats,
   analyzeQuestionTypePerformance,
@@ -30,6 +29,13 @@ export const useFinishedExamModal = ({
   );
   const [selectedClass, setSelectedClass] = useState("ALL");
   const [expandedStudent, setExpandedStudent] = useState<string | null>(null);
+  const [gradingStates, setGradingStates] = useState<Record<string, "CORRECT" | "WRONG">>({});
+
+  const resultsRef = useRef<Result[]>(results);
+  resultsRef.current = results;
+  const gradingStatesRef = useRef<Record<string, "CORRECT" | "WRONG">>({});
+  const studentSaveQueueRef = useRef<Map<string, Promise<void>>>(new Map());
+  const hasGradedChangesRef = useRef(false);
 
   const resetStore = useCallback(() => {
     setDisplayExam(null);
@@ -38,6 +44,10 @@ export const useFinishedExamModal = ({
     setActiveTab("ANALYSIS");
     setSelectedClass("ALL");
     setExpandedStudent(null);
+    setGradingStates({});
+    gradingStatesRef.current = {};
+    studentSaveQueueRef.current.clear();
+    hasGradedChangesRef.current = false;
   }, []);
 
   useEffect(() => {
@@ -46,6 +56,10 @@ export const useFinishedExamModal = ({
       setActiveTab("ANALYSIS");
       setSelectedClass("ALL");
       setExpandedStudent(null);
+      setGradingStates({});
+      gradingStatesRef.current = {};
+      studentSaveQueueRef.current.clear();
+      hasGradedChangesRef.current = false;
     } else {
       resetStore();
     }
@@ -380,48 +394,168 @@ export const useFinishedExamModal = ({
     qId: string,
     isCorrect: boolean,
   ) => {
-    const newAnswers = {
-      ...studentResult.answers,
-      [`_grade_${qId}`]: isCorrect ? "CORRECT" : "WRONG",
+    const studentId = studentResult.student.studentId;
+    const lockKey = `${studentId}::${qId}`;
+    if (gradingStatesRef.current[lockKey]) return;
+
+    const gradeValue: "CORRECT" | "WRONG" = isCorrect ? "CORRECT" : "WRONG";
+    const gradeField = `_grade_${qId}`;
+
+    const latestStudent =
+      resultsRef.current.find((r) => r.student.studentId === studentId) ||
+      studentResult;
+    const hadPrevGrade = Object.prototype.hasOwnProperty.call(
+      latestStudent.answers || {},
+      gradeField,
+    );
+    const prevGrade = latestStudent.answers?.[gradeField];
+
+    gradingStatesRef.current = {
+      ...gradingStatesRef.current,
+      [lockKey]: gradeValue,
     };
+    setGradingStates((prev) => ({ ...prev, [lockKey]: gradeValue }));
 
-    const regrading = calculateExamScore(activeDisplayExam, newAnswers);
-    const newScore = regrading.score;
-    const correct = regrading.correctAnswers;
-
-    setResults(
-      results.map((r) =>
-        r.student.studentId === studentResult.student.studentId
-          ? {
-              ...r,
-              answers: newAnswers,
-              score: newScore,
-              correctAnswers: correct,
-            }
-          : r,
-      ),
+    setResults((prev) =>
+      prev.map((r) => {
+        if (r.student.studentId !== studentId) return r;
+        const mergedAnswers = {
+          ...(r.answers || {}),
+          [gradeField]: gradeValue,
+        };
+        const regrading = calculateExamScore(activeDisplayExam, mergedAnswers);
+        return {
+          ...r,
+          answers: mergedAnswers,
+          score: regrading.score,
+          correctAnswers: regrading.correctAnswers,
+        };
+      }),
     );
 
-    try {
-      await supabase
-        .from("results")
-        .update({
-          answers: newAnswers,
-          score: newScore,
-          correct_answers: correct,
-        })
-        .eq("exam_code", activeDisplayExam.code)
-        .eq("student_id", studentResult.student.studentId);
-    } catch (e) {
-      console.error("Grading failed", e);
-      await showAlertModal({
-        title: "Gagal Menyimpan Nilai",
-        message: "Gagal menyimpan nilai koreksi manual siswa.",
-        tone: "danger",
+    const prevTail = studentSaveQueueRef.current.get(studentId) || Promise.resolve();
+    const saveTask = prevTail
+      .catch(() => {})
+      .then(async () => {
+        try {
+          const currentStudent =
+            resultsRef.current.find((r) => r.student.studentId === studentId) ||
+            latestStudent;
+          const payloadAnswers = {
+            ...(currentStudent.answers || {}),
+            [gradeField]: gradeValue,
+          };
+          const regrading = calculateExamScore(activeDisplayExam, payloadAnswers);
+
+          const saved = await storageService.gradeManualQuestion({
+            examCode: activeDisplayExam.code,
+            studentId,
+            resultId: currentStudent.id ?? currentStudent.student.resultId,
+            questionId: qId,
+            isCorrect,
+            nextAnswers: payloadAnswers,
+            nextScore: regrading.score,
+            nextCorrectAnswers: regrading.correctAnswers,
+            totalQuestions: regrading.totalQuestions,
+          });
+
+          hasGradedChangesRef.current = true;
+
+          setResults((prev) =>
+            prev.map((r) => {
+              if (r.student.studentId !== studentId) return r;
+              const pendingOtherGrades: Record<string, string> = {};
+              for (const [k, v] of Object.entries(r.answers || {})) {
+                if (k.startsWith("_grade_") && k !== gradeField) {
+                  const otherQId = k.slice("_grade_".length);
+                  if (gradingStatesRef.current[`${studentId}::${otherQId}`]) {
+                    pendingOtherGrades[k] = v;
+                  }
+                }
+              }
+              const syncedAnswers = {
+                ...(r.answers || {}),
+                ...(saved.answers || {}),
+                ...pendingOtherGrades,
+                [gradeField]: saved.answers?.[gradeField] ?? gradeValue,
+              };
+              const hasOtherPending = Object.keys(pendingOtherGrades).length > 0;
+              const recalc = hasOtherPending
+                ? calculateExamScore(activeDisplayExam, syncedAnswers)
+                : null;
+              return {
+                ...r,
+                id: saved.id ?? r.id,
+                student: saved.id
+                  ? { ...r.student, resultId: saved.id }
+                  : r.student,
+                answers: syncedAnswers,
+                score: recalc ? recalc.score : saved.score,
+                correctAnswers: recalc
+                  ? recalc.correctAnswers
+                  : saved.correctAnswers,
+              };
+            }),
+          );
+
+          showToast(
+            `Nilai esai (${isCorrect ? "Benar" : "Salah"}) berhasil disimpan.`,
+            "success",
+          );
+        } catch (e) {
+          console.error("Grading failed", e);
+          setResults((prev) =>
+            prev.map((r) => {
+              if (r.student.studentId !== studentId) return r;
+              const rolledBackAnswers = { ...(r.answers || {}) };
+              if (hadPrevGrade && prevGrade !== undefined) {
+                rolledBackAnswers[gradeField] = prevGrade;
+              } else {
+                delete rolledBackAnswers[gradeField];
+              }
+              const rolledBackScore = calculateExamScore(
+                activeDisplayExam,
+                rolledBackAnswers,
+              );
+              return {
+                ...r,
+                answers: rolledBackAnswers,
+                score: rolledBackScore.score,
+                correctAnswers: rolledBackScore.correctAnswers,
+              };
+            }),
+          );
+
+          await showAlertModal({
+            title: "Gagal Menyimpan Nilai",
+            message:
+              e instanceof Error && e.message
+                ? e.message
+                : "Gagal menyimpan nilai koreksi manual siswa.",
+            tone: "danger",
+          });
+        } finally {
+          const nextStates = { ...gradingStatesRef.current };
+          delete nextStates[lockKey];
+          gradingStatesRef.current = nextStates;
+          setGradingStates((prev) => {
+            if (!prev[lockKey]) return prev;
+            const copy = { ...prev };
+            delete copy[lockKey];
+            return copy;
+          });
+        }
       });
-      fetchData();
-    }
+
+    studentSaveQueueRef.current.set(studentId, saveTask);
+    await saveTask;
   };
+
+  const consumeGradedChanges = useCallback(() => {
+    const changed = hasGradedChangesRef.current;
+    hasGradedChangesRef.current = false;
+    return changed;
+  }, []);
 
   const isOlympiad = !!activeDisplayExam?.config?.isOlympiadMode;
   const olympiadMedalDistribution = useMemo(() => {
@@ -476,5 +610,7 @@ export const useFinishedExamModal = ({
     formatDuration,
     toggleStudent,
     rateQuestion,
+    gradingStates,
+    consumeGradedChanges,
   };
 };
