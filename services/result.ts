@@ -816,6 +816,147 @@ export class ResultService {
       }
   }
 
+  async gradeManualQuestion(params: {
+      examCode: string;
+      studentId: string;
+      resultId?: number;
+      questionId: string;
+      isCorrect: boolean;
+      nextAnswers: Record<string, string>;
+      nextScore: number;
+      nextCorrectAnswers: number;
+      totalQuestions?: number;
+  }): Promise<{
+      id?: number;
+      answers: Record<string, string>;
+      score: number;
+      correctAnswers: number;
+      totalQuestions?: number;
+  }> {
+      if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+          throw new Error('Koneksi internet terputus. Penilaian manual memerlukan koneksi ke server.');
+      }
+
+      const expectedGrade = params.isCorrect ? 'CORRECT' : 'WRONG';
+      const validResultId =
+          typeof params.resultId === 'number' && !isNaN(params.resultId) && params.resultId < 1e12
+              ? params.resultId
+              : null;
+
+      const { data: rpcData, error: rpcError } = await supabase.rpc('teacher_grade_manual_question', {
+          p_exam_code: params.examCode,
+          p_student_id: params.studentId,
+          p_question_id: params.questionId,
+          p_grade: expectedGrade,
+          p_result_id: validResultId,
+      });
+
+      if (!rpcError && rpcData && (rpcData as { success?: boolean }).success) {
+          const payload = rpcData as {
+              id?: number;
+              answers?: Record<string, string>;
+              score?: number;
+              correct_answers?: number;
+              total_questions?: number;
+          };
+          return {
+              id: payload.id !== undefined ? Number(payload.id) : (validResultId ?? undefined),
+              answers: payload.answers || params.nextAnswers,
+              score: Number(payload.score ?? params.nextScore),
+              correctAnswers: Number(payload.correct_answers ?? params.nextCorrectAnswers),
+              totalQuestions:
+                  payload.total_questions !== undefined
+                      ? Number(payload.total_questions)
+                      : params.totalQuestions,
+          };
+      }
+
+      if (rpcError) {
+          const errCode = String((rpcError as { code?: string }).code || '');
+          const errMsg = String(rpcError.message || '');
+          const isMissingRpc =
+              errCode === 'PGRST202' ||
+              errCode === '42883' ||
+              /could not find the function|function .*teacher_grade_manual_question.* does not exist/i.test(errMsg);
+
+          if (!isMissingRpc) {
+              throw new Error(errMsg || 'Gagal menyimpan nilai koreksi manual siswa.');
+          }
+      }
+
+      // Fallback update langsung jika fungsi RPC baru belum terpasang di Supabase
+      let baseAnswers = params.nextAnswers;
+      let targetQuery = supabase
+          .from('results')
+          .select('id, answers');
+      targetQuery = validResultId
+          ? targetQuery.eq('id', validResultId).eq('exam_code', params.examCode)
+          : targetQuery.eq('exam_code', params.examCode).eq('student_id', params.studentId);
+      const { data: latestRow } = await targetQuery.maybeSingle();
+
+      if (latestRow?.answers && typeof latestRow.answers === 'object') {
+          baseAnswers = {
+              ...(latestRow.answers as Record<string, string>),
+              ...params.nextAnswers,
+              [`_grade_${params.questionId}`]: expectedGrade,
+          };
+      }
+
+      const roundedScore = Math.round(Number(params.nextScore));
+      const roundedCorrect = Math.round(Number(params.nextCorrectAnswers));
+      const targetRowId = latestRow?.id ? Number(latestRow.id) : validResultId;
+
+      let updateQuery = supabase
+          .from('results')
+          .update({
+              answers: baseAnswers,
+              score: roundedScore,
+              correct_answers: roundedCorrect,
+              updated_at: new Date().toISOString(),
+          });
+
+      updateQuery = targetRowId
+          ? updateQuery.eq('id', targetRowId).eq('exam_code', params.examCode)
+          : updateQuery.eq('exam_code', params.examCode).eq('student_id', params.studentId);
+
+      const { data: updatedRow, error: updateError } = await updateQuery
+          .select('id, answers, score, correct_answers, total_questions')
+          .maybeSingle();
+
+      if (updateError) {
+          throw new Error(updateError.message || 'Gagal menyimpan penilaian esai ke database.');
+      }
+
+      if (!updatedRow) {
+          throw new Error(
+              'Perubahan nilai ditolak oleh kebijakan akses database atau data siswa tidak ditemukan.'
+          );
+      }
+
+      const savedAnswers = (updatedRow.answers as Record<string, string>) || {};
+      const savedGrade = savedAnswers[`_grade_${params.questionId}`];
+      if (
+          savedGrade !== expectedGrade ||
+          Number(updatedRow.score) !== roundedScore ||
+          Number(updatedRow.correct_answers) !== roundedCorrect
+      ) {
+          throw new Error(
+              'Database menolak penyimpanan nilai esai. Pastikan skrip fungsi RPC SQL terbaru telah dijalankan di Supabase dan akun Anda memiliki hak akses.'
+          );
+      }
+
+      return {
+          id: Number(updatedRow.id),
+          answers: savedAnswers,
+          score: Number(updatedRow.score),
+          correctAnswers: Number(updatedRow.correct_answers),
+          totalQuestions:
+              updatedRow.total_questions !== undefined
+                  ? Number(updatedRow.total_questions)
+                  : params.totalQuestions,
+      };
+  }
+
   async deleteStudentResult(examCode: string, studentId: string): Promise<void> {
       const { error } = await supabase
           .from('results')
