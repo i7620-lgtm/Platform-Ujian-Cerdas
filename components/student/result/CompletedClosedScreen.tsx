@@ -9,7 +9,7 @@ export const CompletedClosedScreen: React.FC<CompletedClosedScreenProps> = ({
   onFinish,
 }) => {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950 p-6 transition-colors duration-300">
+    <div className="min-h-[100dvh] safe-pt safe-pb flex items-center justify-center bg-slate-50 dark:bg-slate-950 p-6 transition-colors duration-300">
       <div className="w-full max-w-md text-center bg-white dark:bg-slate-900 p-8 rounded-3xl shadow-xl border border-slate-100 dark:border-slate-800 animate-fade-in">
         <div className="w-16 h-16 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-500 dark:text-indigo-400 rounded-full flex items-center justify-center mx-auto mb-4 ring-4 ring-indigo-50/50 dark:ring-indigo-900/20">
           <CheckCircleIcon className="w-8 h-8" />

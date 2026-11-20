@@ -166,9 +166,16 @@ export const StudentFeedbackModal: React.FC<StudentFeedbackModalProps> = ({
                     <button
                       key={star}
                       type="button"
-                      onClick={() => setRating(star)}
-                      onMouseEnter={() => setHoverRating(star)}
-                      onMouseLeave={() => setHoverRating(null)}
+                      onClick={() => {
+                        setHoverRating(null);
+                        setRating(star);
+                      }}
+                      onPointerEnter={(e) => {
+                        if (e.pointerType === "mouse") setHoverRating(star);
+                      }}
+                      onPointerLeave={(e) => {
+                        if (e.pointerType === "mouse") setHoverRating(null);
+                      }}
                       className="p-1 sm:p-1.5 focus:outline-none transition-transform hover:scale-125 active:scale-95"
                       aria-label={`Beri rating ${star} bintang`}
                     >
@@ -232,7 +239,7 @@ export const StudentFeedbackModal: React.FC<StudentFeedbackModalProps> = ({
                   value={feedback}
                   onChange={(e) => setFeedback(e.target.value)}
                   placeholder="Tulis masukan, kendala, atau saran perbaikan di sini..."
-                  className="w-full text-xs p-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-800 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 resize-none transition-colors"
+                  className="w-full text-base p-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-800 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 resize-none transition-colors"
                 />
               </div>
 
