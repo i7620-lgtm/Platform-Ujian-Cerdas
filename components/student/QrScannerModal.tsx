@@ -1,5 +1,38 @@
 import React, { useRef, useEffect, useState } from "react";
 import { XMarkIcon, ExclamationTriangleIcon } from "../Icons";
+import { detectInAppBrowser, isIOSWebKit } from "../../utils/platformUtils";
+
+const HTML5_QRCODE_CDN_URLS = [
+  "https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js",
+  "https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js",
+];
+
+const loadScript = (src: string): Promise<void> =>
+  new Promise((resolve, reject) => {
+    const script = document.createElement("script");
+    script.src = src;
+    script.async = true;
+    script.onload = () => resolve();
+    script.onerror = () => {
+      script.remove();
+      reject(new Error(`Failed to load ${src}`));
+    };
+    document.body.appendChild(script);
+  });
+
+const ensureHtml5QrcodeLoaded = async (): Promise<void> => {
+  if ((window as any).Html5Qrcode) return;
+  let lastError: unknown;
+  for (const url of HTML5_QRCODE_CDN_URLS) {
+    try {
+      await loadScript(url);
+      if ((window as any).Html5Qrcode) return;
+    } catch (err) {
+      lastError = err;
+    }
+  }
+  throw lastError || new Error("Failed to load QR scanner script");
+};
 
 export const QrScannerModal: React.FC<{
   onScanSuccess: (text: string) => void;
@@ -13,19 +46,7 @@ export const QrScannerModal: React.FC<{
 
     const initScanner = async () => {
       try {
-        // Load from CDN to avoid build-time resolution issues with the package
-        if (!(window as any).Html5Qrcode) {
-          await new Promise((resolve, reject) => {
-            const script = document.createElement("script");
-            script.src =
-              "https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js";
-            script.async = true;
-            script.onload = resolve;
-            script.onerror = () =>
-              reject(new Error("Failed to load QR scanner script"));
-            document.body.appendChild(script);
-          });
-        }
+        await ensureHtml5QrcodeLoaded();
         if (!isMounted) return;
 
         // Access global variable
@@ -62,9 +83,22 @@ export const QrScannerModal: React.FC<{
       } catch (err) {
         console.error("Error starting scanner", err);
         if (isMounted) {
-          setScanError(
-            "Gagal memuat pemindai kamera. Pastikan izin kamera aktif dan koneksi internet stabil, atau ketik kode ujian secara manual.",
-          );
+          const inApp = detectInAppBrowser();
+          if (inApp.isInApp) {
+            setScanError(
+              `Kamera diblokir oleh browser bawaan ${inApp.appName || "aplikasi"}. Buka tautan ujian langsung di ${
+                isIOSWebKit() ? "Safari" : "Chrome / Safari"
+              }, atau ketik kode ujian secara manual.`,
+            );
+          } else if (isIOSWebKit()) {
+            setScanError(
+              "Kamera tidak dapat diakses. Pastikan Anda membuka halaman ini di Safari (bukan browser dalam aplikasi), aktifkan izin Kamera di Pengaturan Safari, lalu coba lagi atau masukkan kode manual.",
+            );
+          } else {
+            setScanError(
+              "Gagal memuat pemindai kamera. Pastikan izin kamera aktif dan koneksi internet stabil, atau ketik kode ujian secara manual.",
+            );
+          }
         }
       }
     };
@@ -94,7 +128,7 @@ export const QrScannerModal: React.FC<{
   }, [onScanSuccess]);
 
   return (
-    <div className="fixed inset-0 z-[100] bg-slate-900/90 backdrop-blur-sm flex flex-col items-center justify-center p-4 animate-fade-in">
+    <div className="fixed inset-0 z-[100] safe-pt safe-pb bg-slate-900/90 backdrop-blur-sm flex flex-col items-center justify-center p-4 animate-fade-in">
       <div className="bg-white dark:bg-slate-800 p-6 rounded-3xl shadow-2xl w-full max-w-sm relative animate-slide-in-up border border-white dark:border-slate-700">
         <h3 className="text-center font-black text-slate-800 dark:text-white mb-4 text-lg">
           Pindai QR Code Ujian

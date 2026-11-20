@@ -1034,6 +1034,10 @@ export const useStudentExamLogic = ({
       /<video(?![^>]*\bpreload=)/gi,
       '<video preload="metadata"',
     );
+    cleaned = cleaned.replace(
+      /<video(?![^>]*\bplaysinline\b)/gi,
+      '<video playsinline webkit-playsinline',
+    );
     if (optimizeHtmlCacheRef.current.size >= 600) {
       const oldestKey = optimizeHtmlCacheRef.current.keys().next().value;
       if (oldestKey !== undefined) optimizeHtmlCacheRef.current.delete(oldestKey);

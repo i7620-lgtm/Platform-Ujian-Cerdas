@@ -19,6 +19,7 @@ import {
   saveLocalCompletedStudent,
   stripClassCapacity,
 } from "../../utils/studentIdentity";
+import { isTouchCapableDevice } from "../../utils/platformUtils";
 
 // Helper to parse "SchoolName-ClassName(Limit)" format
 export const parseClassConfig = (classString: string) => {
@@ -864,6 +865,7 @@ export const useStudentEntryForm = ({
   }, [currentInputSignature, examCode, schoolName, fullName, studentClass, absentNumber, isCheckingCode, queueTick]);
 
   useEffect(() => {
+    if (isTouchCapableDevice()) return;
     if (initialCode) {
       const t = setTimeout(() => nameInputRef.current?.focus(), 100);
       return () => clearTimeout(t);
