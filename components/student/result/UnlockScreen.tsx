@@ -8,6 +8,7 @@ interface UnlockScreenProps {
   isUnlocking: boolean;
   handleUnlockSubmit: (e: React.FormEvent) => void;
   onFinish: () => void;
+  isExamClosed?: boolean;
 }
 
 export const UnlockScreen: React.FC<UnlockScreenProps> = ({
@@ -17,6 +18,7 @@ export const UnlockScreen: React.FC<UnlockScreenProps> = ({
   isUnlocking,
   handleUnlockSubmit,
   onFinish,
+  isExamClosed = false,
 }) => {
   return (
     <div className="min-h-screen flex items-center justify-center bg-rose-50 dark:bg-rose-950 p-6 transition-colors duration-300">
@@ -25,11 +27,22 @@ export const UnlockScreen: React.FC<UnlockScreenProps> = ({
           <LockClosedIcon className="w-8 h-8" />
         </div>
         <h1 className="text-xl font-black text-slate-900 dark:text-white mb-2">
-          Akses Terkunci
+          Sesi Dihentikan Paksa
         </h1>
         <p className="text-sm text-slate-500 dark:text-slate-400 mb-6 leading-relaxed">
-          Sesi Anda dihentikan. <br />
-          Masukkan <strong>Token Guru</strong> untuk membuka kembali akses ujian ini.
+          {isExamClosed ? (
+            <>
+              Sesi Anda berstatus terkunci (dihentikan paksa) dan jadwal ujian telah berakhir atau ditutup.
+              <br />
+              Masukkan <strong>Token Pengawas</strong> jika diberikan izin, atau hubungi guru/pengawas Anda.
+            </>
+          ) : (
+            <>
+              Sesi Anda dihentikan dan sedang menunggu token pengawas.
+              <br />
+              Masukkan <strong>Token Buka Kunci 4 angka</strong> dari pengawas/guru untuk melanjutkan.
+            </>
+          )}
         </p>
 
         <form onSubmit={handleUnlockSubmit} className="mb-6 space-y-3">
