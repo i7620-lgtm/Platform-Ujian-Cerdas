@@ -29,6 +29,7 @@ import { checkAnswerStatus } from "./teacher/archive/archiveUtils";
 import { QuestionResultDetailPopover } from "./QuestionResultDetailPopover";
 import { examService } from "../services/exam";
 import { getGlobalExamEndTimestamp } from "../utils/scheduleUtils";
+import { saveBlobCrossPlatform } from "../utils/platformUtils";
 
 interface StudentResultPageProps {
   result: Result;
@@ -262,7 +263,7 @@ export const StudentResultPage: React.FC<StudentResultPageProps> = ({
     }
   }, [isCheckingSync, currentExam.code, currentResult.student.studentId, onResultUpdated]);
 
-  const handleDownloadEmergencyProof = useCallback(() => {
+  const handleDownloadEmergencyProof = useCallback(async () => {
     const queueItem =
       storageService.getFailedSubmission(currentExam.code, currentResult.student.studentId) ??
       syncState.item;
@@ -305,19 +306,23 @@ export const StudentResultPage: React.FC<StudentResultPageProps> = ({
     const blob = new Blob([JSON.stringify(emergencyProof, null, 2)], {
       type: "application/json;charset=utf-8",
     });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = fileName;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
 
-    setSyncCheckNotice({
-      type: "success",
-      text: `File "${fileName}" berhasil diunduh. Simpan file ini sebagai bukti jawaban resmi untuk diserahkan ke pengawas.`,
+    const saveOutcome = await saveBlobCrossPlatform({
+      blob,
+      fileName,
+      title: fileName,
+      preferShareOnIOS: true,
     });
+
+    if (saveOutcome !== "cancelled") {
+      setSyncCheckNotice({
+        type: "success",
+        text:
+          saveOutcome === "shared"
+            ? `Bukti jawaban "${fileName}" siap disimpan/dibagikan. Pastikan file tersimpan sebagai bukti resmi untuk diserahkan ke pengawas.`
+            : `File "${fileName}" berhasil diunduh. Simpan file ini sebagai bukti jawaban resmi untuk diserahkan ke pengawas.`,
+      });
+    }
   }, [currentExam.code, currentExam.config.examType, currentExam.config.subject, currentResult, syncState]);
 
   // Auto-check server status as soon as browser returns online while pending sync
@@ -524,10 +529,10 @@ export const StudentResultPage: React.FC<StudentResultPageProps> = ({
       : 0;
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#F8FAFC] dark:bg-slate-950 p-6 font-sans relative overflow-hidden transition-colors duration-300">
+    <div className="min-h-[100dvh] safe-pt safe-pb flex items-center justify-center bg-[#F8FAFC] dark:bg-slate-950 p-6 font-sans relative overflow-hidden transition-colors duration-300">
       {/* Theme Toggle Top Right */}
       {toggleTheme && (
-        <div className="absolute top-6 right-6 z-50">
+        <div className="absolute top-[calc(1.5rem+env(safe-area-inset-top,0px))] right-[calc(1.5rem+env(safe-area-inset-right,0px))] z-50">
           <button
             onClick={toggleTheme}
             className="p-2.5 rounded-full bg-white/50 dark:bg-slate-800/50 backdrop-blur-md text-slate-500 dark:text-slate-400 hover:bg-white dark:hover:bg-slate-800 hover:text-indigo-600 dark:hover:text-indigo-400 transition-all shadow-sm border border-white/20 dark:border-slate-700"

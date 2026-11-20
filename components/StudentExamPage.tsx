@@ -10,9 +10,9 @@ import { StudentExamCompletionCard } from "./student/exam/StudentExamCompletionC
 import { StudentDialogModal } from "./student/StudentDialogModal";
 
 const FONT_STEP_CONFIGS: FontStepConfig[] = [
-  { step: -2, percentage: 80, qSizeRem: 0.825, optSizeRem: 0.775, inputSizeRem: 0.775, lineHeight: 1.55, label: "Sangat Kecil" },
-  { step: -1, percentage: 90, qSizeRem: 0.9125, optSizeRem: 0.85, inputSizeRem: 0.85, lineHeight: 1.58, label: "Kecil" },
-  { step: 0, percentage: 100, qSizeRem: 1.0, optSizeRem: 0.9375, inputSizeRem: 0.9375, lineHeight: 1.625, label: "Normal" },
+  { step: -2, percentage: 80, qSizeRem: 0.825, optSizeRem: 0.775, inputSizeRem: 1.0, lineHeight: 1.55, label: "Sangat Kecil" },
+  { step: -1, percentage: 90, qSizeRem: 0.9125, optSizeRem: 0.85, inputSizeRem: 1.0, lineHeight: 1.58, label: "Kecil" },
+  { step: 0, percentage: 100, qSizeRem: 1.0, optSizeRem: 0.9375, inputSizeRem: 1.0, lineHeight: 1.625, label: "Normal" },
   { step: 1, percentage: 112, qSizeRem: 1.125, optSizeRem: 1.05, inputSizeRem: 1.05, lineHeight: 1.625, label: "Besar (+1)" },
   { step: 2, percentage: 125, qSizeRem: 1.25, optSizeRem: 1.15, inputSizeRem: 1.15, lineHeight: 1.65, label: "Besar (+2)" },
   { step: 3, percentage: 140, qSizeRem: 1.375, optSizeRem: 1.25, inputSizeRem: 1.25, lineHeight: 1.68, label: "Besar (+3)" },
@@ -214,17 +214,37 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({
     window.addEventListener("beforeunload", handleBeforeUnload);
 
     let startY = 0;
+    let startedInScrollable = false;
+
+    const findScrollableParent = (target: EventTarget | null): HTMLElement | null => {
+      if (!(target instanceof HTMLElement)) return null;
+      return target.closest(
+        '[data-scrollable="true"], .overflow-y-auto, .overflow-auto, textarea, [role="dialog"]',
+      ) as HTMLElement | null;
+    };
+
     const handleTouchStart = (e: TouchEvent) => {
       if (e.touches.length === 1) {
         startY = e.touches[0].clientY;
+        const scrollableEl = findScrollableParent(e.target);
+        startedInScrollable = Boolean(
+          scrollableEl &&
+            (scrollableEl.scrollHeight > scrollableEl.clientHeight ||
+              scrollableEl.hasAttribute("data-scrollable") ||
+              scrollableEl.getAttribute("role") === "dialog"),
+        );
       }
     };
+
     const handleTouchMove = (e: TouchEvent) => {
       if (e.touches.length === 1) {
+        // Jangan blokir gestur sentuhan di dalam laci navigasi soal, modal, lightbox, dropdown, atau textarea
+        if (startedInScrollable) return;
+
         const currentY = e.touches[0].clientY;
         const scrollTop = window.scrollY || document.documentElement.scrollTop;
 
-        if ((startY <= 50 || currentY <= 50) && currentY >= startY) {
+        if (startY <= 50 && scrollTop <= 0 && currentY > startY) {
           if (e.cancelable) {
             e.preventDefault();
             e.stopPropagation();
@@ -337,7 +357,7 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({
   }, []);
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] dark:bg-slate-950 font-sans exam-secure-shield select-none pb-40 transition-colors duration-300">
+    <div className="min-h-[100dvh] bg-[#F8FAFC] dark:bg-slate-950 font-sans exam-secure-shield select-none pb-[calc(10rem+env(safe-area-inset-bottom,0px))] safe-px transition-colors duration-300">
       {showConfigIntro && (
         <StudentExamIntroModal
           exam={activeExam}
@@ -393,12 +413,12 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({
       />
 
       <main
-        className={`w-full max-w-full mx-auto px-2.5 sm:px-6 pt-20 sm:pt-24 space-y-4 sm:space-y-8 exam-content-scalable exam-font-step-${fontStep}`}
+        className={`w-full max-w-full mx-auto px-2.5 sm:px-6 exam-main-safe space-y-4 sm:space-y-8 exam-content-scalable exam-font-step-${fontStep}`}
         style={
           {
             "--exam-prose-size": `${currentFontConfig.qSizeRem}rem`,
             "--exam-option-size": `${currentFontConfig.optSizeRem}rem`,
-            "--exam-input-size": `${currentFontConfig.inputSizeRem}rem`,
+            "--exam-input-size": `${Math.max(1, currentFontConfig.inputSizeRem)}rem`,
             "--exam-line-height": currentFontConfig.lineHeight,
           } as React.CSSProperties
         }

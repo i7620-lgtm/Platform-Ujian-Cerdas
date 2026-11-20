@@ -33,6 +33,11 @@ export const VisualLightboxModal: React.FC = () => {
   const [position, setPosition] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState<boolean>(false);
   const dragStartRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+  const pinchStateRef = useRef<{
+    initialDistance: number;
+    initialScale: number;
+  } | null>(null);
+  const didTouchInteractRef = useRef<boolean>(false);
   const contentRef = useRef<HTMLDivElement>(null);
 
   const close = useCallback(() => {
@@ -42,13 +47,19 @@ export const VisualLightboxModal: React.FC = () => {
   }, []);
 
   const handleZoomIn = () => setScale((s) => Math.min(s + 0.25, 4));
-  const handleZoomOut = () => setScale((s) => Math.max(s - 0.25, 0.5));
+  const handleZoomOut = () => {
+    setScale((s) => {
+      const next = Math.max(s - 0.25, 0.5);
+      if (next <= 1) setPosition({ x: 0, y: 0 });
+      return next;
+    });
+  };
   const handleResetZoom = () => {
     setScale(1);
     setPosition({ x: 0, y: 0 });
   };
 
-  // Keyboard Escape listener
+  // Keyboard Escape listener & preserve previous body overflow cleanly
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape" && data) {
@@ -57,14 +68,14 @@ export const VisualLightboxModal: React.FC = () => {
     };
 
     if (data) {
+      const prevOverflow = document.body.style.overflow;
       window.addEventListener("keydown", handleKeyDown);
       document.body.style.overflow = "hidden";
+      return () => {
+        window.removeEventListener("keydown", handleKeyDown);
+        document.body.style.overflow = prevOverflow;
+      };
     }
-
-    return () => {
-      window.removeEventListener("keydown", handleKeyDown);
-      document.body.style.overflow = "";
-    };
   }, [data, close]);
 
   // Listen to custom event and global click on images/diagrams
@@ -184,12 +195,77 @@ export const VisualLightboxModal: React.FC = () => {
 
   const handleMouseUp = () => setIsDragging(false);
 
+  // Touch support: 1-finger pan when zoomed & 2-finger pinch-to-zoom for iOS/Android
+  const getTouchDistance = (t1: React.Touch, t2: React.Touch) => {
+    const dx = t1.clientX - t2.clientX;
+    const dy = t1.clientY - t2.clientY;
+    return Math.hypot(dx, dy);
+  };
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    didTouchInteractRef.current = false;
+    if (e.touches.length === 2) {
+      pinchStateRef.current = {
+        initialDistance: Math.max(1, getTouchDistance(e.touches[0], e.touches[1])),
+        initialScale: scale,
+      };
+      setIsDragging(false);
+      didTouchInteractRef.current = true;
+    } else if (e.touches.length === 1 && scale > 1) {
+      setIsDragging(true);
+      dragStartRef.current = {
+        x: e.touches[0].clientX - position.x,
+        y: e.touches[0].clientY - position.y,
+      };
+    }
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (e.touches.length === 2 && pinchStateRef.current) {
+      const dist = getTouchDistance(e.touches[0], e.touches[1]);
+      const ratio = dist / pinchStateRef.current.initialDistance;
+      const nextScale = Math.min(
+        4,
+        Math.max(0.5, pinchStateRef.current.initialScale * ratio),
+      );
+      setScale(nextScale);
+      if (nextScale <= 1) {
+        setPosition({ x: 0, y: 0 });
+      }
+      didTouchInteractRef.current = true;
+    } else if (e.touches.length === 1 && isDragging && scale > 1) {
+      setPosition({
+        x: e.touches[0].clientX - dragStartRef.current.x,
+        y: e.touches[0].clientY - dragStartRef.current.y,
+      });
+      didTouchInteractRef.current = true;
+    }
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (e.touches.length < 2) {
+      pinchStateRef.current = null;
+    }
+    if (e.touches.length === 0) {
+      setIsDragging(false);
+      if (didTouchInteractRef.current) {
+        setTimeout(() => {
+          didTouchInteractRef.current = false;
+        }, 120);
+      }
+    }
+  };
+
   if (!data) return null;
 
   return (
     <div
-      className="fixed inset-0 z-[99999] bg-slate-950/85 backdrop-blur-md flex flex-col items-center justify-between p-3 sm:p-6 select-none animate-in fade-in duration-200"
-      onClick={close}
+      className="fixed inset-0 z-[99999] bg-slate-950/85 backdrop-blur-md flex flex-col items-center justify-between pt-[calc(0.75rem+env(safe-area-inset-top,0px))] pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] px-3 sm:p-6 select-none animate-in fade-in duration-200"
+      onClick={() => {
+        if (!didTouchInteractRef.current) {
+          close();
+        }
+      }}
     >
       {/* Top Header Bar */}
       <div
@@ -205,7 +281,7 @@ export const VisualLightboxModal: React.FC = () => {
               {data.title || "Tampilan Penuh Visual Soal"}
             </h3>
             <p className="text-[11px] text-slate-400 hidden sm:block">
-              Gunakan mouse wheel untuk zoom, drag untuk geser, atau tekan tombol Esc untuk keluar
+              Gunakan mouse wheel / cubit layar untuk zoom, geser saat diperbesar, atau tekan Esc untuk keluar
             </p>
           </div>
         </div>
@@ -255,12 +331,18 @@ export const VisualLightboxModal: React.FC = () => {
 
       {/* Main Visual Display Area */}
       <div
+        data-scrollable="true"
+        style={{ touchAction: "none" }}
         className="flex-1 w-full flex items-center justify-center overflow-hidden my-2 sm:my-4 relative cursor-default"
         onWheel={handleWheel}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseUp}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+        onTouchCancel={handleTouchEnd}
       >
         <div
           ref={contentRef}
@@ -298,9 +380,10 @@ export const VisualLightboxModal: React.FC = () => {
 
       {/* Bottom Hint */}
       <div
-        className="text-[11px] sm:text-xs text-slate-400 bg-slate-900/60 px-3 py-1 rounded-full border border-white/5 backdrop-blur-sm pointer-events-none"
+        className="text-[11px] sm:text-xs text-slate-400 bg-slate-900/60 px-3 py-1 rounded-full border border-white/5 backdrop-blur-sm pointer-events-none text-center"
       >
-        Klik di luar gambar atau tekan tombol <kbd className="px-1.5 py-0.5 rounded bg-white/10 text-white font-mono">Esc</kbd> untuk kembali
+        <span className="sm:hidden">Cubit 2 jari untuk zoom, geser saat diperbesar, ketuk luar untuk tutup</span>
+        <span className="hidden sm:inline">Klik di luar gambar atau tekan tombol <kbd className="px-1.5 py-0.5 rounded bg-white/10 text-white font-mono">Esc</kbd> untuk kembali</span>
       </div>
     </div>
   );
