@@ -66,10 +66,10 @@ export const StudentExamHeader: React.FC<StudentExamHeaderProps> = ({
   return (
     <header
       ref={headerRef}
-      className={`fixed top-0 inset-x-0 z-[60] border-b shadow-sm transition-all duration-300 h-16 flex items-center ${isNavOpen ? "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800" : "bg-white/90 dark:bg-slate-900/90 backdrop-blur-md border-slate-200/60 dark:border-slate-800/60"}`}
+      className={`fixed top-0 inset-x-0 z-[60] border-b shadow-sm transition-all duration-300 exam-header-safe flex items-center ${isNavOpen ? "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800" : "bg-white/90 dark:bg-slate-900/90 backdrop-blur-md border-slate-200/60 dark:border-slate-800/60"}`}
     >
       <div
-        className="absolute top-0 left-0 h-[2px] bg-indigo-600 dark:bg-indigo-500 transition-all duration-700 ease-out z-10"
+        className="absolute top-[env(safe-area-inset-top,0px)] left-0 h-[2px] bg-indigo-600 dark:bg-indigo-500 transition-all duration-700 ease-out z-10"
         style={{ width: `${progress}%` }}
       ></div>
       <div className="w-full max-w-full mx-auto px-3 sm:px-6 flex items-center justify-between">
