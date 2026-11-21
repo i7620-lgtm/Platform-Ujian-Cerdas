@@ -31,9 +31,10 @@ export const DraftExamCard: React.FC<DraftExamCardProps> = ({
   onPrintKisiKisi,
   onPrintKunci,
 }) => {
-  const questionCount = exam.questions.filter(
-    (q) => q.questionType !== "INFO",
-  ).length;
+  const scorableCount =
+    exam.questions.length > 0
+      ? exam.questions.filter((q) => q.questionType !== "INFO").length
+      : exam.config?.scorableQuestionCount ?? exam.config?.totalQuestionCount;
   const formattedDate = new Date(exam.config.date).toLocaleDateString("id-ID", {
     day: "numeric",
     month: "short",
@@ -82,11 +83,15 @@ export const DraftExamCard: React.FC<DraftExamCardProps> = ({
               <CalendarDaysIcon className="w-3.5 h-3.5 text-slate-400 dark:text-slate-500 shrink-0" />
               <span>{formattedDate}</span>
             </span>
-            <span className="text-slate-300 dark:text-slate-600">•</span>
-            <span className="inline-flex items-center gap-1.5 tabular-nums whitespace-nowrap">
-              <ListBulletIcon className="w-3.5 h-3.5 text-slate-400 dark:text-slate-500 shrink-0" />
-              <span>{questionCount} Soal</span>
-            </span>
+            {typeof scorableCount === "number" && (
+              <>
+                <span className="text-slate-300 dark:text-slate-600">•</span>
+                <span className="inline-flex items-center gap-1.5 tabular-nums whitespace-nowrap">
+                  <ListBulletIcon className="w-3.5 h-3.5 text-slate-400 dark:text-slate-500 shrink-0" />
+                  <span>{scorableCount} Soal</span>
+                </span>
+              </>
+            )}
           </div>
         </div>
       </div>
@@ -123,10 +128,12 @@ export const DraftExamCard: React.FC<DraftExamCardProps> = ({
           type="button"
           onClick={() => {
             try {
-              localStorage.setItem(
-                `ujiancerdas_preview_exam_${exam.code}`,
-                JSON.stringify(exam),
-              );
+              if (!exam.questionsDeferred && exam.questions.length > 0) {
+                localStorage.setItem(
+                  `ujiancerdas_preview_exam_${exam.code}`,
+                  JSON.stringify(exam),
+                );
+              }
             } catch {
               // ignore
             }
