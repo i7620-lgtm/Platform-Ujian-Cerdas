@@ -80,8 +80,16 @@ class StorageService {
 
   // --- EXAM METHODS ---
 
-  async getExams(profile?: TeacherProfile): Promise<Record<string, Exam>> {
-      return examService.getExams(profile);
+  async getExams(profile?: TeacherProfile, options?: { includeQuestions?: boolean }): Promise<Record<string, Exam>> {
+      return examService.getExams(profile, options);
+  }
+
+  async ensureExamQuestions(exam: Exam): Promise<Exam> {
+      return examService.ensureExamQuestions(exam);
+  }
+
+  async checkLiveExamStatusForStudent(code: string): Promise<{ status?: string; config?: ExamConfig } | null> {
+      return examService.checkLiveExamStatusForStudent(code);
   }
 
   async getExamForStudent(code: string, studentId?: string, isPreview = false): Promise<Exam | null> {
@@ -144,6 +152,27 @@ class StorageService {
 
   async getResults(examCodeOrCodes?: string | string[], className?: string, schoolName?: string): Promise<Result[]> {
       return resultService.getResults(examCodeOrCodes, className, schoolName);
+  }
+
+  async findDuplicateAbsentStudent(
+      examCode: string,
+      className: string,
+      schoolName: string,
+      absentNumber: string,
+      fullName: string,
+  ): Promise<{ fullName: string } | null> {
+      return resultService.findDuplicateAbsentStudent(examCode, className, schoolName, absentNumber, fullName);
+  }
+
+  async getExamParticipantCounts(examCodes: string[]): Promise<Record<string, number>> {
+      return resultService.getExamParticipantCounts(examCodes);
+  }
+
+  async getOngoingExamResults(
+      examCode: string,
+      options?: { includeAnswers?: boolean; updatedAfterIso?: string },
+  ): Promise<Result[]> {
+      return resultService.getOngoingExamResults(examCode, options);
   }
 
   async autoSaveStudentAnswers(params: {
