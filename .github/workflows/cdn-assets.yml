@@ -1,0 +1,122 @@
+name: Publish Static Assets to jsDelivr CDN
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: cdn-assets-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build-and-publish-cdn:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build assets targeting immutable jsDelivr tag
+        env:
+          VITE_DISABLE_CDN: 'false'
+        run: |
+          SHORT_SHA="${GITHUB_SHA::12}"
+          CDN_TAG="cdn-${SHORT_SHA}"
+          CDN_BASE="https://cdn.jsdelivr.net/gh/${GITHUB_REPOSITORY}@${CDN_TAG}/dist"
+          echo "SHORT_SHA=${SHORT_SHA}" >> "$GITHUB_ENV"
+          echo "CDN_TAG=${CDN_TAG}" >> "$GITHUB_ENV"
+          echo "VITE_CDN_TAG=${CDN_TAG}" >> "$GITHUB_ENV"
+          echo "VITE_CDN_BASE_URL=${CDN_BASE}" >> "$GITHUB_ENV"
+          VITE_CDN_TAG="${CDN_TAG}" VITE_CDN_BASE_URL="${CDN_BASE}" npx vite build
+
+      - name: Publish dist/ to cdn-assets branch and create tag
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          WORK_DIR="$(mktemp -d)"
+          cp -R dist "${WORK_DIR}/dist"
+
+          if git ls-remote --exit-code --heads origin cdn-assets >/dev/null 2>&1; then
+            git fetch origin cdn-assets --depth=1
+            git checkout -B cdn-assets origin/cdn-assets
+          else
+            git checkout --orphan cdn-assets
+          fi
+
+          # Keep cdn-assets branch strictly limited to the compiled dist/ output
+          git rm -rf . >/dev/null 2>&1 || true
+          find . -maxdepth 1 ! -name '.' ! -name '.git' -exec rm -rf {} +
+
+          cp -R "${WORK_DIR}/dist" ./dist
+          cat > README.md <<EOF
+          # UjianCerdas CDN Assets
+
+          Branch otomatis untuk melayani file statis aplikasi (\`dist/assets/*\`) melalui jsDelivr CDN.
+          Tag terbaru: \`${CDN_TAG}\` (dari commit \`${GITHUB_SHA}\`).
+          EOF
+
+          git add -A
+          git commit -m "chore(cdn): publish ${CDN_TAG} from ${SHORT_SHA}"
+          git push origin cdn-assets
+          git tag -f "${CDN_TAG}"
+          git push -f origin "refs/tags/${CDN_TAG}"
+
+      - name: Verify jsDelivr serves all entry assets with HTTP 200
+        run: |
+          node -e '
+            const fs = require("node:fs");
+            const meta = JSON.parse(fs.readFileSync("./dist/cdn-build-meta.json", "utf8"));
+            const base = meta.cdnBaseUrl;
+            const urls = [
+              `${base}/cdn-build-meta.json`,
+              ...meta.entryAssets.map((p) => `${base}/${p}`)
+            ];
+
+            async function verify() {
+              const deadline = Date.now() + 90_000;
+              while (Date.now() < deadline) {
+                let allOk = true;
+                for (const url of urls) {
+                  try {
+                    const res = await fetch(url, { headers: { "Cache-Control": "no-cache" } });
+                    if (!res.ok) {
+                      console.log(`Waiting (${res.status}): ${url}`);
+                      allOk = false;
+                      break;
+                    }
+                  } catch (e) {
+                    console.log(`Waiting (${e.message}): ${url}`);
+                    allOk = false;
+                    break;
+                  }
+                }
+                if (allOk) {
+                  console.log(`All ${urls.length} jsDelivr URLs returned HTTP 200 OK.`);
+                  return;
+                }
+                await new Promise((r) => setTimeout(r, 3000));
+              }
+              throw new Error("Timed out waiting for jsDelivr HTTP 200 verification");
+            }
+
+            verify().catch((err) => {
+              console.error(err);
+              process.exit(1);
+            });
+          '
