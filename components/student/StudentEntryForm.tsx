@@ -20,6 +20,8 @@ import { StudentInvitationCard } from "./StudentInvitationCard";
 import { useStudentScheduleStore } from "../../stores/studentScheduleStore";
 import { calculateStudentAccess } from "../../utils/scheduleUtils";
 import { StudentDialogModal } from "./StudentDialogModal";
+import { detectInAppBrowser } from "../../utils/platformUtils";
+import { showToast } from "../../stores/feedbackStore";
 
 interface StudentEntryFormProps {
   onLoginSuccess: (examCode: string, student: Student) => void;
@@ -98,6 +100,23 @@ export const StudentEntryForm: React.FC<StudentEntryFormProps> = ({
   } = useStudentEntryForm({ initialCode, onLoginSuccess, onViewResult });
 
   const [isNameDropdownOpen, setIsNameDropdownOpen] = useState(false);
+  const [dismissedInAppBanner, setDismissedInAppBanner] = useState(false);
+  const inAppInfo = useMemo(() => detectInAppBrowser(), []);
+
+  const handleCopyExamLink = async () => {
+    try {
+      await navigator.clipboard.writeText(window.location.href);
+      showToast({
+        message: "Tautan ujian disalin. Tempel di aplikasi Safari atau Chrome.",
+        tone: "success",
+      });
+    } catch {
+      showToast({
+        message: "Salin alamat dari bilah browser lalu buka di Safari atau Chrome.",
+        tone: "info",
+      });
+    }
+  };
 
   const filteredSuggestions = useMemo(() => {
     if (!nameSuggestions || nameSuggestions.length === 0) return [];
@@ -175,7 +194,7 @@ export const StudentEntryForm: React.FC<StudentEntryFormProps> = ({
           : "Sesi Terkunci";
 
     return (
-      <div className="min-h-screen w-full flex flex-col items-center justify-center bg-[#FAFAFA] dark:bg-slate-950 relative font-sans transition-colors duration-300">
+      <div className="min-h-[100dvh] w-full flex flex-col items-center justify-center bg-[#FAFAFA] dark:bg-slate-950 relative font-sans safe-pt safe-pb transition-colors duration-300">
         <div className="fixed inset-0 pointer-events-none overflow-hidden">
           <div className="absolute top-[-10%] left-[-10%] w-[60%] h-[60%] bg-gradient-to-br from-rose-50/60 to-orange-50/60 dark:from-rose-900/20 dark:to-orange-900/20 rounded-full blur-[100px] animate-pulse"></div>
         </div>
@@ -216,7 +235,7 @@ export const StudentEntryForm: React.FC<StudentEntryFormProps> = ({
   }
 
   return (
-    <div className="fixed inset-0 w-full h-[100dvh] max-h-[100dvh] overflow-hidden flex flex-col justify-between items-center bg-[#FAFAFA] dark:bg-slate-950 relative font-sans selection:bg-indigo-100 selection:text-indigo-800 transition-colors duration-300 touch-none overscroll-none select-none">
+    <div className="min-h-[100dvh] w-full overflow-x-hidden overflow-y-auto overscroll-y-contain flex flex-col justify-between items-center bg-[#FAFAFA] dark:bg-slate-950 relative font-sans selection:bg-indigo-100 selection:text-indigo-800 safe-pt safe-pb safe-px transition-colors duration-300 select-none">
       <div className="fixed inset-0 pointer-events-none overflow-hidden">
         <div
           className="absolute top-[-10%] left-[-10%] w-[60%] h-[60%] bg-gradient-to-br from-indigo-50/60 to-purple-50/60 dark:from-indigo-900/20 dark:to-purple-900/20 rounded-full blur-[100px] animate-pulse"
@@ -229,10 +248,10 @@ export const StudentEntryForm: React.FC<StudentEntryFormProps> = ({
       </div>
 
       {toggleTheme && (
-        <div className="absolute top-3.5 sm:top-5 right-3.5 sm:right-6 z-50">
+        <div className="fixed top-[calc(0.875rem+env(safe-area-inset-top,0px))] sm:top-[calc(1.25rem+env(safe-area-inset-top,0px))] right-[calc(0.875rem+env(safe-area-inset-right,0px))] sm:right-[calc(1.5rem+env(safe-area-inset-right,0px))] z-50">
           <button
             onClick={toggleTheme}
-            className="p-2.5 rounded-full bg-white/70 dark:bg-slate-800/70 backdrop-blur-md text-slate-500 dark:text-slate-400 hover:bg-white dark:hover:bg-slate-800 hover:text-indigo-600 dark:hover:text-indigo-400 transition-all shadow-sm border border-white/20 dark:border-slate-700 active:scale-95"
+            className="p-2.5 rounded-full bg-white/80 dark:bg-slate-800/80 backdrop-blur-md text-slate-500 dark:text-slate-400 hover:bg-white dark:hover:bg-slate-800 hover:text-indigo-600 dark:hover:text-indigo-400 transition-all shadow-sm border border-white/20 dark:border-slate-700 active:scale-95"
           >
             {isDarkMode ? (
               <SunIcon className="w-4 h-4 sm:w-5 sm:h-5" />
@@ -244,8 +263,34 @@ export const StudentEntryForm: React.FC<StudentEntryFormProps> = ({
       )}
 
       {/* Main Container Layout (Adaptive 2-Column for Landscape/Desktop) */}
-      <div className="w-full max-w-4xl px-4 sm:px-6 relative z-10 flex-1 flex flex-col justify-center items-center min-h-0 py-3 sm:py-6">
-        <div className="w-full flex flex-col landscape:flex-row lg:flex-row items-center justify-center gap-4 sm:gap-6 lg:gap-8 animate-gentle-slide max-h-full overflow-y-auto custom-scrollbar">
+      <div className="w-full max-w-4xl px-4 sm:px-6 relative z-10 flex-1 flex flex-col justify-center items-center py-4 sm:py-6">
+        {inAppInfo.isInApp && !dismissedInAppBanner && (
+          <div className="w-full max-w-[420px] lg:max-w-2xl mb-3 p-3 rounded-2xl bg-amber-50/95 dark:bg-amber-950/50 border border-amber-200 dark:border-amber-800/70 text-amber-900 dark:text-amber-100 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+            <div className="flex items-start gap-2.5 min-w-0 text-left">
+              <ExclamationTriangleIcon className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+              <p className="text-[11px] leading-snug font-medium">
+                Terbuka di browser <strong>{inAppInfo.appName}</strong>. Agar kamera QR lancar & progres ujian tidak terpisah, buka tautan di <strong>Safari / Chrome</strong>.
+              </p>
+            </div>
+            <div className="flex items-center gap-1.5 shrink-0 self-end sm:self-center">
+              <button
+                type="button"
+                onClick={handleCopyExamLink}
+                className="px-2.5 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-[11px] font-bold transition-colors cursor-pointer whitespace-nowrap"
+              >
+                Salin Tautan
+              </button>
+              <button
+                type="button"
+                onClick={() => setDismissedInAppBanner(true)}
+                className="px-2 py-1.5 rounded-lg text-amber-700 dark:text-amber-300 hover:bg-amber-200/50 dark:hover:bg-amber-900/40 text-[11px] font-bold cursor-pointer"
+              >
+                Tutup
+              </button>
+            </div>
+          </div>
+        )}
+        <div className="w-full flex flex-col landscape:flex-row lg:flex-row items-center justify-center gap-4 sm:gap-6 lg:gap-8 animate-gentle-slide">
           
           {/* Kolom Kiri Hero (Tampil di Desktop & Landscape) */}
           <div className="hidden landscape:flex lg:flex flex-col items-start text-left max-w-xs shrink-0 space-y-3">
@@ -319,7 +364,7 @@ export const StudentEntryForm: React.FC<StudentEntryFormProps> = ({
                         }}
                         onFocus={() => setIsFocused("school")}
                         onBlur={() => setIsFocused(null)}
-                        className="block w-full bg-transparent border-none p-0 pb-2 text-sm font-bold text-slate-800 dark:text-slate-100 focus:ring-0 outline-none appearance-none cursor-pointer"
+                        className="block w-full bg-transparent border-none p-0 pb-2 text-base font-bold text-slate-800 dark:text-slate-100 focus:ring-0 outline-none appearance-none cursor-pointer"
                         required
                       >
                         <option value="" disabled className="dark:bg-slate-900">
@@ -346,7 +391,7 @@ export const StudentEntryForm: React.FC<StudentEntryFormProps> = ({
                       onChange={(e) => setSchoolName(e.target.value)}
                       onFocus={() => setIsFocused("school")}
                       onBlur={() => setIsFocused(null)}
-                      className="block w-full bg-transparent border-none p-0 pb-2 text-sm font-bold text-slate-800 dark:text-slate-100 placeholder:text-slate-300 dark:placeholder:text-slate-600 focus:ring-0 outline-none"
+                      className="block w-full bg-transparent border-none p-0 pb-2 text-base font-bold text-slate-800 dark:text-slate-100 placeholder:text-slate-300 dark:placeholder:text-slate-600 focus:ring-0 outline-none"
                       placeholder="Nama sekolah..."
                       required
                     />
@@ -382,7 +427,7 @@ export const StudentEntryForm: React.FC<StudentEntryFormProps> = ({
                         setIsFocused(null);
                         setTimeout(() => setIsNameDropdownOpen(false), 200);
                       }}
-                      className="block w-full bg-transparent border-none p-0 pb-2 text-sm font-bold text-slate-800 dark:text-slate-100 placeholder:text-slate-300 dark:placeholder:text-slate-600 focus:ring-0 outline-none text-left"
+                      className="block w-full bg-transparent border-none p-0 pb-2 text-base font-bold text-slate-800 dark:text-slate-100 placeholder:text-slate-300 dark:placeholder:text-slate-600 focus:ring-0 outline-none text-left"
                       placeholder="Ketik atau pilih nama..."
                       required
                     />
@@ -405,8 +450,10 @@ export const StudentEntryForm: React.FC<StudentEntryFormProps> = ({
 
                 {isNameDropdownOpen && filteredSuggestions.length > 0 && (
                   <div
-                    onMouseDown={(e) => e.preventDefault()}
-                    className="absolute left-0 right-0 top-full mt-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl max-h-56 overflow-y-auto z-50 py-1.5 divide-y divide-slate-100 dark:divide-slate-800"
+                    data-scrollable="true"
+                    onPointerDown={(e) => e.preventDefault()}
+                    onTouchStart={(e) => e.stopPropagation()}
+                    className="absolute left-0 right-0 top-full mt-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl max-h-56 overflow-y-auto overscroll-contain z-50 py-1.5 divide-y divide-slate-100 dark:divide-slate-800"
                   >
                     {filteredSuggestions.map((s) => {
                       const isSelected =
@@ -480,7 +527,7 @@ export const StudentEntryForm: React.FC<StudentEntryFormProps> = ({
                           onChange={(e) => handleClassChange(e.target.value)}
                           onFocus={() => setIsFocused("class")}
                           onBlur={() => setIsFocused(null)}
-                          className="block w-full bg-transparent border-none p-0 pb-2 text-sm font-bold text-slate-800 dark:text-slate-100 focus:ring-0 outline-none appearance-none cursor-pointer text-left"
+                          className="block w-full bg-transparent border-none p-0 pb-2 text-base font-bold text-slate-800 dark:text-slate-100 focus:ring-0 outline-none appearance-none cursor-pointer text-left"
                           required
                         >
                           <option
@@ -519,7 +566,7 @@ export const StudentEntryForm: React.FC<StudentEntryFormProps> = ({
                         onChange={(e) => handleClassChange(e.target.value)}
                         onFocus={() => setIsFocused("class")}
                         onBlur={() => setIsFocused(null)}
-                        className="block w-full bg-transparent border-none p-0 pb-2 text-sm font-bold text-slate-800 dark:text-slate-100 placeholder:text-slate-300 dark:placeholder:text-slate-600 focus:ring-0 outline-none text-left"
+                        className="block w-full bg-transparent border-none p-0 pb-2 text-base font-bold text-slate-800 dark:text-slate-100 placeholder:text-slate-300 dark:placeholder:text-slate-600 focus:ring-0 outline-none text-left"
                         placeholder="Contoh: 9A"
                         required
                       />
@@ -541,7 +588,7 @@ export const StudentEntryForm: React.FC<StudentEntryFormProps> = ({
                           onChange={(e) => handleAbsentNumberChange(e.target.value)}
                           onFocus={() => setIsFocused("absent")}
                           onBlur={() => setIsFocused(null)}
-                          className="block w-full bg-transparent border-none p-0 pb-2 text-sm font-bold text-slate-800 dark:text-slate-100 focus:ring-0 outline-none appearance-none cursor-pointer text-left"
+                          className="block w-full bg-transparent border-none p-0 pb-2 text-base font-bold text-slate-800 dark:text-slate-100 focus:ring-0 outline-none appearance-none cursor-pointer text-left"
                           required
                         >
                           <option
@@ -572,7 +619,7 @@ export const StudentEntryForm: React.FC<StudentEntryFormProps> = ({
                         onChange={(e) => handleAbsentNumberChange(e.target.value)}
                         onFocus={() => setIsFocused("absent")}
                         onBlur={() => setIsFocused(null)}
-                        className="block w-full bg-transparent border-none p-0 pb-2 text-sm font-bold text-slate-800 dark:text-slate-100 placeholder:text-slate-300 dark:placeholder:text-slate-600 focus:ring-0 outline-none text-left font-mono"
+                        className="block w-full bg-transparent border-none p-0 pb-2 text-base font-bold text-slate-800 dark:text-slate-100 placeholder:text-slate-300 dark:placeholder:text-slate-600 focus:ring-0 outline-none text-left font-mono"
                         placeholder="00 / NIS"
                         required
                       />

@@ -63,7 +63,7 @@ export const StudentExamNavDrawer: React.FC<StudentExamNavDrawerProps> = ({
 
       <div
         ref={navMenuRef}
-        className={`fixed top-16 inset-x-0 bottom-0 z-50 bg-white dark:bg-slate-900 flex flex-col transition-all duration-300 ease-in-out origin-top shadow-2xl ${
+        className={`fixed exam-drawer-safe inset-x-0 bottom-0 z-50 bg-white dark:bg-slate-900 flex flex-col transition-all duration-300 ease-in-out origin-top shadow-2xl ${
           isNavOpen
             ? "translate-y-0 opacity-100 visible pointer-events-auto"
             : "-translate-y-full opacity-0 invisible pointer-events-none"
@@ -101,7 +101,10 @@ export const StudentExamNavDrawer: React.FC<StudentExamNavDrawerProps> = ({
         </div>
 
         {/* Konten Utama Laci: Grid Nomor Soal & Kartu Informasi Adaptif */}
-        <div className="flex-1 min-h-0 overflow-y-auto px-3 sm:px-6 py-3 sm:py-4 flex flex-col justify-center items-center overscroll-contain">
+        <div
+          data-scrollable="true"
+          className="flex-1 min-h-0 overflow-y-auto px-3 sm:px-6 py-3 sm:py-4 flex flex-col justify-center items-center overscroll-contain"
+        >
           <div className="w-full max-w-5xl mx-auto flex flex-col items-center justify-center gap-3 sm:gap-4 my-auto">
             {/* Grid Tombol Nomor Soal */}
             <div className="flex flex-wrap gap-1.5 sm:gap-2 justify-center w-full max-w-4xl mx-auto">
@@ -200,7 +203,7 @@ export const StudentExamNavDrawer: React.FC<StudentExamNavDrawerProps> = ({
         </div>
 
         {/* Tombol Selesai di Bagian Bawah Laci Soal */}
-        <div className="shrink-0 border-t border-slate-200/80 dark:border-slate-800 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md px-4 sm:px-6 py-2.5 sm:py-3.5 shadow-lg">
+        <div className="shrink-0 border-t border-slate-200/80 dark:border-slate-800 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md px-4 sm:px-6 pt-2.5 sm:pt-3.5 pb-[calc(0.625rem+env(safe-area-inset-bottom,0px))] sm:pb-[calc(0.875rem+env(safe-area-inset-bottom,0px))] shadow-lg">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-2.5 sm:gap-4 max-w-5xl mx-auto w-full">
             <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
               <span className="font-bold text-slate-700 dark:text-slate-200">{answeredCount} dari {totalQuestions}</span>
@@ -219,9 +222,9 @@ export const StudentExamNavDrawer: React.FC<StudentExamNavDrawerProps> = ({
         </div>
       </div>
 
-      {/* Floating Drawer Button di Sudut Kanan Bawah */}
+      {/* Floating Drawer Button di Sudut Kanan Bawah (Safe Area Aware) */}
       <div
-        className={`fixed bottom-5 right-5 sm:bottom-6 sm:right-6 z-40 transition-opacity duration-200 ${
+        className={`fixed exam-fab-safe z-40 transition-opacity duration-200 ${
           isNavOpen ? "opacity-0 pointer-events-none" : "opacity-100 pointer-events-auto"
         }`}
       >

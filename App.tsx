@@ -20,6 +20,7 @@ import { StudentDialogModal, type StudentDialogVariant } from './components/stud
 import { supabase } from './lib/supabase';
 import { hydrateMathInContainer } from './utils/mathRenderer';
 import { calculateStudentAccess, canStudentResumeInOvertime } from './utils/scheduleUtils';
+import { getExamDates } from './components/teacher/timeUtils';
 import { measureClientBandwidthBytes, detectClientDevice, countIntegrityViolations } from './utils/telemetryUtils';
 import { cleanupExpiredExamCaches } from './utils/cacheHygiene';
 import { findLocalCompletedStudent, saveLocalCompletedStudent } from './utils/studentIdentity';
@@ -75,8 +76,10 @@ const App: React.FC = () => {
     examsRef.current = exams;
   }, [exams]);
   const [results, setResults] = useState<Result[]>([]);
+  const [ongoingExamCounts, setOngoingExamCounts] = useState<Record<string, number>>({});
   const lastExamsFetchRef = useRef<{ teacherId: string; ts: number }>({ teacherId: '', ts: 0 });
   const lastResultsFetchRef = useRef<{ teacherId: string; ts: number }>({ teacherId: '', ts: 0 });
+  const lastCountsFetchRef = useRef<{ teacherId: string; ts: number }>({ teacherId: '', ts: 0 });
   const [isSyncing, setIsSyncing] = useState(false);
   const [isOnline, setIsOnline] = useState(typeof navigator !== 'undefined' && navigator.onLine !== undefined ? navigator.onLine : true);
   const [isLoadingSession, setIsLoadingSession] = useState(true);
@@ -162,10 +165,10 @@ const App: React.FC = () => {
     }
   }, [view]);
 
-  // Kunci total scroll window/body dan gesture overscroll saat berada di SELECTOR, STUDENT_LOGIN, dan TEACHER_LOGIN
+  // Kunci total scroll window/body hanya di SELECTOR; di LOGIN tetap izinkan scroll saat keyboard virtual mobile muncul
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    if (view === 'SELECTOR' || view === 'STUDENT_LOGIN' || view === 'TEACHER_LOGIN') {
+    if (view === 'SELECTOR') {
       const origHtmlOverflow = document.documentElement.style.overflow;
       const origHtmlHeight = document.documentElement.style.height;
       const origBodyOverflow = document.body.style.overflow;
@@ -187,6 +190,13 @@ const App: React.FC = () => {
         document.body.style.height = origBodyHeight;
         document.body.style.overscrollBehavior = origBodyOverscroll;
         document.body.style.touchAction = origBodyTouchAction;
+      };
+    }
+    if (view === 'STUDENT_LOGIN' || view === 'TEACHER_LOGIN') {
+      const origBodyOverscroll = document.body.style.overscrollBehavior;
+      document.body.style.overscrollBehavior = 'contain';
+      return () => {
+        document.body.style.overscrollBehavior = origBodyOverscroll;
       };
     }
   }, [view]);
@@ -983,11 +993,54 @@ const App: React.FC = () => {
     }
     setIsSyncing(true);
     try {
-        const examMap = await storageService.getExams(teacherProfile);
+        const examMap = await storageService.getExams(teacherProfile, { includeQuestions: false });
         examsRef.current = examMap;
         setExams(examMap);
         lastExamsFetchRef.current = { teacherId: teacherProfile.id, ts: Date.now() };
     } finally { setIsSyncing(false); }
+  }, [teacherProfile]);
+
+  const refreshOngoingCounts = useCallback(async (force = false) => {
+    if (!teacherProfile) return;
+    const now = Date.now();
+    if (
+      !force &&
+      lastCountsFetchRef.current.teacherId === teacherProfile.id &&
+      now - lastCountsFetchRef.current.ts < DASHBOARD_CACHE_TTL_MS
+    ) {
+      return;
+    }
+    let currentExamsMap = examsRef.current;
+    if (Object.keys(currentExamsMap).length === 0) {
+      currentExamsMap = await storageService.getExams(teacherProfile, { includeQuestions: false });
+      examsRef.current = currentExamsMap;
+      lastExamsFetchRef.current = { teacherId: teacherProfile.id, ts: Date.now() };
+      if (Object.keys(currentExamsMap).length > 0) {
+        setExams(currentExamsMap);
+      }
+    }
+
+    const ongoingCodes = Object.values(currentExamsMap)
+      .filter((exam) => {
+        if (exam.status === 'DRAFT' || exam.config?.isFinished) return false;
+        const { start, end } = getExamDates(exam);
+        return now >= start.getTime() && now <= end.getTime();
+      })
+      .map((exam) => exam.code);
+
+    if (ongoingCodes.length === 0) {
+      setOngoingExamCounts({});
+      lastCountsFetchRef.current = { teacherId: teacherProfile.id, ts: Date.now() };
+      return;
+    }
+
+    try {
+      const counts = await storageService.getExamParticipantCounts(ongoingCodes);
+      setOngoingExamCounts(counts);
+      lastCountsFetchRef.current = { teacherId: teacherProfile.id, ts: Date.now() };
+    } catch (e) {
+      console.warn('Failed to refresh ongoing exam counts:', e);
+    }
   }, [teacherProfile]);
 
   const refreshResults = useCallback(async (force = false) => {
@@ -1004,7 +1057,7 @@ const App: React.FC = () => {
     try {
         let examCodes = Object.keys(examsRef.current);
         if (examCodes.length === 0) {
-            const examMap = await storageService.getExams(teacherProfile);
+            const examMap = await storageService.getExams(teacherProfile, { includeQuestions: false });
             examsRef.current = examMap;
             examCodes = Object.keys(examMap);
             lastExamsFetchRef.current = { teacherId: teacherProfile.id, ts: Date.now() };
@@ -1153,8 +1206,10 @@ const App: React.FC = () => {
     // FIX: Clear shared state to prevent data leakage/ghosting between sessions
     lastExamsFetchRef.current = { teacherId: '', ts: 0 };
     lastResultsFetchRef.current = { teacherId: '', ts: 0 };
+    lastCountsFetchRef.current = { teacherId: '', ts: 0 };
     setExams({});
     setResults([]);
+    setOngoingExamCounts({});
     window.history.replaceState({}, '', '/');
   };
 
@@ -1230,21 +1285,41 @@ const App: React.FC = () => {
   );
 
   return (
-    <div className={`min-h-screen bg-[#FAFAFA] dark:bg-slate-950 text-slate-800 dark:text-slate-100 font-sans selection:bg-indigo-100 selection:text-indigo-800 overflow-x-hidden antialiased flex flex-col transition-colors duration-300 ${view === 'SELECTOR' ? 'h-[100dvh] max-h-[100dvh] overflow-hidden' : ''}`}>
+    <div className={`min-h-[100dvh] bg-[#FAFAFA] dark:bg-slate-950 text-slate-800 dark:text-slate-100 font-sans selection:bg-indigo-100 selection:text-indigo-800 overflow-x-hidden antialiased flex flex-col transition-colors duration-300 ${view === 'SELECTOR' ? 'h-[100dvh] max-h-[100dvh] overflow-hidden' : ''}`}>
         
-        {/* Status Jaringan Minimalis & Elegan untuk Halaman Non-Selector */}
-        {view !== 'SELECTOR' && (
-            <div className="fixed top-6 right-6 z-[100] pointer-events-none flex flex-col gap-2 items-end">
-                {!isOnline && (
-                    <div className="bg-rose-500/90 backdrop-blur-md text-white px-4 py-2 rounded-full text-[11px] font-bold uppercase tracking-wide shadow-xl flex items-center gap-2 animate-bounce pointer-events-auto ring-1 ring-white/20">
-                        <NoWifiIcon className="w-3.5 h-3.5"/> 
-                        <span>Offline Mode</span>
+        {/* Bar Tipis Status Jaringan di Bawah Header (Saat Ujian) atau di Atas Tengah Non-Overlap (Halaman Lain) */}
+        {view !== 'SELECTOR' && (!isOnline || (isSyncing && isOnline)) && (
+            <div
+                className={`fixed inset-x-0 pointer-events-none flex justify-center ${
+                    view === 'STUDENT_EXAM'
+                        ? 'exam-below-header-safe z-[55]'
+                        : 'top-0 safe-pt z-[100]'
+                }`}
+            >
+                {!isOnline ? (
+                    <div
+                        role="status"
+                        aria-live="polite"
+                        className={`w-full flex items-center justify-center gap-2 px-3 py-1 text-[11px] font-bold tracking-wide shadow-sm pointer-events-auto border-b ${
+                            view === 'STUDENT_EXAM'
+                                ? 'bg-rose-600/95 text-white border-rose-700/60 backdrop-blur-sm'
+                                : 'bg-rose-600/95 text-white border-rose-700/60 backdrop-blur-sm'
+                        }`}
+                    >
+                        <NoWifiIcon className="w-3.5 h-3.5 shrink-0" />
+                        <span className="truncate">
+                            {view === 'STUDENT_EXAM'
+                                ? 'Mode Offline — Jawaban tetap tersimpan aman di perangkat'
+                                : 'Offline Mode — Koneksi terputus'}
+                        </span>
                     </div>
-                )}
-                
-                {isSyncing && isOnline && (
-                    <div className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-md text-indigo-600 dark:text-indigo-400 px-4 py-2 rounded-full text-[11px] font-bold uppercase tracking-wide shadow-lg border border-indigo-50 dark:border-slate-700 flex items-center gap-2 pointer-events-auto">
-                        <div className="w-3 h-3 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
+                ) : (
+                    <div
+                        role="status"
+                        aria-live="polite"
+                        className="w-full flex items-center justify-center gap-2 px-3 py-1 text-[11px] font-bold tracking-wide bg-indigo-50/95 dark:bg-indigo-950/90 text-indigo-700 dark:text-indigo-300 border-b border-indigo-200/70 dark:border-indigo-800/70 backdrop-blur-sm shadow-2xs pointer-events-auto"
+                    >
+                        <div className="w-3 h-3 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin shrink-0"></div>
                         <span>Menyimpan...</span>
                     </div>
                 )}
@@ -1260,8 +1335,8 @@ const App: React.FC = () => {
                     <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] rounded-full bg-blue-50 dark:bg-slate-800 blur-[100px]"></div>
                 </div>
 
-                {/* Tombol Melayang Pojok Kiri Atas (Tidak memakan tinggi alur dokumen) */}
-                <div className="absolute top-3.5 sm:top-5 left-3.5 sm:left-6 z-20 flex items-center gap-2">
+                {/* Tombol Melayang Pojok Kiri Atas (Safe Area Aware) */}
+                <div className="absolute top-[calc(0.875rem+env(safe-area-inset-top,0px))] sm:top-[calc(1.25rem+env(safe-area-inset-top,0px))] left-[calc(0.875rem+env(safe-area-inset-left,0px))] sm:left-[calc(1.5rem+env(safe-area-inset-left,0px))] z-20 flex items-center gap-2">
                     <button
                         onClick={() => setIsInviteOpen(true)}
                         className="flex items-center gap-2 px-3.5 sm:px-4 py-2 sm:py-2.5 rounded-full bg-white/90 dark:bg-slate-800/90 text-slate-600 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-white dark:hover:bg-slate-800 transition-all shadow-md shadow-slate-200/50 dark:shadow-none border border-slate-200/60 dark:border-slate-700 backdrop-blur-sm group active:scale-95"
@@ -1273,10 +1348,10 @@ const App: React.FC = () => {
                     <PWAInstallButton />
                 </div>
 
-                {/* Tombol Melayang Pojok Kanan Atas (Theme Toggle & Status Jaringan) */}
-                <div className="absolute top-3.5 sm:top-5 right-3.5 sm:right-6 z-20 flex items-center gap-2">
+                {/* Tombol Melayang Pojok Kanan Atas (Safe Area Aware) */}
+                <div className="absolute top-[calc(0.875rem+env(safe-area-inset-top,0px))] sm:top-[calc(1.25rem+env(safe-area-inset-top,0px))] right-[calc(0.875rem+env(safe-area-inset-right,0px))] sm:right-[calc(1.5rem+env(safe-area-inset-right,0px))] z-20 flex items-center gap-2">
                     {!isOnline && (
-                        <div className="bg-rose-500/90 backdrop-blur-md text-white px-3 py-1.5 rounded-full text-[10px] sm:text-[11px] font-bold uppercase tracking-wide shadow-md flex items-center gap-1.5 animate-bounce ring-1 ring-white/20">
+                        <div className="bg-rose-500/90 backdrop-blur-md text-white px-3 py-1.5 rounded-full text-[10px] sm:text-[11px] font-bold uppercase tracking-wide shadow-md flex items-center gap-1.5 ring-1 ring-white/20">
                             <NoWifiIcon className="w-3.5 h-3.5" />
                             <span>Offline</span>
                         </div>
@@ -1336,8 +1411,8 @@ const App: React.FC = () => {
                     </div>
                 </main>
 
-                {/* Footer Teks HAKI: Jarak bawah dihitung langsung dari tombol panduan & fitur menuju teks HAKI yang menempel di batas paling bawah layar */}
-                <footer className="w-full max-w-full px-4 pt-2 pb-3 sm:pb-4 z-10 shrink-0">
+                {/* Footer Teks HAKI: Safe Area Bottom */}
+                <footer className="w-full max-w-full px-4 pt-2 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] sm:pb-[calc(1rem+env(safe-area-inset-bottom,0px))] z-10 shrink-0">
                     <p className="text-center text-[10px] sm:text-[11px] font-medium text-slate-400 dark:text-slate-500 tracking-wide select-none leading-relaxed">
                         © {new Date().getFullYear()} I Made Hermawan Surya Putra · Hak Cipta Dilindungi
                     </p>
@@ -1473,6 +1548,8 @@ const App: React.FC = () => {
                     onLogout={handleLogout}
                     onRefreshExams={refreshExams}
                     onRefreshResults={refreshResults}
+                    ongoingExamCounts={ongoingExamCounts}
+                    onRefreshOngoingCounts={refreshOngoingCounts}
 
                 />
             </Suspense>

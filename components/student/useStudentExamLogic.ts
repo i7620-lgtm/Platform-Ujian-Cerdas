@@ -514,16 +514,16 @@ export const useStudentExamLogic = ({
 
     const pollData = async () => {
       if (!isPolling) return;
-      if (typeof navigator !== "undefined" && navigator.onLine !== false) {
+      if (
+        student.class !== "PREVIEW" &&
+        typeof navigator !== "undefined" &&
+        navigator.onLine !== false
+      ) {
         try {
-          // Select lightweight exam columns (version is stored in config.version)
-          const { data } = await supabase
-            .from("exams")
-            .select("status, config")
-            .eq("code", exam.code)
-            .single();
-          if (data) {
-            if (data.status === "closed" && !isSubmittingRef.current) {
+          // Check live exam status & config via Vercel Edge CDN meta first (fallback Supabase)
+          const liveExamMeta = await storageService.checkLiveExamStatusForStudent(exam.code);
+          if (liveExamMeta) {
+            if (liveExamMeta.status === "closed" && !isSubmittingRef.current) {
               const currentIsPR = (activeExam.config.examMode || "").trim().toUpperCase() === "PR";
               triggerTeacherForceStop(
                 "Ujian telah ditutup oleh Guru. Jawaban Anda sedang dikumpulkan otomatis.",
@@ -531,26 +531,26 @@ export const useStudentExamLogic = ({
               );
               return;
             }
-            if (data.config) {
-              const nextConfigJson = JSON.stringify(data.config);
+            if (liveExamMeta.config) {
+              const nextConfigJson = JSON.stringify(liveExamMeta.config);
               if (nextConfigJson !== lastConfigJsonRef.current) {
                 lastConfigJsonRef.current = nextConfigJson;
-                setActiveExam((prev) => ({ ...prev, config: data.config }));
+                setActiveExam((prev) => ({ ...prev, config: liveExamMeta.config as Exam["config"] }));
               }
-              const nextVersion = typeof (data.config as any).version === "number"
-                ? (data.config as any).version
+              const nextVersion = typeof liveExamMeta.config.version === "number"
+                ? liveExamMeta.config.version
                 : undefined;
               applyVersionBundleUpdate(nextVersion);
             }
           }
 
-          // Select extreme for results
-          if (student.resultId && student.class !== "PREVIEW") {
+          // Lightweight status-only check on student result row
+          if (student.resultId) {
             const { data: resultData } = await supabase
               .from("results")
-              .select("status, student_id")
+              .select("status")
               .eq("id", student.resultId)
-              .single();
+              .maybeSingle();
             const currentIsPR = (activeExam.config.examMode || "").trim().toUpperCase() === "PR";
             const shouldStop = resultData && (
               resultData.status === "completed" ||
@@ -569,11 +569,11 @@ export const useStudentExamLogic = ({
         }
       }
 
-      // Calculate next interval based on time left
-      let nextInterval = 60000; // 1 minute default
+      // Calculate next interval based on time left + jitter to avoid thundering herd
+      const jitterMs = Math.floor(Math.random() * 8000);
+      let nextInterval = 60000 + jitterMs; // ~1 minute default
       if (timeLeftRef.current !== undefined && timeLeftRef.current <= 300) {
-        // 5 minutes = 300 seconds
-        nextInterval = 15000; // 15 seconds
+        nextInterval = 15000 + Math.floor(Math.random() * 4000); // ~15 seconds near finish
       }
 
       if (isPolling) {
@@ -581,8 +581,8 @@ export const useStudentExamLogic = ({
       }
     };
 
-    // Start polling
-    pollTimeout = setTimeout(pollData, 60000);
+    // Start polling with jitter
+    pollTimeout = setTimeout(pollData, 60000 + Math.floor(Math.random() * 8000));
 
     return () => {
       isPolling = false;
@@ -1033,6 +1033,10 @@ export const useStudentExamLogic = ({
     cleaned = cleaned.replace(
       /<video(?![^>]*\bpreload=)/gi,
       '<video preload="metadata"',
+    );
+    cleaned = cleaned.replace(
+      /<video(?![^>]*\bplaysinline\b)/gi,
+      '<video playsinline webkit-playsinline',
     );
     if (optimizeHtmlCacheRef.current.size >= 600) {
       const oldestKey = optimizeHtmlCacheRef.current.keys().next().value;

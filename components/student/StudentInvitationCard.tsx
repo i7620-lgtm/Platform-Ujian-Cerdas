@@ -48,7 +48,7 @@ export const StudentInvitationCard: React.FC<StudentInvitationCardProps> = ({
     : "";
 
   return (
-    <div className="min-h-screen w-full flex flex-col items-center justify-center bg-[#FAFAFA] dark:bg-slate-950 p-4 font-sans relative selection:bg-indigo-100 selection:text-indigo-800 transition-colors duration-300">
+    <div className="min-h-[100dvh] safe-pt safe-pb w-full flex flex-col items-center justify-center bg-[#FAFAFA] dark:bg-slate-950 p-4 font-sans relative selection:bg-indigo-100 selection:text-indigo-800 transition-colors duration-300">
       {/* Background Ambience */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden">
         <div

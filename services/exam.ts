@@ -658,7 +658,17 @@ export class ExamService {
         }
     }
 
-    async getExams(profile?: TeacherProfile): Promise<Record<string, Exam>> {
+    private withQuestionCountMetadata(config: ExamConfig, questions: Question[]): ExamConfig {
+        const list = Array.isArray(questions) ? questions : [];
+        const scorableCount = list.filter((q) => q?.questionType !== 'INFO').length;
+        return {
+            ...(config || ({} as ExamConfig)),
+            totalQuestionCount: list.length,
+            scorableQuestionCount: scorableCount,
+        };
+    }
+
+    async getExams(profile?: TeacherProfile, options?: { includeQuestions?: boolean }): Promise<Record<string, Exam>> {
         if (profile && (profile.accountType === 'super_admin' || profile.accountType === 'admin_sekolah')) {
             const verified = await authService.getCurrentUser();
             if (!verified || verified.accountType !== profile.accountType) {
@@ -667,7 +677,14 @@ export class ExamService {
             }
         }
 
-        let query = supabase.from('exams').select('code, author_id, school, config, questions, status, created_at');
+        const includeQuestions = options?.includeQuestions ?? true;
+        const selectColumns = includeQuestions
+            ? 'code, author_id, school, config, questions, status, created_at'
+            : 'code, author_id, school, config, status, created_at';
+
+        const localExams = await this.getLocalTeacherExamsAsync();
+
+        let query = supabase.from('exams').select(selectColumns);
 
         if (profile) {
             if (profile.accountType === 'super_admin') {
@@ -683,23 +700,56 @@ export class ExamService {
 
         const examMap: Record<string, Exam> = {};
         if (data) {
-            data.forEach((row: Record<string, unknown>) => {
-                examMap[row.code as string] = {
-                    code: row.code as string,
-                    authorId: row.author_id as string,
-                    authorSchool: row.school as string,
-                    config: row.config as ExamConfig,
-                    questions: row.questions as Question[],
-                    status: row.status as 'DRAFT' | 'PUBLISHED',
-                    createdAt: row.created_at as string
-                };
+            (data as unknown as Record<string, unknown>[]).forEach((row) => {
+                const code = row.code as string;
+                const config = row.config as ExamConfig;
+                const status = row.status as 'DRAFT' | 'PUBLISHED';
+                const serverVersion = typeof config?.version === 'number' ? config.version : undefined;
+
+                if (includeQuestions) {
+                    examMap[code] = {
+                        code,
+                        authorId: row.author_id as string,
+                        authorSchool: row.school as string,
+                        config,
+                        questions: (row.questions as Question[]) || [],
+                        questionsDeferred: false,
+                        status,
+                        version: serverVersion,
+                        createdAt: row.created_at as string,
+                    };
+                } else {
+                    const localMatch = localExams[code];
+                    const localVersion = typeof localMatch?.config?.version === 'number'
+                        ? localMatch.config.version
+                        : localMatch?.version;
+                    const canReuseLocalQuestions = Boolean(
+                        localMatch &&
+                        !localMatch.questionsDeferred &&
+                        Array.isArray(localMatch.questions) &&
+                        localMatch.questions.length > 0 &&
+                        localMatch.status === status &&
+                        (serverVersion === undefined || serverVersion === localVersion)
+                    );
+
+                    examMap[code] = {
+                        code,
+                        authorId: row.author_id as string,
+                        authorSchool: row.school as string,
+                        config,
+                        questions: canReuseLocalQuestions ? localMatch.questions : [],
+                        questionsDeferred: !canReuseLocalQuestions,
+                        status,
+                        version: serverVersion,
+                        createdAt: row.created_at as string,
+                    };
+                }
             });
         } else if (error) {
             console.error("Error fetching exams from Supabase:", error);
         }
 
         // Merge local teacher exams cache (IndexedDB) to guarantee drafts and published exams never disappear
-        const localExams = await this.getLocalTeacherExamsAsync();
         Object.values(localExams).forEach((localExam) => {
             const isMatch = !profile ||
                 profile.accountType === 'super_admin' ||
@@ -714,6 +764,100 @@ export class ExamService {
         });
 
         return examMap;
+    }
+
+    async ensureExamQuestions(exam: Exam): Promise<Exam> {
+        if (!exam?.code) return exam;
+        if (!exam.questionsDeferred && Array.isArray(exam.questions) && exam.questions.length > 0) {
+            return exam;
+        }
+
+        const cleanCode = exam.code.trim().toUpperCase();
+        const targetVersion = typeof exam.config?.version === 'number' ? exam.config.version : exam.version;
+        const localExams = await this.getLocalTeacherExamsAsync();
+        const localMatch = localExams[cleanCode];
+
+        if (
+            localMatch &&
+            !localMatch.questionsDeferred &&
+            Array.isArray(localMatch.questions) &&
+            localMatch.questions.length > 0
+        ) {
+            const localVersion = typeof localMatch.config?.version === 'number'
+                ? localMatch.config.version
+                : localMatch.version;
+            if ((targetVersion === undefined || localVersion === targetVersion) && localMatch.status === exam.status) {
+                return {
+                    ...exam,
+                    ...localMatch,
+                    questions: localMatch.questions,
+                    questionsDeferred: false,
+                };
+            }
+        }
+
+        try {
+            const { data, error } = await supabase
+                .from('exams')
+                .select('code, author_id, school, config, questions, status, created_at')
+                .eq('code', cleanCode)
+                .maybeSingle();
+
+            if (!error && data && Array.isArray(data.questions)) {
+                const config = (data.config || exam.config) as ExamConfig;
+                const hydrated: Exam = {
+                    code: data.code,
+                    authorId: data.author_id,
+                    authorName: exam.authorName || (config as any)?.authorName,
+                    authorSchool: data.school,
+                    config,
+                    questions: data.questions as Question[],
+                    questionsDeferred: false,
+                    status: data.status as 'DRAFT' | 'PUBLISHED',
+                    createdAt: data.created_at,
+                    version: typeof config?.version === 'number' ? config.version : exam.version,
+                };
+                this.saveLocalTeacherExam(hydrated);
+                return hydrated;
+            }
+        } catch (err) {
+            console.warn("ensureExamQuestions fetch failed, falling back to local cache:", err);
+        }
+
+        if (localMatch && Array.isArray(localMatch.questions) && localMatch.questions.length > 0) {
+            return {
+                ...exam,
+                questions: localMatch.questions,
+                questionsDeferred: false,
+            };
+        }
+
+        return exam;
+    }
+
+    async checkLiveExamStatusForStudent(code: string): Promise<{ status?: string; config?: ExamConfig } | null> {
+        const cleanCode = (code || '').trim().toUpperCase();
+        if (!cleanCode) return null;
+
+        const edgeMeta = await this.fetchEdgeMeta(cleanCode, false);
+        if (edgeMeta.ok && edgeMeta.data) {
+            return {
+                status: edgeMeta.data.status,
+                config: edgeMeta.data.config,
+            };
+        }
+
+        const { data, error } = await supabase
+            .from('exams')
+            .select('status, config')
+            .eq('code', cleanCode)
+            .maybeSingle();
+
+        if (error || !data) return null;
+        return {
+            status: data.status as string,
+            config: this.sanitizeConfigForStudent(data.config as ExamConfig, data.status as string),
+        };
     }
 
     async getExamForStudent(code: string, studentId?: string, isPreview = false): Promise<Exam | null> {
@@ -1456,11 +1600,13 @@ export class ExamService {
         }
 
         const processedQuestions = await this.prepareQuestionsForSave(exam.questions, examCode);
+        exam.config = this.withQuestionCountMetadata(exam.config, processedQuestions);
         const resolvedStatus = exam.status || 'PUBLISHED';
         const publishedExamSnapshot: Exam = {
             ...exam,
             authorId: finalAuthorId,
             questions: processedQuestions,
+            questionsDeferred: false,
             status: resolvedStatus,
             version: nextVersion,
         };
@@ -1606,11 +1752,11 @@ export class ExamService {
         const nextVersion = currentVersion + 1;
         const processedQuestions = await this.prepareQuestionsForSave(exam.questions, examCode);
 
-        const nextConfig = {
+        const nextConfig = this.withQuestionCountMetadata({
             ...exam.config,
             collaborators: config.collaborators,
             version: nextVersion
-        };
+        }, processedQuestions);
 
         const { error: rpcError } = await supabase.rpc('save_collaborator_exam', {
             p_exam_code: exam.code,

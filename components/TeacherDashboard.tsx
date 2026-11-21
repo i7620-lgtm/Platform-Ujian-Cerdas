@@ -81,6 +81,8 @@ interface TeacherDashboardProps {
   onLogout: () => void;
   onRefreshExams: (force?: boolean) => Promise<void>;
   onRefreshResults: (force?: boolean) => Promise<void>;
+  ongoingExamCounts?: Record<string, number>;
+  onRefreshOngoingCounts?: (force?: boolean) => Promise<void>;
   isDarkMode: boolean;
   toggleTheme: () => void;
   onUpdateProfile?: (updatedProfile: TeacherProfile) => void;
@@ -96,6 +98,8 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
   onLogout,
   onRefreshExams,
   onRefreshResults,
+  ongoingExamCounts,
+  onRefreshOngoingCounts,
   isDarkMode,
   toggleTheme,
   onUpdateProfile,
@@ -151,6 +155,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
     results,
     onRefreshExams,
     onRefreshResults,
+    onRefreshOngoingCounts,
   });
 
   if (isMainGuideModalOpen) {
@@ -348,9 +353,13 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
           <OngoingExamsView
             exams={ongoingExams}
             results={results}
+            ongoingExamCounts={ongoingExamCounts}
             onDuplicateExam={handleDuplicateExam}
             onRefresh={async () => {
-              await Promise.all([onRefreshExams(true), onRefreshResults(true)]);
+              await Promise.all([
+                onRefreshExams(true),
+                onRefreshOngoingCounts ? onRefreshOngoingCounts(true) : onRefreshResults(true),
+              ]);
             }}
             setSelectedOngoingExam={setSelectedOngoingExam}
           />
@@ -426,7 +435,9 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
             setSelectedOngoingExam(null);
             setView("FINISHED_EXAMS");
             onRefreshExams(true);
-            onRefreshResults(true);
+            if (onRefreshOngoingCounts) {
+              onRefreshOngoingCounts(true);
+            }
           }}
           isPremium={teacherProfile.isPremium || false}
         />

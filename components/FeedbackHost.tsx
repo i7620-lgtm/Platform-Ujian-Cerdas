@@ -108,6 +108,8 @@ const ToastCard: React.FC<{
       aria-live="polite"
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
+      onTouchStart={handleMouseEnter}
+      onTouchEnd={handleMouseLeave}
       className="pointer-events-auto w-full sm:w-88 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-lg px-4 py-3 flex items-start gap-3 animate-slide-up transition-all"
     >
       <div
@@ -174,7 +176,7 @@ export const FeedbackHost: React.FC = () => {
       {toasts.length > 0 && (
         <div
           aria-label="Notifikasi"
-          className="fixed top-4 right-4 left-4 sm:left-auto z-[11060] pointer-events-none flex flex-col items-center sm:items-end gap-2.5 max-w-full"
+          className="fixed top-[calc(1rem+env(safe-area-inset-top,0px))] right-[calc(1rem+env(safe-area-inset-right,0px))] left-[calc(1rem+env(safe-area-inset-left,0px))] sm:left-auto z-[11060] pointer-events-none flex flex-col items-center sm:items-end gap-2.5 max-w-full"
         >
           {toasts.map((toast) => (
             <ToastCard key={toast.id} toast={toast} onDismiss={dismissToast} />

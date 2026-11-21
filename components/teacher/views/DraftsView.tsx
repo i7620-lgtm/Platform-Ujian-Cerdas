@@ -7,6 +7,7 @@ import { DraftExamCard } from "./DraftExamCard";
 import { PrintSoalModal } from "../modals/berlangsung/PrintSoalModal";
 import { PrintKisiKisiModal } from "../modals/berlangsung/PrintKisiKisiModal";
 import { PrintKunciJawabanModal } from "../modals/berlangsung/PrintKunciJawabanModal";
+import { storageService } from "../../../services/storage";
 
 export const DraftsView: React.FC<{
   exams: Exam[];
@@ -31,6 +32,14 @@ export const DraftsView: React.FC<{
     } finally {
       setIsRefreshing(false);
     }
+  };
+
+  const openWithHydratedQuestions = async (
+    exam: Exam,
+    setter: (hydrated: Exam) => void,
+  ) => {
+    const hydrated = await storageService.ensureExamQuestions(exam);
+    setter(hydrated);
   };
 
   return (
@@ -70,11 +79,11 @@ export const DraftsView: React.FC<{
               key={exam.code}
               exam={exam}
               onDelete={() => onDeleteDraft(exam)}
-              onPreview={() => setPreviewExam(exam)}
+              onPreview={() => openWithHydratedQuestions(exam, setPreviewExam)}
               onContinue={() => onContinueDraft(exam)}
-              onPrintSoal={() => setPrintSoalExam(exam)}
-              onPrintKisiKisi={() => setPrintKisiKisiExam(exam)}
-              onPrintKunci={() => setPrintKunciExam(exam)}
+              onPrintSoal={() => openWithHydratedQuestions(exam, setPrintSoalExam)}
+              onPrintKisiKisi={() => openWithHydratedQuestions(exam, setPrintKisiKisiExam)}
+              onPrintKunci={() => openWithHydratedQuestions(exam, setPrintKunciExam)}
             />
           ))}
         </div>

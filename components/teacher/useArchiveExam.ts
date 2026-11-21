@@ -30,13 +30,14 @@ export const useArchiveExam = (
 
     setIsLoadingArchive(true);
     try {
+      const fullExam = await storageService.ensureExamQuestions(exam);
       // --- VALIDATION FOR ESSAY GRADING ---
-      const essayQuestions = exam.questions.filter(
+      const essayQuestions = fullExam.questions.filter(
         (q) => q.questionType === "ESSAY",
       );
       if (essayQuestions.length > 0) {
         const currentResults = await storageService.getResults(
-          exam.code,
+          fullExam.code,
           undefined,
         );
 
@@ -72,9 +73,9 @@ export const useArchiveExam = (
         return;
       }
 
-      const { backupUrl } = await storageService.performFullArchive(exam);
+      const { backupUrl } = await storageService.performFullArchive(fullExam);
 
-      await deleteExam(exam.code);
+      await deleteExam(fullExam.code);
       onRefreshExams();
 
       if (backupUrl) {

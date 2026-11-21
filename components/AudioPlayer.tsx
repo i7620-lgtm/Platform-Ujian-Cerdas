@@ -11,6 +11,38 @@ import {
   Settings2,
 } from "lucide-react";
 import { showAlertModal } from "../stores/feedbackStore";
+import { isIOSWebKit } from "../utils/platformUtils";
+
+const splitSpeechChunks = (text: string, maxLen = 175): string[] => {
+  const normalized = text.replace(/\s+/g, " ").trim();
+  if (!normalized) return [];
+  const rawSentences = normalized
+    .split(/(?<=[.!?;])\s+/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+  const chunks: string[] = [];
+  for (const sentence of rawSentences) {
+    if (sentence.length <= maxLen) {
+      chunks.push(sentence);
+      continue;
+    }
+    const words = sentence.split(" ");
+    let current = "";
+    for (const word of words) {
+      if (!current) {
+        current = word;
+      } else if (current.length + 1 + word.length <= maxLen) {
+        current += ` ${word}`;
+      } else {
+        chunks.push(current);
+        current = word;
+      }
+    }
+    if (current) chunks.push(current);
+  }
+  return chunks.length > 0 ? chunks : [normalized];
+};
 
 export interface AudioPlayerProps {
   src?: string;
@@ -30,6 +62,8 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
   onDelete,
 }) => {
   const audioRef = useRef<HTMLAudioElement>(null);
+  const speechSessionRef = useRef(0);
+  const speechTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
   const [currentTime, setCurrentTime] = useState(0);
@@ -51,16 +85,25 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
         setProgress((audio.currentTime / audio.duration) * 100);
       }
     };
+    const handlePlay = () => setIsPlaying(true);
+    const handlePause = () => setIsPlaying(false);
     const handleEnded = () => setIsPlaying(false);
+    const handleError = () => setIsPlaying(false);
     const handleLoadedMetadata = () => setDuration(audio.duration);
 
     audio.addEventListener("timeupdate", updateProgress);
+    audio.addEventListener("play", handlePlay);
+    audio.addEventListener("pause", handlePause);
     audio.addEventListener("ended", handleEnded);
+    audio.addEventListener("error", handleError);
     audio.addEventListener("loadedmetadata", handleLoadedMetadata);
 
     return () => {
       audio.removeEventListener("timeupdate", updateProgress);
+      audio.removeEventListener("play", handlePlay);
+      audio.removeEventListener("pause", handlePause);
       audio.removeEventListener("ended", handleEnded);
+      audio.removeEventListener("error", handleError);
       audio.removeEventListener("loadedmetadata", handleLoadedMetadata);
     };
   }, [src, isSpeechMode]);
@@ -68,11 +111,28 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
   // Clean up speech synthesis when unmounted or script changes
   useEffect(() => {
     return () => {
+      speechSessionRef.current += 1;
+      if (speechTimerRef.current) {
+        clearTimeout(speechTimerRef.current);
+        speechTimerRef.current = null;
+      }
       if (typeof window !== "undefined" && "speechSynthesis" in window) {
         window.speechSynthesis.cancel();
       }
     };
   }, [script]);
+
+  const stopSpeechPlayback = () => {
+    speechSessionRef.current += 1;
+    if (speechTimerRef.current) {
+      clearTimeout(speechTimerRef.current);
+      speechTimerRef.current = null;
+    }
+    if (typeof window !== "undefined" && "speechSynthesis" in window) {
+      window.speechSynthesis.cancel();
+    }
+    setIsPlaying(false);
+  };
 
   const togglePlay = () => {
     if (isSpeechMode) {
@@ -86,42 +146,105 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
       }
 
       if (isPlaying) {
-        window.speechSynthesis.cancel();
-        setIsPlaying(false);
-      } else {
-        window.speechSynthesis.cancel(); // Reset any existing speech
-        const cleanScript = (script || "").trim();
-        const utterance = new SpeechSynthesisUtterance(cleanScript);
+        stopSpeechPlayback();
+        return;
+      }
 
-        // Detect language based on simple word heuristics
-        const englishKeywords = /\b(the|is|are|you|what|where|how|listen|conversation|speaker|excuse|hello|please|thank|good|morning)\b/i;
-        const isEnglish = englishKeywords.test(cleanScript);
-        utterance.lang = isEnglish ? "en-US" : "id-ID";
-        utterance.rate = 0.95; // Sedikit lebih perlahan agar terdengar jernih
+      stopSpeechPlayback();
+      const cleanScript = (script || "").trim();
+      const chunks = splitSpeechChunks(cleanScript);
+      if (chunks.length === 0) return;
+
+      const englishKeywords = /\b(the|is|are|you|what|where|how|listen|conversation|speaker|excuse|hello|please|thank|good|morning)\b/i;
+      const targetLang = englishKeywords.test(cleanScript) ? "en-US" : "id-ID";
+      const targetPrefix = targetLang.slice(0, 2).toLowerCase();
+      const voices = window.speechSynthesis.getVoices?.() || [];
+      const matchedVoice =
+        voices.find((v) => v.lang.toLowerCase() === targetLang.toLowerCase()) ||
+        voices.find((v) => v.lang.toLowerCase().startsWith(targetPrefix)) ||
+        null;
+
+      const sessionId = ++speechSessionRef.current;
+      setIsPlaying(true);
+
+      const speakChunkAt = (index: number) => {
+        if (speechSessionRef.current !== sessionId || index >= chunks.length) {
+          if (speechSessionRef.current === sessionId) {
+            setIsPlaying(false);
+          }
+          return;
+        }
+
+        const utterance = new SpeechSynthesisUtterance(chunks[index]);
+        utterance.lang = targetLang;
+        if (matchedVoice) utterance.voice = matchedVoice;
+        utterance.rate = 0.95;
         utterance.pitch = 1.0;
 
-        utterance.onstart = () => setIsPlaying(true);
-        utterance.onend = () => setIsPlaying(false);
-        utterance.onerror = () => setIsPlaying(false);
+        utterance.onstart = () => {
+          if (speechSessionRef.current === sessionId) {
+            setIsPlaying(true);
+          }
+        };
+        utterance.onend = () => {
+          if (speechSessionRef.current !== sessionId) return;
+          if (index + 1 < chunks.length) {
+            const delay = isIOSWebKit() ? 60 : 20;
+            speechTimerRef.current = setTimeout(() => speakChunkAt(index + 1), delay);
+          } else {
+            setIsPlaying(false);
+          }
+        };
+        utterance.onerror = () => {
+          if (speechSessionRef.current === sessionId) {
+            setIsPlaying(false);
+          }
+        };
 
-        window.speechSynthesis.speak(utterance);
-      }
+        try {
+          window.speechSynthesis.speak(utterance);
+        } catch {
+          if (speechSessionRef.current === sessionId) {
+            setIsPlaying(false);
+          }
+        }
+      };
+
+      speakChunkAt(0);
     } else if (audioRef.current) {
       if (isPlaying) {
         audioRef.current.pause();
+        setIsPlaying(false);
       } else {
-        audioRef.current.play();
+        try {
+          const playPromise = audioRef.current.play();
+          if (playPromise && typeof playPromise.then === "function") {
+            playPromise
+              .then(() => {
+                setIsPlaying(true);
+              })
+              .catch(() => {
+                setIsPlaying(false);
+                void showAlertModal({
+                  title: "Audio Tidak Dapat Diputar",
+                  message:
+                    "Browser memblokir pemutaran otomatis atau file audio gagal dimuat. Ketuk tombol Putar sekali lagi.",
+                  tone: "warning",
+                });
+              });
+          } else {
+            setIsPlaying(true);
+          }
+        } catch {
+          setIsPlaying(false);
+        }
       }
-      setIsPlaying(!isPlaying);
     }
   };
 
   const handleReset = () => {
     if (isSpeechMode) {
-      if (typeof window !== "undefined" && "speechSynthesis" in window) {
-        window.speechSynthesis.cancel();
-      }
-      setIsPlaying(false);
+      stopSpeechPlayback();
     } else if (audioRef.current) {
       audioRef.current.pause();
       audioRef.current.currentTime = 0;
@@ -142,7 +265,15 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
 
   return (
     <div className="bg-slate-50 dark:bg-slate-900/90 border border-indigo-100 dark:border-indigo-950/60 rounded-2xl p-3.5 shadow-sm w-full max-w-xl transition-all">
-      {!isSpeechMode && src && <audio ref={audioRef} src={src} className="hidden" />}
+      {!isSpeechMode && src && (
+        <audio
+          ref={audioRef}
+          src={src}
+          playsInline
+          preload="metadata"
+          className="hidden"
+        />
+      )}
 
       {/* Header bar */}
       <div className="flex items-center justify-between mb-2">

@@ -136,6 +136,7 @@ export const StudentExamQuestionCard: React.FC<StudentExamQuestionCardProps> = R
                   <video
                     src={q.videoUrl}
                     controls
+                    playsInline
                     preload="metadata"
                     className="w-full h-full object-contain"
                   />
@@ -179,12 +180,17 @@ export const StudentExamQuestionCard: React.FC<StudentExamQuestionCardProps> = R
               {q.questionType === "ESSAY" && (
                 <textarea
                   value={answerValue}
-                  onChange={(e) => onAnswerChange(q.id, e.target.value)}
+                  onChange={(e) => {
+                    onAnswerChange(q.id, e.target.value);
+                    const el = e.currentTarget;
+                    el.style.height = "auto";
+                    el.style.height = `${Math.min(el.scrollHeight, 420)}px`;
+                  }}
                   onCopy={(e) => e.preventDefault()}
                   onCut={(e) => e.preventDefault()}
                   onPaste={(e) => e.preventDefault()}
                   onContextMenu={(e) => e.preventDefault()}
-                  className="w-full p-3.5 sm:p-5 bg-slate-50 dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 rounded-xl focus:bg-white dark:focus:bg-slate-900 focus:border-indigo-500 dark:focus:border-indigo-500 outline-none min-h-[160px] text-slate-700 dark:text-slate-200 transition-all resize-y placeholder:text-slate-400 dark:placeholder:text-slate-600 leading-relaxed exam-input-secure"
+                  className="w-full text-base p-3.5 sm:p-5 bg-slate-50 dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 rounded-xl focus:bg-white dark:focus:bg-slate-900 focus:border-indigo-500 dark:focus:border-indigo-500 outline-none min-h-[160px] max-h-[420px] overscroll-contain text-slate-700 dark:text-slate-200 transition-all resize-y placeholder:text-slate-400 dark:placeholder:text-slate-600 leading-relaxed exam-input-secure"
                   placeholder="Tulis jawaban lengkap Anda..."
                 />
               )}
@@ -202,7 +208,7 @@ export const StudentExamQuestionCard: React.FC<StudentExamQuestionCardProps> = R
                     onCut={(e) => e.preventDefault()}
                     onPaste={(e) => e.preventDefault()}
                     onContextMenu={(e) => e.preventDefault()}
-                    className="w-full pl-11 pr-3.5 py-3.5 sm:pl-12 sm:pr-4 sm:py-4 bg-slate-50 dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 rounded-xl focus:bg-white dark:focus:bg-slate-900 focus:border-indigo-500 dark:focus:border-indigo-500 outline-none font-bold text-slate-800 dark:text-slate-200 placeholder:text-slate-400 dark:placeholder:text-slate-600 transition-all exam-input-secure"
+                    className="w-full text-base pl-11 pr-3.5 py-3.5 sm:pl-12 sm:pr-4 sm:py-4 bg-slate-50 dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 rounded-xl focus:bg-white dark:focus:bg-slate-900 focus:border-indigo-500 dark:focus:border-indigo-500 outline-none font-bold text-slate-800 dark:text-slate-200 placeholder:text-slate-400 dark:placeholder:text-slate-600 transition-all exam-input-secure"
                     placeholder="Ketik jawaban singkat..."
                   />
                 </div>

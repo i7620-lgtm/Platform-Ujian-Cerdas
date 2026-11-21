@@ -1,5 +1,10 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
+import {
+    isIOSWebKit,
+    isPWAStandalone,
+    saveBlobCrossPlatform,
+} from './platformUtils';
 
 export interface CertData {
     studentName: string;
@@ -41,7 +46,15 @@ export const downloadCertificateAsPdf = async (
             return new Promise((res, rej) => {
                 const handleRendered = async () => {
                     try {
-                        await new Promise(r => setTimeout(r, 500));
+                        await Promise.all([
+                            new Promise((r) => setTimeout(r, 500)),
+                            typeof document !== 'undefined' && document.fonts?.ready
+                                ? Promise.race([
+                                      document.fonts.ready,
+                                      new Promise((r) => setTimeout(r, 500)),
+                                  ])
+                                : Promise.resolve(),
+                        ]);
                         
                         // Select the rendered content element rather than the offset parent div (which has top: -9999px)
                         // This prevents the SVG cloned image from inheriting fixed top: -9999px and rendering out of bounds (blank).
@@ -91,12 +104,27 @@ export const downloadCertificateAsPdf = async (
             });
         };
 
-        for (let i = 0; i < certDataList.length; i++) {
-            if (i > 0) pdf.addPage();
-            await renderSinglePdfContent(certDataList[i]);
+        try {
+            for (let i = 0; i < certDataList.length; i++) {
+                if (i > 0) pdf.addPage();
+                await renderSinglePdfContent(certDataList[i]);
+            }
+
+            if (isIOSWebKit() || isPWAStandalone()) {
+                const pdfBlob = pdf.output('blob');
+                await saveBlobCrossPlatform({
+                    blob: pdfBlob,
+                    fileName,
+                    title: fileName,
+                    preferShareOnIOS: true,
+                });
+            } else {
+                pdf.save(fileName);
+            }
+        } finally {
+            root.unmount();
+            if (div.parentNode) {
+                div.parentNode.removeChild(div);
+            }
         }
-        
-        pdf.save(fileName);
-        root.unmount();
-        document.body.removeChild(div);
 };

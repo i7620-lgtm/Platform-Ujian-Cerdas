@@ -11,12 +11,14 @@ import { useOngoingExamsView } from "../useOngoingExamsView";
 export const OngoingExamsView: React.FC<{
   exams: Exam[];
   results: Result[];
+  ongoingExamCounts?: Record<string, number>;
   onDuplicateExam: (exam: Exam) => void;
   onRefresh?: () => Promise<void> | void;
   setSelectedOngoingExam: (exam: Exam | null) => void;
 }> = ({
   exams,
   results,
+  ongoingExamCounts,
   onDuplicateExam,
   onRefresh,
   setSelectedOngoingExam,
@@ -74,9 +76,10 @@ export const OngoingExamsView: React.FC<{
       {exams.length > 0 ? (
         <div className="flex flex-col gap-4 md:gap-0 md:bg-white md:dark:bg-slate-800 md:rounded-2xl md:border md:border-emerald-200/80 md:dark:border-emerald-900/60 md:divide-y md:divide-slate-100 md:dark:divide-slate-700/80 md:shadow-xs md:overflow-hidden">
           {exams.map((exam) => {
-            const activeCount = results.filter(
-              (r) => r.examCode === exam.code,
-            ).length;
+            const activeCount =
+              ongoingExamCounts && Object.prototype.hasOwnProperty.call(ongoingExamCounts, exam.code)
+                ? ongoingExamCounts[exam.code]
+                : results.filter((r) => r.examCode === exam.code).length;
             return (
               <OngoingExamCard
                 key={exam.code}

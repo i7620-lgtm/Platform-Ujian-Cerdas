@@ -3,10 +3,15 @@ import { offlineService } from './offline';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import type { Result, ResultStatus, Exam, ExamConfig } from '../types';
 import { examService } from './exam';
-import { isSameStudentIdentity, type StudentIdentityCandidate } from '../utils/studentIdentity';
+import {
+  isSameStudentIdentity,
+  normalizeAbsentNumber,
+  normalizeTextToken,
+  type StudentIdentityCandidate,
+} from '../utils/studentIdentity';
 
 export class ResultService {
-  mapRowToResult(row: Record<string, unknown>): Result {
+  parseStudentFromRow(row: Record<string, unknown>) {
         const studentIdStr = row.student_id as string;
         let absentNumber = '00';
         let dbSchoolName = '';
@@ -14,7 +19,7 @@ export class ResultService {
         let studentName = row.student_name as string;
 
         // Parse Format 2 if applicable
-        if (studentIdStr.startsWith('@') && studentIdStr.includes('#') && studentIdStr.includes('$') && studentIdStr.includes('%')) {
+        if (studentIdStr && studentIdStr.startsWith('@') && studentIdStr.includes('#') && studentIdStr.includes('$') && studentIdStr.includes('%')) {
             const match = studentIdStr.match(/^@(.*?)#(.*?)\$(.*?)%(.*)$/);
             if (match) {
                 dbSchoolName = match[1];
@@ -58,6 +63,18 @@ export class ResultService {
             dbClassName = clean;
         }
 
+        return {
+            studentId: studentIdStr,
+            fullName: studentName,
+            class: dbClassName,
+            schoolName: dbSchoolName,
+            absentNumber: absentNumber,
+            resultId: row.id as number | undefined,
+        };
+  }
+
+  mapRowToResult(row: Record<string, unknown>): Result {
+        const studentInfo = this.parseStudentFromRow(row);
         const answers = (row.answers as Record<string, string>) || {};
         const durationStr = answers['_duration'];
         const completionTime = durationStr ? parseInt(durationStr) : undefined;
@@ -65,14 +82,7 @@ export class ResultService {
 
         return {
             id: row.id as number, // Primary Key
-            student: { 
-                studentId: studentIdStr, 
-                fullName: studentName, 
-                class: dbClassName, 
-                schoolName: dbSchoolName,
-                absentNumber: absentNumber,
-                resultId: row.id as number
-            },
+            student: studentInfo,
             examCode: row.exam_code as string, 
             answers: answers, // CRITICAL FIX: Fallback to empty object if null
             score: row.score as number, 
@@ -81,7 +91,7 @@ export class ResultService {
             completionTime: validCompletionTime,
             status: row.status as ResultStatus, 
             activityLog: row.activity_log as string[],
-            timestamp: new Date(row.updated_at as string).getTime(), 
+            timestamp: row.updated_at ? new Date(row.updated_at as string).getTime() : 0, 
             location: row.location as { lat: number; lng: number } | undefined,
             device_id: (row.device_id as string | undefined) || answers['_deviceId'] || undefined
         };
@@ -139,6 +149,130 @@ export class ResultService {
         results = results.filter(r => r.student.schoolName === schoolName);
     }
     return results;
+  }
+
+  async findDuplicateAbsentStudent(
+    examCode: string,
+    className: string,
+    schoolName: string,
+    absentNumber: string,
+    fullName: string,
+  ): Promise<{ fullName: string } | null> {
+    const cleanExamCode = String(examCode || '').trim().toUpperCase();
+    const normInputAbsent = normalizeAbsentNumber(absentNumber);
+    const normInputName = normalizeTextToken(fullName);
+    if (!cleanExamCode || !normInputAbsent) return null;
+
+    const PAGE_SIZE = 1000;
+    let from = 0;
+    while (true) {
+      const { data, error } = await supabase
+        .from('results')
+        .select('student_id, student_name, class_name')
+        .eq('exam_code', cleanExamCode)
+        .range(from, from + PAGE_SIZE - 1);
+
+      if (error || !data || data.length === 0) break;
+
+      for (const row of data as Record<string, unknown>[]) {
+        const parsed = this.parseStudentFromRow(row);
+        if (className && className !== 'ALL' && parsed.class !== className) {
+          continue;
+        }
+        if (schoolName && schoolName !== 'ALL' && parsed.schoolName !== schoolName) {
+          continue;
+        }
+        const rAbsentNorm = normalizeAbsentNumber(parsed.absentNumber);
+        if (
+          rAbsentNorm &&
+          rAbsentNorm === normInputAbsent &&
+          normalizeTextToken(parsed.fullName) !== normInputName
+        ) {
+          return { fullName: parsed.fullName };
+        }
+      }
+
+      if (data.length < PAGE_SIZE) break;
+      from += PAGE_SIZE;
+    }
+
+    return null;
+  }
+
+  async getExamParticipantCounts(examCodes: string[]): Promise<Record<string, number>> {
+    const cleanCodes = Array.from(new Set(examCodes.map((c) => String(c || '').trim()).filter(Boolean)));
+    const counts: Record<string, number> = {};
+    cleanCodes.forEach((code) => {
+      counts[code] = 0;
+    });
+    if (cleanCodes.length === 0) return counts;
+
+    const PAGE_SIZE = 1000;
+    const CODE_BATCH_SIZE = 100;
+
+    for (let i = 0; i < cleanCodes.length; i += CODE_BATCH_SIZE) {
+      const batchCodes = cleanCodes.slice(i, i + CODE_BATCH_SIZE);
+      let from = 0;
+      while (true) {
+        const { data, error } = await supabase
+          .from('results')
+          .select('exam_code')
+          .in('exam_code', batchCodes)
+          .range(from, from + PAGE_SIZE - 1);
+
+        if (error || !data || data.length === 0) break;
+
+        for (const row of data as { exam_code?: string }[]) {
+          if (row.exam_code) {
+            counts[row.exam_code] = (counts[row.exam_code] || 0) + 1;
+          }
+        }
+
+        if (data.length < PAGE_SIZE) break;
+        from += PAGE_SIZE;
+      }
+    }
+
+    return counts;
+  }
+
+  async getOngoingExamResults(
+    examCode: string,
+    options?: { includeAnswers?: boolean; updatedAfterIso?: string },
+  ): Promise<Result[]> {
+    const cleanCode = String(examCode || '').trim().toUpperCase();
+    if (!cleanCode) return [];
+
+    const includeAnswers = options?.includeAnswers ?? true;
+    const SELECT_COLUMNS = includeAnswers
+      ? 'id, exam_code, student_id, student_name, class_name, status, score, correct_answers, total_questions, answers, updated_at'
+      : 'id, exam_code, student_id, student_name, class_name, status, score, correct_answers, total_questions, updated_at';
+
+    const PAGE_SIZE = 1000;
+    const allRows: Record<string, unknown>[] = [];
+    let from = 0;
+
+    while (true) {
+      let query = supabase
+        .from('results')
+        .select(SELECT_COLUMNS)
+        .eq('exam_code', cleanCode)
+        .order('updated_at', { ascending: false })
+        .range(from, from + PAGE_SIZE - 1);
+
+      if (options?.updatedAfterIso) {
+        query = query.gt('updated_at', options.updatedAfterIso);
+      }
+
+      const { data, error } = await query;
+      if (error || !data || data.length === 0) break;
+
+      allRows.push(...(data as unknown as Record<string, unknown>[]));
+      if (data.length < PAGE_SIZE) break;
+      from += PAGE_SIZE;
+    }
+
+    return allRows.map((row) => this.mapRowToResult(row));
   }
 
   /**
@@ -507,7 +641,7 @@ export class ResultService {
               };
           }
 
-          // Fallback: Tolerant identity matching across browsers (e.g. "05" vs "5", whitespace, letter case)
+          // Fallback: 2-step tolerant identity matching (lightweight identity scan first, then single-row full fetch)
           if (studentHint && (studentHint.fullName || studentHint.absentNumber)) {
               const hintCandidate: StudentIdentityCandidate = {
                   studentId,
@@ -515,12 +649,12 @@ export class ResultService {
               };
               const PAGE_SIZE = 1000;
               let from = 0;
-              const matches: Result[] = [];
+              const matchCandidates: { id: number; status: ResultStatus }[] = [];
 
               while (from < 3000) {
                   const { data: rows, error: listErr } = await supabase
                       .from('results')
-                      .select(SELECT_COLS)
+                      .select('id, student_id, student_name, class_name, status, updated_at')
                       .eq('exam_code', cleanExamCode)
                       .order('updated_at', { ascending: false })
                       .range(from, from + PAGE_SIZE - 1);
@@ -533,14 +667,11 @@ export class ResultService {
                   if (!rows || rows.length === 0) break;
 
                   for (const row of rows as Record<string, unknown>[]) {
-                      const mapped = this.mapRowToResult(row);
-                      if (isSameStudentIdentity(mapped.student, hintCandidate)) {
-                          matches.push({
-                              ...mapped,
-                              student: {
-                                  ...mapped.student,
-                                  schoolName: mapped.student.schoolName || undefined,
-                              },
+                      const studentInfo = this.parseStudentFromRow(row);
+                      if (isSameStudentIdentity(studentInfo, hintCandidate) && row.id) {
+                          matchCandidates.push({
+                              id: Number(row.id),
+                              status: row.status as ResultStatus,
                           });
                       }
                   }
@@ -549,13 +680,36 @@ export class ResultService {
                   from += PAGE_SIZE;
               }
 
-              if (matches.length > 0) {
-                  const completedMatch = matches.find((m) => m.status === 'completed');
-                  const forceClosedMatch = matches.find((m) => m.status === 'force_closed');
-                  return {
-                      result: completedMatch || forceClosedMatch || matches[0],
-                      isNetworkError: false,
-                  };
+              if (matchCandidates.length > 0) {
+                  const completedMatch = matchCandidates.find((m) => m.status === 'completed');
+                  const forceClosedMatch = matchCandidates.find((m) => m.status === 'force_closed');
+                  const targetMatch = completedMatch || forceClosedMatch || matchCandidates[0];
+
+                  const { data: fullRow, error: fullErr } = await supabase
+                      .from('results')
+                      .select(SELECT_COLS)
+                      .eq('id', targetMatch.id)
+                      .maybeSingle();
+
+                  if (fullErr) {
+                      const msg = String(fullErr.message || '').toLowerCase();
+                      const isNet = !fullErr.code || msg.includes('failed to fetch') || msg.includes('network');
+                      return { result: null, isNetworkError: isNet };
+                  }
+
+                  if (fullRow) {
+                      const mapped = this.mapRowToResult(fullRow as Record<string, unknown>);
+                      return {
+                          result: {
+                              ...mapped,
+                              student: {
+                                  ...mapped.student,
+                                  schoolName: mapped.student.schoolName || undefined,
+                              },
+                          },
+                          isNetworkError: false,
+                      };
+                  }
               }
           }
 

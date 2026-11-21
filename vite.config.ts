@@ -136,9 +136,80 @@ function ensurePwaIconsPlugin(): Plugin {
   };
 }
 
+function cdnBuildMetaPlugin(cdnBaseUrl: string): Plugin {
+  return {
+    name: 'cdn-build-meta',
+    enforce: 'post',
+    closeBundle() {
+      if (!cdnBaseUrl) return;
+      const distDir = path.resolve(process.cwd(), 'dist');
+      const indexPath = path.join(distDir, 'index.html');
+      if (!fs.existsSync(distDir) || !fs.existsSync(indexPath)) return;
+
+      const html = fs.readFileSync(indexPath, 'utf8');
+      const escapedBase = cdnBaseUrl.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const assetRegex = new RegExp(`${escapedBase}/(assets/[^"'\\s>]+)`, 'g');
+      const entryAssetsSet = new Set<string>();
+      let match: RegExpExecArray | null;
+      while ((match = assetRegex.exec(html)) !== null) {
+        entryAssetsSet.add(match[1]);
+      }
+
+      const rootFiles = fs
+        .readdirSync(distDir, { withFileTypes: true })
+        .filter(
+          (entry) =>
+            entry.isFile() &&
+            !entry.name.startsWith('.') &&
+            entry.name !== 'cdn-build-meta.json'
+        )
+        .map((entry) => entry.name);
+
+      const meta = {
+        tag: (process.env.VITE_CDN_TAG || '').trim(),
+        cdnBaseUrl,
+        builtAt: new Date().toISOString(),
+        entryAssets: Array.from(entryAssetsSet),
+        rootFiles,
+      };
+
+      fs.writeFileSync(
+        path.join(distDir, 'cdn-build-meta.json'),
+        JSON.stringify(meta, null, 2),
+        'utf8'
+      );
+    },
+  };
+}
+
 // https://vitejs.dev/config/
 export default defineConfig(() => {
+  const isCdnDisabled =
+    process.env.VITE_DISABLE_CDN === 'true' || process.env.VITE_DISABLE_CDN === '1';
+  const rawCdnBase = (process.env.VITE_CDN_BASE_URL || '').trim().replace(/\/+$/, '');
+  const cdnBaseUrl = !isCdnDisabled && rawCdnBase ? rawCdnBase : '';
+
+  const baseGlobIgnores = [
+    '**/vendor-jspdf-*.js',
+    '**/vendor-html-to-image-*.js',
+    '**/vendor-xlsx-*.js',
+    '**/vendor-charts-*.js',
+    '**/vendor-math-markdown-*.js',
+    '**/cdn-build-meta.json',
+  ];
+
   return {
+    base: '/',
+    experimental: cdnBaseUrl
+      ? {
+          renderBuiltUrl(filename, { type }) {
+            if (type === 'asset') {
+              return `${cdnBaseUrl}/${filename.replace(/^\/+/, '')}`;
+            }
+            return undefined;
+          },
+        }
+      : undefined,
     plugins: [
       ensurePwaIconsPlugin(),
       react(),
@@ -155,9 +226,11 @@ export default defineConfig(() => {
           skipWaiting: true,
           clientsClaim: true,
           navigateFallbackDenylist: [/^\/api/],
-          globPatterns: ['**/*.{js,css,html,ico,png,svg,webp,woff2}'],
-          // Exclude large vendor chunks from precache to speed up sharing
-          globIgnores: ['**/vendor-jspdf-*.js', '**/vendor-html-to-image-*.js', '**/vendor-xlsx-*.js', '**/vendor-charts-*.js', '**/vendor-math-markdown-*.js'],
+          globPatterns: cdnBaseUrl
+            ? ['**/*.{html,ico,png,svg,webp,woff2}']
+            : ['**/*.{js,css,html,ico,png,svg,webp,woff2}'],
+          // Exclude large vendor chunks (and CDN-offloaded assets when CDN mode is active) from same-origin precache
+          globIgnores: cdnBaseUrl ? [...baseGlobIgnores, '**/assets/**'] : baseGlobIgnores,
           runtimeCaching: [
             {
               urlPattern: /assets\/vendor-(jspdf|html-to-image|xlsx|charts|math-markdown).*\.js$/,
@@ -176,7 +249,7 @@ export default defineConfig(() => {
               options: {
                 cacheName: 'external-cdn-cache',
                 expiration: {
-                  maxEntries: 20,
+                  maxEntries: 120,
                   maxAgeSeconds: 60 * 60 * 24 * 30, // 30 days
                 },
                 cacheableResponse: {
@@ -189,6 +262,20 @@ export default defineConfig(() => {
               handler: 'CacheFirst',
               options: {
                 cacheName: 'cdnjs-cache',
+                expiration: {
+                  maxEntries: 20,
+                  maxAgeSeconds: 60 * 60 * 24 * 30, // 30 days
+                },
+                cacheableResponse: {
+                  statuses: [0, 200],
+                },
+              },
+            },
+            {
+              urlPattern: /^https:\/\/unpkg\.com\/.*/i,
+              handler: 'CacheFirst',
+              options: {
+                cacheName: 'unpkg-cdn-cache',
                 expiration: {
                   maxEntries: 20,
                   maxAgeSeconds: 60 * 60 * 24 * 30, // 30 days
@@ -237,7 +324,8 @@ export default defineConfig(() => {
             }
           ]
         }
-      })
+      }),
+      cdnBuildMetaPlugin(cdnBaseUrl),
     ],
     resolve: {
       dedupe: ['react', 'react-dom']

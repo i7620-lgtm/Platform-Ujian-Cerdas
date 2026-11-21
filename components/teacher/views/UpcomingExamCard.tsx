@@ -147,10 +147,12 @@ export const UpcomingExamCard: React.FC<UpcomingExamCardProps> = ({
           id={`btn-preview-${exam.code}`}
           onClick={() => {
             try {
-              localStorage.setItem(
-                `ujiancerdas_preview_exam_${exam.code}`,
-                JSON.stringify(exam),
-              );
+              if (!exam.questionsDeferred && exam.questions.length > 0) {
+                localStorage.setItem(
+                  `ujiancerdas_preview_exam_${exam.code}`,
+                  JSON.stringify(exam),
+                );
+              }
             } catch {
               // ignore
             }

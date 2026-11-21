@@ -1014,8 +1014,9 @@
 }
 
 .exam-content-scalable textarea,
-.exam-content-scalable input:not([type="checkbox"]):not([type="radio"]) {
-  font-size: var(--exam-input-size) !important;
+.exam-content-scalable input:not([type="checkbox"]):not([type="radio"]),
+.exam-content-scalable select {
+  font-size: max(1rem, var(--exam-input-size)) !important;
 }
 
 /* Ensure math formulas (KaTeX) scale proportionally with base font without breaking sub/superscripts */
@@ -1044,19 +1045,19 @@
 .exam-font-step--2 {
   --exam-prose-size: 0.825rem;
   --exam-option-size: 0.775rem;
-  --exam-input-size: 0.775rem;
+  --exam-input-size: 1rem;
   --exam-line-height: 1.55;
 }
 .exam-font-step--1 {
   --exam-prose-size: 0.9125rem;
   --exam-option-size: 0.85rem;
-  --exam-input-size: 0.85rem;
+  --exam-input-size: 1rem;
   --exam-line-height: 1.58;
 }
 .exam-font-step-0 {
   --exam-prose-size: 1rem;
   --exam-option-size: 0.9375rem;
-  --exam-input-size: 0.9375rem;
+  --exam-input-size: 1rem;
   --exam-line-height: 1.625;
 }
 .exam-font-step-1 {
@@ -1094,13 +1095,13 @@
 .exam-content-small {
   --exam-prose-size: 0.875rem;
   --exam-option-size: 0.8125rem;
-  --exam-input-size: 0.8125rem;
+  --exam-input-size: 1rem;
   --exam-line-height: 1.55;
 }
 .exam-content-normal {
   --exam-prose-size: 1rem;
   --exam-option-size: 0.9375rem;
-  --exam-input-size: 0.9375rem;
+  --exam-input-size: 1rem;
   --exam-line-height: 1.625;
 }
 .exam-content-large {
@@ -1141,4 +1142,59 @@
   -ms-user-select: text !important;
   user-select: text !important;
   -webkit-user-drag: none !important;
+  -webkit-overflow-scrolling: touch;
 }
+
+/* --- Cross-Platform iOS Safe Area & Touch Helpers --- */
+.safe-pt {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+
+.safe-pb {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+.safe-px {
+  padding-left: env(safe-area-inset-left, 0px);
+  padding-right: env(safe-area-inset-right, 0px);
+}
+
+.exam-header-safe {
+  height: calc(4rem + env(safe-area-inset-top, 0px));
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-left: env(safe-area-inset-left, 0px);
+  padding-right: env(safe-area-inset-right, 0px);
+}
+
+.exam-below-header-safe {
+  top: calc(4rem + env(safe-area-inset-top, 0px));
+}
+
+.exam-drawer-safe {
+  top: calc(4rem + env(safe-area-inset-top, 0px));
+  padding-left: env(safe-area-inset-left, 0px);
+  padding-right: env(safe-area-inset-right, 0px);
+}
+
+.exam-main-safe {
+  padding-top: calc(5rem + env(safe-area-inset-top, 0px));
+}
+
+@media (min-width: 640px) {
+  .exam-main-safe {
+    padding-top: calc(6rem + env(safe-area-inset-top, 0px));
+  }
+}
+
+.exam-fab-safe {
+  bottom: calc(1.25rem + env(safe-area-inset-bottom, 0px));
+  right: calc(1.25rem + env(safe-area-inset-right, 0px));
+}
+
+@media (min-width: 640px) {
+  .exam-fab-safe {
+    bottom: calc(1.5rem + env(safe-area-inset-bottom, 0px));
+    right: calc(1.5rem + env(safe-area-inset-right, 0px));
+  }
+}
+

@@ -21,7 +21,7 @@ export const UnlockScreen: React.FC<UnlockScreenProps> = ({
   isExamClosed = false,
 }) => {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-rose-50 dark:bg-rose-950 p-6 transition-colors duration-300">
+    <div className="min-h-[100dvh] safe-pt safe-pb flex items-center justify-center bg-rose-50 dark:bg-rose-950 p-6 transition-colors duration-300">
       <div className="w-full max-w-sm text-center bg-white dark:bg-slate-900 p-8 rounded-3xl shadow-xl border border-rose-100 dark:border-rose-900 animate-fade-in">
         <div className="w-16 h-16 bg-rose-100 dark:bg-rose-900/30 text-rose-500 dark:text-rose-400 rounded-full flex items-center justify-center mx-auto mb-4 ring-4 ring-rose-50/50 dark:ring-rose-900/20">
           <LockClosedIcon className="w-8 h-8" />

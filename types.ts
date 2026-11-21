@@ -202,6 +202,9 @@ export interface ExamConfig {
   // Mode Olimpiade (Sistem Skor Penalti / Pengali Kustom)
   isOlympiadMode?: boolean;
   olympiadScoring?: OlympiadScoringConfig;
+  scorableQuestionCount?: number;
+  totalQuestionCount?: number;
+  version?: number;
   certificateSettings?: {
     enabled: boolean;
     backgroundUrl: string; 
@@ -224,6 +227,7 @@ export interface Exam {
   authorName?: string; // Added to store creator's real name
   authorSchool?: string; 
   questions: Question[];
+  questionsDeferred?: boolean;
   config: ExamConfig;
   isSynced?: boolean; 
   createdAt?: string; 

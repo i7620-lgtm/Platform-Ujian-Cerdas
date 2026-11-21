@@ -22,13 +22,13 @@ export const MatchingView: React.FC<MatchingViewProps> = React.memo(({
 
   useEffect(() => {
     if (openDropdownIdx === null) return;
-    const handleClickOutside = (e: MouseEvent) => {
+    const handleClickOutside = (e: PointerEvent) => {
       if (!(e.target as Element).closest(".custom-dropdown-container")) {
         setOpenDropdownIdx(null);
       }
     };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+    document.addEventListener("pointerdown", handleClickOutside);
+    return () => document.removeEventListener("pointerdown", handleClickOutside);
   }, [openDropdownIdx]);
 
   const currentAnsObj = useMemo<Record<number, string>>(() => {
@@ -104,7 +104,10 @@ export const MatchingView: React.FC<MatchingViewProps> = React.memo(({
               </button>
 
               {isOpen && (
-                <div className="absolute z-50 w-full mt-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl max-h-60 overflow-y-auto custom-scrollbar animate-fade-in">
+                <div
+                  data-scrollable="true"
+                  className="absolute z-50 w-full mt-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl max-h-60 overflow-y-auto overscroll-contain custom-scrollbar animate-fade-in"
+                >
                   {rightOptions.map((opt, idx) => (
                     <div
                       key={idx}

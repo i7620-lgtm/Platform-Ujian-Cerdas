@@ -19,6 +19,7 @@ import {
   saveLocalCompletedStudent,
   stripClassCapacity,
 } from "../../utils/studentIdentity";
+import { isTouchCapableDevice } from "../../utils/platformUtils";
 
 // Helper to parse "SchoolName-ClassName(Limit)" format
 export const parseClassConfig = (classString: string) => {
@@ -864,6 +865,7 @@ export const useStudentEntryForm = ({
   }, [currentInputSignature, examCode, schoolName, fullName, studentClass, absentNumber, isCheckingCode, queueTick]);
 
   useEffect(() => {
+    if (isTouchCapableDevice()) return;
     if (initialCode) {
       const t = setTimeout(() => nameInputRef.current?.focus(), 100);
       return () => clearTimeout(t);
@@ -1313,30 +1315,21 @@ export const useStudentEntryForm = ({
           }
         }
       } else {
-        // Validate duplicate absent number in same class if other results exist
+        // Validate duplicate absent number in same class using lightweight columns only
         try {
-          const classResults = await storageService.getResults(
+          const existingSameAbsent = await storageService.findDuplicateAbsentStudent(
             cleanExamCode,
             cleanClassName,
             cleanSchoolName,
+            absentNumber,
+            fullName,
           );
-          if (classResults && classResults.length > 0) {
-            const normInputAbsent = normalizeAbsentNumber(absentNumber);
-            const existingSameAbsent = classResults.find((r) => {
-              const rAbsentNorm = normalizeAbsentNumber(r.student.absentNumber);
-              return (
-                rAbsentNorm &&
-                rAbsentNorm === normInputAbsent &&
-                normalizeTextToken(r.student.fullName) !== normalizeTextToken(fullName)
-              );
-            });
-            if (existingSameAbsent) {
-              setError(
-                `Nomor urut ${absentNumber.trim()} di kelas ${cleanClassName} sudah terdaftar atas nama ${existingSameAbsent.student.fullName}. Hubungi pengawas.`,
-              );
-              setIsLoading(false);
-              return;
-            }
+          if (existingSameAbsent) {
+            setError(
+              `Nomor urut ${absentNumber.trim()} di kelas ${cleanClassName} sudah terdaftar atas nama ${existingSameAbsent.fullName}. Hubungi pengawas.`,
+            );
+            setIsLoading(false);
+            return;
           }
         } catch (checkErr) {
           console.warn("Could not check duplicate absent number:", checkErr);

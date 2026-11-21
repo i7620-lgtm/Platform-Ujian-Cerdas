@@ -42,7 +42,7 @@ export const useBookGenerator = ({ profile }: UseBookGeneratorParams) => {
     const fetchExams = async () => {
       setIsLoading(true);
       try {
-        const examMap = await storageService.getExams(profile);
+        const examMap = await storageService.getExams(profile, { includeQuestions: true });
         const activeSQL: BookGeneratorExamItem[] = Object.values(examMap).map(
           (e) => ({
             exam: e,
