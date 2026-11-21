@@ -26,6 +26,7 @@ interface UseTeacherDashboardParams {
   results: Result[];
   onRefreshExams: (force?: boolean) => Promise<void>;
   onRefreshResults: (force?: boolean) => Promise<void>;
+  onRefreshOngoingCounts?: (force?: boolean) => Promise<void>;
 }
 
 export const useTeacherDashboard = ({
@@ -37,6 +38,7 @@ export const useTeacherDashboard = ({
   results,
   onRefreshExams,
   onRefreshResults,
+  onRefreshOngoingCounts,
 }: UseTeacherDashboardParams) => {
   // Use Zustand store for UI states directly
   const {
@@ -91,10 +93,17 @@ export const useTeacherDashboard = ({
     ) {
       onRefreshExams(false);
     }
-    if (view === "ONGOING" || view === "ANALYTICS") {
+    if (view === "ONGOING") {
+      if (onRefreshOngoingCounts) {
+        onRefreshOngoingCounts(false);
+      } else {
+        onRefreshResults(false);
+      }
+    }
+    if (view === "ANALYTICS") {
       onRefreshResults(false);
     }
-  }, [view, onRefreshExams, onRefreshResults]);
+  }, [view, onRefreshExams, onRefreshResults, onRefreshOngoingCounts]);
 
   // 2. Prevent accidental data loss
   useEffect(() => {
@@ -457,8 +466,9 @@ export const useTeacherDashboard = ({
   };
 
   // 7. Duplicate Exam Action
-  const handleDuplicateExam = (exam: Exam) => {
-    cloneExamIntoEditor(exam);
+  const handleDuplicateExam = async (exam: Exam) => {
+    const fullExam = await storageService.ensureExamQuestions(exam);
+    cloneExamIntoEditor(fullExam);
   };
 
   // 8. Reuse Exam from Archive
@@ -467,19 +477,21 @@ export const useTeacherDashboard = ({
   };
 
   // 8.5 Continue Draft
-  const handleContinueDraft = (exam: Exam) => {
-    setEditingExam(exam);
-    setQuestions(exam.questions);
-    setConfig(prepareExamConfigForEditor(exam.config));
+  const handleContinueDraft = async (exam: Exam) => {
+    const fullExam = await storageService.ensureExamQuestions(exam);
+    setEditingExam(fullExam);
+    setQuestions(fullExam.questions);
+    setConfig(prepareExamConfigForEditor(fullExam.config));
     setManualMode(true);
     setView("UPLOAD");
   };
 
   // 8.6 Edit Exam Modal
-  const handleEditExamModal = (exam: Exam) => {
-    setEditingExam(exam);
-    setQuestions(exam.questions);
-    setConfig(prepareExamConfigForEditor(exam.config));
+  const handleEditExamModal = async (exam: Exam) => {
+    const fullExam = await storageService.ensureExamQuestions(exam);
+    setEditingExam(fullExam);
+    setQuestions(fullExam.questions);
+    setConfig(prepareExamConfigForEditor(fullExam.config));
     setIsEditModalOpen(true);
   };
 

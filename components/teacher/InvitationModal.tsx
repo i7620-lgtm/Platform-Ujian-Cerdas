@@ -712,8 +712,8 @@ export const InvitationModal: React.FC<InvitationModalProps> = ({
       <KisiKisiModal
         isOpen={showKisiKisi}
         onClose={() => setShowKisiKisi(false)}
-        questions={exam?.questions || []}
-        subject={exam?.config.subject || ""}
+        questions={effectiveExam?.questions || []}
+        subject={effectiveExam?.config.subject || ""}
         examType={effectiveExam?.config.examType}
         classLevel={effectiveExam?.config.classLevel}
         schoolName={schoolName}

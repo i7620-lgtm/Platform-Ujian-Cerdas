@@ -1,5 +1,6 @@
 import { useEffect, useCallback, useState } from "react";
 import { supabase } from "../../lib/supabase";
+import { storageService } from "../../services/storage";
 import type { Exam, DailyExamSession, ExamConfig } from "../../types";
 import { calculateStudentAccess, parseTimeMinutes } from "../../utils/scheduleUtils";
 import {
@@ -62,6 +63,19 @@ export const useInvitationModal = ({
   useEffect(() => {
     setLiveExam(exam || null);
   }, [exam]);
+
+  // Hydrate questions lazily if teacher opens Baca Kisi-Kisi on a deferred exam
+  useEffect(() => {
+    if (showKisiKisi && liveExam?.questionsDeferred) {
+      storageService.ensureExamQuestions(liveExam).then((hydrated) => {
+        setLiveExam((prev) =>
+          prev && prev.code === hydrated.code
+            ? { ...hydrated, config: prev.config || hydrated.config }
+            : prev,
+        );
+      }).catch(() => {});
+    }
+  }, [showKisiKisi, liveExam]);
 
   const updateClassSessionAssignment = useCallback(
     (className: string, update: Partial<ClassSessionAssignment>) => {
