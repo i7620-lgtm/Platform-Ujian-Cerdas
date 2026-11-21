@@ -1,0 +1,29 @@
+{
+  "tag": "cdn-2e8ff5e3f832",
+  "cdnBaseUrl": "https://cdn.jsdelivr.net/gh/i7620-lgtm/Platform-Ujian-Cerdas@cdn-2e8ff5e3f832/dist",
+  "builtAt": "2026-11-21T23:32:18.522Z",
+  "entryAssets": [
+    "assets/index-yBAGFpnk.js",
+    "assets/vendor-state-e5U2a8Cz.js",
+    "assets/vendor-react-core-7gIosMuE.js",
+    "assets/vendor-jspdf-4SQWTCjo.js",
+    "assets/vendor-supabase-D6h2Ap73.js",
+    "assets/vendor-math-markdown-BMmEBmuB.js",
+    "assets/vendor-charts-BhhGOfJV.js",
+    "assets/vendor-xlsx-Ccx-kdi7.js",
+    "assets/vendor-math-markdown-KBT8lzWM.css",
+    "assets/index-B2VAifcH.css"
+  ],
+  "rootFiles": [
+    "apple-touch-icon.png",
+    "favicon.png",
+    "index.html",
+    "manifest.json",
+    "manifest.webmanifest",
+    "pwa-192x192.png",
+    "pwa-512x512.png",
+    "pwa-maskable-512x512.png",
+    "sw.js",
+    "workbox-9cf71040.js"
+  ]
+}

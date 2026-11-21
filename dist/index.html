@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="id" class="scroll-smooth">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/x-icon" href="/favicon.ico" />
+    <link rel="icon" type="image/svg+xml" href="/icon.svg" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#4F46E5" />
+    
+    <!-- Polyfill for process and global so Node modules don't crash -->
+    <script>
+      window.global = window;
+      window.process = { env: {} };
+    </script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/core-js/3.37.0/minified.js"></script>
+    
+    
+    <!-- PWA / Mobile Capability -->
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="UjianCerdas">
+    <meta name="format-detection" content="telephone=no">
+
+    <title>Platform Ujian Cerdas Supabase DB</title>
+    <meta name="description" content="Sebuah platform ujian online yang elegan dan modern untuk guru dan siswa. Didukung oleh AI untuk pembuatan soal otomatis dan dirancang agar tetap berfungsi bahkan dengan koneksi internet yang buruk." />
+
+    <!-- Open Graph / Facebook / WhatsApp -->
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Platform Ujian Cerdas Supabase DB" />
+    <meta property="og:description" content="Sebuah platform ujian online yang elegan dan modern untuk guru dan siswa. Didukung oleh AI untuk pembuatan soal otomatis dan dirancang agar tetap berfungsi bahkan dengan koneksi internet yang buruk." />
+    <meta property="og:site_name" content="Platform Ujian Cerdas" />
+
+    <!-- Twitter / X -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Platform Ujian Cerdas Supabase DB" />
+    <meta name="twitter:description" content="Sebuah platform ujian online yang elegan dan modern untuk guru dan siswa. Didukung oleh AI untuk pembuatan soal otomatis dan dirancang agar tetap berfungsi bahkan dengan koneksi internet yang buruk." />
+
+    <!-- Schema.org JSON-LD -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebApplication",
+      "name": "Platform Ujian Cerdas Supabase DB",
+      "applicationCategory": "EducationalApplication",
+      "operatingSystem": "All",
+      "description": "Sebuah platform ujian online yang elegan dan modern untuk guru dan siswa. Didukung oleh AI untuk pembuatan soal otomatis dan dirancang agar tetap berfungsi bahkan dengan koneksi internet yang buruk.",
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "IDR"
+      }
+    }
+    </script>
+    
+    <!-- Network Optimization -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="dns-prefetch" href="https://fidxmkjpdlfawagawrrm.supabase.co">
+
+    <!-- Fonts: Inter (UI) & JetBrains Mono (Code/Numbers) & Noto Sans Balinese -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@500&family=Noto+Sans+Balinese&display=swap" rel="stylesheet">
+    
+    <!-- KaTeX -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.18.7/dist/katex.min.css">
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.18.7/dist/katex.min.js"></script>
+
+    <!-- PDF.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script>
+      document.addEventListener("DOMContentLoaded", function() {
+        if (window.pdfjsLib) {
+          window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+        }
+      });
+    </script>
+    
+    <!-- Theme Init -->
+    <script>
+      (function() {
+        try {
+          const localTheme = localStorage.getItem('theme');
+          const supportDarkMode = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)').matches : false;
+          if (localTheme === 'dark' || (!localTheme && supportDarkMode)) {
+            document.documentElement.classList.add('dark');
+            document.querySelector('meta[name="theme-color"]').setAttribute('content', '#0f172a');
+          }
+        } catch (e) {}
+      })();
+    </script>
+
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <script type="module" crossorigin src="https://cdn.jsdelivr.net/gh/i7620-lgtm/Platform-Ujian-Cerdas@cdn-2e8ff5e3f832/dist/assets/index-yBAGFpnk.js"></script>
+  <link rel="modulepreload" crossorigin href="https://cdn.jsdelivr.net/gh/i7620-lgtm/Platform-Ujian-Cerdas@cdn-2e8ff5e3f832/dist/assets/vendor-state-e5U2a8Cz.js">
+  <link rel="modulepreload" crossorigin href="https://cdn.jsdelivr.net/gh/i7620-lgtm/Platform-Ujian-Cerdas@cdn-2e8ff5e3f832/dist/assets/vendor-react-core-7gIosMuE.js">
+  <link rel="modulepreload" crossorigin href="https://cdn.jsdelivr.net/gh/i7620-lgtm/Platform-Ujian-Cerdas@cdn-2e8ff5e3f832/dist/assets/vendor-jspdf-4SQWTCjo.js">
+  <link rel="modulepreload" crossorigin href="https://cdn.jsdelivr.net/gh/i7620-lgtm/Platform-Ujian-Cerdas@cdn-2e8ff5e3f832/dist/assets/vendor-supabase-D6h2Ap73.js">
+  <link rel="modulepreload" crossorigin href="https://cdn.jsdelivr.net/gh/i7620-lgtm/Platform-Ujian-Cerdas@cdn-2e8ff5e3f832/dist/assets/vendor-math-markdown-BMmEBmuB.js">
+  <link rel="modulepreload" crossorigin href="https://cdn.jsdelivr.net/gh/i7620-lgtm/Platform-Ujian-Cerdas@cdn-2e8ff5e3f832/dist/assets/vendor-charts-BhhGOfJV.js">
+  <link rel="modulepreload" crossorigin href="https://cdn.jsdelivr.net/gh/i7620-lgtm/Platform-Ujian-Cerdas@cdn-2e8ff5e3f832/dist/assets/vendor-xlsx-Ccx-kdi7.js">
+  <link rel="stylesheet" crossorigin href="https://cdn.jsdelivr.net/gh/i7620-lgtm/Platform-Ujian-Cerdas@cdn-2e8ff5e3f832/dist/assets/vendor-math-markdown-KBT8lzWM.css">
+  <link rel="stylesheet" crossorigin href="https://cdn.jsdelivr.net/gh/i7620-lgtm/Platform-Ujian-Cerdas@cdn-2e8ff5e3f832/dist/assets/index-B2VAifcH.css">
+<link rel="manifest" href="/manifest.webmanifest"></head>
+  <body class="bg-[#FAFAFA] dark:bg-slate-900 font-sans text-slate-900 dark:text-slate-100 antialiased selection:bg-indigo-100 selection:text-indigo-700 transition-colors duration-300">
+    <div id="root"></div>
+  </body>
+</html>
