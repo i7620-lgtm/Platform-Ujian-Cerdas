@@ -79,6 +79,8 @@ export const useFinishedExamModal = ({
     ).length;
   }, [results, activeDisplayExam]);
 
+  const activeDisplayExamRef = useRef<Exam | null>(activeDisplayExam);
+  activeDisplayExamRef.current = activeDisplayExam;
   const activeDisplayExamCodeRef = useRef<string>(exam?.code || "");
   activeDisplayExamCodeRef.current = activeDisplayExam?.code || "";
 
@@ -87,10 +89,20 @@ export const useFinishedExamModal = ({
     if (!targetCode) return;
     setIsLoading(true);
     try {
-      const data = await storageService.getResults(
-        targetCode,
-        undefined,
-      );
+      const currentExamSnapshot = activeDisplayExamRef.current;
+      const examHydrationPromise =
+        currentExamSnapshot && currentExamSnapshot.code === targetCode && currentExamSnapshot.questionsDeferred
+          ? storageService.ensureExamQuestions(currentExamSnapshot)
+          : Promise.resolve(currentExamSnapshot);
+
+      const [hydratedExam, data] = await Promise.all([
+        examHydrationPromise,
+        storageService.getResults(targetCode, undefined),
+      ]);
+
+      if (hydratedExam && hydratedExam.code === targetCode) {
+        setDisplayExam(hydratedExam);
+      }
 
       // SORTING LOGIC: Sort by School, then Class, then by Absent Number (from ID)
       const sortedData = data.sort((a, b) => {
