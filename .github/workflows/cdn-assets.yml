@@ -64,6 +64,11 @@ jobs:
           find . -maxdepth 1 ! -name '.' ! -name '.git' -exec rm -rf {} +
 
           cp -R "${WORK_DIR}/dist" ./dist
+          cat > vercel.json <<'EOF'
+          {
+            "ignoreCommand": "exit 0"
+          }
+          EOF
           cat > README.md <<EOF
           # UjianCerdas CDN Assets
 
