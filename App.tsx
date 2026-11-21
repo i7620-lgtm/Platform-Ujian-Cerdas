@@ -20,6 +20,7 @@ import { StudentDialogModal, type StudentDialogVariant } from './components/stud
 import { supabase } from './lib/supabase';
 import { hydrateMathInContainer } from './utils/mathRenderer';
 import { calculateStudentAccess, canStudentResumeInOvertime } from './utils/scheduleUtils';
+import { getExamDates } from './components/teacher/timeUtils';
 import { measureClientBandwidthBytes, detectClientDevice, countIntegrityViolations } from './utils/telemetryUtils';
 import { cleanupExpiredExamCaches } from './utils/cacheHygiene';
 import { findLocalCompletedStudent, saveLocalCompletedStudent } from './utils/studentIdentity';
@@ -75,8 +76,10 @@ const App: React.FC = () => {
     examsRef.current = exams;
   }, [exams]);
   const [results, setResults] = useState<Result[]>([]);
+  const [ongoingExamCounts, setOngoingExamCounts] = useState<Record<string, number>>({});
   const lastExamsFetchRef = useRef<{ teacherId: string; ts: number }>({ teacherId: '', ts: 0 });
   const lastResultsFetchRef = useRef<{ teacherId: string; ts: number }>({ teacherId: '', ts: 0 });
+  const lastCountsFetchRef = useRef<{ teacherId: string; ts: number }>({ teacherId: '', ts: 0 });
   const [isSyncing, setIsSyncing] = useState(false);
   const [isOnline, setIsOnline] = useState(typeof navigator !== 'undefined' && navigator.onLine !== undefined ? navigator.onLine : true);
   const [isLoadingSession, setIsLoadingSession] = useState(true);
@@ -990,11 +993,54 @@ const App: React.FC = () => {
     }
     setIsSyncing(true);
     try {
-        const examMap = await storageService.getExams(teacherProfile);
+        const examMap = await storageService.getExams(teacherProfile, { includeQuestions: false });
         examsRef.current = examMap;
         setExams(examMap);
         lastExamsFetchRef.current = { teacherId: teacherProfile.id, ts: Date.now() };
     } finally { setIsSyncing(false); }
+  }, [teacherProfile]);
+
+  const refreshOngoingCounts = useCallback(async (force = false) => {
+    if (!teacherProfile) return;
+    const now = Date.now();
+    if (
+      !force &&
+      lastCountsFetchRef.current.teacherId === teacherProfile.id &&
+      now - lastCountsFetchRef.current.ts < DASHBOARD_CACHE_TTL_MS
+    ) {
+      return;
+    }
+    let currentExamsMap = examsRef.current;
+    if (Object.keys(currentExamsMap).length === 0) {
+      currentExamsMap = await storageService.getExams(teacherProfile, { includeQuestions: false });
+      examsRef.current = currentExamsMap;
+      lastExamsFetchRef.current = { teacherId: teacherProfile.id, ts: Date.now() };
+      if (Object.keys(currentExamsMap).length > 0) {
+        setExams(currentExamsMap);
+      }
+    }
+
+    const ongoingCodes = Object.values(currentExamsMap)
+      .filter((exam) => {
+        if (exam.status === 'DRAFT' || exam.config?.isFinished) return false;
+        const { start, end } = getExamDates(exam);
+        return now >= start.getTime() && now <= end.getTime();
+      })
+      .map((exam) => exam.code);
+
+    if (ongoingCodes.length === 0) {
+      setOngoingExamCounts({});
+      lastCountsFetchRef.current = { teacherId: teacherProfile.id, ts: Date.now() };
+      return;
+    }
+
+    try {
+      const counts = await storageService.getExamParticipantCounts(ongoingCodes);
+      setOngoingExamCounts(counts);
+      lastCountsFetchRef.current = { teacherId: teacherProfile.id, ts: Date.now() };
+    } catch (e) {
+      console.warn('Failed to refresh ongoing exam counts:', e);
+    }
   }, [teacherProfile]);
 
   const refreshResults = useCallback(async (force = false) => {
@@ -1011,7 +1057,7 @@ const App: React.FC = () => {
     try {
         let examCodes = Object.keys(examsRef.current);
         if (examCodes.length === 0) {
-            const examMap = await storageService.getExams(teacherProfile);
+            const examMap = await storageService.getExams(teacherProfile, { includeQuestions: false });
             examsRef.current = examMap;
             examCodes = Object.keys(examMap);
             lastExamsFetchRef.current = { teacherId: teacherProfile.id, ts: Date.now() };
@@ -1160,8 +1206,10 @@ const App: React.FC = () => {
     // FIX: Clear shared state to prevent data leakage/ghosting between sessions
     lastExamsFetchRef.current = { teacherId: '', ts: 0 };
     lastResultsFetchRef.current = { teacherId: '', ts: 0 };
+    lastCountsFetchRef.current = { teacherId: '', ts: 0 };
     setExams({});
     setResults([]);
+    setOngoingExamCounts({});
     window.history.replaceState({}, '', '/');
   };
 
@@ -1500,6 +1548,8 @@ const App: React.FC = () => {
                     onLogout={handleLogout}
                     onRefreshExams={refreshExams}
                     onRefreshResults={refreshResults}
+                    ongoingExamCounts={ongoingExamCounts}
+                    onRefreshOngoingCounts={refreshOngoingCounts}
 
                 />
             </Suspense>
