@@ -70,9 +70,37 @@ export const useOngoingExamModal = ({
   useEffect(() => {
     localResultsRef.current = localResults;
   }, [localResults]);
+  const lastPollCursorRef = useRef<string | null>(null);
+  const hydratedCodeRef = useRef<string | null>(null);
+
+  const advanceCursorFromResults = useCallback((items: Result[]) => {
+    let maxTs = 0;
+    for (const item of items) {
+      if (typeof item.timestamp === "number" && item.timestamp > maxTs) {
+        maxTs = item.timestamp;
+      }
+    }
+    const baseTs = maxTs > 0 ? maxTs : Date.now();
+    lastPollCursorRef.current = new Date(Math.max(0, baseTs - 2000)).toISOString();
+  }, []);
 
   useEffect(() => {
     setDisplayExam(exam);
+    lastPollCursorRef.current = null;
+    if (!exam?.code) {
+      hydratedCodeRef.current = null;
+      return;
+    }
+    if (exam.questionsDeferred && hydratedCodeRef.current !== exam.code) {
+      hydratedCodeRef.current = exam.code;
+      storageService.ensureExamQuestions(exam).then((hydrated) => {
+        setDisplayExam((prev) =>
+          prev && prev.code === hydrated.code
+            ? { ...hydrated, config: prev.config || hydrated.config }
+            : prev,
+        );
+      }).catch(() => {});
+    }
   }, [exam]);
 
   const fetchLatest = useCallback(
@@ -80,12 +108,12 @@ export const useOngoingExamModal = ({
       if (!displayExam?.code) return;
       if (!silent) setIsRefreshing(true);
       try {
-        const data = await storageService.getResults(
-          displayExam.code,
-          undefined,
-          undefined,
-        );
+        const includeAnswers = !displayExam.config?.disableRealtime;
+        const data = await storageService.getOngoingExamResults(displayExam.code, {
+          includeAnswers,
+        });
         setLocalResults(data);
+        advanceCursorFromResults(data);
 
         const { data: examData } = await supabase
           .from("exams")
@@ -103,7 +131,7 @@ export const useOngoingExamModal = ({
         if (!silent) setIsRefreshing(false);
       }
     },
-    [displayExam?.code],
+    [displayExam?.code, displayExam?.config?.disableRealtime, advanceCursorFromResults],
   );
 
   useEffect(() => {
@@ -114,23 +142,77 @@ export const useOngoingExamModal = ({
       if (!displayExam?.code || isDisposed) return;
       if (typeof document !== "undefined" && document.hidden) return;
       try {
-        const PAGE_SIZE = 1000;
-        const allServerRows: { id: number; status: string; score: number | null; correct_answers: number | null; updated_at: string }[] = [];
+        const cursor = lastPollCursorRef.current;
+        const isLargeScaleMode = Boolean(displayExam.config?.disableRealtime);
+
+        if (!cursor) {
+          const full = await storageService.getOngoingExamResults(displayExam.code, {
+            includeAnswers: !isLargeScaleMode,
+          });
+          if (!isDisposed) {
+            setLocalResults(full);
+            advanceCursorFromResults(full);
+          }
+          return;
+        }
+
+        if (isLargeScaleMode) {
+          // Normal Mode (disableRealtime): delta fetch lightweight columns only, zero answers & location
+          const changedRows = await storageService.getOngoingExamResults(displayExam.code, {
+            includeAnswers: false,
+            updatedAfterIso: cursor,
+          });
+          if (changedRows.length === 0 || isDisposed) return;
+
+          advanceCursorFromResults(changedRows);
+          setLocalResults((prev) => {
+            const map = new Map<number, number>();
+            const next = [...prev];
+            next.forEach((r, idx) => {
+              if (typeof r.id === "number") map.set(r.id, idx);
+            });
+            for (const changed of changedRows) {
+              if (typeof changed.id === "number" && map.has(changed.id)) {
+                next[map.get(changed.id)!] = changed;
+              } else {
+                next.push(changed);
+              }
+            }
+            return next;
+          });
+          return;
+        }
+
+        // Realtime Mode Backup: delta query changed status/score since cursor
+        const POLL_PAGE_SIZE = 1000;
+        const changedServerRows: { id: number; status: string; score: number | null; correct_answers: number | null; updated_at: string }[] = [];
         let from = 0;
         while (true) {
           const { data, error } = await supabase
             .from("results")
             .select("id, status, score, correct_answers, updated_at")
             .eq("exam_code", displayExam.code)
-            .range(from, from + PAGE_SIZE - 1);
+            .gt("updated_at", cursor)
+            .range(from, from + POLL_PAGE_SIZE - 1);
 
           if (error || !data || data.length === 0) break;
-          allServerRows.push(...(data as any[]));
-          if (data.length < PAGE_SIZE) break;
-          from += PAGE_SIZE;
+          changedServerRows.push(...(data as any[]));
+          if (data.length < POLL_PAGE_SIZE) break;
+          from += POLL_PAGE_SIZE;
         }
 
-        if (allServerRows.length === 0 || isDisposed) return;
+        if (changedServerRows.length === 0 || isDisposed) return;
+
+        let maxTs = 0;
+        for (const r of changedServerRows) {
+          if (r.updated_at) {
+            const ts = new Date(r.updated_at).getTime();
+            if (ts > maxTs) maxTs = ts;
+          }
+        }
+        if (maxTs > 0) {
+          lastPollCursorRef.current = new Date(Math.max(0, maxTs - 2000)).toISOString();
+        }
 
         const currentSnapshot = localResultsRef.current;
         const localMap = new Map<number, Result>();
@@ -140,9 +222,9 @@ export const useOngoingExamModal = ({
           }
         }
         const idsToFetch: number[] = [];
-        const serverMap = new Map(allServerRows.map((row) => [row.id, row]));
+        const serverMap = new Map(changedServerRows.map((row) => [row.id, row]));
 
-        for (const serverRec of allServerRows) {
+        for (const serverRec of changedServerRows) {
           const localRec = localMap.get(serverRec.id);
           if (localRec) {
             if (
@@ -200,7 +282,7 @@ export const useOngoingExamModal = ({
             const { data: specificData } = await supabase
               .from("results")
               .select(
-                "id, exam_code, student_id, student_name, class_name, status, score, correct_answers, total_questions, answers, updated_at, location",
+                "id, exam_code, student_id, student_name, class_name, status, score, correct_answers, total_questions, answers, updated_at",
               )
               .in("id", idsToFetch.slice(i, i + DETAIL_BATCH));
             if (specificData) {
@@ -226,7 +308,7 @@ export const useOngoingExamModal = ({
       }
     };
 
-    const pollInterval = setInterval(runLightweightPoll, 15000);
+    const pollInterval = setInterval(runLightweightPoll, 30000);
     const handleVisibilityChange = () => {
       if (!document.hidden) {
         runLightweightPoll();
@@ -239,7 +321,7 @@ export const useOngoingExamModal = ({
       clearInterval(pollInterval);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
-  }, [displayExam?.code, fetchLatest]);
+  }, [displayExam?.code, displayExam?.config?.disableRealtime, fetchLatest, advanceCursorFromResults]);
 
   useEffect(() => {
     if (!displayExam?.code) return;
@@ -390,7 +472,7 @@ export const useOngoingExamModal = ({
           supabase
             .from("results")
             .select(
-              "id, exam_code, student_id, student_name, class_name, status, score, correct_answers, total_questions, answers, updated_at, location",
+              "id, exam_code, student_id, student_name, class_name, status, score, correct_answers, total_questions, answers, updated_at",
             )
             .eq("exam_code", examCode)
             .eq("student_id", studentId)
@@ -738,6 +820,9 @@ export const useOngoingExamModal = ({
           await storageService.deleteStudentResult(
             displayExam?.code || "",
             studentId,
+          );
+          setLocalResults((prev) =>
+            prev.filter((r) => r.student.studentId !== studentId),
           );
           fetchLatest(true);
           setAlertDialog({ isOpen: true, message: "Data siswa berhasil dihapus." });
