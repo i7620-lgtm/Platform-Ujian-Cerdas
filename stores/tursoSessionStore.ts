@@ -12,7 +12,9 @@ interface TursoSessionState {
   examKeys: Record<string, string>;
   tursoMetaCache: Record<string, TursoMetaEntry>;
   tursoUrl: string | null;
+  tursoReadToken: string | null;
   setTursoUrl: (url: string) => void;
+  setTursoReadToken: (token: string) => void;
   setExamKey: (code: string, examKey: string) => void;
   getExamKey: (code: string) => string | null;
   hydrateExamKey: (code: string) => Promise<string | null>;
@@ -23,6 +25,7 @@ interface TursoSessionState {
 
 const TURSO_KEY_PREFIX = 'turso_key_';
 const TURSO_URL_STORAGE_KEY = 'turso_client_url';
+const TURSO_RO_TOKEN_STORAGE_KEY = 'turso_client_ro_token';
 const MAX_RAM_KEY_ENTRIES = 24;
 
 function normalizeCode(code: string): string {
@@ -33,6 +36,7 @@ export const useTursoSessionStore = create<TursoSessionState>((set, get) => ({
   examKeys: {},
   tursoMetaCache: {},
   tursoUrl: null,
+  tursoReadToken: null,
 
   setTursoUrl: (rawUrl) => {
     const clean = String(rawUrl || '').trim();
@@ -40,6 +44,15 @@ export const useTursoSessionStore = create<TursoSessionState>((set, get) => ({
     if (get().tursoUrl !== clean) {
       set({ tursoUrl: clean });
       offlineService.saveLocalProgress(TURSO_URL_STORAGE_KEY, clean).catch(() => {});
+    }
+  },
+
+  setTursoReadToken: (rawToken) => {
+    const clean = String(rawToken || '').trim();
+    if (!clean) return;
+    if (get().tursoReadToken !== clean) {
+      set({ tursoReadToken: clean });
+      offlineService.saveLocalProgress(TURSO_RO_TOKEN_STORAGE_KEY, clean).catch(() => {});
     }
   },
 
@@ -71,11 +84,21 @@ export const useTursoSessionStore = create<TursoSessionState>((set, get) => ({
     const code = normalizeCode(rawCode);
     if (!code) return null;
 
-    if (!get().tursoUrl) {
+    if (!get().tursoUrl || !get().tursoReadToken) {
       try {
-        const storedUrl = await offlineService.getLocalProgress(TURSO_URL_STORAGE_KEY);
+        const [storedUrl, storedToken] = await Promise.all([
+          !get().tursoUrl ? offlineService.getLocalProgress(TURSO_URL_STORAGE_KEY) : Promise.resolve(null),
+          !get().tursoReadToken ? offlineService.getLocalProgress(TURSO_RO_TOKEN_STORAGE_KEY) : Promise.resolve(null),
+        ]);
+        const patch: Partial<TursoSessionState> = {};
         if (typeof storedUrl === 'string' && storedUrl.trim()) {
-          set({ tursoUrl: storedUrl.trim() });
+          patch.tursoUrl = storedUrl.trim();
+        }
+        if (typeof storedToken === 'string' && storedToken.trim()) {
+          patch.tursoReadToken = storedToken.trim();
+        }
+        if (Object.keys(patch).length > 0) {
+          set(patch);
         }
       } catch {
         /* ignore */
