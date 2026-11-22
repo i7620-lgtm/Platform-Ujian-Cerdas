@@ -154,7 +154,12 @@ async function startServer() {
       const code = (req.params.code || "").trim().toUpperCase();
       const bearerToken = extractBearerToken(req.headers);
       const proctorToken = (req.headers["x-proctor-token"] as string) || (req.query.token as string) || "";
-      const result = await handleExamTursoSyncRequest({ code, bearerToken, proctorToken });
+      const result = await handleExamTursoSyncRequest({
+        code,
+        bearerToken,
+        proctorToken,
+        fallbackBundle: req.body?.examBundle,
+      });
       return sendExamContentResponse(res, result);
     } catch (error: any) {
       res.status(500).json({ success: false, error: error.message });

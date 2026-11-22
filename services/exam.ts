@@ -8,6 +8,7 @@ import { clearExamLocalCache } from '../utils/cacheHygiene';
 import { ContentModerator, ModerationError } from './contentModeration';
 import {
     deleteExamFromTursoFromClient,
+    ensureTursoClientReady,
     fetchAndDecryptTursoExamBundle,
     fetchTursoExamMeta,
     isTursoClientConfigured,
@@ -847,7 +848,7 @@ export class ExamService {
         if (!cleanCode) return null;
 
         // 1. Primary: Direct Read-Only Turso poll (0 Vercel requests, 0 Supabase egress)
-        if (isTursoClientConfigured()) {
+        if (await ensureTursoClientReady(cleanCode)) {
             try {
                 const tursoMeta = await fetchTursoExamMeta(cleanCode);
                 if (tursoMeta) {
@@ -945,7 +946,7 @@ export class ExamService {
 
         // 1. FAST PATH: Check Schedule / Pre-login (Turso first, then Vercel Edge meta)
         if (studentId === 'check_schedule') {
-            if (!isPreview && isTursoClientConfigured()) {
+            if (!isPreview && (await ensureTursoClientReady(cleanCode))) {
                 try {
                     const tursoMeta = await fetchTursoExamMeta(cleanCode);
                     if (tursoMeta) {
@@ -1066,7 +1067,7 @@ export class ExamService {
         } | null = null;
         let preloadedTursoQuestions: Question[] | null = null;
 
-        if (!isPreview && isTursoClientConfigured()) {
+        if (!isPreview && (await ensureTursoClientReady(cleanCode))) {
             try {
                 const tursoMeta = await fetchTursoExamMeta(cleanCode);
                 if (tursoMeta && tursoMeta.status !== 'closed') {
@@ -1224,7 +1225,7 @@ export class ExamService {
             }
         } else {
             // 4. Download complete student package (Turso decrypted bundle first, then Vercel Edge CDN)
-            if (!isPreview && isTursoClientConfigured()) {
+            if (!isPreview && (await ensureTursoClientReady(cleanCode))) {
                 try {
                     const decrypted = await fetchAndDecryptTursoExamBundle(cleanCode, { isPreview: false });
                     if (decrypted?.bundle && Array.isArray(decrypted.bundle.questions) && decrypted.bundle.questions.length > 0) {
@@ -1361,7 +1362,7 @@ export class ExamService {
             }
         } catch { /* ignore */ }
 
-        if (isTursoClientConfigured()) {
+        if (await ensureTursoClientReady(cleanCode)) {
             try {
                 const decrypted = await fetchAndDecryptTursoExamBundle(cleanCode, { isPreview: false });
                 if (decrypted?.bundle && Array.isArray(decrypted.bundle.questions) && decrypted.bundle.questions.length > 0) {
@@ -1606,7 +1607,7 @@ export class ExamService {
         }
         try {
             // 1. Primary: Turso Read-Only encrypted bundle (0 Vercel polling cost, 0 Supabase egress)
-            if (isTursoClientConfigured()) {
+            if (await ensureTursoClientReady(cleanCode)) {
                 const tursoMeta = await fetchTursoExamMeta(cleanCode);
                 if (tursoMeta) {
                     if (tursoMeta.status === 'closed') {
@@ -1799,16 +1800,16 @@ export class ExamService {
             return;
         }
         try {
-            const tursoSyncPromise = syncExamToTursoFromClient(cleanCode, proctorToken);
+            const examBundle = typeof examOrCode === 'string' ? undefined : this.buildStudentEdgeBundle(examOrCode, version);
+            const tursoSyncPromise = syncExamToTursoFromClient(cleanCode, proctorToken, examBundle);
             if (status === 'DRAFT') {
                 await Promise.race([
                     tursoSyncPromise,
-                    new Promise<void>((resolve) => setTimeout(resolve, 2500)),
+                    new Promise<void>((resolve) => setTimeout(resolve, 6000)),
                 ]);
                 return;
             }
 
-            const examBundle = typeof examOrCode === 'string' ? undefined : this.buildStudentEdgeBundle(examOrCode, version);
             const warmTask = (async () => {
                 await Promise.allSettled([
                     tursoSyncPromise,
@@ -1827,7 +1828,7 @@ export class ExamService {
 
             await Promise.race([
                 warmTask,
-                new Promise<void>((resolve) => setTimeout(resolve, 2500)),
+                new Promise<void>((resolve) => setTimeout(resolve, 6000)),
             ]);
         } catch { /* ignore */ }
     }

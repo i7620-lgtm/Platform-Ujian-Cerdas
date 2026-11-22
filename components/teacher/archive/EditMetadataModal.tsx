@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { PencilIcon, XMarkIcon, ExclamationTriangleIcon } from "../../Icons";
 import type { Exam } from "../../../types";
 import { EXAM_TYPES } from "../constants";
+import { formatForDateInput } from "../../../utils/timezoneUtils";
 
 interface EditMetadataModalProps {
   exam: Exam;
@@ -30,7 +31,7 @@ export const EditMetadataModal: React.FC<EditMetadataModalProps> = ({
     subject: exam.config.subject || "",
     classLevel: exam.config.classLevel || "",
     examType: exam.config.examType || "",
-    date: exam.config.date || "",
+    date: exam.config.date ? formatForDateInput(exam.config.date) : "",
     manualParticipantCount: exam.config.manualParticipantCount || "",
   });
 
@@ -177,7 +178,7 @@ export const EditMetadataModal: React.FC<EditMetadataModalProps> = ({
               <input
                 type="date"
                 name="date"
-                value={formData.date}
+                value={formData.date ? formatForDateInput(formData.date) : ""}
                 onChange={handleChange}
                 className="w-full px-3 py-2 border rounded-lg text-sm dark:bg-slate-900 dark:border-slate-700 dark:text-white"
               />

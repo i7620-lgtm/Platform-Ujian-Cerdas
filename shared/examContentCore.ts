@@ -42,6 +42,25 @@ export function getServerSupabase() {
   return { primaryDb: anonClient, fallbackDb: anonClient, isServiceRole: false };
 }
 
+export function getUserScopedSupabase(bearerToken?: string) {
+  const token = String(bearerToken || '').trim();
+  const rawUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
+  const supabaseUrl = isValidHttpUrl(rawUrl) ? rawUrl.trim() : DEFAULT_SUPABASE_URL;
+
+  const rawAnonKey = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY;
+  const anonKey = isValidSupabaseKey(rawAnonKey) ? rawAnonKey.trim() : DEFAULT_SUPABASE_ANON_KEY;
+
+  if (!token) return null;
+  return createClient(supabaseUrl, anonKey, {
+    auth: { autoRefreshToken: false, persistSession: false },
+    global: {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    },
+  });
+}
+
 export interface CachedMetaBundle {
   code: string;
   authorId?: string;

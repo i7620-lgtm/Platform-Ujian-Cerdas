@@ -34,17 +34,30 @@ function normalizeTursoHttpUrl(rawUrl?: string): string {
 
 function getClientTursoConfig(): { url: string; readToken: string } {
   const env = (import.meta as any).env || {};
-  const fallbackStoreUrl = useTursoSessionStore.getState().tursoUrl || '';
+  const storeState = useTursoSessionStore.getState();
   const url = normalizeTursoHttpUrl(
-    env.VITE_TURSO_DATABASE_URL || env.VITE_TURSO_URL || env.VITE_TURSO_DB_URL || fallbackStoreUrl
+    env.VITE_TURSO_DATABASE_URL || env.VITE_TURSO_URL || env.VITE_TURSO_DB_URL || storeState.tursoUrl || ''
   );
-  const readToken = String(env.VITE_TURSO_READ_TOKEN || '').trim();
+  const readToken = String(env.VITE_TURSO_READ_TOKEN || storeState.tursoReadToken || '').trim();
   return { url, readToken };
 }
 
 export function isTursoClientConfigured(): boolean {
   const { url, readToken } = getClientTursoConfig();
   return Boolean(url && readToken && typeof crypto !== 'undefined' && crypto.subtle);
+}
+
+export async function ensureTursoClientReady(rawCode: string): Promise<boolean> {
+  if (isTursoClientConfigured()) return true;
+  if (typeof crypto === 'undefined' || !crypto.subtle) return false;
+  const code = String(rawCode || '').trim().toUpperCase();
+  if (!code) return false;
+
+  await useTursoSessionStore.getState().hydrateExamKey(code);
+  if (isTursoClientConfigured()) return true;
+
+  await ensureExamDecryptionKey(code, false);
+  return isTursoClientConfigured();
 }
 
 function base64UrlToUint8Array(b64u: string): Uint8Array {
@@ -225,6 +238,10 @@ export async function ensureExamDecryptionKey(
       useTursoSessionStore.getState().setTursoUrl(String(json.tursoUrl));
     }
 
+    if (json.tursoReadToken) {
+      useTursoSessionStore.getState().setTursoReadToken(String(json.tursoReadToken));
+    }
+
     if (json.examKey && json.tursoEnabled) {
       useTursoSessionStore.getState().setExamKey(code, String(json.examKey));
     }
@@ -340,21 +357,34 @@ async function buildTeacherAuthHeaders(proctorToken?: string): Promise<Record<st
   return headers;
 }
 
-export async function syncExamToTursoFromClient(rawCode: string, proctorToken?: string): Promise<void> {
+export async function syncExamToTursoFromClient(
+  rawCode: string,
+  proctorToken?: string,
+  examBundle?: Record<string, any>
+): Promise<boolean> {
   const code = String(rawCode || '').trim().toUpperCase();
-  if (!code) return;
+  if (!code) return false;
   try {
     const headers = await buildTeacherAuthHeaders(proctorToken);
     if (!headers['Authorization'] && !headers['X-Proctor-Token']) {
-      return;
+      console.warn('[TursoSync] Dilewati: tidak ada sesi guru atau token kolaborator untuk kode', code);
+      return false;
     }
-    await fetch(`/api/exam-content/${code}/sync-turso`, {
+    const res = await fetch(`/api/exam-content/${code}/sync-turso`, {
       method: 'POST',
       headers,
-      body: JSON.stringify({ code }),
-    }).catch(() => {});
-  } catch {
-    /* graceful non-blocking fallback */
+      body: JSON.stringify(examBundle ? { code, examBundle } : { code }),
+    });
+    const ct = res.headers.get('content-type') || '';
+    const json = ct.includes('application/json') ? await res.json().catch(() => null) : null;
+    if (!res.ok || !json?.tursoSynced) {
+      console.warn('[TursoSync] Sinkronisasi ke Turso tidak aktif/gagal:', res.status, json?.error || json?.reason || res.statusText);
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.warn('[TursoSync] Gagal menghubungi server sinkronisasi Turso:', err);
+    return false;
   }
 }
 

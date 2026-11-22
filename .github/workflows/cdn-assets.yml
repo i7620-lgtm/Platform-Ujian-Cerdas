@@ -34,6 +34,8 @@ jobs:
       - name: Build assets targeting immutable jsDelivr tag
         env:
           VITE_DISABLE_CDN: 'false'
+          VITE_TURSO_DATABASE_URL: ${{ vars.VITE_TURSO_DATABASE_URL || secrets.VITE_TURSO_DATABASE_URL || '' }}
+          VITE_TURSO_READ_TOKEN: ${{ vars.VITE_TURSO_READ_TOKEN || secrets.VITE_TURSO_READ_TOKEN || '' }}
         run: |
           SHORT_SHA="${GITHUB_SHA::12}"
           CDN_TAG="cdn-${SHORT_SHA}"
@@ -129,4 +131,3 @@ jobs:
               process.exit(1);
             });
           '
- 
