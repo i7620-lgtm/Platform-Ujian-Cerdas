@@ -851,6 +851,8 @@ export class ResultService {
                   examService.saveLocalTeacherExam(updatedExam);
               }
           }
+          // Sync closed status to Turso & wipe encrypted questions payload immediately
+          await examService.syncExamToTurso(cleanCode);
       } catch (dbErr) {
           console.warn("Supabase update error during stopExamOverall:", dbErr);
       }
@@ -922,6 +924,7 @@ export class ResultService {
               version: nextVersion
           };
           await supabase.from('exams').update({ config: newConfig }).eq('code', examCode);
+          await examService.syncExamToTurso(examCode);
       }
   }
 

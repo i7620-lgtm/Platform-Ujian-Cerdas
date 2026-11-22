@@ -2,13 +2,25 @@ import express from "express";
 import path from "path";
 import cors from "cors";
 import {
+  getTursoServerDiagnostics,
+  handleExamKeyRequest,
   handleExamMetaRequest,
   handleExamTestRequest,
   handleExamSolutionsRequest,
+  handleExamTursoDeleteRequest,
+  handleExamTursoSyncRequest,
   handleExamWarmRequest,
   sendExamContentResponse,
 } from "./server/examContent.ts";
 import { moderateExamContentOnServer } from "./server/contentModeration.ts";
+
+function extractBearerToken(headers: Record<string, any>): string {
+  const raw = String(headers?.authorization || headers?.Authorization || "").trim();
+  if (/^Bearer\s+/i.test(raw)) {
+    return raw.replace(/^Bearer\s+/i, "").trim();
+  }
+  return "";
+}
 
 async function startServer() {
   const app = express();
@@ -19,8 +31,15 @@ async function startServer() {
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
   // API Routes
-  app.get("/api/health", (req, res) => {
-    res.json({ status: "ok", port: PORT, env: process.env.NODE_ENV || "development" });
+  app.get("/api/health", async (req, res) => {
+    const checkTurso = req.query.check === "turso";
+    const turso = await getTursoServerDiagnostics({ ping: checkTurso }).catch(() => null);
+    res.json({
+      status: "ok",
+      port: PORT,
+      env: process.env.NODE_ENV || "development",
+      ...(turso ? { turso } : {}),
+    });
   });
 
   app.post("/api/moderate-content", async (req, res) => {
@@ -113,6 +132,41 @@ async function startServer() {
         method: req.method,
         examBundle: req.body?.examBundle,
       });
+      return sendExamContentResponse(res, result);
+    } catch (error: any) {
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  app.get("/api/exam-content/:code/key", async (req, res) => {
+    try {
+      const code = (req.params.code || "").trim().toUpperCase();
+      const isPreview = req.query.preview === "true" || req.query.isPreview === "true";
+      const result = await handleExamKeyRequest({ code, isPreview });
+      return sendExamContentResponse(res, result);
+    } catch (error: any) {
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  app.post("/api/exam-content/:code/sync-turso", async (req, res) => {
+    try {
+      const code = (req.params.code || "").trim().toUpperCase();
+      const bearerToken = extractBearerToken(req.headers);
+      const proctorToken = (req.headers["x-proctor-token"] as string) || (req.query.token as string) || "";
+      const result = await handleExamTursoSyncRequest({ code, bearerToken, proctorToken });
+      return sendExamContentResponse(res, result);
+    } catch (error: any) {
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  app.all("/api/exam-content/:code/delete-turso", async (req, res) => {
+    try {
+      const code = (req.params.code || "").trim().toUpperCase();
+      const bearerToken = extractBearerToken(req.headers);
+      const proctorToken = (req.headers["x-proctor-token"] as string) || (req.query.token as string) || "";
+      const result = await handleExamTursoDeleteRequest({ code, bearerToken, proctorToken });
       return sendExamContentResponse(res, result);
     } catch (error: any) {
       res.status(500).json({ success: false, error: error.message });
