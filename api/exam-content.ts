@@ -145,6 +145,7 @@ export default async function handler(req: any, res: any) {
         code,
         bearerToken,
         proctorToken: String(proctorToken),
+        fallbackBundle: parsedBody?.examBundle,
       });
       return sendExamContentResponse(res, result);
     }
