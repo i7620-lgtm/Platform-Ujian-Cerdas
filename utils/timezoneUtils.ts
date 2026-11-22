@@ -115,6 +115,27 @@ export const normalizeDateString = (rawDate?: string): string => {
 };
 
 /**
+ * Mengonversi nilai tanggal mentah (termasuk ISO timestamp UTC) ke format yyyy-MM-dd
+ * yang valid untuk <input type="date">.
+ */
+export const formatForDateInput = (rawDate?: string): string => {
+  if (!rawDate) {
+    return new Date().toLocaleDateString("en-CA");
+  }
+  const trimmed = rawDate.trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+    return trimmed;
+  }
+  if (trimmed.includes("T")) {
+    const parsed = new Date(trimmed);
+    if (!isNaN(parsed.getTime())) {
+      return parsed.toLocaleDateString("en-CA");
+    }
+  }
+  return normalizeDateString(trimmed);
+};
+
+/**
  * Mengonversi tanggal (YYYY-MM-DD), jam (HH:mm), dan zona waktu menjadi absolute epoch timestamp (ms).
  * Memastikan perhitungan waktu tidak terdistorsi oleh perbedaan zona waktu lokal perangkat klien.
  */
