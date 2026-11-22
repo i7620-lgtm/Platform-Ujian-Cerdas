@@ -1,16 +1,73 @@
 import React from "react";
 
-export const LogoIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
-  <svg
-    {...props}
-    xmlns="http://www.w3.org/2000/svg"
-    viewBox="0 0 24 24"
-    fill="currentColor"
-  >
-    <path d="M12 2.25c-5.376 0-9.75 4.374-9.75 9.75s4.374 9.75 9.75 9.75 9.75-4.374 9.75-9.75S17.376 2.25 12 2.25Zm.094 15.341a.75.75 0 0 1-.884-.652l-.003-2.435-.002-3.35c0-1.242.02-2.484.058-3.725.011-.371.363-.642.736-.642.373 0 .725.27.736.642.038 1.24.058 2.482.058 3.725l.001 5.79.001.002a.75.75 0 0 1-.696.749Z" />
-    <path d="M12 2.25a9.715 9.715 0 0 0-7.398 3.482c.453.053.918.14 1.39.26 1.768.442 3.536.885 3.536 2.213v1.332a.75.75 0 0 1-1.5 0V9.528c0-.501-.83-1.028-1.66-1.272a.75.75 0 0 1-.51-1.337A8.21 8.21 0 0 1 12 3.75c2.193 0 4.212.85 5.733 2.25a.75.75 0 0 1-.53 1.282c-1.428.1-1.678.89-1.678 1.51v4.101a.75.75 0 0 1-1.5 0V10.5c0-1.328 1.768-1.77 3.536-2.214.472-.118.937-.206 1.39-.26A9.715 9.715 0 0 0 12 2.25Z" />
-  </svg>
-);
+export const LogoIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => {
+  const uid = React.useId().replace(/:/g, "");
+  const gradId = `uc-logo-grad-${uid}`;
+  const clipId = `uc-logo-clip-${uid}`;
+
+  return (
+    <svg
+      {...props}
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 512 512"
+      aria-hidden="true"
+    >
+      <defs>
+        <linearGradient
+          id={gradId}
+          x1="0"
+          y1="0"
+          x2="512"
+          y2="512"
+          gradientUnits="userSpaceOnUse"
+        >
+          <stop offset="0%" stopColor="#4F46E5" />
+          <stop offset="100%" stopColor="#3730A3" />
+        </linearGradient>
+        <clipPath id={clipId}>
+          <rect x="0" y="0" width="512" height="512" rx="108" />
+        </clipPath>
+      </defs>
+      <g clipPath={`url(#${clipId})`}>
+        <rect width="512" height="512" rx="108" fill={`url(#${gradId})`} />
+        <circle cx="256" cy="260" r="172" fill="#FFFFFF" fillOpacity="0.08" />
+        <circle
+          cx="256"
+          cy="260"
+          r="183"
+          fill="none"
+          stroke="#E0E7FF"
+          strokeOpacity="0.92"
+          strokeWidth="22"
+        />
+        <rect x="198" y="356" width="116" height="34" rx="14" fill="#FFFFFF" />
+        <rect x="230" y="228" width="52" height="138" rx="6" fill="#FFFFFF" />
+        <path d="M190 194 H322 L302 240 Q256 258 210 240 Z" fill="#E0E7FF" />
+        <path d="M256 116 L388 174 L256 232 L124 174 Z" fill="#FFFFFF" />
+        <line
+          x1="256"
+          y1="174"
+          x2="362"
+          y2="186"
+          stroke="#FDE047"
+          strokeWidth="12"
+          strokeLinecap="round"
+        />
+        <circle cx="256" cy="174" r="10" fill="#FDE047" />
+        <line
+          x1="362"
+          y1="186"
+          x2="362"
+          y2="286"
+          stroke="#FACC15"
+          strokeWidth="16"
+          strokeLinecap="round"
+        />
+        <circle cx="362" cy="294" r="16" fill="#FACC15" />
+      </g>
+    </svg>
+  );
+};
 
 export const MagnifyingGlassIcon: React.FC<React.SVGProps<SVGSVGElement>> = (
   props,
