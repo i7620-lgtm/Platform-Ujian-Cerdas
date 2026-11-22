@@ -6,6 +6,13 @@ import { uploadToCloudinary } from './cloudinary';
 import { offlineService } from './offline';
 import { clearExamLocalCache } from '../utils/cacheHygiene';
 import { ContentModerator, ModerationError } from './contentModeration';
+import {
+    deleteExamFromTursoFromClient,
+    fetchAndDecryptTursoExamBundle,
+    fetchTursoExamMeta,
+    isTursoClientConfigured,
+    syncExamToTursoFromClient,
+} from './tursoExamClient';
 
 export { ModerationError };
 
@@ -839,6 +846,55 @@ export class ExamService {
         const cleanCode = (code || '').trim().toUpperCase();
         if (!cleanCode) return null;
 
+        // 1. Primary: Direct Read-Only Turso poll (0 Vercel requests, 0 Supabase egress)
+        if (isTursoClientConfigured()) {
+            try {
+                const tursoMeta = await fetchTursoExamMeta(cleanCode);
+                if (tursoMeta) {
+                    if (tursoMeta.status === 'closed') {
+                        return {
+                            status: 'closed',
+                            config: { isFinished: true } as ExamConfig,
+                        };
+                    }
+
+                    const localCacheKey = `edge_bundle_${cleanCode}`;
+                    const localCached = await offlineService.getLocalProgress(localCacheKey) as {
+                        version?: number;
+                        config?: ExamConfig;
+                        questions?: Question[];
+                    } | null;
+
+                    if (localCached && localCached.version === tursoMeta.version && localCached.config) {
+                        return {
+                            status: tursoMeta.status,
+                            config: localCached.config,
+                        };
+                    }
+
+                    const decrypted = await fetchAndDecryptTursoExamBundle(cleanCode, { isPreview: false });
+                    if (decrypted?.isClosed) {
+                        return { status: 'closed', config: { isFinished: true } as ExamConfig };
+                    }
+                    if (decrypted?.bundle) {
+                        await offlineService.saveLocalProgress(localCacheKey, {
+                            version: decrypted.bundle.version,
+                            config: decrypted.bundle.config,
+                            questions: decrypted.bundle.questions,
+                            savedAt: Date.now(),
+                        });
+                        return {
+                            status: decrypted.bundle.status,
+                            config: decrypted.bundle.config,
+                        };
+                    }
+                }
+            } catch {
+                /* fall through to Vercel Edge */
+            }
+        }
+
+        // 2. Fallback: Vercel Edge meta
         const edgeMeta = await this.fetchEdgeMeta(cleanCode, false);
         if (edgeMeta.ok && edgeMeta.data) {
             return {
@@ -847,6 +903,7 @@ export class ExamService {
             };
         }
 
+        // 3. Fallback: Supabase
         const { data, error } = await supabase
             .from('exams')
             .select('status, config')
@@ -886,8 +943,51 @@ export class ExamService {
             }
         }
 
-        // 1. FAST PATH: Check Schedule / Pre-login (Vercel Edge meta first, zero questions payload)
+        // 1. FAST PATH: Check Schedule / Pre-login (Turso first, then Vercel Edge meta)
         if (studentId === 'check_schedule') {
+            if (!isPreview && isTursoClientConfigured()) {
+                try {
+                    const tursoMeta = await fetchTursoExamMeta(cleanCode);
+                    if (tursoMeta) {
+                        if (tursoMeta.status === 'closed') {
+                            return {
+                                code: cleanCode,
+                                config: { isFinished: true } as ExamConfig,
+                                questions: [],
+                                status: 'closed' as any,
+                                version: tursoMeta.version,
+                            };
+                        }
+                        const decrypted = await fetchAndDecryptTursoExamBundle(cleanCode, { isPreview: false });
+                        if (decrypted?.errorCode === 'EXAM_IS_DRAFT') {
+                            throw new Error("EXAM_IS_DRAFT");
+                        }
+                        if (decrypted?.bundle) {
+                            await offlineService.saveLocalProgress(`edge_bundle_${cleanCode}`, {
+                                version: decrypted.bundle.version,
+                                config: decrypted.bundle.config,
+                                questions: decrypted.bundle.questions,
+                                savedAt: Date.now(),
+                            });
+                            return {
+                                code: decrypted.bundle.code,
+                                authorId: decrypted.bundle.authorId,
+                                authorName: decrypted.bundle.authorName || 'Pengajar',
+                                authorSchool: decrypted.bundle.authorSchool,
+                                config: decrypted.bundle.config,
+                                questions: [],
+                                status: decrypted.bundle.status as 'DRAFT' | 'PUBLISHED',
+                                version: decrypted.bundle.version,
+                            };
+                        }
+                    }
+                } catch (tursoErr: any) {
+                    if (tursoErr?.message === 'EXAM_IS_DRAFT') {
+                        throw tursoErr;
+                    }
+                }
+            }
+
             const edgeMeta = await this.fetchEdgeMeta(cleanCode, isPreview);
             if (edgeMeta.errorCode === 'EXAM_IS_DRAFT' && !isPreview) {
                 throw new Error("EXAM_IS_DRAFT");
@@ -954,7 +1054,7 @@ export class ExamService {
             };
         }
 
-        // 2. Fetch exam metadata & allowed config directly from Vercel Edge first
+        // 2. Fetch exam metadata & allowed config (Turso first, then Vercel Edge, then Supabase)
         let metaData: {
             code: string;
             authorId?: string;
@@ -964,44 +1064,104 @@ export class ExamService {
             status: 'DRAFT' | 'PUBLISHED';
             version: number;
         } | null = null;
+        let preloadedTursoQuestions: Question[] | null = null;
 
-        const edgeMeta = await this.fetchEdgeMeta(cleanCode, isPreview);
-        if (edgeMeta.errorCode === 'EXAM_IS_DRAFT' && !isPreview) {
-            throw new Error("EXAM_IS_DRAFT");
-        }
-        if (edgeMeta.ok && edgeMeta.data) {
-            metaData = {
-                code: edgeMeta.data.code,
-                authorId: edgeMeta.data.authorId,
-                authorName: edgeMeta.data.authorName || 'Pengajar',
-                authorSchool: edgeMeta.data.authorSchool,
-                config: edgeMeta.data.config,
-                status: edgeMeta.data.status as 'DRAFT' | 'PUBLISHED',
-                version: edgeMeta.data.version
-            };
-        } else {
-            // Fallback: Query safe metadata columns from Supabase if Edge meta did not succeed
+        if (!isPreview && isTursoClientConfigured()) {
             try {
-                const metaRes = await supabase
-                    .from('exams')
-                    .select('code, author_id, school, config, status, created_at')
-                    .eq('code', cleanCode)
-                    .maybeSingle();
+                const tursoMeta = await fetchTursoExamMeta(cleanCode);
+                if (tursoMeta && tursoMeta.status !== 'closed') {
+                    const localCached = await offlineService.getLocalProgress(`edge_bundle_${cleanCode}`) as {
+                        version?: number;
+                        config?: ExamConfig;
+                        questions?: Question[];
+                    } | null;
 
-                if (!metaRes.error && metaRes.data) {
-                    metaData = {
-                        code: metaRes.data.code,
-                        authorId: metaRes.data.author_id,
-                        authorName: (metaRes.data.config as any)?.authorName || 'Pengajar',
-                        authorSchool: metaRes.data.school,
-                        config: this.sanitizeConfigForStudent(metaRes.data.config, metaRes.data.status),
-                        status: metaRes.data.status,
-                        version: (metaRes.data.config && typeof (metaRes.data.config as any).version === 'number')
-                            ? (metaRes.data.config as any).version
-                            : 1,
-                    };
+                    if (
+                        localCached &&
+                        localCached.version === tursoMeta.version &&
+                        localCached.config &&
+                        Array.isArray(localCached.questions) &&
+                        localCached.questions.length > 0
+                    ) {
+                        metaData = {
+                            code: cleanCode,
+                            authorName: (localCached.config as any)?.authorName || 'Pengajar',
+                            config: localCached.config,
+                            status: tursoMeta.status as 'DRAFT' | 'PUBLISHED',
+                            version: tursoMeta.version,
+                        };
+                        preloadedTursoQuestions = localCached.questions;
+                    } else {
+                        const decrypted = await fetchAndDecryptTursoExamBundle(cleanCode, { isPreview: false });
+                        if (decrypted?.errorCode === 'EXAM_IS_DRAFT') {
+                            throw new Error("EXAM_IS_DRAFT");
+                        }
+                        if (decrypted?.bundle) {
+                            metaData = {
+                                code: decrypted.bundle.code,
+                                authorId: decrypted.bundle.authorId,
+                                authorName: decrypted.bundle.authorName || 'Pengajar',
+                                authorSchool: decrypted.bundle.authorSchool,
+                                config: decrypted.bundle.config,
+                                status: decrypted.bundle.status as 'DRAFT' | 'PUBLISHED',
+                                version: decrypted.bundle.version,
+                            };
+                            preloadedTursoQuestions = decrypted.bundle.questions;
+                            await offlineService.saveLocalProgress(`edge_bundle_${cleanCode}`, {
+                                version: decrypted.bundle.version,
+                                config: decrypted.bundle.config,
+                                questions: decrypted.bundle.questions,
+                                savedAt: Date.now(),
+                            });
+                        }
+                    }
                 }
-            } catch { /* ignore */ }
+            } catch (tursoErr: any) {
+                if (tursoErr?.message === 'EXAM_IS_DRAFT') {
+                    throw tursoErr;
+                }
+            }
+        }
+
+        if (!metaData) {
+            const edgeMeta = await this.fetchEdgeMeta(cleanCode, isPreview);
+            if (edgeMeta.errorCode === 'EXAM_IS_DRAFT' && !isPreview) {
+                throw new Error("EXAM_IS_DRAFT");
+            }
+            if (edgeMeta.ok && edgeMeta.data) {
+                metaData = {
+                    code: edgeMeta.data.code,
+                    authorId: edgeMeta.data.authorId,
+                    authorName: edgeMeta.data.authorName || 'Pengajar',
+                    authorSchool: edgeMeta.data.authorSchool,
+                    config: edgeMeta.data.config,
+                    status: edgeMeta.data.status as 'DRAFT' | 'PUBLISHED',
+                    version: edgeMeta.data.version
+                };
+            } else {
+                // Fallback: Query safe metadata columns from Supabase if Edge meta did not succeed
+                try {
+                    const metaRes = await supabase
+                        .from('exams')
+                        .select('code, author_id, school, config, status, created_at')
+                        .eq('code', cleanCode)
+                        .maybeSingle();
+
+                    if (!metaRes.error && metaRes.data) {
+                        metaData = {
+                            code: metaRes.data.code,
+                            authorId: metaRes.data.author_id,
+                            authorName: (metaRes.data.config as any)?.authorName || 'Pengajar',
+                            authorSchool: metaRes.data.school,
+                            config: this.sanitizeConfigForStudent(metaRes.data.config, metaRes.data.status),
+                            status: metaRes.data.status,
+                            version: (metaRes.data.config && typeof (metaRes.data.config as any).version === 'number')
+                                ? (metaRes.data.config as any).version
+                                : 1,
+                        };
+                    }
+                } catch { /* ignore */ }
+            }
         }
 
         if (!metaData) {
@@ -1047,7 +1207,7 @@ export class ExamService {
         let loadedQuestions: Question[] = [];
         let resolvedConfig: ExamConfig = metaData.config;
 
-        // 3. Check IndexedDB local cache matching current version
+        // 3. Check preloaded Turso questions or IndexedDB local cache matching current version
         const localCacheKey = `edge_bundle_${cleanCode}`;
         const localCached = await offlineService.getLocalProgress(localCacheKey) as {
             version: number;
@@ -1055,15 +1215,36 @@ export class ExamService {
             questions: Question[];
         } | null;
 
-        if (localCached && localCached.version === examVersion && Array.isArray(localCached.questions) && localCached.questions.length > 0) {
+        if (Array.isArray(preloadedTursoQuestions) && preloadedTursoQuestions.length > 0) {
+            loadedQuestions = preloadedTursoQuestions;
+        } else if (localCached && localCached.version === examVersion && Array.isArray(localCached.questions) && localCached.questions.length > 0) {
             loadedQuestions = localCached.questions;
             if (!resolvedConfig && localCached.config) {
                 resolvedConfig = localCached.config;
             }
         } else {
-            // 4. Download complete student package (allowed config + stripped questions) directly from Vercel Edge CDN
-            try {
-                const response = await fetch(`/api/exam-content/${cleanCode}/test?v=${examVersion}&preview=${isPreview}`);
+            // 4. Download complete student package (Turso decrypted bundle first, then Vercel Edge CDN)
+            if (!isPreview && isTursoClientConfigured()) {
+                try {
+                    const decrypted = await fetchAndDecryptTursoExamBundle(cleanCode, { isPreview: false });
+                    if (decrypted?.bundle && Array.isArray(decrypted.bundle.questions) && decrypted.bundle.questions.length > 0) {
+                        loadedQuestions = decrypted.bundle.questions;
+                        if (decrypted.bundle.config) {
+                            resolvedConfig = decrypted.bundle.config;
+                        }
+                        await offlineService.saveLocalProgress(localCacheKey, {
+                            version: decrypted.bundle.version || examVersion,
+                            config: resolvedConfig,
+                            questions: loadedQuestions,
+                            savedAt: Date.now()
+                        });
+                    }
+                } catch { /* fall through to Vercel Edge */ }
+            }
+
+            if (loadedQuestions.length === 0) {
+                try {
+                    const response = await fetch(`/api/exam-content/${cleanCode}/test?v=${examVersion}&preview=${isPreview}`);
                 const contentType = response.headers.get('content-type') || '';
                 if (response.ok && contentType.includes('application/json')) {
                     const json = await response.json();
@@ -1079,9 +1260,10 @@ export class ExamService {
                             savedAt: Date.now()
                         });
                     }
+                    }
+                } catch (edgeErr) {
+                    console.warn("Edge CDN fetch error, checking fallback caches:", edgeErr);
                 }
-            } catch (edgeErr) {
-                console.warn("Edge CDN fetch error, checking fallback caches:", edgeErr);
             }
 
             // Fallback 1: Direct Supabase query ONLY if Edge failed (will gracefully no-op for restricted anon role)
@@ -1163,11 +1345,38 @@ export class ExamService {
     }
 
     /**
-     * Fetch latest sanitized question bundle for live mid-exam updates (Edge CDN + Supabase fallback)
+     * Fetch latest sanitized question bundle for live mid-exam updates (IndexedDB -> Turso -> Edge CDN -> Supabase)
      */
     async fetchLatestQuestionsBundleForStudent(code: string, version: number): Promise<Question[] | null> {
         const cleanCode = (code || '').trim().toUpperCase();
         if (!cleanCode) return null;
+
+        try {
+            const cached = await offlineService.getLocalProgress(`edge_bundle_${cleanCode}`) as {
+                version?: number;
+                questions?: Question[];
+            } | null;
+            if (cached && cached.version === version && Array.isArray(cached.questions) && cached.questions.length > 0) {
+                return cached.questions;
+            }
+        } catch { /* ignore */ }
+
+        if (isTursoClientConfigured()) {
+            try {
+                const decrypted = await fetchAndDecryptTursoExamBundle(cleanCode, { isPreview: false });
+                if (decrypted?.bundle && Array.isArray(decrypted.bundle.questions) && decrypted.bundle.questions.length > 0) {
+                    await offlineService.saveLocalProgress(`edge_bundle_${cleanCode}`, {
+                        version: decrypted.bundle.version || version,
+                        config: decrypted.bundle.config,
+                        questions: decrypted.bundle.questions,
+                        savedAt: Date.now(),
+                    });
+                    return decrypted.bundle.questions;
+                }
+            } catch {
+                /* fall through to Vercel Edge */
+            }
+        }
 
         try {
             const response = await fetch(`/api/exam-content/${cleanCode}/test?v=${version}`);
@@ -1331,11 +1540,20 @@ export class ExamService {
                 .subscribe()
             : null;
 
-        // 2. Normal Mode Fallback: Staggered Periodic Check (Vercel Edge meta first, <500 bytes, fallback Supabase)
+        // 2. Normal Mode Fallback: Staggered Periodic Check (Turso first -> Vercel Edge meta -> Supabase)
         const jitterMs = Math.floor(Math.random() * 20000) + 180000;
         const timerId = setInterval(async () => {
             if (!active) return;
             try {
+                if (isTursoClientConfigured()) {
+                    const tursoMeta = await fetchTursoExamMeta(cleanCode);
+                    if (tursoMeta && tursoMeta.version > currentVersion) {
+                        onUpdate(tursoMeta.version);
+                        return;
+                    }
+                    if (tursoMeta) return;
+                }
+
                 const edgeMeta = await this.fetchEdgeMeta(cleanCode, false);
                 if (edgeMeta.ok && edgeMeta.data) {
                     const ver = edgeMeta.data.version;
@@ -1387,7 +1605,40 @@ export class ExamService {
             return { config: offlineExam?.config || null, isNetworkError: true };
         }
         try {
-            // Primary: Read allowed exam config directly from Vercel Edge
+            // 1. Primary: Turso Read-Only encrypted bundle (0 Vercel polling cost, 0 Supabase egress)
+            if (isTursoClientConfigured()) {
+                const tursoMeta = await fetchTursoExamMeta(cleanCode);
+                if (tursoMeta) {
+                    if (tursoMeta.status === 'closed') {
+                        return { config: { isFinished: true } as ExamConfig, isNetworkError: false };
+                    }
+                    const localCached = await offlineService.getLocalProgress(`edge_bundle_${cleanCode}`) as {
+                        version?: number;
+                        config?: ExamConfig;
+                    } | null;
+                    if (localCached && localCached.version === tursoMeta.version && localCached.config) {
+                        return { config: localCached.config, isNetworkError: false };
+                    }
+                    const decrypted = await fetchAndDecryptTursoExamBundle(cleanCode, { isPreview: false });
+                    if (decrypted?.isClosed) {
+                        return { config: { isFinished: true } as ExamConfig, isNetworkError: false };
+                    }
+                    if (decrypted?.errorCode === 'EXAM_IS_DRAFT') {
+                        return { config: null, isNetworkError: false };
+                    }
+                    if (decrypted?.bundle?.config) {
+                        await offlineService.saveLocalProgress(`edge_bundle_${cleanCode}`, {
+                            version: decrypted.bundle.version,
+                            config: decrypted.bundle.config,
+                            questions: decrypted.bundle.questions,
+                            savedAt: Date.now(),
+                        });
+                        return { config: decrypted.bundle.config, isNetworkError: false };
+                    }
+                }
+            }
+
+            // 2. Fallback: Read allowed exam config from Vercel Edge
             const edgeMeta = await this.fetchEdgeMeta(cleanCode, false);
             if (edgeMeta.ok && edgeMeta.data?.config) {
                 const resolvedConfig: ExamConfig = edgeMeta.data.status === 'closed'
@@ -1527,22 +1778,46 @@ export class ExamService {
     }
 
     /**
-     * Push sanitized student-allowed exam bundle to Vercel Edge origin and prime CDN GET caches
+     * Public helper so ResultService (stopExamOverall / extendExamTime) can push updates or wipe Turso.
+     */
+    async syncExamToTurso(code: string, proctorToken?: string): Promise<void> {
+        await syncExamToTursoFromClient(code, proctorToken);
+    }
+
+    /**
+     * Push sanitized student-allowed exam bundle to Vercel Edge origin + encrypted Turso store
      * whenever a teacher publishes or updates a non-DRAFT exam.
      */
-    private async warmExamEdgeCache(examOrCode: Exam | string, version: number, status?: string): Promise<void> {
+    private async warmExamEdgeCache(
+        examOrCode: Exam | string,
+        version: number,
+        status?: string,
+        proctorToken?: string
+    ): Promise<void> {
         const cleanCode = (typeof examOrCode === 'string' ? examOrCode : examOrCode?.code || '').trim().toUpperCase();
-        if (!cleanCode || status === 'DRAFT') {
+        if (!cleanCode) {
             return;
         }
         try {
+            const tursoSyncPromise = syncExamToTursoFromClient(cleanCode, proctorToken);
+            if (status === 'DRAFT') {
+                await Promise.race([
+                    tursoSyncPromise,
+                    new Promise<void>((resolve) => setTimeout(resolve, 2500)),
+                ]);
+                return;
+            }
+
             const examBundle = typeof examOrCode === 'string' ? undefined : this.buildStudentEdgeBundle(examOrCode, version);
             const warmTask = (async () => {
-                await fetch(`/api/exam-content/${cleanCode}/warm?v=${version}`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(examBundle ? { code: cleanCode, examBundle } : { code: cleanCode }),
-                }).catch(() => {});
+                await Promise.allSettled([
+                    tursoSyncPromise,
+                    fetch(`/api/exam-content/${cleanCode}/warm?v=${version}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(examBundle ? { code: cleanCode, examBundle } : { code: cleanCode }),
+                    }),
+                ]);
 
                 await Promise.allSettled([
                     fetch(`/api/exam-content/${cleanCode}/meta?preview=false`, { method: 'GET' }),
@@ -1771,7 +2046,8 @@ export class ExamService {
             await this.warmExamEdgeCache(
                 { ...exam, config: nextConfig, questions: processedQuestions, status: resolvedStatus },
                 nextVersion,
-                resolvedStatus
+                resolvedStatus,
+                token
             );
             return;
         }
@@ -1783,6 +2059,9 @@ export class ExamService {
     async deleteExam(code: string): Promise<void> {
         const cleanCode = (code || '').trim().toUpperCase();
         if (!cleanCode) return;
+
+        // Delete from Turso BEFORE deleting from Supabase so server verifies exam ownership cleanly
+        await deleteExamFromTursoFromClient(cleanCode);
 
         this.removeLocalTeacherExam(cleanCode);
         await clearExamLocalCache(cleanCode);
