@@ -126,8 +126,8 @@ export const InvitationModal: React.FC<InvitationModalProps> = ({
           </div>
 
           <div className="px-5 pb-5 -mt-8 relative flex flex-col items-center text-center flex-1">
-            <div className="w-14 h-14 bg-white dark:bg-slate-800 rounded-2xl shadow-lg flex items-center justify-center text-indigo-600 dark:text-indigo-400 mb-2 ring-4 ring-white dark:ring-slate-900">
-              <LogoIcon className="w-7 h-7" />
+            <div className="w-14 h-14 p-1.5 bg-white dark:bg-slate-800 rounded-2xl shadow-lg flex items-center justify-center mb-2 ring-4 ring-white dark:ring-slate-900">
+              <LogoIcon className="w-full h-full" />
             </div>
 
             <h2 className="text-base font-black text-slate-900 dark:text-white tracking-tight leading-none">
@@ -469,8 +469,8 @@ export const InvitationModal: React.FC<InvitationModalProps> = ({
               {/* Left Panel: QR Code & Access Details (~38% width) */}
               <div className="w-[38%] p-5 lg:p-6 flex flex-col items-center justify-between bg-slate-50/70 dark:bg-slate-800/30 border-r border-slate-100 dark:border-slate-800 shrink-0">
                 {/* Brand Logo Header */}
-                <div className="flex items-center gap-1.5 opacity-80 mb-2">
-                  <LogoIcon className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+                <div className="flex items-center gap-2 mb-2">
+                  <LogoIcon className="w-6 h-6 shrink-0" />
                   <span className="font-black text-xs text-slate-700 dark:text-slate-300 tracking-tight">
                     UjianCerdas
                   </span>

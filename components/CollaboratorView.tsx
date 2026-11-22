@@ -120,8 +120,8 @@ export const CollaboratorView: React.FC<CollaboratorViewProps> = ({
       <header className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-slate-100 dark:border-slate-800 sticky top-0 z-40">
         <div className="w-full max-w-full mx-auto px-6 py-4 flex justify-between items-center">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-indigo-50 dark:bg-indigo-900/30 rounded-lg">
-              <LogoIcon className="w-6 h-6 text-indigo-600 dark:text-indigo-400" />
+            <div className="p-1 bg-white dark:bg-slate-800 rounded-xl shadow-xs border border-slate-100 dark:border-slate-700">
+              <LogoIcon className="w-8 h-8" />
             </div>
             <div>
               <h1 className="font-bold text-slate-900 dark:text-white">

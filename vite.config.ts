@@ -4,103 +4,10 @@ import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 import fs from 'node:fs';
 import path from 'node:path';
-import zlib from 'node:zlib';
-
-function createCrc32Table(): Uint32Array {
-  const table = new Uint32Array(256);
-  for (let i = 0; i < 256; i++) {
-    let c = i;
-    for (let k = 0; k < 8; k++) {
-      c = (c & 1) ? (0xedb88320 ^ (c >>> 1)) : (c >>> 1);
-    }
-    table[i] = c >>> 0;
-  }
-  return table;
-}
-
-const CRC_TABLE = createCrc32Table();
-
-function crc32(buf: Buffer): number {
-  let c = 0xffffffff;
-  for (let i = 0; i < buf.length; i++) {
-    c = CRC_TABLE[(c ^ buf[i]) & 0xff] ^ (c >>> 8);
-  }
-  return (c ^ 0xffffffff) >>> 0;
-}
-
-function pngChunk(type: string, data: Buffer): Buffer {
-  const typeBuf = Buffer.from(type, 'ascii');
-  const lenBuf = Buffer.alloc(4);
-  lenBuf.writeUInt32BE(data.length, 0);
-  const crcBuf = Buffer.alloc(4);
-  crcBuf.writeUInt32BE(crc32(Buffer.concat([typeBuf, data])), 0);
-  return Buffer.concat([lenBuf, typeBuf, data, crcBuf]);
-}
-
-function generateBrandIconPng(size: number, maskable = false): Buffer {
-  const raw = Buffer.alloc(size * (1 + size * 4));
-  const padScale = maskable ? 0.72 : 0.88;
-
-  for (let y = 0; y < size; y++) {
-    const rowStart = y * (1 + size * 4);
-    raw[rowStart] = 0;
-    for (let x = 0; x < size; x++) {
-      const t = (x + y) / (2 * size);
-      let r = Math.round(79 + (55 - 79) * t);   // #4F46E5 -> #3730A3
-      let g = Math.round(70 + (48 - 70) * t);
-      let b = Math.round(229 + (163 - 229) * t);
-      const a = 255;
-
-      // Normalized coords [-1, 1] scaled for safe zone
-      const nx = ((x / (size - 1)) * 2 - 1) / padScale;
-      const ny = ((y / (size - 1)) * 2 - 1) / padScale;
-
-      // White graduation cap diamond top
-      const inDiamond = Math.abs(nx) / 0.72 + Math.abs(ny + 0.14) / 0.34 <= 1;
-      // Cap base
-      const inBase =
-        Math.abs(nx) <= 0.42 &&
-        ny >= 0.08 &&
-        ny <= 0.42 &&
-        Math.abs(nx) <= 0.42 - (ny - 0.08) * 0.18;
-      // Gold tassel line & dot
-      const inTassel =
-        (Math.abs(nx - 0.56) <= 0.04 && ny >= -0.05 && ny <= 0.42) ||
-        ((nx - 0.56) ** 2 + (ny - 0.46) ** 2 <= 0.07 ** 2);
-
-      if (inDiamond) {
-        r = 255; g = 255; b = 255;
-      } else if (inBase) {
-        r = 224; g = 231; b = 255;
-      } else if (inTassel) {
-        r = 250; g = 204; b = 21;
-      }
-
-      const px = rowStart + 1 + x * 4;
-      raw[px] = r;
-      raw[px + 1] = g;
-      raw[px + 2] = b;
-      raw[px + 3] = a;
-    }
-  }
-
-  const ihdr = Buffer.alloc(13);
-  ihdr.writeUInt32BE(size, 0);
-  ihdr.writeUInt32BE(size, 4);
-  ihdr[8] = 8; // bit depth
-  ihdr[9] = 6; // RGBA
-  ihdr[10] = 0;
-  ihdr[11] = 0;
-  ihdr[12] = 0;
-
-  const compressed = zlib.deflateSync(raw);
-  return Buffer.concat([
-    Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]),
-    pngChunk('IHDR', ihdr),
-    pngChunk('IDAT', compressed),
-    pngChunk('IEND', Buffer.alloc(0)),
-  ]);
-}
+import {
+  generateBrandIconPng,
+  generateBrandFaviconIco,
+} from './scripts/brandIconRasterizer.mjs';
 
 function ensurePwaIconsPlugin(): Plugin {
   const ensureIcons = (targetDir: string) => {
@@ -119,6 +26,10 @@ function ensurePwaIconsPlugin(): Plugin {
       if (!fs.existsSync(fullPath)) {
         fs.writeFileSync(fullPath, generateBrandIconPng(icon.size, icon.maskable));
       }
+    }
+    const icoPath = path.join(targetDir, 'favicon.ico');
+    if (!fs.existsSync(icoPath)) {
+      fs.writeFileSync(icoPath, generateBrandFaviconIco());
     }
   };
 

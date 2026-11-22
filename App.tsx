@@ -1359,8 +1359,8 @@ const App: React.FC = () => {
                 {/* Alur Konten Utama: Jarak atas dihitung langsung dari batas atas layar ke ikon UjianCerdas */}
                 <main className="flex-1 w-full max-w-sm mx-auto px-4 sm:px-6 flex flex-col items-center justify-center pt-6 sm:pt-8 md:pt-10 z-10 min-h-0">
                     <div className="text-center mb-5 sm:mb-6 shrink-0">
-                        <div className="inline-flex p-3 sm:p-3.5 bg-white dark:bg-slate-800 rounded-2xl shadow-sm mb-2.5 sm:mb-3 border border-slate-50 dark:border-slate-700 ring-1 ring-slate-100 dark:ring-slate-800">
-                            <LogoIcon className="w-8 h-8 sm:w-10 sm:h-10 text-indigo-600 dark:text-indigo-400" />
+                        <div className="inline-flex p-1.5 bg-white dark:bg-slate-800 rounded-[20px] shadow-md mb-2.5 sm:mb-3 border border-slate-100 dark:border-slate-700 ring-1 ring-slate-100/80 dark:ring-slate-800">
+                            <LogoIcon className="w-11 h-11 sm:w-12 sm:h-12" />
                         </div>
                         
                         <h1 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white tracking-tight mb-1 sm:mb-1.5">
