@@ -18,6 +18,7 @@ import {
 import { DailySessionsSettings } from "./DailySessionsSettings";
 import {
   detectUserIndonesianTimezone,
+  formatForDateInput,
   getTimezoneLabel,
 } from "../../../../../utils/timezoneUtils";
 import { showAlertModal } from "../../../../../stores/feedbackStore";
@@ -434,11 +435,7 @@ export const ExamConfigSettings: React.FC<ExamConfigSettingsProps> = ({
                 id="input-pr-end-date"
                 type="date"
                 name="endDate"
-                value={
-                  config.endDate ||
-                  config.date ||
-                  new Date().toLocaleDateString("en-CA")
-                }
+                value={formatForDateInput(config.endDate || config.date)}
                 onChange={handleConfigChange}
                 className="w-full p-3 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary text-sm font-medium shadow-sm text-slate-800 dark:text-slate-200"
               />
@@ -489,11 +486,7 @@ export const ExamConfigSettings: React.FC<ExamConfigSettingsProps> = ({
                 id="input-exam-start-date"
                 type="date"
                 name="startDate"
-                value={
-                  config.startDate ||
-                  config.date ||
-                  new Date().toLocaleDateString("en-CA")
-                }
+                value={formatForDateInput(config.startDate || config.date)}
                 onChange={handleConfigChange}
                 className="w-full p-3 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary text-sm font-medium shadow-sm text-slate-800 dark:text-slate-200"
               />
@@ -522,11 +515,7 @@ export const ExamConfigSettings: React.FC<ExamConfigSettingsProps> = ({
                 id="input-exam-end-date"
                 type="date"
                 name="endDate"
-                value={
-                  config.endDate ||
-                  config.date ||
-                  new Date().toLocaleDateString("en-CA")
-                }
+                value={formatForDateInput(config.endDate || config.date)}
                 onChange={handleConfigChange}
                 className="w-full p-3 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary text-sm font-medium shadow-sm text-slate-800 dark:text-slate-200"
               />
