@@ -288,13 +288,13 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
         </div>
       </div>
 
-      <div className="pt-10">
-        <div className="p-4 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl shadow-sm mb-6">
-          <h2 className="text-xl font-bold text-neutral dark:text-white">
+      <div className="pt-8">
+        <div className="px-4 py-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-2xs mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1">
+          <h2 className="text-base sm:text-lg font-bold text-slate-800 dark:text-white">
             {isEditing ? "2. Konfigurasi" : "4. Konfigurasi"}
           </h2>
-          <p className="text-sm text-gray-500 dark:text-slate-400 mt-1">
-            Pengaturan waktu dan keamanan ujian.
+          <p className="text-xs text-slate-500 dark:text-slate-400">
+            Pengaturan target, jadwal, keamanan, dan sistem penilaian.
           </p>
         </div>
 
@@ -309,14 +309,14 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
         />
       </div>
 
-      <div className="text-center pt-10 pb-20">
+      <div className="text-center pt-6 pb-14">
         {isEditing ? (
-          <div className="flex flex-col sm:flex-row justify-center items-center gap-4 w-full sm:w-auto px-4 sm:px-0">
+          <div className="flex flex-col sm:flex-row justify-center items-center gap-2.5 w-full sm:w-auto px-4 sm:px-0">
             <button
               type="button"
               disabled={isSaving}
               onClick={onCancel}
-              className="w-full sm:w-auto bg-white dark:bg-slate-800 text-gray-700 dark:text-slate-300 border border-gray-300 dark:border-slate-600 font-bold py-4 px-10 rounded-2xl hover:bg-gray-50 dark:hover:bg-slate-700 transition-all shadow-sm active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full sm:w-auto bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-600 text-xs sm:text-sm font-bold py-2.5 px-5 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors shadow-2xs active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap cursor-pointer"
             >
               Batal
             </button>
@@ -325,16 +325,17 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
                 type="button"
                 disabled={isSaving}
                 onClick={onSaveDraft}
-                className="w-full sm:w-auto bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-600 font-bold py-4 px-10 rounded-2xl hover:bg-slate-200 dark:hover:bg-slate-600 transition-all shadow-sm flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full sm:w-auto bg-slate-50 dark:bg-slate-700/70 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-600 text-xs sm:text-sm font-bold py-2.5 px-5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors shadow-2xs flex items-center justify-center gap-1.5 active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap cursor-pointer"
               >
                 {isSaving ? (
                   <>
-                    <div className="w-5 h-5 border-2 border-slate-400 border-t-transparent rounded-full animate-spin" />
+                    <div className="w-4 h-4 border-2 border-slate-400 border-t-transparent rounded-full animate-spin" />
                     <span>Menyimpan...</span>
                   </>
                 ) : (
                   <>
-                    <PencilIcon className="w-5 h-5" /> Perbarui Draf
+                    <PencilIcon className="w-4 h-4 text-slate-500 dark:text-slate-300" />
+                    <span>Perbarui Draf</span>
                   </>
                 )}
               </button>
@@ -343,11 +344,11 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
               type="button"
               disabled={isSaving}
               onClick={onSave}
-              className="w-full sm:w-auto bg-primary dark:bg-indigo-600 text-white font-bold py-4 px-14 rounded-2xl hover:bg-primary-focus dark:hover:bg-indigo-700 transition-all shadow-xl shadow-indigo-100 dark:shadow-indigo-900/30 transform hover:-translate-y-1 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              className="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-700 text-white text-xs sm:text-sm font-bold py-2.5 px-6 rounded-xl transition-colors shadow-sm active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1.5 whitespace-nowrap cursor-pointer"
             >
               {isSaving ? (
                 <>
-                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                   <span>Menyimpan Perubahan...</span>
                 </>
               ) : (
@@ -357,22 +358,23 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
           </div>
         ) : (
           <>
-            <div className="flex flex-col sm:flex-row justify-center gap-4 items-center">
+            <div className="flex flex-col sm:flex-row justify-center gap-2.5 items-center">
               {onSaveDraft && (
                 <button
                   type="button"
                   disabled={isSaving}
                   onClick={onSaveDraft}
-                  className="w-full sm:w-auto bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-2 border-slate-100 dark:border-slate-700 font-bold py-4 px-10 rounded-2xl hover:bg-slate-50 dark:hover:bg-slate-700 transition-all flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full sm:w-auto bg-slate-50 dark:bg-slate-700/70 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-600 text-xs sm:text-sm font-bold py-2.5 px-5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors shadow-2xs flex items-center justify-center gap-1.5 active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap cursor-pointer"
                 >
                   {isSaving ? (
                     <>
-                      <div className="w-5 h-5 border-2 border-slate-400 border-t-transparent rounded-full animate-spin" />
+                      <div className="w-4 h-4 border-2 border-slate-400 border-t-transparent rounded-full animate-spin" />
                       <span>Menyimpan Draf...</span>
                     </>
                   ) : (
                     <>
-                      <PencilIcon className="w-5 h-5" /> Simpan Draf
+                      <PencilIcon className="w-4 h-4 text-slate-500 dark:text-slate-300" />
+                      <span>Simpan Draf</span>
                     </>
                   )}
                 </button>
@@ -381,16 +383,17 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
                 type="button"
                 disabled={isSaving}
                 onClick={onSave}
-                className="w-full sm:w-auto bg-emerald-600 text-white font-bold py-4 px-14 rounded-2xl hover:bg-emerald-700 transition-all shadow-xl shadow-emerald-100 dark:shadow-emerald-900/30 transform hover:-translate-y-1 flex items-center justify-center gap-3 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white text-xs sm:text-sm font-bold py-2.5 px-6 rounded-xl transition-colors shadow-sm flex items-center justify-center gap-1.5 active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap cursor-pointer"
               >
                 {isSaving ? (
                   <>
-                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                     <span>Mempublikasikan...</span>
                   </>
                 ) : (
                   <>
-                    <CheckCircleIcon className="w-6 h-6" /> Publikasikan Sekarang
+                    <CheckCircleIcon className="w-4 h-4" />
+                    <span>Publikasikan Sekarang</span>
                   </>
                 )}
               </button>
