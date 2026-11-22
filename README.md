@@ -1,4 +1,4 @@
 # UjianCerdas CDN Assets
 
 Branch otomatis untuk melayani file statis aplikasi (`dist/assets/*`) melalui jsDelivr CDN.
-Tag terbaru: `cdn-7e070b3339fc` (dari commit `7e070b3339fc5085b0092b805716a31148adef3d`).
+Tag terbaru: `cdn-e6df3aba8ee9` (dari commit `e6df3aba8ee9bee2acb92539aa22a6680ca09876`).
