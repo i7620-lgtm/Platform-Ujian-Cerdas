@@ -51,10 +51,12 @@ jobs:
 
           WORK_DIR="$(mktemp -d)"
           cp -R dist "${WORK_DIR}/dist"
+          rm -rf dist
+          git reset --hard HEAD
 
           if git ls-remote --exit-code --heads origin cdn-assets >/dev/null 2>&1; then
             git fetch origin cdn-assets --depth=1
-            git checkout -B cdn-assets origin/cdn-assets
+            git checkout -f -B cdn-assets origin/cdn-assets
           else
             git checkout --orphan cdn-assets
           fi
@@ -77,8 +79,10 @@ jobs:
           EOF
 
           git add -A
-          git commit -m "chore(cdn): publish ${CDN_TAG} from ${SHORT_SHA}"
-          git push origin cdn-assets
+          if ! git diff --cached --quiet; then
+            git commit -m "chore(cdn): publish ${CDN_TAG} from ${SHORT_SHA}"
+            git push origin cdn-assets
+          fi
           git tag -f "${CDN_TAG}"
           git push -f origin "refs/tags/${CDN_TAG}"
 
@@ -125,3 +129,4 @@ jobs:
               process.exit(1);
             });
           '
+ 
