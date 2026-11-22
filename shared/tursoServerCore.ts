@@ -1,4 +1,10 @@
-import { getExamMetaBundle, getServerSupabase, storeWarmBundleInMemory, type ExamContentHttpResult } from './examContentCore';
+import {
+  getExamMetaBundle,
+  getServerSupabase,
+  getUserScopedSupabase,
+  storeWarmBundleInMemory,
+  type ExamContentHttpResult,
+} from './examContentCore';
 import {
   buildTursoSafeBundle,
   deriveTursoExamKeyBase64Url,
@@ -13,6 +19,7 @@ export interface TursoSqlArg {
 export interface TursoDiagnostics {
   readyForServerSync: boolean;
   readyForClientConfig: boolean;
+  hasSupabaseServiceRole: boolean;
   hasServerUrl: boolean;
   hasServerAuthToken: boolean;
   serverAuthTokenRole: 'rw' | 'ro' | 'invalid' | 'missing';
@@ -116,7 +123,8 @@ async function executeTursoPipeline(
   });
 
   if (!response.ok) {
-    throw new Error(`Turso HTTP error ${response.status}`);
+    const errText = await response.text().catch(() => '');
+    throw new Error(`Turso HTTP error ${response.status}${errText ? `: ${errText.slice(0, 200)}` : ''}`);
   }
 
   const data = (await response.json()) as {
@@ -165,11 +173,13 @@ export async function getTursoServerDiagnostics(options?: { ping?: boolean }): P
 
   const serverAuthTokenRole = inspectTursoJwtRole(cfg.authToken);
   const clientReadTokenRole = inspectTursoJwtRole(clientReadToken);
+  const { isServiceRole } = getServerSupabase();
 
   const diag: TursoDiagnostics = {
     readyForServerSync:
       cfg.isSyncConfigured && serverAuthTokenRole === 'rw' && cfg.examSecret.length >= 16,
     readyForClientConfig: Boolean(clientUrl && clientReadToken && clientReadTokenRole === 'ro'),
+    hasSupabaseServiceRole: isServiceRole,
     hasServerUrl: Boolean(cfg.url),
     hasServerAuthToken: Boolean(cfg.authToken),
     serverAuthTokenRole,
@@ -194,25 +204,64 @@ export async function getTursoServerDiagnostics(options?: { ping?: boolean }): P
   return diag;
 }
 
-async function fetchAuthoritativeExamRow(code: string) {
+async function fetchAuthoritativeExamRow(code: string, bearerToken?: string) {
   const { primaryDb, fallbackDb, isServiceRole } = getServerSupabase();
-  let { data, error } = await primaryDb
-    .from('exams')
-    .select('code, author_id, school, config, questions, status')
-    .eq('code', code)
-    .maybeSingle();
+  let metadataOnly = false;
+  let dbForAuth = primaryDb;
 
-  if (error && isServiceRole) {
-    const retry = await fallbackDb
+  // 1. If service_role is active, read full row including questions directly
+  if (isServiceRole) {
+    const res = await primaryDb
       .from('exams')
       .select('code, author_id, school, config, questions, status')
       .eq('code', code)
       .maybeSingle();
-    data = retry.data;
-    error = retry.error;
+    if (!res.error && res.data) {
+      return { data: res.data, error: null, primaryDb, metadataOnly: false };
+    }
   }
 
-  return { data, error, primaryDb };
+  // 2. If teacher JWT is provided (and no service_role or service_role missed), query via user-scoped client
+  // so Supabase RLS ("Authenticated authors can manage own exams") grants SELECT on `questions`.
+  const userDb = getUserScopedSupabase(bearerToken);
+  if (userDb) {
+    dbForAuth = userDb;
+    const userRes = await userDb
+      .from('exams')
+      .select('code, author_id, school, config, questions, status')
+      .eq('code', code)
+      .maybeSingle();
+    if (!userRes.error && userRes.data) {
+      return { data: userRes.data, error: null, primaryDb: userDb, metadataOnly: false };
+    }
+  }
+
+  // 3. Fallback: try anon full select (if permissive RLS) then safe metadata-only columns (if column-level RLS revokes `questions`)
+  const anonFull = await fallbackDb
+    .from('exams')
+    .select('code, author_id, school, config, questions, status')
+    .eq('code', code)
+    .maybeSingle();
+  if (!anonFull.error && anonFull.data) {
+    return { data: anonFull.data, error: null, primaryDb: dbForAuth, metadataOnly: false };
+  }
+
+  const metaRes = await (userDb || fallbackDb)
+    .from('exams')
+    .select('code, author_id, school, config, status')
+    .eq('code', code)
+    .maybeSingle();
+  if (!metaRes.error && metaRes.data) {
+    metadataOnly = true;
+    return {
+      data: { ...metaRes.data, questions: null as any },
+      error: null,
+      primaryDb: dbForAuth,
+      metadataOnly,
+    };
+  }
+
+  return { data: null, error: metaRes.error || anonFull.error, primaryDb: dbForAuth, metadataOnly: false };
 }
 
 async function verifyTeacherWriteAccess(params: {
@@ -220,10 +269,13 @@ async function verifyTeacherWriteAccess(params: {
   bearerToken?: string;
   proctorToken?: string;
 }): Promise<
-  | { ok: true; examRow: Record<string, any> }
+  | { ok: true; examRow: Record<string, any>; metadataOnly: boolean }
   | { ok: false; status: number; error: string }
 > {
-  const { data: examRow, error, primaryDb } = await fetchAuthoritativeExamRow(params.code);
+  const { data: examRow, error, primaryDb, metadataOnly } = await fetchAuthoritativeExamRow(
+    params.code,
+    params.bearerToken
+  );
   if (error || !examRow) {
     return { ok: false, status: 404, error: 'EXAM_NOT_FOUND' };
   }
@@ -238,7 +290,7 @@ async function verifyTeacherWriteAccess(params: {
       (c: any) => c?.token === proctorToken && c?.role === 'editor'
     );
     if (isEditorCollab) {
-      return { ok: true, examRow };
+      return { ok: true, examRow, metadataOnly };
     }
   }
 
@@ -255,7 +307,7 @@ async function verifyTeacherWriteAccess(params: {
 
     const userId = userData.user.id;
     if (examRow.author_id && examRow.author_id === userId) {
-      return { ok: true, examRow };
+      return { ok: true, examRow, metadataOnly };
     }
 
     const { data: profile } = await primaryDb
@@ -265,7 +317,7 @@ async function verifyTeacherWriteAccess(params: {
       .maybeSingle();
 
     if (profile?.role === 'super_admin') {
-      return { ok: true, examRow };
+      return { ok: true, examRow, metadataOnly };
     }
 
     if (
@@ -274,7 +326,7 @@ async function verifyTeacherWriteAccess(params: {
       examRow.school &&
       String(profile.school).trim().toLowerCase() === String(examRow.school).trim().toLowerCase()
     ) {
-      return { ok: true, examRow };
+      return { ok: true, examRow, metadataOnly };
     }
 
     return { ok: false, status: 403, error: 'FORBIDDEN_NOT_EXAM_OWNER' };
@@ -287,6 +339,7 @@ export async function handleExamTursoSyncRequest(params: {
   code: string;
   bearerToken?: string;
   proctorToken?: string;
+  fallbackBundle?: { config?: any; questions?: any[]; status?: string; version?: number };
 }): Promise<ExamContentHttpResult> {
   const code = String(params.code || '').trim().toUpperCase();
   const headers: Record<string, string> = {
@@ -314,6 +367,26 @@ export async function handleExamTursoSyncRequest(params: {
   const isClosed = examRow.status === 'closed' || Boolean(rawConfig.isFinished);
   const isDraft = examRow.status === 'DRAFT';
 
+  const authoritativeQuestions = Array.isArray(examRow.questions)
+    ? examRow.questions
+    : auth.metadataOnly && Array.isArray(params.fallbackBundle?.questions)
+      ? params.fallbackBundle.questions
+      : null;
+
+  if (!isDraft && !isClosed && !authoritativeQuestions) {
+    return {
+      status: 503,
+      headers,
+      body: {
+        success: false,
+        tursoSynced: false,
+        error: 'EXAM_QUESTIONS_UNREADABLE_CHECK_SERVICE_ROLE_KEY',
+      },
+    };
+  }
+
+  const resolvedQuestions = authoritativeQuestions || [];
+
   // Keep in-memory Edge bundle synchronized as fallback
   if (!isDraft) {
     storeWarmBundleInMemory(code, {
@@ -324,7 +397,7 @@ export async function handleExamTursoSyncRequest(params: {
       status: isClosed ? 'closed' : examRow.status || 'PUBLISHED',
       version,
       config: rawConfig,
-      questions: Array.isArray(examRow.questions) ? examRow.questions : [],
+      questions: resolvedQuestions,
     });
   }
 
@@ -385,7 +458,7 @@ export async function handleExamTursoSyncRequest(params: {
       status: 'PUBLISHED',
       version,
       config: rawConfig,
-      questions: Array.isArray(examRow.questions) ? examRow.questions : [],
+      questions: resolvedQuestions,
     });
 
     const encryptedPayload = encryptTursoBundlePayload(tursoCfg.examSecret, code, safeBundle);
@@ -537,6 +610,9 @@ export async function handleExamKeyRequest(params: {
   }
 
   const examKey = deriveTursoExamKeyBase64Url(tursoCfg.examSecret, code);
+  const rawClientReadToken = String(process.env.VITE_TURSO_READ_TOKEN || '').trim();
+  const safeClientReadToken =
+    inspectTursoJwtRole(rawClientReadToken) === 'ro' ? rawClientReadToken : undefined;
   return {
     status: 200,
     headers,
@@ -547,6 +623,7 @@ export async function handleExamKeyRequest(params: {
       version: meta.version,
       examKey,
       tursoUrl: tursoCfg.url,
+      ...(safeClientReadToken ? { tursoReadToken: safeClientReadToken } : {}),
       tursoEnabled: true,
     },
   };
