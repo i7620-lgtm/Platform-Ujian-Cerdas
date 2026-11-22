@@ -27,36 +27,19 @@ import { findLocalCompletedStudent, saveLocalCompletedStudent } from './utils/st
 import { FeedbackHost } from './components/FeedbackHost';
 import { showAlertModal, showConfirmModal, showToast } from './stores/feedbackStore';
 import { PWAInstallButton } from './components/PWAInstallButton';
-
-function lazyWithRetry<T extends React.ComponentType<any>>(
-  componentImport: () => Promise<{ default: T }>
-): React.LazyExoticComponent<T> {
-  return React.lazy(async () => {
-    try {
-      return await componentImport();
-    } catch (error) {
-      console.error("Gagal memuat komponen dinamis, memuat ulang halaman...", error);
-      const isChunkLoadFailed = 
-        error instanceof TypeError ||
-        (error as any)?.name === "ChunkLoadError" ||
-        /Failed to fetch dynamically imported module|chunk/i.test(String(error));
-        
-      if (isChunkLoadFailed) {
-        const lastReload = sessionStorage.getItem("last-chunk-reload-app");
-        const now = Date.now();
-        if (!lastReload || now - parseInt(lastReload, 10) > 10000) {
-          sessionStorage.setItem("last-chunk-reload-app", String(now));
-          window.location.reload();
-          return new Promise(() => {});
-        }
-      }
-      throw error;
-    }
-  });
-}
+import {
+  lazyWithRetry,
+  purgeScriptCachesOnly,
+  performCacheBustedReload,
+  PENDING_PWA_REFRESH_KEY,
+  EXAM_IN_PROGRESS_KEY,
+} from './utils/cdnFallback';
 
 // Lazy Load Teacher Dashboard agar siswa tidak perlu mendownload kodenya
-const TeacherDashboard = lazyWithRetry(() => import('./components/TeacherDashboard').then(module => ({ default: module.TeacherDashboard })));
+const TeacherDashboard = lazyWithRetry(
+  () => import('./components/TeacherDashboard').then(module => ({ default: module.TeacherDashboard })),
+  'app'
+);
 
 type View = 'SELECTOR' | 'TEACHER_LOGIN' | 'STUDENT_LOGIN' | 'TEACHER_DASHBOARD' | 'STUDENT_EXAM' | 'STUDENT_RESULT' | 'LIVE_MONITOR' | 'TERMS' | 'PRIVACY' | 'TUTORIAL' | 'WAITING_ROOM' | 'COLLABORATOR_MODE' | 'RESULT_NOT_FOUND';
 
@@ -146,17 +129,23 @@ const App: React.FC = () => {
     }
   }, [darkMode]);
 
-  // Track active exam session for safe PWA updates
+  // Track active exam session for safe PWA & jsDelivr updates
   useEffect(() => {
     try {
       if (typeof window !== 'undefined' && typeof sessionStorage !== 'undefined') {
         if (view === 'STUDENT_EXAM') {
-          sessionStorage.setItem('is_exam_in_progress', 'true');
+          sessionStorage.setItem(EXAM_IN_PROGRESS_KEY, 'true');
         } else {
-          sessionStorage.removeItem('is_exam_in_progress');
-          if (sessionStorage.getItem('pending_pwa_refresh') === 'true') {
-            sessionStorage.removeItem('pending_pwa_refresh');
-            window.location.reload();
+          sessionStorage.removeItem(EXAM_IN_PROGRESS_KEY);
+          if (
+            view !== 'STUDENT_RESULT' &&
+            sessionStorage.getItem(PENDING_PWA_REFRESH_KEY) === 'true'
+          ) {
+            sessionStorage.removeItem(PENDING_PWA_REFRESH_KEY);
+            void (async () => {
+              await purgeScriptCachesOnly();
+              performCacheBustedReload();
+            })();
           }
         }
       }
