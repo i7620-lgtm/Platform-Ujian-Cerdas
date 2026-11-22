@@ -95,6 +95,194 @@
 </head>
   <body class="bg-[#FAFAFA] dark:bg-slate-900 font-sans text-slate-900 dark:text-slate-100 antialiased selection:bg-indigo-100 selection:text-indigo-700 transition-colors duration-300">
     <div id="root"></div>
+    <script>
+      (function () {
+        var ATTEMPT_KEY = 'ujiancerdas_cdn_recovery_attempts';
+        var MAX_AUTO_ATTEMPTS = 2;
+        var WINDOW_MS = 60000;
+        var WATCHDOG_MS = 6000;
+        var recovering = false;
+
+        function isRootMounted() {
+          if (window.__APP_MOUNTED__) return true;
+          var rootEl = document.getElementById('root');
+          return Boolean(rootEl && rootEl.childElementCount > 0);
+        }
+
+        function readAttempts() {
+          try {
+            var raw = sessionStorage.getItem(ATTEMPT_KEY);
+            if (!raw) return { count: 0, ts: Date.now() };
+            var parsed = JSON.parse(raw);
+            var now = Date.now();
+            if (!parsed || typeof parsed.ts !== 'number' || now - parsed.ts > WINDOW_MS) {
+              return { count: 0, ts: now };
+            }
+            return {
+              count: typeof parsed.count === 'number' ? parsed.count : 0,
+              ts: parsed.ts
+            };
+          } catch (e) {
+            return { count: 0, ts: Date.now() };
+          }
+        }
+
+        function recordAttempt() {
+          var state = readAttempts();
+          var next = {
+            count: state.count + 1,
+            ts: state.count === 0 ? Date.now() : state.ts
+          };
+          try {
+            sessionStorage.setItem(ATTEMPT_KEY, JSON.stringify(next));
+          } catch (e) {}
+          return next.count;
+        }
+
+        function purgeScriptCachesOnly() {
+          var tasks = [];
+          try {
+            if (navigator.serviceWorker && navigator.serviceWorker.getRegistrations) {
+              tasks.push(
+                navigator.serviceWorker.getRegistrations().then(function (regs) {
+                  return Promise.all(regs.map(function (reg) {
+                    return reg.unregister().catch(function () { return false; });
+                  }));
+                }).catch(function () {})
+              );
+            }
+          } catch (e) {}
+
+          try {
+            if (window.caches && window.caches.keys) {
+              tasks.push(
+                window.caches.keys().then(function (keys) {
+                  return Promise.all(keys.map(function (key) {
+                    return window.caches.delete(key).catch(function () { return false; });
+                  }));
+                }).catch(function () {})
+              );
+            }
+          } catch (e) {}
+
+          return Promise.all(tasks);
+        }
+
+        function cacheBustedReload() {
+          try {
+            var nextUrl = new URL(window.location.href);
+            nextUrl.searchParams.set('_cdn_r', String(Date.now()));
+            window.location.replace(nextUrl.toString());
+          } catch (e) {
+            window.location.reload();
+          }
+        }
+
+        function renderEmergencyRecoveryUI(isOffline) {
+          var rootEl = document.getElementById('root');
+          if (!rootEl || window.__APP_MOUNTED__) return;
+
+          var isDark = document.documentElement.classList.contains('dark');
+          var bgPage = isDark ? '#020617' : '#F8FAFC';
+          var bgCard = isDark ? '#0F172A' : '#FFFFFF';
+          var borderCard = isDark ? '#1E293B' : '#E2E8F0';
+          var textPrimary = isDark ? '#F8FAFC' : '#0F172A';
+          var textMuted = isDark ? '#CBD5E1' : '#475569';
+          var bgNote = isDark ? 'rgba(30,41,59,0.75)' : '#F1F5F9';
+          var borderNote = isDark ? '#334155' : '#E2E8F0';
+          var iconBg = isDark ? 'rgba(245,158,11,0.14)' : '#FFFBEB';
+          var iconBorder = isDark ? 'rgba(245,158,11,0.35)' : '#FDE68A';
+          var iconColor = isDark ? '#FBBF24' : '#D97706';
+
+          var title = isOffline
+            ? 'Koneksi Terputus Saat Memuat Aplikasi'
+            : 'Aplikasi Memerlukan Pembaruan Cache';
+          var bodyText = isOffline
+            ? 'Perangkat sedang tidak terhubung ke internet untuk mengunduh komponen terbaru aplikasi. Pastikan koneksi internet aktif lalu tekan tombol di bawah.'
+            : 'Versi cache lama di browser tidak lagi cocok dengan pembaruan server terbaru. Bersihkan cache script untuk mengunduh versi terbaru secara aman.';
+
+          rootEl.innerHTML =
+            '<div style="min-height:100vh;width:100%;display:flex;align-items:center;justify-content:center;padding:20px;box-sizing:border-box;background:' + bgPage + ';color:' + textPrimary + ';font-family:Inter,system-ui,-apple-system,sans-serif;">' +
+              '<div style="width:100%;max-width:420px;background:' + bgCard + ';border:1px solid ' + borderCard + ';border-radius:24px;padding:28px 24px;box-shadow:0 20px 45px rgba(15,23,42,0.12);text-align:center;box-sizing:border-box;">' +
+                '<div style="width:52px;height:52px;margin:0 auto 16px;border-radius:16px;background:' + iconBg + ';border:1px solid ' + iconBorder + ';color:' + iconColor + ';display:flex;align-items:center;justify-content:center;">' +
+                  '<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4"/><path d="M12 17h.01"/><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z"/></svg>' +
+                '</div>' +
+                '<h1 style="margin:0 0 10px;font-size:20px;line-height:1.3;font-weight:800;letter-spacing:-0.02em;color:' + textPrimary + ';">' + title + '</h1>' +
+                '<p style="margin:0 0 18px;font-size:14px;line-height:1.6;color:' + textMuted + ';">' + bodyText + '</p>' +
+                '<div style="padding:12px 14px;border-radius:14px;background:' + bgNote + ';border:1px solid ' + borderNote + ';text-align:left;margin-bottom:20px;">' +
+                  '<p style="margin:0;font-size:12px;line-height:1.55;font-weight:500;color:' + textMuted + ';">Data lokal ujian serta jawaban siswa yang tersimpan di perangkat Anda tetap aman dan tidak akan terhapus.</p>' +
+                '</div>' +
+                '<button id="uc-emergency-reload-btn" type="button" style="width:100%;min-height:48px;padding:12px 20px;border:none;border-radius:14px;background:#4F46E5;color:#FFFFFF;font-size:14px;font-weight:700;cursor:pointer;box-shadow:0 8px 20px rgba(79,70,229,0.28);">Perbarui &amp; Muat Ulang</button>' +
+              '</div>' +
+            '</div>';
+
+          var btn = document.getElementById('uc-emergency-reload-btn');
+          if (btn) {
+            btn.addEventListener('click', function () {
+              btn.disabled = true;
+              btn.textContent = 'Memperbarui Cache...';
+              try { sessionStorage.removeItem(ATTEMPT_KEY); } catch (e) {}
+              purgeScriptCachesOnly().finally(function () {
+                cacheBustedReload();
+              });
+            });
+          }
+        }
+
+        function triggerRecovery(reason) {
+          if (recovering || isRootMounted()) return;
+          recovering = true;
+
+          if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+            renderEmergencyRecoveryUI(true);
+            return;
+          }
+
+          var attempts = readAttempts();
+          if (attempts.count >= MAX_AUTO_ATTEMPTS) {
+            renderEmergencyRecoveryUI(false);
+            return;
+          }
+
+          recordAttempt();
+          purgeScriptCachesOnly().finally(function () {
+            cacheBustedReload();
+          });
+        }
+
+        function isCriticalAppAsset(url) {
+          if (!url) return false;
+          if (/cdn\.jsdelivr\.net\/npm\/katex/i.test(url)) return false;
+          return /\/assets\/|\/index\.tsx|cdn\.jsdelivr\.net\/gh\//i.test(url);
+        }
+
+        window.addEventListener('error', function (event) {
+          if (isRootMounted()) return;
+          var target = event && event.target;
+          if (target && (target.tagName === 'SCRIPT' || target.tagName === 'LINK')) {
+            var src = target.src || target.href || '';
+            if (isCriticalAppAsset(src)) {
+              triggerRecovery('asset-error');
+            }
+          }
+        }, true);
+
+        window.addEventListener('unhandledrejection', function (event) {
+          if (isRootMounted()) return;
+          var reason = event && event.reason;
+          var text = reason ? ((reason.name || '') + ' ' + (reason.message || String(reason))) : '';
+          if (/ChunkLoadError|Failed to fetch dynamically imported module|Importing a module script failed|error loading dynamically imported module|Unable to preload CSS/i.test(text)) {
+            triggerRecovery('module-rejection');
+          }
+        });
+
+        window.setTimeout(function () {
+          if (!isRootMounted()) {
+            triggerRecovery('blank-watchdog');
+          }
+        }, WATCHDOG_MS);
+      })();
+    </script>
     <script type="module" src="/index.tsx"></script>
   </body>
 </html>

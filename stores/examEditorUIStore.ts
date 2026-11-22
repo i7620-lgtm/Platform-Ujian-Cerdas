@@ -9,6 +9,21 @@ export interface ChartTarget {
     preferredType?: 'bar' | 'line' | 'pie' | 'venn' | 'relation' | 'cartesian';
 }
 
+export type ConfigTabId = 'general' | 'schedule' | 'security_results' | 'bank_olympiad';
+
+export type ConfigInfoTopic =
+    | 'target_classes'
+    | 'exam_mode'
+    | 'daily_sessions'
+    | 'allow_overtime'
+    | 'detect_behavior'
+    | 'lock_violation'
+    | 'bank_soal'
+    | 'olympiad'
+    | 'certificate'
+    | 'operation_mode'
+    | null;
+
 interface ExamEditorUIState {
     classTagInput: string;
     isTypeSelectionModalOpen: boolean;
@@ -20,6 +35,8 @@ interface ExamEditorUIState {
     insertIndex: number | null;
     isGeneratingId: string | null;
     questionValidation: Record<string, { category?: boolean; level?: boolean; scoreWeight?: boolean }>;
+    activeConfigTab: ConfigTabId;
+    configInfoTopic: ConfigInfoTopic;
 
     setClassTagInput: (val: string) => void;
     setTypeSelectionModalOpen: (isOpen: boolean) => void;
@@ -33,6 +50,8 @@ interface ExamEditorUIState {
     setQuestionValidation: (qId: string, errors: { category?: boolean; level?: boolean; scoreWeight?: boolean }) => void;
     clearQuestionValidationField: (qId: string, field: 'category' | 'level' | 'scoreWeight') => void;
     clearQuestionValidation: (qId: string) => void;
+    setActiveConfigTab: (tab: ConfigTabId) => void;
+    setConfigInfoTopic: (topic: ConfigInfoTopic) => void;
     resetUI: () => void;
 }
 
@@ -48,6 +67,8 @@ export const useExamEditorUIStore = create<ExamEditorUIState>()(
         insertIndex: null,
         isGeneratingId: null,
         questionValidation: {},
+        activeConfigTab: 'general',
+        configInfoTopic: null,
 
         setClassTagInput: (val) => set((state) => { state.classTagInput = val; }),
         setTypeSelectionModalOpen: (isOpen) => set((state) => { state.isTypeSelectionModalOpen = isOpen; }),
@@ -69,6 +90,12 @@ export const useExamEditorUIStore = create<ExamEditorUIState>()(
         clearQuestionValidation: (qId) => set((state) => {
             delete state.questionValidation[qId];
         }),
+        setActiveConfigTab: (tab) => set((state) => {
+            state.activeConfigTab = tab;
+        }),
+        setConfigInfoTopic: (topic) => set((state) => {
+            state.configInfoTopic = topic;
+        }),
         
         resetUI: () => set((state) => {
             state.classTagInput = '';
@@ -81,6 +108,8 @@ export const useExamEditorUIStore = create<ExamEditorUIState>()(
             state.insertIndex = null;
             state.isGeneratingId = null;
             state.questionValidation = {};
+            state.activeConfigTab = 'general';
+            state.configInfoTopic = null;
         }),
     }))
 );
