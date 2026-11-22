@@ -1,17 +1,17 @@
 {
-  "tag": "cdn-9fc4cb81c409",
-  "cdnBaseUrl": "https://cdn.jsdelivr.net/gh/i7620-lgtm/Platform-Ujian-Cerdas@cdn-9fc4cb81c409/dist",
-  "builtAt": "2026-11-22T08:21:21.659Z",
+  "tag": "cdn-567016aa72bc",
+  "cdnBaseUrl": "https://cdn.jsdelivr.net/gh/i7620-lgtm/Platform-Ujian-Cerdas@cdn-567016aa72bc/dist",
+  "builtAt": "2026-11-22T09:24:39.979Z",
   "entryAssets": [
-    "assets/index-nLrN7Z3s.js",
+    "assets/index-Dm0fxSJD.js",
     "assets/vendor-state-e5U2a8Cz.js",
     "assets/vendor-react-core-7gIosMuE.js",
-    "assets/vendor-jspdf-DcnI8bSK.js",
+    "assets/vendor-jspdf-B4TWlpq_.js",
     "assets/vendor-supabase-D6h2Ap73.js",
-    "assets/vendor-math-markdown-CzTyJ33a.js",
+    "assets/vendor-math-markdown-Cqu6wLIr.js",
     "assets/vendor-charts-BhhGOfJV.js",
     "assets/vendor-xlsx-Ccx-kdi7.js",
-    "assets/vendor-math-markdown-PR3u497I.css",
+    "assets/vendor-math-markdown-Cbw46cdj.css",
     "assets/index-B2VAifcH.css"
   ],
   "rootFiles": [
