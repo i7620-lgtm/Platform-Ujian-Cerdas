@@ -8,6 +8,7 @@ import { sanitizeHtml } from "../teacher/examUtils";
 import { useExamAntiCheat } from "../../hooks/useExamAntiCheat";
 import { getOvertimeGraceStatus, isOvertimeAllowedForExam } from "../../utils/scheduleUtils";
 import { measureClientBandwidthBytes, detectClientDevice, countIntegrityViolations } from "../../utils/telemetryUtils";
+import { useTursoSessionStore } from "../../stores/tursoSessionStore";
 
 export interface ExamDialogState {
   isOpen: boolean;
@@ -251,6 +252,8 @@ export const useStudentExamLogic = ({
         } catch {
           // ignore
         }
+
+        await useTursoSessionStore.getState().clearExamKey(activeExam.code);
 
         setExamDialog((prev) => ({ ...prev, isOpen: false }));
       } catch (error) {
@@ -511,16 +514,18 @@ export const useStudentExamLogic = ({
 
     let pollTimeout: NodeJS.Timeout;
     let isPolling = true;
+    let pollCycleCount = 0;
 
     const pollData = async () => {
       if (!isPolling) return;
+      pollCycleCount++;
       if (
         student.class !== "PREVIEW" &&
         typeof navigator !== "undefined" &&
         navigator.onLine !== false
       ) {
         try {
-          // Check live exam status & config via Vercel Edge CDN meta first (fallback Supabase)
+          // Check live exam status & config via Turso Read-Only first (fallback Vercel Edge / Supabase)
           const liveExamMeta = await storageService.checkLiveExamStatusForStudent(exam.code);
           if (liveExamMeta) {
             if (liveExamMeta.status === "closed" && !isSubmittingRef.current) {
@@ -544,8 +549,9 @@ export const useStudentExamLogic = ({
             }
           }
 
-          // Lightweight status-only check on student result row
-          if (student.resultId) {
+          // Lightweight status-only check on student result row every 3rd poll (~3m) to minimize Supabase egress
+          // (autoSaveStudentAnswers also checks lockedStatus every 60s when dirty)
+          if (student.resultId && pollCycleCount % 3 === 0) {
             const { data: resultData } = await supabase
               .from("results")
               .select("status")
