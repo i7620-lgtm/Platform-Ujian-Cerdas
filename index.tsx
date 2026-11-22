@@ -11,35 +11,13 @@ import './style.css';
 
 // Register PWA service worker with smart auto-update
 import { registerSW } from 'virtual:pwa-register';
+import {
+  isExamSessionActive,
+  PENDING_PWA_REFRESH_KEY,
+  verifyJsDelivrOriginOnBoot,
+} from './utils/cdnFallback';
 
 let isRefreshing = false;
-
-function isExamSessionActive(): boolean {
-  try {
-    if (typeof sessionStorage !== 'undefined' && sessionStorage.getItem('is_exam_in_progress') === 'true') {
-      return true;
-    }
-    if (typeof localStorage !== 'undefined' && localStorage.getItem('ujiancerdas_active_exam_session')) {
-      return true;
-    }
-    return false;
-  } catch {
-    return false;
-  }
-}
-
-// Clean up any legacy caches containing obsolete chunk hashes
-if (typeof window !== 'undefined' && 'caches' in window) {
-  caches.keys().then((cacheNames) => {
-    cacheNames.forEach((cacheName) => {
-      // If the cache is an outdated workbox or app cache that does not match current version, purge it
-      if (cacheName.includes('workbox-precache') || cacheName.includes('Platform Ujian Cerdas')) {
-        // Workbox cleanupOutdatedCaches will take care of standard revisions,
-        // but any orphan cache entry can be cleanly verified.
-      }
-    });
-  }).catch(() => {});
-}
 
 // Auto reload window when new service worker takes control (seamless update)
 if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
@@ -61,7 +39,7 @@ const updateSW = registerSW({
     } else {
       console.info('Versi baru siap, menunda refresh hingga sesi ujian selesai.');
       try {
-        sessionStorage.setItem('pending_pwa_refresh', 'true');
+        sessionStorage.setItem(PENDING_PWA_REFRESH_KEY, 'true');
       } catch { /* ignore */ }
     }
   },
@@ -104,3 +82,8 @@ root.render(
     </ErrorBoundary>
   </React.StrictMode>
 );
+
+if (typeof window !== 'undefined') {
+  (window as unknown as { __APP_MOUNTED__?: boolean }).__APP_MOUNTED__ = true;
+  verifyJsDelivrOriginOnBoot();
+}
