@@ -69,9 +69,11 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({
     matchingOptionsMap,
     isMonitoring,
     monitoringLabel,
-    isAnswered,
+    answeredMap,
     handleSubmit,
-    timeLeft,
+    getTimeLeft,
+    subscribeTimeLeft,
+    flushLocalProgress,
     handleAnswerChange,
     scrollToQuestion,
     isSessionGracePeriodActive,
@@ -83,6 +85,10 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({
 
   const [isSessionBannerDismissed, setIsSessionBannerDismissed] = useState(false);
   const [expandedHints, setExpandedHints] = useState<Record<string, boolean>>({});
+  const isSubmittingRef = useRef(isSubmitting);
+  useEffect(() => {
+    isSubmittingRef.current = isSubmitting;
+  }, [isSubmitting]);
 
   const toggleHint = useCallback((questionId: string) => {
     setExpandedHints((prev) => ({ ...prev, [questionId]: !prev[questionId] }));
@@ -101,6 +107,40 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({
     }
     return list;
   }, [activeExam.questions]);
+
+  const scorableNumberedQuestions = useMemo(
+    () =>
+      numberedQuestions
+        .filter(({ q }) => q.questionType !== "INFO")
+        .map(({ q, num }) => ({ id: q.id, num })),
+    [numberedQuestions],
+  );
+
+  const unansweredItems = useMemo(
+    () => scorableNumberedQuestions.filter(({ id }) => !answeredMap[id]),
+    [scorableNumberedQuestions, answeredMap],
+  );
+
+  const handleToggleNav = useCallback(() => {
+    setIsNavOpen((prev) => !prev);
+  }, [setIsNavOpen]);
+
+  const handleCloseNav = useCallback(() => {
+    setIsNavOpen(false);
+  }, [setIsNavOpen]);
+
+  const handleRequestSubmitFromDrawer = useCallback(() => {
+    setIsNavOpen(false);
+    handleSubmit(false);
+  }, [setIsNavOpen, handleSubmit]);
+
+  const handleSubmitCard = useCallback(() => {
+    handleSubmit(false);
+  }, [handleSubmit]);
+
+  const handleStartIntro = useCallback(() => {
+    setShowConfigIntro(false);
+  }, [setShowConfigIntro]);
 
   const [fontStep, setFontStep] = useState<number>(() => {
     try {
@@ -123,7 +163,7 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({
   const currentFontConfig =
     FONT_STEP_CONFIGS.find((c) => c.step === fontStep) || FONT_STEP_CONFIGS[2];
 
-  const handleDecreaseFontSize = () => {
+  const handleDecreaseFontSize = useCallback(() => {
     setFontStep((prev) => {
       const next = Math.max(MIN_FONT_STEP, prev - 1);
       try {
@@ -137,9 +177,9 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({
       }
       return next;
     });
-  };
+  }, []);
 
-  const handleResetFontSize = () => {
+  const handleResetFontSize = useCallback(() => {
     setFontStep(() => {
       try {
         localStorage.setItem("student_font_step", "0");
@@ -149,9 +189,9 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({
       }
       return NORMAL_FONT_STEP;
     });
-  };
+  }, []);
 
-  const handleIncreaseFontSize = () => {
+  const handleIncreaseFontSize = useCallback(() => {
     setFontStep((prev) => {
       const next = Math.min(MAX_FONT_STEP, prev + 1);
       try {
@@ -165,7 +205,7 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({
       }
       return next;
     });
-  };
+  }, []);
 
   const headerRef = useRef<HTMLElement>(null);
   const navMenuRef = useRef<HTMLDivElement>(null);
@@ -206,7 +246,8 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({
     window.addEventListener("popstate", handlePopState);
 
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-      if (!isSubmitting) {
+      flushLocalProgress();
+      if (!isSubmittingRef.current) {
         e.preventDefault();
         e.returnValue = "";
       }
@@ -269,7 +310,7 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({
       window.removeEventListener("touchstart", handleTouchStart, true);
       window.removeEventListener("touchmove", handleTouchMove, true);
     };
-  }, [isSubmitting]);
+  }, [flushLocalProgress]);
 
   useEffect(() => {
     window.scrollTo({ top: 0, left: 0, behavior: "instant" });
@@ -361,7 +402,7 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({
       {showConfigIntro && (
         <StudentExamIntroModal
           exam={activeExam}
-          onStart={() => setShowConfigIntro(false)}
+          onStart={handleStartIntro}
         />
       )}
 
@@ -371,7 +412,7 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({
         student={student}
         progress={progress}
         isNavOpen={isNavOpen}
-        onToggleNav={() => setIsNavOpen(!isNavOpen)}
+        onToggleNav={handleToggleNav}
         isMonitoring={isMonitoring}
         monitoringLabel={monitoringLabel}
         fontStep={fontStep}
@@ -383,7 +424,8 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({
         onIncreaseFontSize={handleIncreaseFontSize}
         isDarkMode={isDarkMode}
         toggleTheme={toggleTheme}
-        timeLeft={timeLeft}
+        getTimeLeft={getTimeLeft}
+        subscribeTimeLeft={subscribeTimeLeft}
         formatTime={formatTime}
         onBack={onBack}
       />
@@ -391,10 +433,11 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({
       <StudentExamNavDrawer
         navMenuRef={navMenuRef}
         isNavOpen={isNavOpen}
-        onCloseNav={() => setIsNavOpen(false)}
-        onToggleNav={() => setIsNavOpen(!isNavOpen)}
+        onCloseNav={handleCloseNav}
+        onToggleNav={handleToggleNav}
         activeExam={activeExam}
-        answers={answers}
+        scorableNumberedQuestions={scorableNumberedQuestions}
+        answeredMap={answeredMap}
         answeredCount={answeredCount}
         totalQuestions={totalQuestions}
         progress={progress}
@@ -404,12 +447,8 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({
         monitoringLabel={monitoringLabel}
         isSessionGracePeriodActive={isSessionGracePeriodActive}
         sessionEndTime={sessionEndTime}
-        isAnswered={isAnswered}
         scrollToQuestion={scrollToQuestion}
-        onRequestSubmit={() => {
-          setIsNavOpen(false);
-          handleSubmit(false);
-        }}
+        onRequestSubmit={handleRequestSubmitFromDrawer}
       />
 
       <main
@@ -425,7 +464,7 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({
       >
         {/* Banner Mode Pratinjau Guru */}
         {(student.class === "PREVIEW" || student.studentId.includes("PREVIEW")) && (
-          <div className="p-3.5 sm:p-4 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900/60 text-amber-900 dark:text-amber-100 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs animate-fade-in mb-4">
+          <div className="p-3.5 sm:p-4 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900/60 text-amber-900 dark:text-amber-100 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs mb-4">
             <div className="flex items-center gap-3">
               <div className="p-2 rounded-xl bg-amber-100 dark:bg-amber-900/60 text-amber-700 dark:text-amber-300 shrink-0">
                 <span className="w-2.5 h-2.5 rounded-full bg-amber-500 block"></span>
@@ -443,7 +482,7 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({
               <button
                 type="button"
                 onClick={onBack}
-                className="px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs shrink-0 self-end sm:self-center transition-all shadow-sm cursor-pointer flex items-center gap-1.5"
+                className="px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs shrink-0 self-end sm:self-center transition-colors shadow-sm cursor-pointer flex items-center gap-1.5"
               >
                 Kembali ke Dashboard
               </button>
@@ -453,7 +492,7 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({
 
         {/* Banner Grace Period */}
         {isSessionGracePeriodActive && !isSessionBannerDismissed && (
-          <div className="p-4 sm:p-5 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900/60 text-amber-800 dark:text-amber-200 text-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs animate-fade-in">
+          <div className="p-4 sm:p-5 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900/60 text-amber-800 dark:text-amber-200 text-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs">
             <div className="flex items-center gap-3">
               <div className="p-2 rounded-xl bg-amber-100 dark:bg-amber-900/60 text-amber-700 dark:text-amber-300 shrink-0">
                 <ClockIcon className="w-5 h-5" />
@@ -503,7 +542,7 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({
         )}
 
         {numberedQuestions.map(({ q, num }) => {
-          const answered = isAnswered(q, answers);
+          const answered = !!answeredMap[q.id];
           const isMissing =
             hasAttemptedSubmit && !answered && q.questionType !== "INFO";
 
@@ -526,15 +565,14 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({
         })}
 
         <StudentExamCompletionCard
-          activeExam={activeExam}
-          answers={answers}
+          isOlympiadMode={activeExam.config?.isOlympiadMode}
+          unansweredItems={unansweredItems}
           answeredCount={answeredCount}
           totalQuestions={totalQuestions}
           progress={progress}
           isSubmitting={isSubmitting}
-          isAnswered={isAnswered}
           scrollToQuestion={scrollToQuestion}
-          onSubmit={() => handleSubmit(false)}
+          onSubmit={handleSubmitCard}
         />
       </main>
 
