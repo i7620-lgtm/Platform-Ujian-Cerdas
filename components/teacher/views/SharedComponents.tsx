@@ -88,7 +88,7 @@ export const RemainingTime: React.FC<{
   if (!timeState.isUnlimited) {
     if (totalMinutesLeft < 5) {
       colorClass =
-        "bg-rose-50 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400 border-rose-100 dark:border-rose-800 animate-pulse";
+        "bg-rose-50 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400 border-rose-100 dark:border-rose-800";
       dotClass = "bg-rose-500";
     } else if (totalMinutesLeft < 15) {
       colorClass =
@@ -107,14 +107,9 @@ export const RemainingTime: React.FC<{
     <div
       className={`flex items-center ${size === "sm" ? "gap-1.5 px-2 py-0.5 rounded-md text-[10px]" : "gap-2 px-3 py-1.5 rounded-lg text-sm"} border ${colorClass} transition-colors duration-500`}
     >
-      <span className={`relative flex ${size === "sm" ? "h-1.5 w-1.5" : "h-2 w-2"}`}>
-        <span
-          className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${dotClass}`}
-        ></span>
-        <span
-          className={`relative inline-flex rounded-full ${size === "sm" ? "h-1.5 w-1.5" : "h-2 w-2"} ${dotClass}`}
-        ></span>
-      </span>
+      <span
+        className={`inline-flex rounded-full ${size === "sm" ? "h-1.5 w-1.5" : "h-2 w-2"} ${dotClass}`}
+      ></span>
       <span className={`font-mono font-bold ${size === "sm" ? "tracking-normal" : "tracking-widest"} tabular-nums`}>
         {timeState.isUnlimited ? "Tanpa Batas" : timeString}
       </span>
