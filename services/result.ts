@@ -35,10 +35,14 @@ export class ResultService {
                 const parts = studentIdStr.includes('_') ? studentIdStr.split('_') : studentIdStr.split('-');
                 if (parts.length >= 2) {
                     const lastPart = parts[parts.length - 1];
-                    if (!isNaN(parseInt(lastPart))) {
+                    const isUnixTimestampSuffix = /^\d{12,}$/.test(lastPart);
+                    if (!isUnixTimestampSuffix && !isNaN(parseInt(lastPart, 10))) {
                         absentNumber = lastPart;
                     } else if (parts.length > 2) {
-                        absentNumber = parts[parts.length - 2];
+                        const prevPart = parts[parts.length - 2];
+                        if (!/^\d{12,}$/.test(prevPart)) {
+                            absentNumber = prevPart;
+                        }
                     }
                 }
             }

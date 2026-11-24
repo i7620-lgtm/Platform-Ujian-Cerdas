@@ -14,6 +14,7 @@ interface UseExamAntiCheatProps {
     timeLeftRef: React.MutableRefObject<number>;
     onForceSubmit: (isAuto: boolean, status: ResultStatus) => void;
     onTeacherForceStop?: (message: string, status: ResultStatus) => void;
+    onBeforeFlush?: () => void;
     isSubmitting: boolean;
 }
 
@@ -27,11 +28,32 @@ export const useExamAntiCheat = ({
     timeLeftRef,
     onForceSubmit,
     onTeacherForceStop,
+    onBeforeFlush,
     isSubmitting,
 }: UseExamAntiCheatProps) => {
     const isSubmittingRef = useRef(isSubmitting);
-    const [timeLeft, setTimeLeft] = useState(0);
     const [deadline, setDeadline] = useState<number>(0);
+
+    const examConfigRef = useRef(exam.config);
+    const onForceSubmitRef = useRef(onForceSubmit);
+    const onBeforeFlushRef = useRef(onBeforeFlush);
+
+    useEffect(() => {
+        examConfigRef.current = exam.config;
+        onForceSubmitRef.current = onForceSubmit;
+        onBeforeFlushRef.current = onBeforeFlush;
+    }, [exam.config, onForceSubmit, onBeforeFlush]);
+
+    const timeListenersRef = useRef<Set<(seconds: number) => void>>(new Set());
+
+    const getTimeLeft = useCallback(() => timeLeftRef.current, [timeLeftRef]);
+
+    const subscribeTimeLeft = useCallback((listener: (seconds: number) => void) => {
+        timeListenersRef.current.add(listener);
+        return () => {
+            timeListenersRef.current.delete(listener);
+        };
+    }, []);
 
     // Keep dynamic isSubmitting status synchronized in real-time ref
     useEffect(() => {
@@ -42,57 +64,99 @@ export const useExamAntiCheat = ({
     const addViolationLog = useCallback((reason: string) => {
         const timestamp = new Date().toLocaleTimeString();
         logRef.current.push(`[${timestamp}] Pelanggaran: ${reason}`);
+        onBeforeFlushRef.current?.();
         storageService.saveLocalProgress(storageKey, {
             answers: answersRef.current,
             logs: logRef.current,
         });
     }, [storageKey, answersRef, logRef]);
 
+    const examMode = exam.config.examMode;
+    const timeLimit = exam.config.timeLimit;
+    const startDate = exam.config.startDate;
+    const endDate = exam.config.endDate;
+    const startTime = exam.config.startTime;
+    const endTime = exam.config.endTime;
+    const timezone = exam.config.timezone;
+    const allowOvertime = exam.config.allowOvertime;
+    const enableDailyWindow = exam.config.enableDailyWindow;
+    const dailyStartTime = exam.config.dailyStartTime;
+    const dailyEndTime = exam.config.dailyEndTime;
+    const dailySessionsJson = JSON.stringify(exam.config.dailySessions || null);
+
     // Calculate dynamic deadline (respecting allowOvertime, personal timeLimit, daily session end, and global exam end)
     useEffect(() => {
+        const cfg = examConfigRef.current;
         let calculatedDeadline: number;
 
-        const mode = (exam.config.examMode || 'UJIAN').trim().toUpperCase();
+        const mode = (examMode || 'UJIAN').trim().toUpperCase();
         const isPR = mode === 'PR';
 
         if (student.class === 'PREVIEW') {
-            const timeLimitMs = isPR ? 0 : (exam.config.timeLimit || 0) * 60 * 1000;
+            const timeLimitMs = isPR ? 0 : (timeLimit || 0) * 60 * 1000;
             calculatedDeadline = timeLimitMs > 0 ? Date.now() + timeLimitMs : Infinity;
         } else {
             const storedStartTime = initialData?.answers?._startTime ? parseInt(initialData.answers._startTime) : null;
             const actualStartTime = storedStartTime || initialData?.timestamp || Date.now();
-            calculatedDeadline = computeStudentExamDeadline(exam.config, student.class, actualStartTime);
+            calculatedDeadline = computeStudentExamDeadline(cfg, student.class, actualStartTime);
         }
 
-        // Defer state update to avoid synchronous cascading renders detection during effects
         const timeoutId = setTimeout(() => {
             setDeadline(calculatedDeadline);
         }, 0);
 
         return () => clearTimeout(timeoutId);
-    }, [exam.config, student.class, initialData?.timestamp, initialData?.answers?._startTime]);
+    }, [
+        examMode,
+        timeLimit,
+        startDate,
+        endDate,
+        startTime,
+        endTime,
+        timezone,
+        allowOvertime,
+        enableDailyWindow,
+        dailyStartTime,
+        dailyEndTime,
+        dailySessionsJson,
+        student.class,
+        initialData?.timestamp,
+        initialData?.answers?._startTime,
+    ]);
 
-    // Setup active timers/clocks
+    // Setup active timers/clocks without causing parent page re-renders every second
     useEffect(() => {
         if (deadline === 0) return;
 
+        const notifyListeners = (nextValue: number) => {
+            timeListenersRef.current.forEach((cb) => {
+                try {
+                    cb(nextValue);
+                } catch {
+                    // ignore listener error
+                }
+            });
+        };
+
         const tick = () => {
             if (deadline === Infinity) {
-                setTimeLeft(Infinity);
-                timeLeftRef.current = Infinity;
+                if (timeLeftRef.current !== Infinity) {
+                    timeLeftRef.current = Infinity;
+                    notifyListeners(Infinity);
+                }
                 return;
             }
             const now = Date.now();
             const diff = Math.max(0, Math.floor((deadline - now) / 1000));
-            setTimeLeft(diff);
-            timeLeftRef.current = diff;
+            if (timeLeftRef.current !== diff) {
+                timeLeftRef.current = diff;
+                notifyListeners(diff);
+            }
 
             if (diff <= 0 && student.class !== 'PREVIEW' && !isSubmittingRef.current) {
-                // Pada mode PR, jangan auto-submit paksa saat deadline berakhir,
-                // biarkan siswa mengumpulkan, namun sistem login telah diblokir untuk pengerjaan baru.
-                const mode = (exam.config.examMode || 'UJIAN').trim().toUpperCase();
+                const mode = (examMode || 'UJIAN').trim().toUpperCase();
                 if (mode !== 'PR') {
-                    onForceSubmit(true, 'completed');
+                    onForceSubmitRef.current(true, 'completed');
                 }
             }
         };
@@ -100,43 +164,45 @@ export const useExamAntiCheat = ({
         tick();
         const timer = setInterval(tick, 1000);
         return () => clearInterval(timer);
-    }, [deadline, onForceSubmit, student.class, timeLeftRef, exam.config.examMode]);
+    }, [deadline, student.class, timeLeftRef, examMode]);
+
+    const detectBehavior = Boolean(exam.config.detectBehavior);
+    const continueWithPermission = Boolean(exam.config.continueWithPermission);
 
     // Handle Active Anti-Cheat (Meninggalkan Halaman / Buka Tab Baru / Keluar Halaman)
     useEffect(() => {
-        const isPR = (exam.config.examMode || '').trim().toUpperCase() === 'PR';
-        if (student.class === 'PREVIEW' || !exam.config.detectBehavior || isPR) return;
+        const isPR = (examMode || '').trim().toUpperCase() === 'PR';
+        if (student.class === 'PREVIEW' || !detectBehavior || isPR) return;
 
         const { softLogDelayMs, hardLockDelayMs } = getAntiCheatBlurThresholds();
         let blurTimeout: ReturnType<typeof setTimeout> | null = null;
         let notifLockTimeout: ReturnType<typeof setTimeout> | null = null;
 
         const handleViolation = (type: 'soft' | 'hard', reason: string) => {
-            const currentIsPR = (exam.config.examMode || '').trim().toUpperCase() === 'PR';
+            const currentIsPR = (examMode || '').trim().toUpperCase() === 'PR';
             if (isSubmittingRef.current || currentIsPR) return;
 
             const timestamp = new Date().toLocaleTimeString();
             logRef.current.push(`[${timestamp}] Pelanggaran: ${reason}`);
+            onBeforeFlushRef.current?.();
             storageService.saveLocalProgress(storageKey, {
                 answers: answersRef.current,
                 logs: logRef.current,
             });
 
-            // Hanya kunci sesi jika merupakan pelanggaran 'hard' (terbukti meninggalkan aplikasi/tab atau buka notifikasi melewati batas toleransi)
-            if (type === 'hard' && exam.config.continueWithPermission) {
-                onForceSubmit(true, 'force_closed');
+            if (type === 'hard' && continueWithPermission) {
+                onForceSubmitRef.current(true, 'force_closed');
             }
         };
 
         const handleVisibilityChange = () => {
             if (document.hidden && !isSubmittingRef.current) {
-                // Konfirmasi pasti bahwa aplikasi ditinggalkan / diminimalkan
                 handleViolation('hard', 'Meninggalkan halaman / beralih aplikasi');
             }
         };
 
         const handlePageHide = () => {
-            // Safari/WebKit iOS mengandalkan pagehide untuk persistensi lokal sebelum halaman dibekukan/ditutup
+            onBeforeFlushRef.current?.();
             storageService.saveLocalProgress(storageKey, {
                 answers: answersRef.current,
                 logs: logRef.current,
@@ -146,7 +212,6 @@ export const useExamAntiCheat = ({
         const handleBlur = () => {
             if (isSubmittingRef.current) return;
 
-            // 1. Deteksi apakah kehilangan fokus dipicu oleh elemen input / keyboard virtual mobile
             const activeEl = document.activeElement;
             const isTypingField =
                 activeEl &&
@@ -156,11 +221,9 @@ export const useExamAntiCheat = ({
                  (activeEl as HTMLElement).isContentEditable);
 
             if (isTypingField) {
-                // Aktivitas pengetikan normal siswa di ponsel/iPhone, abaikan
                 return;
             }
 
-            // 2. Berikan toleransi adaptif (1.5s desktop / 3s perangkat sentuh-iOS) untuk pencatatan log awal
             if (blurTimeout) clearTimeout(blurTimeout);
             blurTimeout = setTimeout(() => {
                 if (document.hidden && !isSubmittingRef.current) {
@@ -170,7 +233,6 @@ export const useExamAntiCheat = ({
                 }
             }, softLogDelayMs);
 
-            // 3. Batas toleransi kunci akses adaptif (5s desktop / 8s perangkat sentuh-iOS)
             if (notifLockTimeout) clearTimeout(notifLockTimeout);
             notifLockTimeout = setTimeout(() => {
                 if (!isSubmittingRef.current && (!document.hasFocus() || document.hidden)) {
@@ -183,7 +245,6 @@ export const useExamAntiCheat = ({
         };
 
         const handleFocus = () => {
-            // Batalkan kedua timer jika pengguna kembali fokus sebelum batas waktu
             if (blurTimeout) {
                 clearTimeout(blurTimeout);
                 blurTimeout = null;
@@ -207,7 +268,7 @@ export const useExamAntiCheat = ({
             window.removeEventListener('blur', handleBlur);
             window.removeEventListener('focus', handleFocus);
         };
-    }, [exam.config, student.class, onForceSubmit, storageKey, answersRef, logRef]);
+    }, [examMode, detectBehavior, continueWithPermission, student.class, storageKey, answersRef, logRef]);
 
     // Handle Exam Force Stopped by Teacher
     useEffect(() => {
@@ -216,13 +277,14 @@ export const useExamAntiCheat = ({
             if (onTeacherForceStop) {
                 onTeacherForceStop(msg, 'completed');
             } else {
-                onForceSubmit(true, 'completed');
+                onForceSubmitRef.current(true, 'completed');
             }
         }
-    }, [exam.config.isFinished, onForceSubmit, onTeacherForceStop, student.class]);
+    }, [exam.config.isFinished, onTeacherForceStop, student.class]);
 
     return {
-        timeLeft,
+        getTimeLeft,
+        subscribeTimeLeft,
         addViolationLog,
     };
 };

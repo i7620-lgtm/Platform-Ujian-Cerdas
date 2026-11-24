@@ -21,8 +21,11 @@ export const StudentExamIntroModal: React.FC<StudentExamIntroModalProps> = ({
   onStart,
 }) => {
   return (
-    <div className="fixed inset-0 z-[200] flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-md animate-fade-in">
-      <div className="bg-white dark:bg-slate-900 w-full max-w-lg sm:max-w-xl md:max-w-2xl max-h-[92dvh] overflow-y-auto custom-scrollbar rounded-[1.75rem] sm:rounded-[2.25rem] shadow-2xl border border-white dark:border-slate-800 animate-gentle-slide p-5 sm:p-6 md:p-7">
+    <div
+      data-math-ignore="true"
+      className="fixed inset-0 z-[200] flex items-center justify-center p-3 sm:p-4 bg-slate-900/65"
+    >
+      <div className="bg-white dark:bg-slate-900 w-full max-w-lg sm:max-w-xl md:max-w-2xl max-h-[92dvh] overflow-y-auto custom-scrollbar rounded-[1.75rem] sm:rounded-[2.25rem] shadow-2xl border border-white dark:border-slate-800 p-5 sm:p-6 md:p-7">
         <div className="flex flex-col items-center text-center mb-4 sm:mb-5">
           <div className="w-11 h-11 sm:w-12 sm:h-12 bg-indigo-50 dark:bg-indigo-900/30 rounded-2xl flex items-center justify-center text-indigo-600 dark:text-indigo-400 mb-2.5 sm:mb-3 shadow-xs">
             <ShieldCheckIcon className="w-6 h-6 sm:w-6.5 sm:h-6.5" />

@@ -67,6 +67,8 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
     schoolScopedResults,
     totalScopedCount,
     classCounts,
+    isInitialLoading,
+    loadError,
     isRefreshing,
     isAddTimeOpen,
     addTimeValue,
@@ -80,6 +82,7 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
     generatedTokenData,
     editingStudent,
     onlineStudents,
+    broadcastCounts,
     setSelectedClass,
     setSelectedSchool,
     setStatusFilter,
@@ -136,21 +139,25 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
     }
   };
 
-  // Auto-scroll student list table in live monitoring (smooth top-to-bottom and bottom-to-top)
-  const [autoScrollEnabled, setAutoScrollEnabled] = React.useState(true);
+  // Auto-scroll student list table in live monitoring (OFF by default, low-overhead interval when enabled)
+  const [autoScrollEnabled, setAutoScrollEnabled] = React.useState(false);
   const [isInteracting, setIsInteracting] = React.useState(false);
   const scrollContainerRef = React.useRef<HTMLDivElement>(null);
   const isHoveredRef = React.useRef(false);
-  const animFrameRef = React.useRef<number | null>(null);
   const lastTimeRef = React.useRef<number | null>(null);
   const directionRef = React.useRef<"down" | "up">("down");
   const pauseUntilRef = React.useRef<number>(0);
   const pageSwitchPendingRef = React.useRef(false);
 
-  const scorableQuestionCount = React.useMemo(
-    () => (displayExam?.questions || []).filter((q) => q.questionType !== "INFO").length,
-    [displayExam?.questions],
-  );
+  const scorableQuestionCount = React.useMemo(() => {
+    const fromConfig = displayExam?.config?.scorableQuestionCount;
+    if (typeof fromConfig === "number" && fromConfig > 0) return fromConfig;
+    const loadedQuestions = displayExam?.questions || [];
+    if (loadedQuestions.length > 0) {
+      return loadedQuestions.filter((q) => q.questionType !== "INFO").length;
+    }
+    return localResults[0]?.totalQuestions || 0;
+  }, [displayExam?.config?.scorableQuestionCount, displayExam?.questions, localResults]);
 
   const handlePageChange = (nextPage: number) => {
     pageSwitchPendingRef.current = false;
@@ -163,26 +170,27 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
   React.useEffect(() => {
     const el = scrollContainerRef.current;
     if (!el || !autoScrollEnabled) {
-      if (animFrameRef.current) {
-        cancelAnimationFrame(animFrameRef.current);
-        animFrameRef.current = null;
-      }
       pageSwitchPendingRef.current = false;
       return;
     }
 
     lastTimeRef.current = performance.now();
-    pauseUntilRef.current = performance.now() + 1500; // brief initial reading pause
+    pauseUntilRef.current = performance.now() + 1500;
     pageSwitchPendingRef.current = false;
 
-    const speed = 26; // comfortable, gentle scrolling speed (px/sec)
+    const speed = 26; // px/sec
 
-    const step = (now: number) => {
+    const timer = setInterval(() => {
+      if (typeof document !== "undefined" && document.hidden) {
+        lastTimeRef.current = performance.now();
+        return;
+      }
+      const now = performance.now();
       if (!lastTimeRef.current) lastTimeRef.current = now;
       const dt = Math.min((now - lastTimeRef.current) / 1000, 0.1);
       lastTimeRef.current = now;
 
-      if (autoScrollEnabled && !isHoveredRef.current && el) {
+      if (!isHoveredRef.current && el) {
         const maxScroll = el.scrollHeight - el.clientHeight;
         if (now >= pauseUntilRef.current) {
           if (pageSwitchPendingRef.current) {
@@ -200,7 +208,7 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                   pauseUntilRef.current = now + 2000;
                 } else {
                   directionRef.current = "up";
-                  pauseUntilRef.current = now + 2000; // pause 2s at bottom
+                  pauseUntilRef.current = now + 2000;
                 }
               }
             } else {
@@ -208,7 +216,7 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
               if (el.scrollTop <= 1) {
                 el.scrollTop = 0;
                 directionRef.current = "down";
-                pauseUntilRef.current = now + 2000; // pause 2s at top
+                pauseUntilRef.current = now + 2000;
               }
             }
           } else if (totalPages > 1) {
@@ -217,25 +225,21 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
           }
         }
       }
-
-      animFrameRef.current = requestAnimationFrame(step);
-    };
-
-    animFrameRef.current = requestAnimationFrame(step);
+    }, 40);
 
     return () => {
-      if (animFrameRef.current) {
-        cancelAnimationFrame(animFrameRef.current);
-        animFrameRef.current = null;
-      }
+      clearInterval(timer);
     };
-  }, [autoScrollEnabled, paginatedResults, totalPages, setCurrentPage]);
+  }, [autoScrollEnabled, totalPages, setCurrentPage]);
 
   if (!displayExam) return null;
 
   return createPortal(
     <>
-      <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-0 sm:p-4 z-50 animate-fade-in">
+      <div
+        data-math-ignore="true"
+        className="fixed inset-0 bg-slate-900/60 flex items-center justify-center p-0 sm:p-4 z-50"
+      >
         <div className="bg-white dark:bg-slate-800 sm:rounded-[2rem] shadow-2xl w-full max-w-full h-full sm:h-[90vh] flex flex-col overflow-hidden relative border border-white dark:border-slate-700">
           {/* Header Modal */}
           <div className="px-4 py-3 sm:px-6 sm:py-3.5 border-b border-slate-100 dark:border-slate-700/80 bg-white dark:bg-slate-800 sticky top-0 z-20 shadow-xs font-sans flex flex-col gap-2.5">
@@ -259,7 +263,7 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                   )}
                   <RemainingTime exam={displayExam} size="sm" />
                   {isRefreshing && (
-                    <span className="text-[10px] font-bold text-indigo-500 dark:text-indigo-400 animate-pulse">
+                    <span className="text-[10px] font-bold text-indigo-500 dark:text-indigo-400">
                       Sync...
                     </span>
                   )}
@@ -494,7 +498,19 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
           </div>
 
           {/* Content Section */}
-          <div className="flex-1 overflow-auto p-4 sm:p-6 bg-slate-50/50 dark:bg-slate-900/50 flex flex-col gap-6 font-sans">
+          <div className="flex-1 overflow-auto p-4 sm:p-6 bg-slate-50/50 dark:bg-slate-900/50 flex flex-col gap-4 font-sans">
+            {loadError && (
+              <div className="px-4 py-3 rounded-2xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300 text-xs font-bold flex items-center justify-between gap-3">
+                <span>{loadError}</span>
+                <button
+                  type="button"
+                  onClick={() => fetchLatest(false)}
+                  className="px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-[11px] font-black uppercase tracking-wider shrink-0 cursor-pointer"
+                >
+                  Muat Ulang
+                </button>
+              </div>
+            )}
             {/* Main Student List Board */}
             <div className="bg-white dark:bg-slate-800 rounded-3xl border border-slate-100 dark:border-slate-700 shadow-sm flex-1 min-h-0 overflow-hidden flex flex-col">
               {/* Instant Search Toolbar */}
@@ -584,7 +600,15 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 dark:divide-slate-700/50">
-                    {paginatedResults.length > 0 ? (
+                    {isInitialLoading && paginatedResults.length === 0 ? (
+                      Array.from({ length: 5 }).map((_, idx) => (
+                        <tr key={`loading-skeleton-${idx}`}>
+                          <td colSpan={canShowActionColumn ? 6 : 5} className="px-6 py-4">
+                            <div className="h-5 bg-slate-100 dark:bg-slate-700/60 rounded-lg w-full" />
+                          </td>
+                        </tr>
+                      ))
+                    ) : paginatedResults.length > 0 ? (
                       paginatedResults.map((r) => {
                         const isPlaceholder = !!r.isPlaceholder || !r.student.fullName;
                         const cleanClass = r.student.class
@@ -601,7 +625,7 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                           return (
                             <tr
                               key={r.student.studentId}
-                              className="hover:bg-slate-50/40 dark:hover:bg-slate-800/30 transition-colors opacity-70 hover:opacity-100"
+                              className="hover:bg-slate-50/40 dark:hover:bg-slate-800/30 transition-colors opacity-75 hover:opacity-100"
                             >
                               <td className="px-6 py-4 whitespace-nowrap">
                                 <div className="flex items-center gap-3">
@@ -609,10 +633,10 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                                     {r.student.absentNumber}
                                   </div>
                                   <div>
-                                    <div className="text-xs font-semibold text-slate-400 dark:text-slate-500 italic">
-                                      - Belum Ada Data Siswa -
+                                    <div className={`text-xs font-semibold ${r.student.fullName ? "text-slate-600 dark:text-slate-300" : "text-slate-400 dark:text-slate-500 italic"}`}>
+                                      {r.student.fullName || "- Belum Ada Data Siswa -"}
                                     </div>
-                                    <div className="text-[10px] text-slate-300 dark:text-slate-600 uppercase font-bold tracking-wider mt-0.5">
+                                    <div className="text-[10px] text-slate-400 dark:text-slate-500 uppercase font-bold tracking-wider mt-0.5">
                                       {r.student.schoolName || "-"}
                                     </div>
                                   </div>
@@ -650,11 +674,12 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                           );
                         }
 
+                        const liveBroadcast = broadcastCounts[r.student.studentId];
                         const totalQuestions =
-                          r.totalQuestions || scorableQuestionCount;
-                        const answeredCount = Object.keys(
-                          r.answers || {},
-                        ).filter((k) => !k.startsWith("_")).length;
+                          liveBroadcast?.total || r.totalQuestions || scorableQuestionCount;
+                        const answeredCount =
+                          liveBroadcast?.answered ??
+                          Object.keys(r.answers || {}).filter((k) => !k.startsWith("_")).length;
                         const isOnline = onlineStudents[r.student.studentId];
 
                         return (
@@ -689,14 +714,14 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                                   <span>Sudah Selesai</span>
                                 </span>
                               ) : r.status === "force_closed" ? (
-                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 rounded-lg text-[10px] font-black uppercase border border-rose-200 dark:border-rose-800 shadow-sm animate-pulse">
+                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 rounded-lg text-[10px] font-black uppercase border border-rose-200 dark:border-rose-800 shadow-sm">
                                   <LockClosedIcon className="w-3.5 h-3.5 text-rose-500" />
                                   <span>Terkunci</span>
                                 </span>
                               ) : (
                                 <div className="flex flex-col gap-1">
                                   <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 rounded-lg text-[10px] font-black uppercase border border-emerald-200 dark:border-emerald-800 shadow-sm">
-                                    <span className="w-2 h-2 bg-emerald-500 rounded-full animate-ping"></span>
+                                    <span className="w-2 h-2 bg-emerald-500 rounded-full"></span>
                                     <span>Sedang Mengerjakan</span>
                                     {isOnline && !displayExam?.config?.disableRealtime ? (
                                       <span className="text-[8px] px-1.5 py-0.5 bg-emerald-200/60 dark:bg-emerald-900/60 text-emerald-800 dark:text-emerald-300 rounded font-black tracking-widest ml-0.5">
@@ -890,7 +915,7 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                           autoScrollEnabled
                             ? isInteracting
                               ? "bg-amber-500"
-                              : "bg-indigo-500 animate-pulse"
+                              : "bg-indigo-500"
                             : "bg-slate-400"
                         }`}
                       ></span>
@@ -939,65 +964,84 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
         </div>
       </div>
 
-      {/* Modular Sub-modals */}
-      <ShareModal
-        isOpen={isShareModalOpen}
-        onClose={() => setIsShareModalOpen(false)}
-        liveUrl={liveUrl}
-        proctorUrl={proctorUrl}
-        examCode={displayExam.code}
-      />
+      {/* Modular Sub-modals (Conditionally mounted ONLY when opened) */}
+      {isShareModalOpen && (
+        <ShareModal
+          isOpen={isShareModalOpen}
+          onClose={() => setIsShareModalOpen(false)}
+          liveUrl={liveUrl}
+          proctorUrl={proctorUrl}
+          examCode={displayExam.code}
+        />
+      )}
 
-      <JoinQRModal
-        isOpen={isJoinQrModalOpen}
-        onClose={() => setIsJoinQrModalOpen(false)}
-        joinUrl={joinUrl}
-        examCode={displayExam.code}
-      />
+      {isJoinQrModalOpen && (
+        <JoinQRModal
+          isOpen={isJoinQrModalOpen}
+          onClose={() => setIsJoinQrModalOpen(false)}
+          joinUrl={joinUrl}
+          examCode={displayExam.code}
+        />
+      )}
 
-      <GuideModal
-        isOpen={isGuideModalOpen}
-        onClose={() => setIsGuideModalOpen(false)}
-        examMode={displayExam.config.examMode}
-      />
+      {isGuideModalOpen && (
+        <GuideModal
+          isOpen={isGuideModalOpen}
+          onClose={() => setIsGuideModalOpen(false)}
+          examMode={displayExam.config.examMode}
+        />
+      )}
 
-      <ManualEditStudentModal
-        isOpen={!!editingStudent}
-        onClose={() => setEditingStudent(null)}
-        student={editingStudent}
-        onSave={handleUpdateStudentSubmit}
-      />
+      {!!editingStudent && (
+        <ManualEditStudentModal
+          isOpen={!!editingStudent}
+          onClose={() => setEditingStudent(null)}
+          student={editingStudent}
+          onSave={handleUpdateStudentSubmit}
+        />
+      )}
 
-      <GeneratedTokenPopup
-        isOpen={!!generatedTokenData}
-        onClose={() => setGeneratedTokenData(null)}
-        tokenData={generatedTokenData}
-      />
+      {!!generatedTokenData && (
+        <GeneratedTokenPopup
+          isOpen={!!generatedTokenData}
+          onClose={() => setGeneratedTokenData(null)}
+          tokenData={generatedTokenData}
+        />
+      )}
 
-      <AddTimeModal
-        isOpen={isAddTimeOpen}
-        onClose={() => setIsAddTimeOpen(false)}
-        addTimeValue={addTimeValue}
-        setAddTimeValue={setAddTimeValue}
-        onSubmit={handleAddTimeSubmit}
-      />
+      {isAddTimeOpen && (
+        <AddTimeModal
+          isOpen={isAddTimeOpen}
+          onClose={() => setIsAddTimeOpen(false)}
+          addTimeValue={addTimeValue}
+          setAddTimeValue={setAddTimeValue}
+          onSubmit={handleAddTimeSubmit}
+        />
+      )}
 
-      <PrintSoalModal
-        isOpen={isPrintModalOpen}
-        onClose={() => setIsPrintModalOpen(false)}
-        exam={displayExam}
-        teacherProfile={teacherProfile}
-      />
+      {isPrintModalOpen && (
+        <PrintSoalModal
+          isOpen={isPrintModalOpen}
+          onClose={() => setIsPrintModalOpen(false)}
+          exam={displayExam}
+          teacherProfile={teacherProfile}
+        />
+      )}
 
-      <PrintKisiKisiModal
-        isOpen={isKisiKisiModalOpen}
-        onClose={() => setIsKisiKisiModalOpen(false)}
-        exam={displayExam}
-        teacherProfile={teacherProfile}
-      />
+      {isKisiKisiModalOpen && (
+        <PrintKisiKisiModal
+          isOpen={isKisiKisiModalOpen}
+          onClose={() => setIsKisiKisiModalOpen(false)}
+          exam={displayExam}
+          teacherProfile={teacherProfile}
+        />
+      )}
 
       {confirmDialog?.isOpen && (
-        <div className="fixed inset-0 z-[100] bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4">
+        <div
+          data-math-ignore="true"
+          className="fixed inset-0 z-[100] bg-slate-900/60 flex items-center justify-center p-4"
+        >
           <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl w-full max-w-sm p-6 border border-slate-100 dark:border-slate-700 animate-slide-up">
             <h3 className="text-lg font-black text-slate-800 dark:text-white mb-2">Konfirmasi</h3>
             <p className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-6">{confirmDialog.message}</p>
@@ -1020,7 +1064,10 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
       )}
 
       {alertDialog?.isOpen && (
-        <div className="fixed inset-0 z-[100] bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4">
+        <div
+          data-math-ignore="true"
+          className="fixed inset-0 z-[100] bg-slate-900/60 flex items-center justify-center p-4"
+        >
           <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl w-full max-w-sm p-6 border border-slate-100 dark:border-slate-700 animate-slide-up text-center">
             <h3 className="text-lg font-black text-slate-800 dark:text-white mb-2">Pemberitahuan</h3>
             <p className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-6">{alertDialog.message}</p>

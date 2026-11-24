@@ -373,10 +373,18 @@ export const renderMathInHtml = (html: string): string => {
  */
 export const hydrateMathInContainer = (container: Element | Document = document) => {
   if (typeof window === "undefined" || !container) return;
+  if (
+    container instanceof Element &&
+    (container.hasAttribute("data-math-ignore") ||
+      container.closest("[data-math-ignore='true']"))
+  ) {
+    return;
+  }
 
   // 1. Hydrate all .math-visual[data-latex] where KaTeX HTML is not yet present or uses legacy small inline fractions
   const mathVisuals = container.querySelectorAll(".math-visual[data-latex]:not([data-math-hydrated='true'])");
   mathVisuals.forEach((el) => {
+    if (el.closest("[data-math-ignore='true']")) return;
     const htmlEl = el as HTMLElement;
     const displayMode = htmlEl.style.display === "block";
     if (!displayMode && htmlEl.style.verticalAlign === "middle") {
@@ -397,8 +405,9 @@ export const hydrateMathInContainer = (container: Element | Document = document)
     ".option-content:not([data-math-hydrated='true']), .student-question-text:not([data-math-hydrated='true']), .wysiwyg-content:not([data-math-hydrated='true']), .prose:not([data-math-hydrated='true'])",
   );
   textContainers.forEach((tc) => {
-    // Avoid re-hydrating or interfering with active inputs, editable areas, or inside KaTeX
+    // Avoid re-hydrating or interfering with active inputs, editable areas, ignored containers, or inside KaTeX
     if (
+      tc.closest("[data-math-ignore='true']") ||
       tc.closest("[contenteditable='true']") ||
       tc.closest("input, textarea, .katex, .katex-html")
     ) {

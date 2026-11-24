@@ -1123,8 +1123,15 @@
   -webkit-user-drag: none !important;
 }
 
-.exam-secure-shield * {
+.exam-secure-shield a,
+.exam-secure-shield img,
+.exam-secure-shield .student-question-text,
+.exam-secure-shield .option-content {
   -webkit-touch-callout: none !important;
+}
+
+.exam-textarea-autogrow {
+  field-sizing: content;
 }
 
 .exam-secure-shield img {

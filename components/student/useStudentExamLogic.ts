@@ -49,6 +49,37 @@ const getQuestionAnswersSignature = (ans?: Record<string, string> | null): strin
   return JSON.stringify(clean);
 };
 
+const isQuestionValueAnswered = (q: Question, ans: string | undefined): boolean => {
+  if (!ans) return false;
+  if (q.questionType === "COMPLEX_MULTIPLE_CHOICE") {
+    try {
+      const parsed = JSON.parse(ans);
+      return Array.isArray(parsed) && parsed.length > 0;
+    } catch {
+      return false;
+    }
+  }
+  if (q.questionType === "TRUE_FALSE") {
+    try {
+      const parsed = JSON.parse(ans);
+      const rowCount = q.trueFalseRows?.length || 0;
+      return Object.keys(parsed).length >= rowCount && rowCount > 0;
+    } catch {
+      return false;
+    }
+  }
+  if (q.questionType === "MATCHING") {
+    try {
+      const parsed = JSON.parse(ans);
+      const pairCount = q.matchingPairs?.length || 0;
+      return Object.keys(parsed).length >= pairCount && pairCount > 0;
+    } catch {
+      return false;
+    }
+  }
+  return ans.trim().length > 0;
+};
+
 export const useStudentExamLogic = ({
   exam,
   student,
@@ -99,6 +130,13 @@ export const useStudentExamLogic = ({
   const isStateLoadedRef = useRef<boolean>(false);
   const studentResultIdRef = useRef<number | undefined>(student.resultId ?? initialData?.id);
   const isAutoSavingRef = useRef(false);
+  const dirtyVersionRef = useRef(0);
+  const lastSyncedDirtyVersionRef = useRef(0);
+  const localSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingLastQRef = useRef<string | null>(null);
+  const perQuestionAnswerCacheRef = useRef<
+    Map<string, { raw: string; qRef: Question; answered: boolean }>
+  >(new Map());
 
   useEffect(() => {
     const nextId = student.resultId ?? initialData?.id;
@@ -129,42 +167,63 @@ export const useStudentExamLogic = ({
     ? "Diawasi & Terkunci"
     : "Diawasi Sistem";
 
-  const isAnswered = useCallback((q: Question, currentAnswers: Record<string, string>) => {
-    const ans = currentAnswers[q.id];
-    if (!ans) return false;
-    if (q.questionType === "COMPLEX_MULTIPLE_CHOICE") {
+  const isAnswered = useCallback(
+    (q: Question, currentAnswers: Record<string, string>) =>
+      isQuestionValueAnswered(q, currentAnswers[q.id]),
+    [],
+  );
+
+  const flushLocalProgress = useCallback(() => {
+    if (localSaveTimerRef.current) {
+      clearTimeout(localSaveTimerRef.current);
+      localSaveTimerRef.current = null;
+    }
+    if (student.class === "PREVIEW") {
+      pendingLastQRef.current = null;
+      return;
+    }
+    storageService
+      .saveLocalProgress(STORAGE_KEY, {
+        answers: answersRef.current,
+        logs: logRef.current,
+        resultId: studentResultIdRef.current,
+        lastUpdated: Date.now(),
+      })
+      .catch(() => {});
+
+    const pendingLastQ = pendingLastQRef.current;
+    if (pendingLastQ) {
+      pendingLastQRef.current = null;
       try {
-        const parsed = JSON.parse(ans);
-        return Array.isArray(parsed) && parsed.length > 0;
+        localStorage.setItem(
+          `exam_last_q_${activeExam.code}_${student.studentId}`,
+          pendingLastQ,
+        );
       } catch {
-        return false;
+        // ignore
       }
     }
-    if (q.questionType === "TRUE_FALSE") {
-      try {
-        const parsed = JSON.parse(ans);
-        const rowCount = q.trueFalseRows?.length || 0;
-        return Object.keys(parsed).length >= rowCount && rowCount > 0;
-      } catch {
-        return false;
+  }, [STORAGE_KEY, activeExam.code, student.class, student.studentId]);
+
+  const scheduleLocalSave = useCallback(
+    (qId: string, delayMs: number) => {
+      pendingLastQRef.current = qId;
+      if (localSaveTimerRef.current) {
+        clearTimeout(localSaveTimerRef.current);
       }
-    }
-    if (q.questionType === "MATCHING") {
-      try {
-        const parsed = JSON.parse(ans);
-        const pairCount = q.matchingPairs?.length || 0;
-        return Object.keys(parsed).length >= pairCount && pairCount > 0;
-      } catch {
-        return false;
-      }
-    }
-    return ans.trim().length > 0;
-  }, []);
+      localSaveTimerRef.current = setTimeout(() => {
+        localSaveTimerRef.current = null;
+        flushLocalProgress();
+      }, delayMs);
+    },
+    [flushLocalProgress],
+  );
 
   const executeSubmit = useCallback(
     async (status: ResultStatus = "completed") => {
       if (isSubmittingRef.current) return;
 
+      flushLocalProgress();
       setIsSubmitting(true);
       isSubmittingRef.current = true;
 
@@ -272,7 +331,7 @@ export const useStudentExamLogic = ({
         });
       }
     },
-    [activeExam, onSubmit, userLocation, STORAGE_KEY, student.studentId],
+    [activeExam, onSubmit, userLocation, STORAGE_KEY, student.studentId, flushLocalProgress],
   );
 
   const handleSubmit = useCallback(
@@ -356,7 +415,7 @@ export const useStudentExamLogic = ({
     executeSubmit("completed");
   }, [executeSubmit]);
 
-  const { timeLeft } = useExamAntiCheat({
+  const { getTimeLeft, subscribeTimeLeft } = useExamAntiCheat({
     student,
     exam: activeExam,
     initialData,
@@ -366,8 +425,15 @@ export const useStudentExamLogic = ({
     timeLeftRef,
     onForceSubmit: handleSubmit,
     onTeacherForceStop: triggerTeacherForceStop,
+    onBeforeFlush: flushLocalProgress,
     isSubmitting,
   });
+
+  useEffect(() => {
+    return () => {
+      flushLocalProgress();
+    };
+  }, [flushLocalProgress]);
 
   useEffect(() => {
     let channel: ReturnType<typeof supabase.channel> | null = null;
@@ -707,9 +773,18 @@ export const useStudentExamLogic = ({
           setAnswers(loadedAnswers);
           answersRef.current = loadedAnswers;
           if (localData.logs) logRef.current = localData.logs;
-          lastSyncedSignatureRef.current = initialData?.id
+          const serverSig = initialData?.id
             ? getQuestionAnswersSignature(initialData.answers)
             : "{}";
+          const localSig = getQuestionAnswersSignature(loadedAnswers);
+          lastSyncedSignatureRef.current = serverSig;
+          if (localSig !== serverSig) {
+            dirtyVersionRef.current = 1;
+            lastSyncedDirtyVersionRef.current = 0;
+          } else {
+            dirtyVersionRef.current = 0;
+            lastSyncedDirtyVersionRef.current = 0;
+          }
           isStateLoadedRef.current = true;
           return;
         }
@@ -773,6 +848,8 @@ export const useStudentExamLogic = ({
           setAnswers(loadedAnswers);
           answersRef.current = loadedAnswers;
           lastSyncedSignatureRef.current = getQuestionAnswersSignature(loadedAnswers);
+          dirtyVersionRef.current = 0;
+          lastSyncedDirtyVersionRef.current = 0;
         } else {
           let deviceId = localStorage.getItem("deviceId");
           if (!deviceId) {
@@ -783,6 +860,8 @@ export const useStudentExamLogic = ({
           setAnswers(loadedAnswers);
           answersRef.current = loadedAnswers;
           lastSyncedSignatureRef.current = "{}";
+          dirtyVersionRef.current = 0;
+          lastSyncedDirtyVersionRef.current = 0;
         }
         isStateLoadedRef.current = true;
       })();
@@ -810,13 +889,13 @@ export const useStudentExamLogic = ({
       if (!isStateLoadedRef.current || isSubmittingRef.current || isAutoSavingRef.current) return;
       if (typeof navigator !== "undefined" && navigator.onLine === false) return;
 
-      const currentAnswers = answersRef.current;
-      const currentSignature = getQuestionAnswersSignature(currentAnswers);
-      // Strict dirty check: no change -> zero requests sent
-      if (currentSignature === lastSyncedSignatureRef.current) {
+      const currentDirtyVersion = dirtyVersionRef.current;
+      // Strict O(1) dirty check: no change since last sync -> zero CPU/network work
+      if (currentDirtyVersion === lastSyncedDirtyVersionRef.current) {
         return;
       }
 
+      const currentAnswers = answersRef.current;
       const mode = (activeExam.config.examMode || "UJIAN").trim().toUpperCase();
       const currentIsPR = mode === "PR";
       const timeLimitMin = Number(activeExam.config.timeLimit) || 0;
@@ -837,6 +916,7 @@ export const useStudentExamLogic = ({
       }
 
       isAutoSavingRef.current = true;
+      const syncAttemptVersion = currentDirtyVersion;
       const payloadSnapshot = { ...currentAnswers };
       try {
         const res = await storageService.autoSaveStudentAnswers({
@@ -855,7 +935,8 @@ export const useStudentExamLogic = ({
         }
 
         if (res.ok) {
-          lastSyncedSignatureRef.current = currentSignature;
+          lastSyncedDirtyVersionRef.current = syncAttemptVersion;
+          lastSyncedSignatureRef.current = getQuestionAnswersSignature(payloadSnapshot);
           lastServerSyncAtRef.current = Date.now();
           if (typeof res.resultId === "number" && res.resultId > 0) {
             studentResultIdRef.current = res.resultId;
@@ -937,26 +1018,30 @@ export const useStudentExamLogic = ({
       .catch(() => {});
   }, [activeExam, student.studentId, isAnswered]);
 
+  const questionSaveDelayMap = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const q of activeExam.questions) {
+      const isTextTyping =
+        q.questionType === "ESSAY" ||
+        q.questionType === "FILL_IN_THE_BLANK" ||
+        (q.questionType === "QUESTIONNAIRE" && q.questionnaireFormat === "text");
+      map.set(q.id, isTextTyping ? 450 : 120);
+    }
+    return map;
+  }, [activeExam.questions]);
+
   const handleAnswerChange = useCallback(
     (qId: string, val: string) => {
-      setAnswers((prev) => {
-        const next = { ...prev, [qId]: val };
-        answersRef.current = next;
-        if (student.class !== "PREVIEW") {
-          storageService.saveLocalProgress(STORAGE_KEY, {
-            answers: next,
-            logs: logRef.current,
-            resultId: studentResultIdRef.current,
-            lastUpdated: Date.now(),
-          });
-          try {
-            localStorage.setItem(`exam_last_q_${activeExam.code}_${student.studentId}`, qId);
-          } catch {
-            // ignore
-          }
-        }
-        return next;
-      });
+      const next = { ...answersRef.current, [qId]: val };
+      answersRef.current = next;
+      dirtyVersionRef.current += 1;
+      setAnswers(next);
+
+      if (student.class !== "PREVIEW") {
+        const delayMs = questionSaveDelayMap.get(qId) ?? 200;
+        scheduleLocalSave(qId, delayMs);
+      }
+
       if (student.class !== "PREVIEW" && !activeExam.config.disableRealtime) {
         const now = Date.now();
         if (now - lastBroadcastTimeRef.current > 2000) {
@@ -966,12 +1051,11 @@ export const useStudentExamLogic = ({
       }
     },
     [
-      STORAGE_KEY,
-      activeExam.code,
+      questionSaveDelayMap,
+      scheduleLocalSave,
       activeExam.config.disableRealtime,
       broadcastProgress,
       student.class,
-      student.studentId,
     ],
   );
 
@@ -988,7 +1072,7 @@ export const useStudentExamLogic = ({
     }
   }, [activeExam.code, student.studentId]);
 
-  const formatTime = (s: number) => {
+  const formatTime = useCallback((s: number) => {
     if (s === Infinity) return "Tanpa Batas Waktu";
     const h = Math.floor(s / 3600),
       m = Math.floor((s % 3600) / 60),
@@ -996,19 +1080,39 @@ export const useStudentExamLogic = ({
     return h > 0
       ? `${h}:${m.toString().padStart(2, "0")}:${sec.toString().padStart(2, "0")}`
       : `${m}:${sec.toString().padStart(2, "0")}`;
-  };
+  }, []);
 
   const totalQuestions = useMemo(
     () => activeExam.questions.filter((q) => q.questionType !== "INFO").length,
     [activeExam.questions],
   );
-  const answeredCount = useMemo(
-    () =>
-      activeExam.questions.filter(
-        (q) => q.questionType !== "INFO" && isAnswered(q, answers),
-      ).length,
-    [activeExam.questions, answers, isAnswered],
-  );
+
+  const answeredMap = useMemo(() => {
+    const cache = perQuestionAnswerCacheRef.current;
+    const nextMap: Record<string, boolean> = {};
+    for (const q of activeExam.questions) {
+      if (q.questionType === "INFO") continue;
+      const raw = answers[q.id] || "";
+      const hit = cache.get(q.id);
+      if (hit && hit.raw === raw && hit.qRef === q) {
+        nextMap[q.id] = hit.answered;
+      } else {
+        const answered = isQuestionValueAnswered(q, raw);
+        cache.set(q.id, { raw, qRef: q, answered });
+        nextMap[q.id] = answered;
+      }
+    }
+    return nextMap;
+  }, [activeExam.questions, answers]);
+
+  const answeredCount = useMemo(() => {
+    let count = 0;
+    for (const key in answeredMap) {
+      if (answeredMap[key]) count += 1;
+    }
+    return count;
+  }, [answeredMap]);
+
   const progress =
     totalQuestions > 0 ? Math.round((answeredCount / totalQuestions) * 100) : 0;
 
@@ -1118,8 +1222,11 @@ export const useStudentExamLogic = ({
     isMonitoring,
     monitoringLabel,
     isAnswered,
+    answeredMap,
     handleSubmit,
-    timeLeft,
+    getTimeLeft,
+    subscribeTimeLeft,
+    flushLocalProgress,
     handleAnswerChange,
     scrollToQuestion,
     answersRef,
