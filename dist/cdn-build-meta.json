@@ -1,18 +1,18 @@
 {
-  "tag": "cdn-2403d62340af",
-  "cdnBaseUrl": "https://cdn.jsdelivr.net/gh/i7620-lgtm/Platform-Ujian-Cerdas@cdn-2403d62340af/dist",
-  "builtAt": "2026-11-22T12:08:43.118Z",
+  "tag": "cdn-17ec39bae16a",
+  "cdnBaseUrl": "https://cdn.jsdelivr.net/gh/i7620-lgtm/Platform-Ujian-Cerdas@cdn-17ec39bae16a/dist",
+  "builtAt": "2026-11-24T11:06:47.025Z",
   "entryAssets": [
-    "assets/index-CAwBCYBZ.js",
+    "assets/index-gcwljAis.js",
     "assets/vendor-state-e5U2a8Cz.js",
     "assets/vendor-react-core-epku87Fy.js",
-    "assets/vendor-jspdf-DHr10pbJ.js",
+    "assets/vendor-jspdf-CLFDSQQh.js",
     "assets/vendor-supabase-D6h2Ap73.js",
-    "assets/vendor-math-markdown-Brb3gQL5.js",
+    "assets/vendor-math-markdown-D3S7atzw.js",
     "assets/vendor-charts-C3V2zGwb.js",
     "assets/vendor-xlsx-Ccx-kdi7.js",
-    "assets/vendor-math-markdown-DbQyN6Fz.css",
-    "assets/index-BO6y9gom.css"
+    "assets/vendor-math-markdown-DbkC2FoB.css",
+    "assets/index-DXwlesdH.css"
   ],
   "rootFiles": [
     "apple-touch-icon.png",
