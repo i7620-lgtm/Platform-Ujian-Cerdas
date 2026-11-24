@@ -1,8 +1,21 @@
 import { useEffect, useRef, useMemo, useCallback, useState } from "react";
 import type { RealtimeChannel } from "@supabase/supabase-js";
-import type { Exam, Result, TeacherProfile } from "../../../../types";
+import type {
+  Exam,
+  RegisteredStudentConfig,
+  Result,
+  TeacherProfile,
+} from "../../../../types";
 import { supabase } from "../../../../lib/supabase";
 import { storageService } from "../../../../services/storage";
+import {
+  isSameStudentIdentity,
+  normalizeAbsentNumber,
+  normalizeClassToken,
+  normalizeTextToken,
+  stripClassCapacity,
+  type StudentIdentityCandidate,
+} from "../../../../utils/studentIdentity";
 
 interface UseOngoingExamModalProps {
   exam: Exam | null;
@@ -24,6 +37,28 @@ interface EditingStudentData {
 
 const PAGE_SIZE = 50;
 
+const compareAbsentSafe = (aRaw?: string, bRaw?: string): number => {
+  const a = normalizeAbsentNumber(aRaw);
+  const b = normalizeAbsentNumber(bRaw);
+  if (!a && !b) return 0;
+  if (!a || a === "-") return 1;
+  if (!b || b === "-") return -1;
+  return a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" });
+};
+
+const isResultRowEqual = (a: Result, b: Result): boolean =>
+  a.id === b.id &&
+  a.status === b.status &&
+  (a.score ?? 0) === (b.score ?? 0) &&
+  (a.correctAnswers ?? 0) === (b.correctAnswers ?? 0) &&
+  (a.totalQuestions ?? 0) === (b.totalQuestions ?? 0) &&
+  (a.timestamp ?? 0) === (b.timestamp ?? 0) &&
+  a.student.studentId === b.student.studentId &&
+  a.student.fullName === b.student.fullName &&
+  a.student.class === b.student.class &&
+  (a.student.schoolName || "") === (b.student.schoolName || "") &&
+  (a.student.absentNumber || "") === (b.student.absentNumber || "");
+
 export const useOngoingExamModal = ({
   exam,
   onClose,
@@ -31,7 +66,7 @@ export const useOngoingExamModal = ({
   proctorToken,
   isPremium,
 }: UseOngoingExamModalProps) => {
-  const [displayExam, setDisplayExam] = useState<Exam | null>(null);
+  const [displayExam, setDisplayExam] = useState<Exam | null>(exam);
   const [selectedClass, setSelectedClass] = useState("ALL");
   const [selectedSchool, setSelectedSchool] = useState("ALL");
   const [statusFilter, setStatusFilter] = useState<
@@ -40,6 +75,13 @@ export const useOngoingExamModal = ({
   const [searchQuery, setSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [localResults, setLocalResults] = useState<Result[]>([]);
+  const [fallbackRegisteredStudents, setFallbackRegisteredStudents] = useState<
+    RegisteredStudentConfig[]
+  >([]);
+  const [isInitialLoading, setIsInitialLoading] = useState<boolean>(
+    Boolean(exam?.code),
+  );
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isAddTimeOpen, setIsAddTimeOpen] = useState(false);
   const [addTimeValue, setAddTimeValue] = useState<number | "">("");
@@ -48,8 +90,15 @@ export const useOngoingExamModal = ({
   const [isGuideModalOpen, setIsGuideModalOpen] = useState(false);
   const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
   const [isKisiKisiModalOpen, setIsKisiKisiModalOpen] = useState(false);
-  const [confirmDialog, setConfirmDialog] = useState<{isOpen: boolean; message: string; onConfirm: () => void}>({ isOpen: false, message: '', onConfirm: () => {} });
-  const [alertDialog, setAlertDialog] = useState<{isOpen: boolean; message: string}>({ isOpen: false, message: '' });
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean;
+    message: string;
+    onConfirm: () => void;
+  }>({ isOpen: false, message: "", onConfirm: () => {} });
+  const [alertDialog, setAlertDialog] = useState<{
+    isOpen: boolean;
+    message: string;
+  }>({ isOpen: false, message: "" });
 
   const [generatedTokenData, setGeneratedTokenData] = useState<{
     name: string;
@@ -60,6 +109,9 @@ export const useOngoingExamModal = ({
   const [onlineStudents, setOnlineStudents] = useState<Record<string, boolean>>(
     {},
   );
+  const [broadcastCounts, setBroadcastCounts] = useState<
+    Record<string, { answered: number; total: number }>
+  >({});
 
   const processingIdsRef = useRef<Set<string>>(new Set());
   const broadcastProgressRef = useRef<
@@ -72,6 +124,11 @@ export const useOngoingExamModal = ({
   }, [localResults]);
   const lastPollCursorRef = useRef<string | null>(null);
   const hydratedCodeRef = useRef<string | null>(null);
+  const fetchedRosterCodeRef = useRef<string | null>(null);
+  const lastConfigJsonRef = useRef<string>(
+    exam?.config ? JSON.stringify(exam.config) : "",
+  );
+  const hasCompletedInitialLoadRef = useRef<boolean>(false);
 
   const advanceCursorFromResults = useCallback((items: Result[]) => {
     let maxTs = 0;
@@ -81,38 +138,129 @@ export const useOngoingExamModal = ({
       }
     }
     const baseTs = maxTs > 0 ? maxTs : Date.now();
-    lastPollCursorRef.current = new Date(Math.max(0, baseTs - 2000)).toISOString();
+    lastPollCursorRef.current = new Date(
+      Math.max(0, baseTs - 2000),
+    ).toISOString();
   }, []);
 
   useEffect(() => {
     setDisplayExam(exam);
+    lastConfigJsonRef.current = exam?.config ? JSON.stringify(exam.config) : "";
     lastPollCursorRef.current = null;
+    setLoadError(null);
+    setFallbackRegisteredStudents([]);
+    setBroadcastCounts({});
+    hasCompletedInitialLoadRef.current = false;
+
     if (!exam?.code) {
       hydratedCodeRef.current = null;
+      fetchedRosterCodeRef.current = null;
+      setIsInitialLoading(false);
       return;
     }
-    if (exam.questionsDeferred && hydratedCodeRef.current !== exam.code) {
+
+    setIsInitialLoading(true);
+    if (!exam.questionsDeferred) {
       hydratedCodeRef.current = exam.code;
-      storageService.ensureExamQuestions(exam).then((hydrated) => {
+    } else if (hydratedCodeRef.current !== exam.code) {
+      hydratedCodeRef.current = null;
+    }
+
+    const configRoster = exam.config?.registeredStudents;
+    if (
+      (!configRoster || configRoster.length === 0) &&
+      fetchedRosterCodeRef.current !== exam.code
+    ) {
+      const targetCode = exam.code;
+      fetchedRosterCodeRef.current = targetCode;
+      let cancelled = false;
+
+      (async () => {
+        try {
+          const allRoster: RegisteredStudentConfig[] = [];
+          const ROSTER_PAGE = 1000;
+          let from = 0;
+          while (!cancelled) {
+            const { data, error } = await supabase
+              .from("registered_students")
+              .select("id, school_name, class_name, student_name, absent_number")
+              .eq("exam_code", targetCode)
+              .range(from, from + ROSTER_PAGE - 1);
+
+            if (error || !data || data.length === 0) break;
+            allRoster.push(...(data as RegisteredStudentConfig[]));
+            if (data.length < ROSTER_PAGE) break;
+            from += ROSTER_PAGE;
+          }
+          if (!cancelled && allRoster.length > 0) {
+            setFallbackRegisteredStudents(allRoster);
+          }
+        } catch (err) {
+          console.warn("Gagal memuat daftar siswa terdaftar:", err);
+        }
+      })();
+
+      return () => {
+        cancelled = true;
+      };
+    } else if (configRoster && configRoster.length > 0) {
+      fetchedRosterCodeRef.current = exam.code;
+    }
+  }, [exam]);
+
+  // Lazy question hydration ONLY when teacher opens Soal PDF or Kisi-Kisi preview
+  useEffect(() => {
+    if (!displayExam?.code) return;
+    if (!isPrintModalOpen && !isKisiKisiModalOpen) return;
+    if (!displayExam.questionsDeferred || hydratedCodeRef.current === displayExam.code) {
+      return;
+    }
+
+    let cancelled = false;
+    hydratedCodeRef.current = displayExam.code;
+    storageService
+      .ensureExamQuestions(displayExam)
+      .then((hydrated) => {
+        if (cancelled) return;
         setDisplayExam((prev) =>
           prev && prev.code === hydrated.code
             ? { ...hydrated, config: prev.config || hydrated.config }
             : prev,
         );
-      }).catch(() => {});
-    }
-  }, [exam]);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          hydratedCodeRef.current = null;
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [displayExam, isPrintModalOpen, isKisiKisiModalOpen]);
 
   const fetchLatest = useCallback(
     async (silent = false) => {
       if (!displayExam?.code) return;
       if (!silent) setIsRefreshing(true);
+      setLoadError(null);
       try {
         const includeAnswers = !displayExam.config?.disableRealtime;
-        const data = await storageService.getOngoingExamResults(displayExam.code, {
-          includeAnswers,
+        const data = await storageService.getOngoingExamResults(
+          displayExam.code,
+          {
+            includeAnswers,
+          },
+        );
+        setLocalResults((prev) => {
+          if (
+            prev.length === data.length &&
+            prev.every((row, idx) => isResultRowEqual(row, data[idx]))
+          ) {
+            return prev;
+          }
+          return data;
         });
-        setLocalResults(data);
         advanceCursorFromResults(data);
 
         const { data: examData } = await supabase
@@ -121,17 +269,32 @@ export const useOngoingExamModal = ({
           .eq("code", displayExam.code)
           .maybeSingle();
         if (examData && examData.config) {
-          setDisplayExam((prev) =>
-            prev ? { ...prev, config: examData.config } : null,
-          );
+          const nextJson = JSON.stringify(examData.config);
+          if (nextJson !== lastConfigJsonRef.current) {
+            lastConfigJsonRef.current = nextJson;
+            setDisplayExam((prev) =>
+              prev ? { ...prev, config: examData.config } : null,
+            );
+          }
         }
       } catch (e) {
         console.error("Fetch failed", e);
+        if (!hasCompletedInitialLoadRef.current || !silent) {
+          setLoadError(
+            "Gagal memuat data pemantauan. Periksa koneksi internet lalu tekan Muat Ulang.",
+          );
+        }
       } finally {
+        hasCompletedInitialLoadRef.current = true;
+        setIsInitialLoading(false);
         if (!silent) setIsRefreshing(false);
       }
     },
-    [displayExam?.code, displayExam?.config?.disableRealtime, advanceCursorFromResults],
+    [
+      displayExam?.code,
+      displayExam?.config?.disableRealtime,
+      advanceCursorFromResults,
+    ],
   );
 
   useEffect(() => {
@@ -146,11 +309,22 @@ export const useOngoingExamModal = ({
         const isLargeScaleMode = Boolean(displayExam.config?.disableRealtime);
 
         if (!cursor) {
-          const full = await storageService.getOngoingExamResults(displayExam.code, {
-            includeAnswers: !isLargeScaleMode,
-          });
+          const full = await storageService.getOngoingExamResults(
+            displayExam.code,
+            {
+              includeAnswers: !isLargeScaleMode,
+            },
+          );
           if (!isDisposed) {
-            setLocalResults(full);
+            setLocalResults((prev) => {
+              if (
+                prev.length === full.length &&
+                prev.every((row, idx) => isResultRowEqual(row, full[idx]))
+              ) {
+                return prev;
+              }
+              return full;
+            });
             advanceCursorFromResults(full);
           }
           return;
@@ -158,34 +332,55 @@ export const useOngoingExamModal = ({
 
         if (isLargeScaleMode) {
           // Normal Mode (disableRealtime): delta fetch lightweight columns only, zero answers & location
-          const changedRows = await storageService.getOngoingExamResults(displayExam.code, {
-            includeAnswers: false,
-            updatedAfterIso: cursor,
-          });
+          const changedRows = await storageService.getOngoingExamResults(
+            displayExam.code,
+            {
+              includeAnswers: false,
+              updatedAfterIso: cursor,
+            },
+          );
           if (changedRows.length === 0 || isDisposed) return;
 
           advanceCursorFromResults(changedRows);
           setLocalResults((prev) => {
-            const map = new Map<number, number>();
-            const next = [...prev];
-            next.forEach((r, idx) => {
-              if (typeof r.id === "number") map.set(r.id, idx);
+            const indexById = new Map<number, number>();
+            prev.forEach((r, idx) => {
+              if (typeof r.id === "number") indexById.set(r.id, idx);
             });
+
+            let hasAnyChange = false;
+            let next: Result[] | null = null;
+
             for (const changed of changedRows) {
-              if (typeof changed.id === "number" && map.has(changed.id)) {
-                next[map.get(changed.id)!] = changed;
+              if (typeof changed.id === "number" && indexById.has(changed.id)) {
+                const idx = indexById.get(changed.id)!;
+                const currentItem = (next || prev)[idx];
+                if (!isResultRowEqual(currentItem, changed)) {
+                  if (!next) next = [...prev];
+                  next[idx] = changed;
+                  hasAnyChange = true;
+                }
               } else {
+                if (!next) next = [...prev];
+                indexById.set(changed.id ?? -next.length - 1, next.length);
                 next.push(changed);
+                hasAnyChange = true;
               }
             }
-            return next;
+            return hasAnyChange && next ? next : prev;
           });
           return;
         }
 
         // Realtime Mode Backup: delta query changed status/score since cursor
         const POLL_PAGE_SIZE = 1000;
-        const changedServerRows: { id: number; status: string; score: number | null; correct_answers: number | null; updated_at: string }[] = [];
+        const changedServerRows: {
+          id: number;
+          status: string;
+          score: number | null;
+          correct_answers: number | null;
+          updated_at: string;
+        }[] = [];
         let from = 0;
         while (true) {
           const { data, error } = await supabase
@@ -211,7 +406,9 @@ export const useOngoingExamModal = ({
           }
         }
         if (maxTs > 0) {
-          lastPollCursorRef.current = new Date(Math.max(0, maxTs - 2000)).toISOString();
+          lastPollCursorRef.current = new Date(
+            Math.max(0, maxTs - 2000),
+          ).toISOString();
         }
 
         const currentSnapshot = localResultsRef.current;
@@ -222,7 +419,9 @@ export const useOngoingExamModal = ({
           }
         }
         const idsToFetch: number[] = [];
-        const serverMap = new Map(changedServerRows.map((row) => [row.id, row]));
+        const serverMap = new Map(
+          changedServerRows.map((row) => [row.id, row]),
+        );
 
         for (const serverRec of changedServerRows) {
           const localRec = localMap.get(serverRec.id);
@@ -286,7 +485,9 @@ export const useOngoingExamModal = ({
               )
               .in("id", idsToFetch.slice(i, i + DETAIL_BATCH));
             if (specificData) {
-              fetchedRows.push(...(specificData as Record<string, unknown>[]));
+              fetchedRows.push(
+                ...(specificData as Record<string, unknown>[]),
+              );
             }
           }
 
@@ -321,7 +522,12 @@ export const useOngoingExamModal = ({
       clearInterval(pollInterval);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
-  }, [displayExam?.code, displayExam?.config?.disableRealtime, fetchLatest, advanceCursorFromResults]);
+  }, [
+    displayExam?.code,
+    displayExam?.config?.disableRealtime,
+    fetchLatest,
+    advanceCursorFromResults,
+  ]);
 
   useEffect(() => {
     if (!displayExam?.code) return;
@@ -329,9 +535,7 @@ export const useOngoingExamModal = ({
     const examCode = displayExam.code;
 
     if (displayExam.config?.disableRealtime) {
-      console.log(
-        "Realtime disabled (Normal Mode). Relying on polling.",
-      );
+      console.log("Realtime disabled (Normal Mode). Relying on polling.");
       return;
     }
 
@@ -399,18 +603,41 @@ export const useOngoingExamModal = ({
                 const old = updated[i];
                 updated[i] = {
                   ...old,
-                  status: newData.status !== undefined ? (newData.status as any) : old.status,
-                  score: newData.score !== undefined ? (newData.score as number) : old.score,
-                  correctAnswers: newData.correct_answers !== undefined ? (newData.correct_answers as number) : old.correctAnswers,
-                  totalQuestions: newData.total_questions !== undefined ? (newData.total_questions as number) : old.totalQuestions,
-                  answers: newData.answers !== undefined ? (newData.answers as Record<string, string>) : old.answers,
-                  activityLog: newData.activity_log !== undefined ? (newData.activity_log as string[]) : old.activityLog,
-                  timestamp: newData.updated_at !== undefined ? new Date(newData.updated_at as string).getTime() : old.timestamp,
-                  location: newData.location !== undefined ? (newData.location as any) : old.location,
+                  status:
+                    newData.status !== undefined
+                      ? (newData.status as any)
+                      : old.status,
+                  score:
+                    newData.score !== undefined
+                      ? (newData.score as number)
+                      : old.score,
+                  correctAnswers:
+                    newData.correct_answers !== undefined
+                      ? (newData.correct_answers as number)
+                      : old.correctAnswers,
+                  totalQuestions:
+                    newData.total_questions !== undefined
+                      ? (newData.total_questions as number)
+                      : old.totalQuestions,
+                  answers:
+                    newData.answers !== undefined
+                      ? (newData.answers as Record<string, string>)
+                      : old.answers,
+                  activityLog:
+                    newData.activity_log !== undefined
+                      ? (newData.activity_log as string[])
+                      : old.activityLog,
+                  timestamp:
+                    newData.updated_at !== undefined
+                      ? new Date(newData.updated_at as string).getTime()
+                      : old.timestamp,
+                  location:
+                    newData.location !== undefined
+                      ? (newData.location as any)
+                      : old.location,
                 };
                 return updated;
               }
-              // If not found in local state, trigger a fetch to be safe
               setTimeout(() => fetchLatest(true), 100);
               return current;
             });
@@ -430,11 +657,15 @@ export const useOngoingExamModal = ({
             payload.new as { config?: Record<string, unknown> }
           ).config;
           if (newConfig) {
-            setDisplayExam((prev) =>
-              prev
-                ? { ...prev, config: newConfig as unknown as Exam["config"] }
-                : null,
-            );
+            const nextJson = JSON.stringify(newConfig);
+            if (nextJson !== lastConfigJsonRef.current) {
+              lastConfigJsonRef.current = nextJson;
+              setDisplayExam((prev) =>
+                prev
+                  ? { ...prev, config: newConfig as unknown as Exam["config"] }
+                  : null,
+              );
+            }
           }
         },
       )
@@ -446,19 +677,34 @@ export const useOngoingExamModal = ({
           total: totalQuestions,
           timestamp,
         };
-        setOnlineStudents((prev) => ({ ...prev, [studentId]: true }));
+        setBroadcastCounts((prev) => {
+          const existing = prev[studentId];
+          if (
+            existing &&
+            existing.answered === answeredCount &&
+            existing.total === totalQuestions
+          ) {
+            return prev;
+          }
+          return {
+            ...prev,
+            [studentId]: { answered: answeredCount, total: totalQuestions },
+          };
+        });
+        setOnlineStudents((prev) =>
+          prev[studentId] ? prev : { ...prev, [studentId]: true },
+        );
         setLocalResults((prev) => {
           const idx = prev.findIndex((r) => r.student.studentId === studentId);
-          if (idx >= 0 && prev[idx].status === "in_progress") {
+          if (
+            idx >= 0 &&
+            prev[idx].status === "in_progress" &&
+            prev[idx].timestamp !== timestamp
+          ) {
             const updated = [...prev];
             updated[idx] = {
               ...updated[idx],
-              answers: Object.fromEntries(
-                Array(answeredCount)
-                  .fill("placeholder")
-                  .map((_, i) => [i.toString(), "placeholder"]),
-              ),
-              timestamp: timestamp,
+              timestamp,
             };
             return updated;
           }
@@ -509,10 +755,132 @@ export const useOngoingExamModal = ({
     isPremium,
   ]);
 
+  const effectiveRegisteredStudents = useMemo(() => {
+    const fromConfig = displayExam?.config?.registeredStudents;
+    if (fromConfig && fromConfig.length > 0) return fromConfig;
+    return fallbackRegisteredStudents;
+  }, [displayExam?.config?.registeredStudents, fallbackRegisteredStudents]);
+
+  // O(N) merge of active/completed participants + unjoined registered students ONLY (zero synthetic 1..maxAbsent rows)
+  const mergedResults = useMemo(() => {
+    if (!effectiveRegisteredStudents || effectiveRegisteredStudents.length === 0) {
+      return localResults;
+    }
+
+    const joinedFullBuckets = new Map<string, Result[]>();
+    const joinedNoAbsBuckets = new Map<string, Result[]>();
+
+    for (const r of localResults) {
+      const nameTok = normalizeTextToken(r.student.fullName);
+      const classTok = normalizeClassToken(r.student.class);
+      const absTok = normalizeAbsentNumber(r.student.absentNumber);
+      if (nameTok && classTok) {
+        const noAbsKey = `${nameTok}::${classTok}`;
+        const listNoAbs = joinedNoAbsBuckets.get(noAbsKey);
+        if (listNoAbs) listNoAbs.push(r);
+        else joinedNoAbsBuckets.set(noAbsKey, [r]);
+
+        if (absTok) {
+          const fullKey = `${noAbsKey}::${absTok}`;
+          const listFull = joinedFullBuckets.get(fullKey);
+          if (listFull) listFull.push(r);
+          else joinedFullBuckets.set(fullKey, [r]);
+        }
+      }
+    }
+
+    const seenRegisteredKeys = new Set<string>();
+    const unjoinedRegistered: Result[] = [];
+    const examCode = displayExam?.code || "";
+    const defaultAuthorSchool = displayExam?.authorSchool || "";
+
+    effectiveRegisteredStudents.forEach((reg, idx) => {
+      const rawName = (reg.student_name || reg.fullName || "").trim();
+      if (!rawName) return;
+
+      const rawClass = reg.class_name || reg.className || "";
+      const parsedClass = stripClassCapacity(rawClass);
+      const cleanClass = (parsedClass.className || rawClass || "").trim() || "Lainnya";
+      const cleanSchool = (
+        reg.school_name ||
+        reg.schoolName ||
+        parsedClass.schoolName ||
+        defaultAuthorSchool ||
+        ""
+      ).trim();
+      const rawAbsent = String(reg.absent_number ?? reg.absentNumber ?? "").trim();
+
+      const nameTok = normalizeTextToken(rawName);
+      const classTok = normalizeClassToken(cleanClass);
+      const absTok = normalizeAbsentNumber(rawAbsent);
+      const schoolTok = normalizeTextToken(cleanSchool);
+
+      const dedupKey = `${schoolTok}::${nameTok}::${classTok}::${absTok}`;
+      if (seenRegisteredKeys.has(dedupKey)) return;
+      seenRegisteredKeys.add(dedupKey);
+
+      const candidate: StudentIdentityCandidate = {
+        fullName: rawName,
+        class: cleanClass,
+        absentNumber: rawAbsent,
+        schoolName: cleanSchool,
+      };
+
+      const noAbsKey = `${nameTok}::${classTok}`;
+      let alreadyJoined = false;
+
+      if (absTok) {
+        const bucket = joinedFullBuckets.get(`${noAbsKey}::${absTok}`);
+        if (bucket && bucket.some((r) => isSameStudentIdentity(r.student, candidate))) {
+          alreadyJoined = true;
+        }
+      } else {
+        const bucket = joinedNoAbsBuckets.get(noAbsKey);
+        if (
+          bucket &&
+          bucket.some((r) => {
+            const rSchool = normalizeTextToken(r.student.schoolName);
+            return !schoolTok || !rSchool || rSchool === schoolTok;
+          })
+        ) {
+          alreadyJoined = true;
+        }
+      }
+
+      if (alreadyJoined) return;
+
+      unjoinedRegistered.push({
+        id: undefined,
+        isPlaceholder: true,
+        student: {
+          studentId: `registered-${examCode}-${idx}-${classTok}-${absTok || "na"}`,
+          fullName: rawName,
+          schoolName: cleanSchool,
+          class: cleanClass,
+          absentNumber: rawAbsent || "-",
+        },
+        examCode,
+        answers: {},
+        score: 0,
+        totalQuestions: 0,
+        correctAnswers: 0,
+        status: undefined,
+      });
+    });
+
+    if (unjoinedRegistered.length === 0) return localResults;
+    return [...localResults, ...unjoinedRegistered];
+  }, [
+    localResults,
+    effectiveRegisteredStudents,
+    displayExam?.code,
+    displayExam?.authorSchool,
+  ]);
+
   const schoolScopedResults = useMemo(() => {
-    if (!selectedSchool || selectedSchool === "ALL") return localResults;
-    return localResults.filter((r) => r.student.schoolName === selectedSchool);
-  }, [localResults, selectedSchool]);
+    if (!selectedSchool || selectedSchool === "ALL") return mergedResults;
+    return mergedResults.filter((r) => r.student.schoolName === selectedSchool);
+  }, [mergedResults, selectedSchool]);
 
   const uniqueClassesInResults = useMemo(() => {
     const classes = new Set(
@@ -546,10 +914,10 @@ export const useOngoingExamModal = ({
 
   const uniqueSchoolsInResults = useMemo(() => {
     const schools = new Set(
-      localResults.map((r) => r.student.schoolName || "Lainnya"),
+      mergedResults.map((r) => r.student.schoolName || "Lainnya"),
     );
-    return Array.from(schools).sort((a, b) => a.localeCompare(b, undefined));
-  }, [localResults]);
+    return Array.from(schools).sort((a, b) => a.localeCompare(b));
+  }, [mergedResults]);
 
   const classCounts = useMemo(() => {
     const counts: Record<string, number> = {};
@@ -568,187 +936,16 @@ export const useOngoingExamModal = ({
   const totalScopedCount = scopedResults.length;
 
   const sortedResults = useMemo(() => {
-    if (statusFilter !== "ALL") {
-      let filtered = [...scopedResults];
-      if (statusFilter === "LOCKED") {
-        filtered = filtered.filter((r) => r.status === "force_closed");
-      } else if (statusFilter === "ONLINE") {
-        filtered = filtered.filter((r) => r.status === "in_progress");
-      } else if (statusFilter === "COMPLETED") {
-        filtered = filtered.filter((r) => r.status === "completed");
-      }
-
-      return filtered.sort((a, b) => {
-        const schoolA = a.student.schoolName || "";
-        const schoolB = b.student.schoolName || "";
-        const schoolCompare = schoolA.localeCompare(schoolB, undefined, {
-          sensitivity: "base",
-        });
-        if (schoolCompare !== 0) return schoolCompare;
-
-        const classA = a.student.class || "";
-        const classB = b.student.class || "";
-        const classCompare = classA.localeCompare(classB, undefined, {
-          numeric: true,
-          sensitivity: "base",
-        });
-        if (classCompare !== 0) return classCompare;
-
-        const absA = parseInt(a.student.absentNumber) || 0;
-        const absB = parseInt(b.student.absentNumber) || 0;
-        return absA - absB;
-      });
+    let filtered = scopedResults;
+    if (statusFilter === "LOCKED") {
+      filtered = scopedResults.filter((r) => r.status === "force_closed");
+    } else if (statusFilter === "ONLINE") {
+      filtered = scopedResults.filter((r) => r.status === "in_progress");
+    } else if (statusFilter === "COMPLETED") {
+      filtered = scopedResults.filter((r) => r.status === "completed");
     }
 
-    const classGroups = new Map<
-      string,
-      { school: string; className: string; results: Result[] }
-    >();
-
-    if (selectedClass && selectedClass !== "ALL") {
-      const defaultSchool =
-        selectedSchool && selectedSchool !== "ALL"
-          ? selectedSchool
-          : scopedResults[0]?.student.schoolName || "";
-      const key = `${defaultSchool}:::${selectedClass}`;
-      classGroups.set(key, {
-        school: defaultSchool,
-        className: selectedClass,
-        results: [],
-      });
-    }
-
-    scopedResults.forEach((r) => {
-      const sch = r.student.schoolName || "";
-      const cls = r.student.class || "Lainnya";
-      const key = `${sch}:::${cls}`;
-      if (!classGroups.has(key)) {
-        classGroups.set(key, { school: sch, className: cls, results: [] });
-      }
-      classGroups.get(key)!.results.push(r);
-    });
-
-    const getConfiguredClassLimit = (
-      className: string,
-      schoolName: string,
-      targetClasses?: string[],
-    ): number | null => {
-      if (!targetClasses || targetClasses.length === 0) return null;
-
-      const cleanTargetClassName = className
-        .replace(/\(\d+\)$/, "")
-        .trim()
-        .toLowerCase();
-      const cleanSchool = (schoolName || "").trim().toLowerCase();
-
-      for (const tc of targetClasses) {
-        const match = String(tc).match(/^(.+?)(?:\s*\(\s*(\d+)\s*\))?$/);
-        if (match && match[2]) {
-          const limit = parseInt(match[2], 10);
-          if (!isNaN(limit) && limit > 0) {
-            const fullPrefix = match[1].trim();
-            let tcSchool = "";
-            let tcClass = fullPrefix;
-            const dashIdx = fullPrefix.indexOf("-");
-            if (dashIdx !== -1) {
-              tcSchool = fullPrefix.substring(0, dashIdx).trim().toLowerCase();
-              tcClass = fullPrefix.substring(dashIdx + 1).trim();
-            }
-            const cleanTcClass = tcClass.toLowerCase();
-
-            const isClassMatch =
-              cleanTcClass === cleanTargetClassName ||
-              cleanTargetClassName.endsWith(cleanTcClass) ||
-              cleanTcClass.endsWith(cleanTargetClassName);
-
-            const isSchoolMatch =
-              !tcSchool ||
-              !cleanSchool ||
-              tcSchool === cleanSchool ||
-              cleanSchool.includes(tcSchool) ||
-              tcSchool.includes(cleanSchool);
-
-            if (isClassMatch && isSchoolMatch) {
-              return limit;
-            }
-          }
-        }
-      }
-
-      return null;
-    };
-
-    const finalResults: Result[] = [];
-
-    classGroups.forEach((group) => {
-      const { school, className, results } = group;
-
-      const numericAbsents = results
-        .map((r) => parseInt(r.student.absentNumber, 10))
-        .filter((n) => !isNaN(n) && n > 0);
-
-      const nonNumericResults = results.filter(
-        (r) =>
-          isNaN(parseInt(r.student.absentNumber, 10)) ||
-          parseInt(r.student.absentNumber, 10) <= 0,
-      );
-
-      const configuredLimit = getConfiguredClassLimit(
-        className,
-        school,
-        displayExam?.config?.targetClasses,
-      );
-
-      const maxSubmittedAbsent =
-        numericAbsents.length > 0 ? Math.max(...numericAbsents) : 0;
-
-      const maxAbsent =
-        configuredLimit !== null && configuredLimit > 0
-          ? Math.max(configuredLimit, maxSubmittedAbsent)
-          : maxSubmittedAbsent;
-
-      if (maxAbsent > 0) {
-        const absentMap = new Map<number, Result[]>();
-        results.forEach((r) => {
-          const num = parseInt(r.student.absentNumber, 10);
-          if (!isNaN(num) && num > 0) {
-            if (!absentMap.has(num)) absentMap.set(num, []);
-            absentMap.get(num)!.push(r);
-          }
-        });
-
-        for (let i = 1; i <= maxAbsent; i++) {
-          const existing = absentMap.get(i);
-          if (existing && existing.length > 0) {
-            finalResults.push(...existing);
-          } else {
-            finalResults.push({
-              id: undefined,
-              isPlaceholder: true,
-              student: {
-                studentId: `placeholder-${className}-${i}`,
-                fullName: "",
-                schoolName: school,
-                class: className,
-                absentNumber: String(i),
-              },
-              examCode: displayExam?.code || "",
-              answers: {},
-              score: 0,
-              totalQuestions: 0,
-              correctAnswers: 0,
-              status: undefined,
-            });
-          }
-        }
-      } else {
-        finalResults.push(...results);
-      }
-
-      finalResults.push(...nonNumericResults);
-    });
-
-    return finalResults.sort((a, b) => {
+    return [...filtered].sort((a, b) => {
       const schoolA = a.student.schoolName || "";
       const schoolB = b.student.schoolName || "";
       const schoolCompare = schoolA.localeCompare(schoolB, undefined, {
@@ -764,11 +961,19 @@ export const useOngoingExamModal = ({
       });
       if (classCompare !== 0) return classCompare;
 
-      const absA = parseInt(a.student.absentNumber) || 0;
-      const absB = parseInt(b.student.absentNumber) || 0;
-      return absA - absB;
+      const absCompare = compareAbsentSafe(
+        a.student.absentNumber,
+        b.student.absentNumber,
+      );
+      if (absCompare !== 0) return absCompare;
+
+      return (a.student.fullName || "").localeCompare(
+        b.student.fullName || "",
+        undefined,
+        { sensitivity: "base" },
+      );
     });
-  }, [scopedResults, statusFilter, selectedClass, selectedSchool, displayExam?.code, displayExam?.config?.targetClasses]);
+  }, [scopedResults, statusFilter]);
 
   const handleGenerateToken = async (
     studentId: string,
@@ -1056,6 +1261,8 @@ export const useOngoingExamModal = ({
     scopedResults,
     totalScopedCount,
     classCounts,
+    isInitialLoading,
+    loadError,
     isRefreshing,
     isAddTimeOpen,
     addTimeValue,
@@ -1065,6 +1272,7 @@ export const useOngoingExamModal = ({
     generatedTokenData,
     editingStudent,
     onlineStudents,
+    broadcastCounts,
 
     // Setter / UI helper methods
     setSelectedClass,
