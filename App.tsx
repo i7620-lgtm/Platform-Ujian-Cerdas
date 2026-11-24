@@ -205,12 +205,13 @@ const App: React.FC = () => {
           for (let i = 0; i < m.addedNodes.length; i++) {
             const node = m.addedNodes[i];
             if (node instanceof HTMLElement) {
-              // Ignore internal KaTeX nodes or nodes already marked as hydrated
+              // Ignore internal KaTeX nodes, explicitly ignored UI containers, or nodes already marked as hydrated
               if (
                 node.classList.contains('katex') ||
                 node.classList.contains('katex-html') ||
                 node.hasAttribute('data-math-hydrated') ||
-                node.querySelector?.('.katex')
+                node.hasAttribute('data-math-ignore') ||
+                node.closest?.('[data-math-ignore="true"]')
               ) {
                 continue;
               }
@@ -235,13 +236,9 @@ const App: React.FC = () => {
         debounceTimer = setTimeout(() => {
           const roots = Array.from(pendingRoots);
           pendingRoots.clear();
-          if (roots.length > 15) {
-            hydrateMathInContainer(document.body);
-          } else {
-            for (const root of roots) {
-              if (root.isConnected) {
-                hydrateMathInContainer(root);
-              }
+          for (const root of roots) {
+            if (root.isConnected && !root.closest?.('[data-math-ignore="true"]')) {
+              hydrateMathInContainer(root);
             }
           }
         }, 120);
