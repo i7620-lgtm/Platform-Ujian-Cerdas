@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useSyncExternalStore } from "react";
 import type { Exam, Student } from "../../../types";
 import {
   ClockIcon,
@@ -18,6 +18,37 @@ export interface FontStepConfig {
   label: string;
 }
 
+interface ExamTimerPillProps {
+  getTimeLeft: () => number;
+  subscribeTimeLeft: (listener: (seconds: number) => void) => () => void;
+  formatTime: (seconds: number) => string;
+}
+
+const ExamTimerPill: React.FC<ExamTimerPillProps> = React.memo(
+  ({ getTimeLeft, subscribeTimeLeft, formatTime }) => {
+    const secondsLeft = useSyncExternalStore(
+      subscribeTimeLeft,
+      getTimeLeft,
+      getTimeLeft,
+    );
+
+    return (
+      <div
+        className={`flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-xl border font-mono font-bold tracking-tight transition-colors shadow-sm ${
+          secondsLeft !== Infinity && secondsLeft > 0 && secondsLeft < 300
+            ? "bg-rose-50 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400 border-rose-200 dark:border-rose-800"
+            : "bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700"
+        }`}
+      >
+        <ClockIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+        <span className="text-xs sm:text-sm tabular-nums">
+          {formatTime(secondsLeft)}
+        </span>
+      </div>
+    );
+  },
+);
+
 interface StudentExamHeaderProps {
   headerRef: React.RefObject<HTMLElement | null>;
   activeExam: Exam;
@@ -36,12 +67,13 @@ interface StudentExamHeaderProps {
   onIncreaseFontSize: () => void;
   isDarkMode?: boolean;
   toggleTheme?: () => void;
-  timeLeft: number;
+  getTimeLeft: () => number;
+  subscribeTimeLeft: (listener: (seconds: number) => void) => () => void;
   formatTime: (seconds: number) => string;
   onBack?: () => void;
 }
 
-export const StudentExamHeader: React.FC<StudentExamHeaderProps> = ({
+export const StudentExamHeader: React.FC<StudentExamHeaderProps> = React.memo(({
   headerRef,
   activeExam,
   student,
@@ -59,17 +91,23 @@ export const StudentExamHeader: React.FC<StudentExamHeaderProps> = ({
   onIncreaseFontSize,
   isDarkMode,
   toggleTheme,
-  timeLeft,
+  getTimeLeft,
+  subscribeTimeLeft,
   formatTime,
   onBack,
 }) => {
   return (
     <header
       ref={headerRef}
-      className={`fixed top-0 inset-x-0 z-[60] border-b shadow-sm transition-all duration-300 exam-header-safe flex items-center ${isNavOpen ? "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800" : "bg-white/90 dark:bg-slate-900/90 backdrop-blur-md border-slate-200/60 dark:border-slate-800/60"}`}
+      data-math-ignore="true"
+      className={`fixed top-0 inset-x-0 z-[60] border-b shadow-sm transition-colors duration-200 exam-header-safe flex items-center ${
+        isNavOpen
+          ? "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800"
+          : "bg-white/95 dark:bg-slate-900/95 border-slate-200/80 dark:border-slate-800/80"
+      }`}
     >
       <div
-        className="absolute top-[env(safe-area-inset-top,0px)] left-0 h-[2px] bg-indigo-600 dark:bg-indigo-500 transition-all duration-700 ease-out z-10"
+        className="absolute top-[env(safe-area-inset-top,0px)] left-0 h-[2px] bg-indigo-600 dark:bg-indigo-500 transition-all duration-300 ease-out z-10"
         style={{ width: `${progress}%` }}
       ></div>
       <div className="w-full max-w-full mx-auto px-3 sm:px-6 flex items-center justify-between">
@@ -99,7 +137,7 @@ export const StudentExamHeader: React.FC<StudentExamHeaderProps> = ({
         <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
           {/* Compact Monitoring Badge - Visible ONLY when Nav is Closed */}
           {isMonitoring && !isNavOpen && (
-            <div className="flex items-center gap-1.5 px-2 py-1.5 bg-indigo-50 dark:bg-indigo-900/30 border border-indigo-100 dark:border-indigo-800 rounded-lg mr-0.5 animate-fade-in">
+            <div className="flex items-center gap-1.5 px-2 py-1.5 bg-indigo-50 dark:bg-indigo-900/30 border border-indigo-100 dark:border-indigo-800 rounded-lg mr-0.5">
               <span className="inline-flex rounded-full h-2 w-2 bg-indigo-500"></span>
               <span className="hidden sm:inline text-[10px] font-black uppercase tracking-wide text-indigo-600 dark:text-indigo-400 whitespace-nowrap">
                 {monitoringLabel}
@@ -179,7 +217,7 @@ export const StudentExamHeader: React.FC<StudentExamHeaderProps> = ({
             <button
               type="button"
               onClick={toggleTheme}
-              className="w-9 h-9 flex items-center justify-center rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 hover:text-indigo-600 dark:hover:text-indigo-400 transition-all shadow-sm border border-slate-200 dark:border-slate-700 cursor-pointer"
+              className="w-9 h-9 flex items-center justify-center rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors shadow-sm border border-slate-200 dark:border-slate-700 cursor-pointer"
               aria-label="Toggle Theme"
             >
               {isDarkMode ? (
@@ -189,18 +227,17 @@ export const StudentExamHeader: React.FC<StudentExamHeaderProps> = ({
               )}
             </button>
           )}
-          <div
-            className={`flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-xl border font-mono font-bold tracking-tight transition-all shadow-sm ${timeLeft !== Infinity && timeLeft > 0 && timeLeft < 300 ? "bg-rose-50 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400 border-rose-200 dark:border-rose-800" : "bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700"}`}
-          >
-            <ClockIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-            <span className="text-xs sm:text-sm tabular-nums">{formatTime(timeLeft)}</span>
-          </div>
+          <ExamTimerPill
+            getTimeLeft={getTimeLeft}
+            subscribeTimeLeft={subscribeTimeLeft}
+            formatTime={formatTime}
+          />
 
           {(student.class === "PREVIEW" || student.studentId.includes("PREVIEW")) && onBack && (
             <button
               type="button"
               onClick={onBack}
-              className="px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs shadow-sm transition-all flex items-center gap-1 cursor-pointer shrink-0"
+              className="px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs shadow-sm transition-colors flex items-center gap-1 cursor-pointer shrink-0"
               title="Keluar dari mode preview dan kembali ke Dashboard Guru"
             >
               <span className="hidden sm:inline">Kembali ke </span>Dashboard
@@ -210,4 +247,4 @@ export const StudentExamHeader: React.FC<StudentExamHeaderProps> = ({
       </div>
     </header>
   );
-};
+});
