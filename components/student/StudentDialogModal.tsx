@@ -74,7 +74,8 @@ export const StudentDialogModal: React.FC<StudentDialogModalProps> = ({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[10050] bg-slate-950/65 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in"
+      data-math-ignore="true"
+      className="fixed inset-0 z-[10050] bg-slate-950/70 flex items-center justify-center p-4"
       role="dialog"
       aria-modal="true"
       aria-labelledby="student-dialog-title"
